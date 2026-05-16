@@ -1,0 +1,20 @@
+## Interface: 120005
+## Title: ArtisanFinder
+## Notes: Finds available artisans from the Crafting Order customer form.
+## Author: clery
+## Version: 0.1.0
+## SavedVariables: ArtisanFinderDB
+
+Libs\LibStub\LibStub.lua
+Libs\CallbackHandler-1.0\CallbackHandler-1.0.lua
+Libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
+Libs\LibDBIcon-1.0\LibDBIcon-1.0.lua
+
+Util.lua
+Core.lua
+Comms.lua
+Scanner.lua
+CustomerUI.lua
+CrafterUI.lua
+Minimap.lua
+Slash.lua
