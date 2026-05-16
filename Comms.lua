@@ -103,7 +103,7 @@ function AF:HandleQuery(parts, sender)
 		return
 	end
 
-	local throttleKey = table.concat({ sender, itemID, professionID }, ":")
+	local throttleKey = table.concat({ sender, itemID, professionID, queryToken }, ":")
 	local lastSent = self.db.responseThrottle[throttleKey]
 	if lastSent and self:Now() - lastSent < self.RESPONSE_THROTTLE then
 		return
