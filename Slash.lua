@@ -8,22 +8,27 @@ end
 
 function AF:SetDebugSelfResults(enabled)
 	self.db.debugSelfResults = enabled == true
-	self:Print("debug self results " .. (self.db.debugSelfResults and "enabled" or "disabled") .. ".")
+	self:Print(self:Text("DEBUG_SELF_CHANGED", self.db.debugSelfResults and self:Text("ENABLED") or self:Text("DISABLED")))
 	if self.RefreshCustomerQuery then
 		self:RefreshCustomerQuery(true)
 	end
 end
 
 function AF:PrintSlashHelp()
-	self:Print("/af debug on - show this character in customer results when scanned")
-	self:Print("/af debug off - disable debug self results")
-	self:Print("/af debug toggle - toggle debug self results")
-	self:Print("/af debug - show current debug state")
+	self:Print(self:Text("SCAN_HELP_FORCE"))
+	self:Print(self:Text("DEBUG_HELP_ON"))
+	self:Print(self:Text("DEBUG_HELP_OFF"))
+	self:Print(self:Text("DEBUG_HELP_TOGGLE"))
+	self:Print(self:Text("DEBUG_HELP_STATE"))
 end
 
 function AF:HandleSlash(message)
 	local command, rest = NormalizeCommand(message)
-	if command == "debug" then
+	if command == "scan" then
+		if self.StartOrResumeCurrentProfessionScan then
+			self:StartOrResumeCurrentProfessionScan(true, false)
+		end
+	elseif command == "debug" then
 		if rest == "on" then
 			self:SetDebugSelfResults(true)
 		elseif rest == "off" then
@@ -31,9 +36,9 @@ function AF:HandleSlash(message)
 		elseif rest == "toggle" then
 			self:SetDebugSelfResults(not self.db.debugSelfResults)
 		elseif rest == "" then
-			self:Print("debug self results are " .. (self.db.debugSelfResults and "enabled" or "disabled") .. ".")
+			self:Print(self:Text("DEBUG_SELF_STATE", self.db.debugSelfResults and self:Text("ENABLED") or self:Text("DISABLED")))
 		else
-			self:Print("unknown debug command: " .. rest)
+			self:Print(self:Text("DEBUG_UNKNOWN", rest))
 			self:PrintSlashHelp()
 		end
 	else

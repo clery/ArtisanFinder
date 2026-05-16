@@ -5,19 +5,23 @@ AF.frame = CreateFrame("Frame")
 local function RegisterEvent(frame, event)
 	local ok = pcall(frame.RegisterEvent, frame, event)
 	if not ok then
-		AF:Print("skipping unavailable event " .. event .. ".")
+		AF:Print(AF:Text("EVENT_UNAVAILABLE", event))
 	end
 end
 
 RegisterEvent(AF.frame, "ADDON_LOADED")
 RegisterEvent(AF.frame, "PLAYER_LOGIN")
 RegisterEvent(AF.frame, "CHAT_MSG_ADDON")
+RegisterEvent(AF.frame, "CHAT_MSG_CHANNEL")
 RegisterEvent(AF.frame, "CRAFTINGORDERS_SHOW_CUSTOMER")
 RegisterEvent(AF.frame, "TRADE_SKILL_SHOW")
+RegisterEvent(AF.frame, "TRADE_SKILL_CLOSE")
 RegisterEvent(AF.frame, "TRADE_SKILL_LIST_UPDATE")
 RegisterEvent(AF.frame, "TRADE_SKILL_DATA_SOURCE_CHANGED")
 RegisterEvent(AF.frame, "SKILL_LINES_CHANGED")
 RegisterEvent(AF.frame, "SPELLS_CHANGED")
+RegisterEvent(AF.frame, "TRAIT_CONFIG_UPDATED")
+RegisterEvent(AF.frame, "TRAIT_NODE_CHANGED")
 
 function AF:OnAddonLoaded(name)
 	if name ~= addonName then
@@ -46,11 +50,11 @@ function AF:OnPlayerLogin()
 	if self.InitializeSlashCommands then
 		self:InitializeSlashCommands()
 	end
-	if self.ScheduleAutoScan then
-		self:ScheduleAutoScan()
+	if self.InitializeTradeChat then
+		self:InitializeTradeChat()
 	end
 
-	self:Print("loaded. Crafter availability is off for this session.")
+	self:Print(self:Text("ADDON_LOADED"))
 end
 
 function AF:SetAvailable(value)
@@ -61,7 +65,7 @@ function AF:SetAvailable(value)
 	if self.RefreshMinimap then
 		self:RefreshMinimap()
 	end
-	self:Print("crafter availability " .. (self.available and "enabled" or "disabled") .. ".")
+	self:Print(self:Text("AVAILABILITY_CHANGED", self.available and self:Text("ENABLED") or self:Text("DISABLED")))
 end
 
 function AF:ToggleAvailable()
@@ -86,6 +90,10 @@ AF.frame:SetScript("OnEvent", function(_, event, ...)
 		if AF.OnAddonMessage then
 			AF:OnAddonMessage(...)
 		end
+	elseif event == "CHAT_MSG_CHANNEL" then
+		if AF.OnTradeChatMessage then
+			AF:OnTradeChatMessage(...)
+		end
 	elseif event == "CRAFTINGORDERS_SHOW_CUSTOMER" then
 		C_Timer.After(0, function()
 			AF:TryAttachProfessionUIs()
@@ -96,8 +104,8 @@ AF.frame:SetScript("OnEvent", function(_, event, ...)
 	elseif event == "TRADE_SKILL_SHOW" or event == "TRADE_SKILL_DATA_SOURCE_CHANGED" then
 		C_Timer.After(0, function()
 			AF:TryAttachProfessionUIs()
-			if AF.QueueAutoScan then
-				AF:QueueAutoScan(false)
+			if event == "TRADE_SKILL_SHOW" and AF.ResumeCurrentProfessionScanIfNeeded then
+				AF:ResumeCurrentProfessionScanIfNeeded()
 			end
 			if AF.RefreshCrafterUI then
 				AF:RefreshCrafterUI()
@@ -106,9 +114,15 @@ AF.frame:SetScript("OnEvent", function(_, event, ...)
 				AF:TrySelectPendingProfessionRecipe()
 			end
 		end)
-	elseif event == "TRADE_SKILL_LIST_UPDATE" or event == "SKILL_LINES_CHANGED" or event == "SPELLS_CHANGED" then
-		if AF.QueueAutoScan then
-			AF:QueueAutoScan(true)
+	elseif event == "TRADE_SKILL_CLOSE" then
+		if AF.PauseActiveProfessionScan then
+			AF:PauseActiveProfessionScan()
+		else
+			AF.activeScan = nil
+		end
+	elseif event == "TRADE_SKILL_LIST_UPDATE" or event == "SKILL_LINES_CHANGED" or event == "SPELLS_CHANGED" or event == "TRAIT_CONFIG_UPDATED" or event == "TRAIT_NODE_CHANGED" then
+		if AF.QueueAutoScanForChange then
+			AF:QueueAutoScanForChange(event)
 		end
 		if AF.TrySelectPendingProfessionRecipe then
 			AF:TrySelectPendingProfessionRecipe()

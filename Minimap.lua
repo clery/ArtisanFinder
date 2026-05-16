@@ -1,7 +1,7 @@
 local _, AF = ...
 
-local ICON = "Interface\\Icons\\INV_Inscription_Tradeskill01"
-local ICON_COORDS = { 0.08, 0.92, 0.08, 0.92 }
+local ICON = "Interface\\Minimap\\Tracking\\Profession"
+local ICON_COORDS = { 0, 1, 0, 1 }
 
 local function OpenProfessionPanel()
 	if C_AddOns and C_AddOns.LoadAddOn then
@@ -35,7 +35,7 @@ function AF:InitializeMinimap()
 	local ldb = LibStub and LibStub("LibDataBroker-1.1", true)
 	local icon = LibStub and LibStub("LibDBIcon-1.0", true)
 	if not ldb or not icon then
-		self:Print("minimap libraries were not available.")
+		self:Print(self:Text("MINIMAP_LIBS_MISSING"))
 		return
 	end
 
@@ -56,11 +56,11 @@ function AF:InitializeMinimap()
 				return
 			end
 			tooltip:AddLine("ArtisanFinder", 1, 0.82, 0)
-			tooltip:AddLine(AF.available and "Available this session" or "Unavailable this session", AF.available and 0.1 or 1, AF.available and 1 or 0.25, 0.1)
-			tooltip:AddLine("Scanned items: " .. AF:TableCount(AF.db.artisanProfile.items), 1, 1, 1)
+			tooltip:AddLine(AF.available and AF:Text("MINIMAP_AVAILABLE") or AF:Text("MINIMAP_UNAVAILABLE"), AF.available and 0.1 or 1, AF.available and 1 or 0.25, 0.1)
+			tooltip:AddLine(AF:Text("MINIMAP_SCANNED", AF:TableCount(AF.db.artisanProfile.items)), 1, 1, 1)
 			tooltip:AddLine(" ")
-			tooltip:AddLine("Left-click: toggle availability", 0.65, 0.65, 0.65)
-			tooltip:AddLine("Right-click: open profession panel", 0.65, 0.65, 0.65)
+			tooltip:AddLine(AF:Text("MINIMAP_LEFT_CLICK"), 0.65, 0.65, 0.65)
+			tooltip:AddLine(AF:Text("MINIMAP_RIGHT_CLICK"), 0.65, 0.65, 0.65)
 		end,
 	})
 

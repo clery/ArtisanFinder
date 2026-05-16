@@ -7,14 +7,6 @@ local function SetEditBoxText(box, text)
 	box.artisanFinderSettingText = false
 end
 
-local function CopperToGoldText(copper)
-	copper = tonumber(copper)
-	if not copper or copper <= 0 then
-		return ""
-	end
-	return tostring(copper / 10000)
-end
-
 local function AddGoldIcon(parent, anchor)
 	local icon = parent:CreateTexture(nil, "ARTWORK")
 	icon:SetSize(14, 14)
@@ -29,6 +21,56 @@ local function WatchEditBox(box, callback)
 			callback()
 		end
 	end)
+end
+
+local function SizeButtonForText(button, text, minWidth, maxWidth)
+	button:SetText(text)
+	local fontString = button:GetFontString()
+	local textWidth = fontString and fontString:GetStringWidth() or 0
+	local width = math.ceil(textWidth + 26)
+	width = math.max(minWidth or 54, width)
+	if maxWidth then
+		width = math.min(maxWidth, width)
+	end
+	button:SetWidth(width)
+	return width
+end
+
+local function FitNoteAndSave(container, noteLabel, noteBox, saveButton, totalWidth, minNoteWidth)
+	local saveWidth = SizeButtonForText(saveButton, AF:Text("SAVE"), 54)
+	local noteWidth = math.max(minNoteWidth or 80, totalWidth - noteLabel:GetWidth() - 4 - 8 - saveWidth)
+	local fittedWidth = math.max(totalWidth, noteLabel:GetWidth() + 4 + noteWidth + 8 + saveWidth)
+	noteBox:SetWidth(noteWidth)
+	saveButton:ClearAllPoints()
+	saveButton:SetPoint("LEFT", noteBox, "RIGHT", 8, 0)
+	container:SetWidth(fittedWidth)
+end
+
+local function AddInfoButton(parent, tooltipTitle, tooltipText)
+	local button = CreateFrame("Button", nil, parent, "UIPanelInfoButton")
+	button:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		GameTooltip:SetText(AF:Text(tooltipTitle), 1, 0.82, 0)
+		GameTooltip:AddLine(AF:Text(tooltipText), 1, 1, 1, true)
+		GameTooltip:AddLine(" ")
+		GameTooltip:AddLine(AF:Text("COMMISSION_HELP_0"), 0.8, 0.8, 0.8, true)
+		GameTooltip:AddLine(AF:Text("COMMISSION_HELP_FREE"), 0.8, 0.8, 0.8, true)
+		GameTooltip:AddLine(AF:Text("COMMISSION_HELP_POSITIVE"), 0.8, 0.8, 0.8, true)
+		GameTooltip:Show()
+	end)
+	button:SetScript("OnLeave", function()
+		GameTooltip:Hide()
+	end)
+	return button
+end
+
+local function ParseCommissionOrWarn(box)
+	local copper, free, state = AF:NormalizeCommissionInput(box:GetText())
+	if not copper then
+		AF:Print(AF:Text("COMMISSION_INVALID"))
+		return nil
+	end
+	return copper, free, state
 end
 
 function AF:InitializeCrafterUI()
@@ -118,7 +160,7 @@ function AF:EnsureCurrentRecipeEntry(context)
 		local professionKey = tostring(context.professionID)
 		local profession = self.db.artisanProfile.professions[professionKey] or {
 			id = context.professionID,
-			name = context.professionName or ("Profession " .. tostring(context.professionID)),
+			name = context.professionName or AF:Text("PROFESSION_FALLBACK", tostring(context.professionID)),
 			recipes = {},
 		}
 		self.db.artisanProfile.professions[professionKey] = profession
@@ -140,59 +182,52 @@ function AF:AttachCrafterUI()
 
 	local frame = CreateFrame("Frame", "ArtisanFinderCrafterFrame", form)
 	frame:SetSize(326, 58)
+	frame.info = AddInfoButton(frame, "ITEM_SPECIFIC_COMMISSION", "ITEM_SPECIFIC_TOOLTIP")
+	frame.info:SetPoint("TOPRIGHT", -2, -2)
 
 	frame.priceLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	frame.priceLabel:SetSize(86, 20)
+	frame.priceLabel:SetSize(74, 20)
 	frame.priceLabel:SetPoint("TOPLEFT", 0, -2)
-	frame.priceLabel:SetJustifyH("RIGHT")
-	frame.priceLabel:SetText("Commission")
+	frame.priceLabel:SetJustifyH("LEFT")
+	frame.priceLabel:SetText(self:Text("COMMISSION"))
 
 	frame.price = CreateFrame("EditBox", nil, frame, "InputBoxTemplate")
 	frame.price:SetSize(58, 22)
-	frame.price:SetPoint("LEFT", frame.priceLabel, "RIGHT", 8, 0)
+	frame.price:SetPoint("LEFT", frame.priceLabel, "RIGHT", 4, 0)
 	frame.price:SetAutoFocus(false)
 	frame.priceGold = AddGoldIcon(frame, frame.price)
 
-	frame.free = CreateFrame("CheckButton", nil, frame, "UICheckButtonTemplate")
-	frame.free:SetPoint("LEFT", frame.priceGold, "RIGHT", 4, 0)
-	frame.free.Text:SetText("Free")
-
 	frame.noteLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	frame.noteLabel:SetSize(86, 20)
+	frame.noteLabel:SetSize(74, 20)
 	frame.noteLabel:SetPoint("TOPLEFT", frame.priceLabel, "BOTTOMLEFT", 0, -9)
-	frame.noteLabel:SetJustifyH("RIGHT")
-	frame.noteLabel:SetText("Note")
+	frame.noteLabel:SetJustifyH("LEFT")
+	frame.noteLabel:SetText(self:Text("NOTE"))
 
 	frame.note = CreateFrame("EditBox", nil, frame, "InputBoxTemplate")
 	frame.note:SetSize(170, 22)
-	frame.note:SetPoint("LEFT", frame.noteLabel, "RIGHT", 8, 0)
+	frame.note:SetPoint("LEFT", frame.noteLabel, "RIGHT", 4, 0)
 	frame.note:SetAutoFocus(false)
 	frame.note:SetMaxLetters(AF.MAX_NOTE_BYTES)
 
 	frame.save = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
 	frame.save:SetSize(54, 22)
 	frame.save:SetPoint("LEFT", frame.note, "RIGHT", 8, 0)
-	frame.save:SetText("Save")
+	FitNoteAndSave(frame, frame.noteLabel, frame.note, frame.save, 326, 120)
 	frame.save:Hide()
 	frame.save:SetScript("OnClick", function()
 		local context = AF:GetCurrentCraftingRecipeContext()
 		local item = AF:EnsureCurrentRecipeEntry(context)
 		if not item or context.learned == false then
-			AF:Print("select a learned craft before saving item pricing.")
+			AF:Print(AF:Text("SELECT_LEARNED_CRAFT"))
 			return
 		end
 
-		local copper = 0
-		local free = frame.free:GetChecked()
-		if not free then
-			copper = AF:ParseCopperFromGoldText(frame.price:GetText())
-			if not copper then
-				AF:Print("enter a numeric gold value or check Free.")
-				return
-			end
+		local copper, free, state = ParseCommissionOrWarn(frame.price)
+		if not copper then
+			return
 		end
 
-		AF:SetItemPrice(item.itemID, copper, free, frame.note:GetText())
+		AF:SetItemPrice(item.itemID, copper, free, frame.note:GetText(), state)
 		AF:RefreshCrafterUI()
 	end)
 
@@ -201,41 +236,39 @@ function AF:AttachCrafterUI()
 	self:ApplyProfessionPanel(defaults)
 	defaults.title = defaults:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 	defaults.title:SetPoint("TOPLEFT", 12, -10)
-	defaults.title:SetText("Default commission")
+	defaults.title:SetText(self:Text("DEFAULT_COMMISSION"))
+	defaults.info = AddInfoButton(defaults, "DEFAULT_COMMISSION", "DEFAULT_COMMISSION_TOOLTIP")
+	defaults.info:SetPoint("TOPRIGHT", -10, -8)
 	defaults.divider = self:AddDivider(defaults, defaults.title, -7)
 
 	defaults.priceLabel = defaults:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	defaults.priceLabel:SetSize(86, 20)
+	defaults.priceLabel:SetSize(74, 20)
 	defaults.priceLabel:SetPoint("TOPLEFT", defaults.divider, "BOTTOMLEFT", 0, -8)
-	defaults.priceLabel:SetJustifyH("RIGHT")
-	defaults.priceLabel:SetText("Commission")
+	defaults.priceLabel:SetJustifyH("LEFT")
+	defaults.priceLabel:SetText(self:Text("COMMISSION"))
 
 	defaults.price = CreateFrame("EditBox", nil, defaults, "InputBoxTemplate")
 	defaults.price:SetSize(58, 22)
-	defaults.price:SetPoint("LEFT", defaults.priceLabel, "RIGHT", 8, 0)
+	defaults.price:SetPoint("LEFT", defaults.priceLabel, "RIGHT", 4, 0)
 	defaults.price:SetAutoFocus(false)
 	defaults.priceGold = AddGoldIcon(defaults, defaults.price)
 
-	defaults.free = CreateFrame("CheckButton", nil, defaults, "UICheckButtonTemplate")
-	defaults.free:SetPoint("LEFT", defaults.priceGold, "RIGHT", 4, 0)
-	defaults.free.Text:SetText("Free")
-
 	defaults.noteLabel = defaults:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	defaults.noteLabel:SetSize(86, 20)
+	defaults.noteLabel:SetSize(74, 20)
 	defaults.noteLabel:SetPoint("TOPLEFT", defaults.priceLabel, "BOTTOMLEFT", 0, -9)
-	defaults.noteLabel:SetJustifyH("RIGHT")
-	defaults.noteLabel:SetText("Note")
+	defaults.noteLabel:SetJustifyH("LEFT")
+	defaults.noteLabel:SetText(self:Text("NOTE"))
 
 	defaults.note = CreateFrame("EditBox", nil, defaults, "InputBoxTemplate")
 	defaults.note:SetSize(128, 22)
-	defaults.note:SetPoint("LEFT", defaults.noteLabel, "RIGHT", 8, 0)
+	defaults.note:SetPoint("LEFT", defaults.noteLabel, "RIGHT", 4, 0)
 	defaults.note:SetAutoFocus(false)
 	defaults.note:SetMaxLetters(AF.MAX_NOTE_BYTES)
 
 	defaults.save = CreateFrame("Button", nil, defaults, "UIPanelButtonTemplate")
 	defaults.save:SetSize(54, 22)
 	defaults.save:SetPoint("LEFT", defaults.note, "RIGHT", 8, 0)
-	defaults.save:SetText("Save")
+	FitNoteAndSave(defaults, defaults.noteLabel, defaults.note, defaults.save, 286, 88)
 	defaults.save:Hide()
 	defaults.save:SetScript("OnClick", function()
 		local context = AF:GetCurrentCraftingRecipeContext()
@@ -245,21 +278,16 @@ function AF:AttachCrafterUI()
 			professionID = profession and profession.id
 		end
 		if not professionID then
-			AF:Print("open a profession before saving a default price.")
+			AF:Print(AF:Text("OPEN_PROFESSION_DEFAULT"))
 			return
 		end
 
-		local copper = 0
-		local free = defaults.free:GetChecked()
-		if not free then
-			copper = AF:ParseCopperFromGoldText(defaults.price:GetText())
-			if not copper then
-				AF:Print("enter a numeric gold value or check Free.")
-				return
-			end
+		local copper, free, state = ParseCommissionOrWarn(defaults.price)
+		if not copper then
+			return
 		end
 
-		AF:SetProfessionPrice(professionID, copper, free, defaults.note:GetText())
+		AF:SetProfessionPrice(professionID, copper, free, defaults.note:GetText(), state)
 		AF:RefreshCrafterUI()
 	end)
 
@@ -271,10 +299,8 @@ function AF:AttachCrafterUI()
 	end
 	WatchEditBox(frame.price, markItemDirty)
 	WatchEditBox(frame.note, markItemDirty)
-	frame.free:SetScript("OnClick", markItemDirty)
 	WatchEditBox(defaults.price, markDefaultDirty)
 	WatchEditBox(defaults.note, markDefaultDirty)
-	defaults.free:SetScript("OnClick", markDefaultDirty)
 
 	self.crafterFrame = frame
 	self.crafterDefaultsFrame = defaults
@@ -343,9 +369,7 @@ function AF:UpdateCrafterDirtyState()
 	local item = context and self.db.artisanProfile.items[tostring(context.itemID or "")]
 	local itemDirty = false
 	if item then
-		local currentCopper = AF:ParseCopperFromGoldText(frame.price:GetText()) or 0
-		itemDirty = currentCopper ~= (tonumber(item.priceCopper) or 0)
-			or frame.free:GetChecked() ~= (item.freeCommission == true)
+		itemDirty = self:IsCommissionInputDirty(frame.price:GetText(), item)
 			or (frame.note:GetText() or "") ~= (item.note or "")
 	end
 	if itemDirty then
@@ -360,12 +384,8 @@ function AF:UpdateCrafterDirtyState()
 		professionID = profession and profession.id
 	end
 	local default = professionID and self.db.artisanProfile.professionPrices[tostring(professionID)]
-	local defaultCopper = default and tonumber(default.priceCopper) or 0
-	local defaultFree = default and default.freeCommission == true or false
 	local defaultNote = default and default.note or ""
-	local currentDefaultCopper = AF:ParseCopperFromGoldText(defaults.price:GetText()) or 0
-	local defaultDirty = currentDefaultCopper ~= defaultCopper
-		or defaults.free:GetChecked() ~= defaultFree
+	local defaultDirty = self:IsCommissionInputDirty(defaults.price:GetText(), default)
 		or (defaults.note:GetText() or "") ~= defaultNote
 	if defaultDirty then
 		defaults.save:Show()
@@ -399,8 +419,7 @@ function AF:RefreshCrafterUI()
 	else
 		local item = self:EnsureCurrentRecipeEntry(context)
 		frame:Show()
-		SetEditBoxText(frame.price, CopperToGoldText(item.priceCopper))
-		frame.free:SetChecked(item.freeCommission == true)
+		SetEditBoxText(frame.price, self:FormatCommissionInput(item))
 		SetEditBoxText(frame.note, item.note or "")
 	end
 
@@ -408,12 +427,10 @@ function AF:RefreshCrafterUI()
 		defaults:Show()
 		local default = self.db.artisanProfile.professionPrices[tostring(professionID)]
 		if default then
-			SetEditBoxText(defaults.price, CopperToGoldText(default.priceCopper))
-			defaults.free:SetChecked(default.freeCommission == true)
+			SetEditBoxText(defaults.price, self:FormatCommissionInput(default))
 			SetEditBoxText(defaults.note, default.note or "")
 		else
-			SetEditBoxText(defaults.price, "")
-			defaults.free:SetChecked(false)
+			SetEditBoxText(defaults.price, "0")
 			SetEditBoxText(defaults.note, "")
 		end
 	else

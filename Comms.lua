@@ -80,6 +80,8 @@ function AF:OnAddonMessage(prefix, message, channel, sender)
 		self:HandleQuery(parts, normalizedSender)
 	elseif kind == "R" then
 		self:HandleResponse(parts, normalizedSender)
+	elseif kind == "D" then
+		self:HandleReagentDetail(parts, normalizedSender)
 	end
 end
 
@@ -126,6 +128,13 @@ function AF:HandleQuery(parts, sender)
 		tonumber(item.concentrationCost) or "",
 		encodedLink,
 		queryToken,
+		tonumber(item.bestQuality) or "",
+		tonumber(item.bestConcentrationQuality) or "",
+		tonumber(item.bestTotalSkill) or "",
+		tonumber(item.bestConcentrationCost) or "",
+		item.bestReagentTruncated and 1 or 0,
+		self:EncodeField(item.qualityAtlas, 48),
+		self:EncodeField(item.bestQualityAtlas, 48),
 	}
 	local payload = table.concat(payloadParts, "|")
 	if #payload > 255 then
@@ -136,9 +145,72 @@ function AF:HandleQuery(parts, sender)
 		payloadParts[7] = self:EncodeField(note, 32)
 		payload = table.concat(payloadParts, "|")
 	end
+	if #payload > 255 then
+		payloadParts[17] = ""
+		payloadParts[18] = ""
+		payloadParts[19] = ""
+		payloadParts[20] = ""
+		payloadParts[21] = ""
+		payloadParts[22] = ""
+		payloadParts[23] = ""
+		payload = table.concat(payloadParts, "|")
+	end
 
 	self:SendAddon(payload, "WHISPER", sender)
+	self:SendReagentDetail(item, sender, queryToken)
 	self.db.responseThrottle[throttleKey] = self:Now()
+end
+
+function AF:SendReagentDetail(item, target, queryToken)
+	local summary = item and item.bestReagentSummary
+	if not summary or summary == "" then
+		return
+	end
+
+	local encodedSummary = self:EncodeReagentSummary(summary, 1050)
+	local chunks = {}
+	local maxChunkBytes = 150
+	local offset = 1
+	while offset <= #encodedSummary do
+		table.insert(chunks, encodedSummary:sub(offset, offset + maxChunkBytes - 1))
+		offset = offset + maxChunkBytes
+	end
+
+	for index, chunk in ipairs(chunks) do
+		local payload = table.concat({
+			"D",
+			self.PROTOCOL_VERSION,
+			tonumber(item.itemID) or 0,
+			tonumber(item.recipeID) or 0,
+			queryToken,
+			index,
+			#chunks,
+			chunk,
+		}, "|")
+		self:SendAddon(payload, "WHISPER", target)
+	end
+end
+
+function AF:EncodeReagentSummary(summary, maxBytes)
+	local encodedLines = {}
+	local length = 0
+	for reagentText in tostring(summary or ""):gmatch("[^;\n]+") do
+		reagentText = reagentText:match("^%s*(.-)%s*$")
+		if reagentText ~= "" then
+			local encodedLine = self:EncodeField(reagentText)
+			local separator = #encodedLines > 0 and self:EncodeField("; ") or ""
+			if length + #separator + #encodedLine > maxBytes then
+				break
+			end
+			if separator ~= "" then
+				table.insert(encodedLines, separator)
+				length = length + #separator
+			end
+			table.insert(encodedLines, encodedLine)
+			length = length + #encodedLine
+		end
+	end
+	return table.concat(encodedLines, "")
 end
 
 function AF:HandleResponse(parts, sender)
@@ -156,6 +228,13 @@ function AF:HandleResponse(parts, sender)
 	local concentrationCost = tonumber(parts[14])
 	local professionLink = self:DecodeField(parts[15])
 	local queryToken = tonumber(parts[16])
+	local bestQuality = tonumber(parts[17])
+	local bestConcentrationQuality = tonumber(parts[18])
+	local bestTotalSkill = tonumber(parts[19])
+	local bestConcentrationCost = tonumber(parts[20])
+	local bestReagentTruncated = tonumber(parts[21]) == 1
+	local qualityAtlas = self:DecodeField(parts[22])
+	local bestQualityAtlas = self:DecodeField(parts[23])
 
 	if not itemID then
 		return
@@ -180,16 +259,85 @@ function AF:HandleResponse(parts, sender)
 		recipeDifficulty = recipeDifficulty,
 		totalSkill = totalSkill,
 		quality = quality,
+		qualityAtlas = qualityAtlas ~= "" and qualityAtlas or nil,
 		concentrationQuality = concentrationQuality,
 		concentrationCost = concentrationCost,
+		bestQuality = bestQuality,
+		bestQualityAtlas = bestQualityAtlas ~= "" and bestQualityAtlas or nil,
+		bestConcentrationQuality = bestConcentrationQuality,
+		bestTotalSkill = bestTotalSkill,
+		bestConcentrationCost = bestConcentrationCost,
+		bestReagentTruncated = bestReagentTruncated,
 		professionLink = professionLink ~= "" and professionLink or nil,
 		updatedAt = timestamp,
 		verifiedAt = verifiedForCurrentQuery and self:Now() or nil,
 		lastQueryToken = queryToken,
 		lastQueryAt = verifiedForCurrentQuery and self.lastQueryAt or nil,
 	}
+	self:ApplyPendingReagentDetail(sender, itemID, recipeID, queryToken)
 
 	if self.RefreshCustomerResults then
 		self:RefreshCustomerResults()
+	end
+end
+
+function AF:GetReagentDetailKey(sender, itemID, recipeID, queryToken)
+	return table.concat({ sender, itemID or 0, recipeID or 0, queryToken or 0 }, ":")
+end
+
+function AF:ApplyPendingReagentDetail(sender, itemID, recipeID, queryToken)
+	if not self.pendingReagentDetails then
+		return
+	end
+	local key = self:GetReagentDetailKey(sender, itemID, recipeID, queryToken)
+	local pending = self.pendingReagentDetails[key]
+	if not pending or not pending.summary then
+		return
+	end
+	local itemCache = self.db.customerCache[tostring(itemID)]
+	local entry = itemCache and itemCache[sender]
+	local entryRecipeID = tonumber(entry and entry.recipeID) or 0
+	if entry and tonumber(entry.lastQueryToken) == tonumber(queryToken) and entryRecipeID == (tonumber(recipeID) or 0) then
+		entry.bestReagentSummary = pending.summary
+		self.pendingReagentDetails[key] = nil
+	end
+end
+
+function AF:HandleReagentDetail(parts, sender)
+	local itemID = tonumber(parts[3])
+	local recipeID = tonumber(parts[4]) or 0
+	local queryToken = tonumber(parts[5])
+	local seq = tonumber(parts[6])
+	local total = tonumber(parts[7])
+	local payload = parts[8]
+	if not itemID or not queryToken or not seq or not total or not payload then
+		return
+	end
+	if queryToken ~= tonumber(self.currentCustomerQueryToken) or itemID ~= tonumber(self.currentCustomerQueryItemID) then
+		return
+	end
+	if seq < 1 or total < 1 or seq > total or total > 8 then
+		return
+	end
+
+	self.pendingReagentDetails = self.pendingReagentDetails or {}
+	local key = self:GetReagentDetailKey(sender, itemID, recipeID, queryToken)
+	local pending = self.pendingReagentDetails[key]
+	if not pending or pending.total ~= total then
+		pending = { total = total, chunks = {}, received = 0 }
+		self.pendingReagentDetails[key] = pending
+	end
+	if not pending.chunks[seq] then
+		pending.received = pending.received + 1
+	end
+	pending.chunks[seq] = payload
+
+	if pending.received == pending.total then
+		local combined = table.concat(pending.chunks, "")
+		pending.summary = self:DecodeField(combined)
+		self:ApplyPendingReagentDetail(sender, itemID, recipeID, queryToken)
+		if self.RefreshCustomerResults then
+			self:RefreshCustomerResults()
+		end
 	end
 end

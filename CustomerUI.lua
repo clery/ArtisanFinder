@@ -1,51 +1,82 @@
 local _, AF = ...
 
 local SORT_MODES = {
-	{ key = "best", label = "Best" },
-	{ key = "price", label = "Price" },
-	{ key = "quality", label = "Quality" },
-	{ key = "recent", label = "Recent" },
+	{ key = "best", labelKey = "SORT_RECOMMENDED" },
+	{ key = "commission", labelKey = "SORT_COMMISSION" },
+	{ key = "quality", labelKey = "SORT_QUALITY" },
 }
 
-local ROW_HEIGHT = 50
+local ROW_HEIGHT = 58
 
-local function GetAgeText(now, updatedAt)
-	local age = math.max(0, now - (updatedAt or now))
-	if age < 60 then
-		return "just now"
-	end
-	if age < 3600 then
-		return math.floor(age / 60) .. "m ago"
-	end
-	return math.floor(age / 3600) .. "h ago"
+local function GetSortMode(index)
+	return SORT_MODES[index or 1] or SORT_MODES[1]
+end
+
+local function GetSortLabel(index)
+	return AF:Text(GetSortMode(index).labelKey)
 end
 
 local function CreateCustomerRow(parent)
 	local row = CreateFrame("Button", nil, parent)
-	row:SetSize(332, ROW_HEIGHT)
+	row:SetSize(394, ROW_HEIGHT)
 	AF:StyleListRow(row)
 	row:EnableMouse(true)
-	row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+	row:RegisterForClicks("LeftButtonUp")
 
-	row.name = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-	row.name:SetPoint("TOPLEFT", 8, -5)
-	row.name:SetPoint("RIGHT", -6, 0)
+	row.certified = row:CreateTexture(nil, "OVERLAY")
+	row.certified:SetSize(15, 15)
+	row.certified:SetPoint("TOPLEFT", 8, -6)
+	row.certified:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
+
+	row.name = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	row.name:SetPoint("TOPLEFT", row.certified, "TOPRIGHT", 4, 0)
+	row.name:SetPoint("RIGHT", -40, 0)
 	row.name:SetJustifyH("LEFT")
 
-	row.detail = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	row.detail:SetPoint("TOPLEFT", row.name, "BOTTOMLEFT", 0, -2)
-	row.detail:SetPoint("RIGHT", -6, 0)
+	row.detail = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	row.detail:SetPoint("TOPLEFT", row.name, "BOTTOMLEFT", 0, -3)
+	row.detail:SetPoint("RIGHT", -40, 0)
 	row.detail:SetJustifyH("LEFT")
 
-	row.capability = row:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-	row.capability:SetPoint("TOPLEFT", row.detail, "BOTTOMLEFT", 0, -2)
-	row.capability:SetPoint("RIGHT", -6, 0)
+	row.capability = row:CreateFontString(nil, "OVERLAY", "GameFontDisable")
+	row.capability:SetPoint("TOPLEFT", row.detail, "BOTTOMLEFT", 0, -3)
+	row.capability:SetPoint("RIGHT", -40, 0)
 	row.capability:SetJustifyH("LEFT")
 
-	row:SetScript("OnClick", function(buttonFrame, button)
-		if button == "RightButton" and buttonFrame.entry then
-			AF:ShowCustomerMenu(buttonFrame.entry, buttonFrame)
+	row.action = CreateFrame("Button", nil, row)
+	row.action:SetSize(24, 24)
+	row.action:SetPoint("RIGHT", -5, 0)
+	row.action:SetNormalTexture("Interface\\Buttons\\UI-OptionsButton")
+	row.action:SetPushedTexture("Interface\\Buttons\\UI-OptionsButton")
+	row.action:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+	row.action:GetNormalTexture():ClearAllPoints()
+	row.action:GetNormalTexture():SetSize(21, 21)
+	row.action:GetNormalTexture():SetPoint("CENTER")
+	row.action:GetPushedTexture():ClearAllPoints()
+	row.action:GetPushedTexture():SetSize(21, 21)
+	row.action:GetPushedTexture():SetPoint("CENTER", 1, -1)
+	row.action:SetScript("OnClick", function(buttonFrame)
+		if row.entry then
+			AF:ShowCustomerMenu(row.entry, buttonFrame)
 		end
+	end)
+	row:SetScript("OnEnter", function(buttonFrame)
+		if buttonFrame.entry then
+			GameTooltip:SetOwner(buttonFrame, "ANCHOR_RIGHT")
+			GameTooltip:SetText(AF:GetDisplayPlayerName(buttonFrame.entry.name or "?"), 1, 0.82, 0)
+			if buttonFrame.entry.professionName then
+				GameTooltip:AddLine(buttonFrame.entry.professionName, 1, 1, 1)
+			end
+			GameTooltip:AddLine(buttonFrame.entry.tradeLead and AF:Text("MISSING_ADDON_DATA") or AF:Text("CERTIFIED_ADDON_DATA"), buttonFrame.entry.tradeLead and 0.75 or 0.35, buttonFrame.entry.tradeLead and 0.75 or 1, buttonFrame.entry.tradeLead and 0.75 or 0.35, true)
+			if not buttonFrame.entry.tradeLead then
+				AF:AddCapabilityTooltipLines(GameTooltip, buttonFrame.entry)
+			end
+			AF:StyleCustomerTooltip(GameTooltip)
+			GameTooltip:Show()
+		end
+	end)
+	row:SetScript("OnLeave", function()
+		GameTooltip:Hide()
 	end)
 
 	return row
@@ -64,7 +95,7 @@ function AF:AttachCustomerUI()
 
 	local parent = ProfessionsCustomerOrdersFrame.Form
 	local frame = CreateFrame("Frame", "ArtisanFinderCustomerFrame", parent, "BackdropTemplate")
-	frame:SetSize(368, 426)
+	frame:SetSize(430, 462)
 	frame:SetPoint("TOPLEFT", parent, "TOPRIGHT", 8, -2)
 	self:ApplyProfessionPanel(frame)
 	frame:Hide()
@@ -77,11 +108,11 @@ function AF:AttachCustomerUI()
 	frame.status:SetPoint("TOPLEFT", frame.title, "BOTTOMLEFT", 0, -7)
 	frame.status:SetPoint("RIGHT", -14, 0)
 	frame.status:SetJustifyH("LEFT")
-	frame.status:SetText("Select an order item.")
+	frame.status:SetText(self:Text("SELECT_ORDER_ITEM"))
 	frame.divider = self:AddDivider(frame, frame.status, -8)
 
 	frame.search = CreateFrame("EditBox", nil, frame, "SearchBoxTemplate")
-	frame.search:SetSize(176, 20)
+	frame.search:SetSize(172, 22)
 	frame.search:SetPoint("TOPLEFT", frame.divider, "BOTTOMLEFT", 0, -8)
 	frame.search:SetAutoFocus(false)
 	frame.search:SetScript("OnTextChanged", function()
@@ -90,22 +121,23 @@ function AF:AttachCustomerUI()
 	end)
 
 	frame.sort = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-	frame.sort:SetSize(92, 22)
+	frame.sort:SetSize(154, 24)
 	frame.sort:SetPoint("LEFT", frame.search, "RIGHT", 8, 0)
-	frame.sort:SetText("Sort: " .. SORT_MODES[self.customerSortIndex or 1].label)
+	self.customerSortIndex = SORT_MODES[self.customerSortIndex or 1] and self.customerSortIndex or 1
+	frame.sort:SetText(self:Text("SORT_BUTTON", GetSortLabel(self.customerSortIndex)))
 	frame.sort:SetScript("OnClick", function()
 		AF.customerSortIndex = (AF.customerSortIndex or 1) + 1
 		if AF.customerSortIndex > #SORT_MODES then
 			AF.customerSortIndex = 1
 		end
-		frame.sort:SetText("Sort: " .. SORT_MODES[AF.customerSortIndex].label)
+		frame.sort:SetText(AF:Text("SORT_BUTTON", GetSortLabel(AF.customerSortIndex)))
 		AF:RefreshCustomerResults()
 	end)
 
 	frame.refresh = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-	frame.refresh:SetSize(58, 22)
+	frame.refresh:SetSize(70, 24)
 	frame.refresh:SetPoint("LEFT", frame.sort, "RIGHT", 6, 0)
-	frame.refresh:SetText("Refresh")
+	frame.refresh:SetText(self:Text("REFRESH"))
 	frame.refresh:SetScript("OnClick", function()
 		AF:RefreshCustomerQuery(true)
 	end)
@@ -115,7 +147,7 @@ function AF:AttachCustomerUI()
 	frame.scroll:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -30, 14)
 	frame.scroll:SetFrameLevel(frame:GetFrameLevel() + 2)
 	frame.content = CreateFrame("Frame", nil, frame.scroll)
-	frame.content:SetSize(332, 1)
+	frame.content:SetSize(394, 1)
 	frame.scroll:SetScrollChild(frame.content)
 	frame.scrollInset = CreateFrame("Frame", nil, frame, "BackdropTemplate")
 	frame.scrollInset:SetPoint("TOPLEFT", frame.scroll, "TOPLEFT", -4, 4)
@@ -143,10 +175,10 @@ function AF:AttachCustomerUI()
 	frame.menu.whisper = CreateFrame("Button", nil, frame.menu, "UIPanelButtonTemplate")
 	frame.menu.whisper:SetSize(112, 22)
 	frame.menu.whisper:SetPoint("TOP", 0, -10)
-	frame.menu.whisper:SetText("Whisper")
+	frame.menu.whisper:SetText(self:Text("WHISPER"))
 	frame.menu.whisper:SetScript("OnClick", function()
 		if frame.menu.entry then
-			AF:OpenWhisper(frame.menu.entry.target or frame.menu.entry.name, AF:GetCrafterWhisperMessage(frame.menu.entry))
+			AF:OpenWhisper(frame.menu.entry.target or frame.menu.entry.name)
 		end
 		AF:HideCustomerMenu()
 	end)
@@ -154,7 +186,7 @@ function AF:AttachCustomerUI()
 	frame.menu.personal = CreateFrame("Button", nil, frame.menu, "UIPanelButtonTemplate")
 	frame.menu.personal:SetSize(112, 22)
 	frame.menu.personal:SetPoint("TOP", frame.menu.whisper, "BOTTOM", 0, -4)
-	frame.menu.personal:SetText("Personal Order")
+	frame.menu.personal:SetText(self:Text("PERSONAL_ORDER"))
 	frame.menu.personal:SetScript("OnClick", function()
 		if frame.menu.entry then
 			AF:FillPersonalOrder(frame.menu.entry)
@@ -165,7 +197,7 @@ function AF:AttachCustomerUI()
 	frame.menu.link = CreateFrame("Button", nil, frame.menu, "UIPanelButtonTemplate")
 	frame.menu.link:SetSize(112, 22)
 	frame.menu.link:SetPoint("TOP", frame.menu.personal, "BOTTOM", 0, -4)
-	frame.menu.link:SetText("Profession")
+	frame.menu.link:SetText(self:Text("PROFESSION"))
 	frame.menu.link:SetScript("OnClick", function()
 		if frame.menu.entry then
 			AF:OpenCrafterProfession(frame.menu.entry)
@@ -325,20 +357,31 @@ function AF:InjectDebugSelfResult(itemID, professionID)
 	for i = 1, 50 do
 		local isFree = i % 7 == 0 or freeCommission
 		self.db.customerCache[itemKey]["__debug_self_" .. i] = {
-			name = (self.playerName or self:GetPlayerFullName()) .. " Debug " .. i,
+			name = (self.playerName or self:GetPlayerFullName()) .. " " .. self:Text("DEBUG_SUFFIX", i),
 			target = self.playerName or self:GetPlayerFullName(),
 			itemID = itemID,
 			professionID = item.professionID,
 			professionName = item.professionName or self:GetProfessionName(item.professionID),
 			priceCopper = isFree and 0 or ((tonumber(basePriceCopper) or 0) + (i * 10000)),
 			freeCommission = isFree,
-			note = (note ~= "" and note or "Debug crafter") .. " #" .. i,
+			note = (note ~= "" and note or self:Text("DEBUG_CRAFTER")) .. " #" .. i,
 			recipeID = item.recipeID,
 			recipeDifficulty = item.recipeDifficulty,
 			totalSkill = tonumber(item.totalSkill) and (tonumber(item.totalSkill) + (i % 9) - 4) or nil,
-			quality = tonumber(item.quality) and math.max(1, tonumber(item.quality) - (i % 2)) or nil,
-			concentrationQuality = tonumber(item.concentrationQuality) and math.min(5, tonumber(item.concentrationQuality) + (i % 3 == 0 and 0 or -1)) or nil,
-			concentrationCost = item.concentrationCost,
+			quality = item.quality,
+			rawQuality = item.rawQuality,
+			qualityAtlas = item.qualityAtlas,
+			concentrationQuality = nil,
+			concentrationCost = nil,
+			bestQuality = item.bestQuality,
+			rawBestQuality = item.rawBestQuality,
+			bestQualityAtlas = item.bestQualityAtlas,
+			bestConcentrationQuality = nil,
+			bestTotalSkill = item.bestTotalSkill,
+			bestConcentrationCost = nil,
+			bestReagentSummary = item.bestReagentSummary,
+			bestReagentTruncated = item.bestReagentTruncated,
+			bestReagentPendingNames = item.bestReagentPendingNames,
 			professionLink = item.professionLink,
 			updatedAt = now,
 			verifiedAt = now,
@@ -364,7 +407,7 @@ function AF:RefreshCustomerQuery(force)
 		self.currentCustomerQueryToken = nil
 		self.currentCustomerQueryItemID = nil
 		self.currentCustomerQueryProfessionID = nil
-		self:RefreshCustomerResults("Select an order item.")
+		self:RefreshCustomerResults(self:Text("SELECT_ORDER_ITEM"))
 		return
 	end
 
@@ -401,24 +444,39 @@ function AF:RefreshCustomerResults(statusOverride)
 
 	local itemID = self.currentCustomerItemID
 	local itemName = self.currentCustomerItemName or self:GetDisplayItemName(itemID)
-	local sortMode = SORT_MODES[self.customerSortIndex or 1].key
+	local sortMode = GetSortMode(self.customerSortIndex).key
 	local filterText = frame.search and frame.search:GetText() or ""
 	local queryToken = self.currentCustomerQueryToken
 	local rows = itemID and self:GetCachedArtisans(itemID, filterText, sortMode, queryToken) or {}
-	frame.status:SetText(statusOverride or (itemID and ("Available artisans for " .. itemName) or "Select an order item."))
+	frame.status:SetText(statusOverride or (itemID and self:Text("AVAILABLE_ARTISANS_FOR", itemName) or self:Text("SELECT_ORDER_ITEM")))
 	self:EnsureCustomerRows(#rows)
 	frame.content:SetHeight(math.max(1, #rows * ROW_HEIGHT))
 
-	local now = self:Now()
 	for i, row in ipairs(self.customerRows or {}) do
 		local entry = rows[i]
 		if entry then
 			row.entry = entry
 			row:SetWidth(math.max(280, frame.scroll:GetWidth() - 4))
-			row.name:SetText((entry.name or "?"))
-			local note = entry.note and entry.note ~= "" and (" - " .. entry.note) or ""
-			row.detail:SetText(self:FormatMoney(entry.priceCopper, entry.freeCommission) .. note .. " (" .. GetAgeText(now, entry.updatedAt) .. ")")
-			row.capability:SetText(self:FormatCapability(entry))
+			if entry.tradeLead then
+				row.certified:Hide()
+				row.name:ClearAllPoints()
+				row.name:SetPoint("TOPLEFT", 8, -6)
+				row.name:SetPoint("RIGHT", -40, 0)
+			else
+				row.certified:Show()
+				row.name:ClearAllPoints()
+				row.name:SetPoint("TOPLEFT", row.certified, "TOPRIGHT", 4, 0)
+				row.name:SetPoint("RIGHT", -40, 0)
+			end
+			row.name:SetText(self:GetDisplayPlayerName(entry.name or "?"))
+			if entry.tradeLead then
+				row.detail:SetText(entry.note or self:Text("MISSING_ADDON_DATA"))
+				row.capability:SetText(entry.professionName or "")
+			else
+				local note = entry.note and entry.note ~= "" and (" - " .. entry.note) or ""
+				row.detail:SetText(self:FormatMoney(entry.priceCopper, entry.freeCommission) .. note)
+				row.capability:SetText(self:FormatCapability(entry))
+			end
 			row:Show()
 		else
 			row.entry = nil
@@ -432,23 +490,15 @@ function AF:RefreshCustomerResults(statusOverride)
 			hasAvailableUnfiltered = #self:GetCachedArtisans(itemID, "", sortMode, queryToken) > 0
 		end
 		if self.db.debugSelfResults and not self.db.artisanProfile.items[tostring(itemID)] then
-			frame.status:SetText("Debug on, but this character has not scanned " .. itemName .. ".")
+			frame.status:SetText(self:Text("DEBUG_NOT_SCANNED", itemName))
 		elseif filterText ~= "" and hasAvailableUnfiltered then
-			frame.status:SetText("No available artisans match the filter for " .. itemName .. ".")
+			frame.status:SetText(self:Text("NO_FILTER_MATCH", itemName))
 		elseif self.lastQueryAt and self:Now() - self.lastQueryAt < self.LIVE_QUERY_TIMEOUT then
-			frame.status:SetText("Checking available artisans for " .. itemName .. "...")
+			frame.status:SetText(self:Text("CHECKING_ARTISANS", itemName))
 		else
-			frame.status:SetText("No available artisans found for " .. itemName .. ".")
+			frame.status:SetText(self:Text("NO_ARTISANS_FOUND", itemName))
 		end
 	end
-end
-
-function AF:GetCrafterWhisperMessage(entry)
-	local capability = self:FormatCapability(entry)
-	if capability == "" then
-		return ""
-	end
-	return "Hi! ArtisanFinder shows for this craft: " .. capability .. ". "
 end
 
 function AF:OpenCrafterProfession(entry)
@@ -513,7 +563,7 @@ end
 
 function AF:FillPersonalOrder(entry)
 	if not entry then
-		self:Print("open a customer order before filling a personal order.")
+		self:Print(self:Text("PERSONAL_ORDER_NO_FORM"))
 		return
 	end
 
@@ -533,5 +583,5 @@ function AF:FillPersonalOrder(entry)
 	end
 
 	form:UpdateListOrderButton()
-	self:Print("filled personal order fields. Please review before placing the order.")
+	self:Print(self:Text("PERSONAL_ORDER_FILLED"))
 end

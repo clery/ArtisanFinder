@@ -130,6 +130,21 @@ function AF:NormalizeName(name)
 	return name
 end
 
+function AF:GetDisplayPlayerName(name)
+	name = tostring(name or "")
+	local playerName, realm = name:match("^([^-]+)-(.+)$")
+	if not playerName or not realm then
+		return name
+	end
+
+	local currentRealm = GetRealmName()
+	currentRealm = currentRealm and currentRealm:gsub("%s+", "") or ""
+	if realm == currentRealm then
+		return playerName
+	end
+	return name
+end
+
 function AF:EncodeNote(note)
 	note = tostring(note or "")
 	note = note:gsub("[\r\n]", " ")
@@ -163,25 +178,175 @@ end
 function AF:ParseCopperFromGoldText(text)
 	text = tostring(text or ""):match("^%s*(.-)%s*$")
 	if text == "" then
-		return 0
-	end
-	if text:lower() == "free" then
-		return 0, true
+		return 0, false, "unspecified"
 	end
 	local value = tonumber(text)
 	if not value then
 		return nil
 	end
-	return math.floor(value * 10000 + 0.5), false
+	if value == 0 then
+		return 0, false, "unspecified"
+	end
+	if value == -1 then
+		return 0, true, "free"
+	end
+	if value < 0 then
+		return nil
+	end
+	return math.floor(value * 10000 + 0.5), false, "paid"
+end
+
+function AF:GetCommissionInputText(priceCopper, freeCommission)
+	if freeCommission == true then
+		return "-1"
+	end
+	priceCopper = tonumber(priceCopper) or 0
+	if priceCopper <= 0 then
+		return "0"
+	end
+	return tostring(priceCopper / 10000)
+end
+
+function AF:GetQualityIconMarkup(quality, atlas, size)
+	size = size or 14
+	if atlas and atlas ~= "" and CreateAtlasMarkup then
+		local ok, markup = pcall(CreateAtlasMarkup, atlas, size, size)
+		if ok and markup and markup ~= "" then
+			return markup
+		end
+	end
+	quality = tonumber(quality)
+	if not quality or quality <= 0 then
+		return nil
+	end
+	if CreateAtlasMarkup then
+		local atlasNames = {
+			"Professions-Icon-Quality-Tier" .. quality .. "-Small",
+			"Professions-Icon-Quality-Tier" .. quality,
+		}
+		for _, atlasName in ipairs(atlasNames) do
+			local ok, markup = pcall(CreateAtlasMarkup, atlasName, size, size)
+			if ok and markup and markup ~= "" then
+				return markup
+			end
+		end
+	end
+	return "Q" .. quality
+end
+
+local function HasCommissionValue(entry)
+	if not entry then
+		return false
+	end
+	return entry.freeCommission == true or (tonumber(entry.priceCopper) or 0) > 0 or entry.commissionSpecified == true
+end
+
+local function HasNoteValue(entry)
+	return entry and entry.note and entry.note ~= ""
+end
+
+local function GetEntryCommission(entry)
+	if HasCommissionValue(entry) then
+		return tonumber(entry.priceCopper) or 0, entry.freeCommission == true
+	end
+	return nil
+end
+
+local function GetEntryNote(entry)
+	if HasNoteValue(entry) then
+		return entry.note
+	end
+	return nil
+end
+
+function AF:GetSavedCommissionState(entry)
+	if not HasCommissionValue(entry) then
+		return "unspecified", 0, false
+	end
+	if entry.freeCommission == true then
+		return "free", 0, true
+	end
+	local copper = tonumber(entry.priceCopper) or 0
+	if copper > 0 then
+		return "paid", copper, false
+	end
+	return "unspecified", 0, false
+end
+
+function AF:SetCommissionFields(entry, priceCopper, freeCommission, state)
+	if not entry then
+		return
+	end
+	state = state or "unspecified"
+	if state == "free" then
+		entry.priceCopper = 0
+		entry.freeCommission = true
+		entry.commissionSpecified = true
+	elseif state == "paid" then
+		entry.priceCopper = tonumber(priceCopper) or 0
+		entry.freeCommission = false
+		entry.commissionSpecified = true
+	else
+		entry.priceCopper = nil
+		entry.freeCommission = false
+		entry.commissionSpecified = false
+	end
+end
+
+function AF:CommissionStateFromInput(text)
+	return self:ParseCopperFromGoldText(text)
+end
+
+function AF:FormatCommissionInput(entry)
+	local _, copper, free = self:GetSavedCommissionState(entry)
+	return self:GetCommissionInputText(copper, free)
+end
+
+function AF:IsCommissionInputDirty(text, entry)
+	local copper, free, state = self:CommissionStateFromInput(text)
+	if not copper then
+		return true
+	end
+	local savedState, savedCopper, savedFree = self:GetSavedCommissionState(entry)
+	return state ~= savedState or copper ~= savedCopper or free ~= savedFree
+end
+
+function AF:NormalizeCommissionInput(text)
+	local copper, free, state = self:CommissionStateFromInput(text)
+	if not copper then
+		return nil
+	end
+	return copper, free, state
+end
+
+function AF:GetProfessionPriceEntry(professionID)
+	local profile = self.db and self.db.artisanProfile
+	return profile and profile.professionPrices[tostring(professionID or "")]
+end
+
+function AF:EntryHasCommissionValue(entry)
+	return HasCommissionValue(entry)
+end
+
+function AF:EntryHasNoteValue(entry)
+	return HasNoteValue(entry)
+end
+
+function AF:GetEntryCommission(entry)
+	return GetEntryCommission(entry)
+end
+
+function AF:GetEntryNote(entry)
+	return GetEntryNote(entry)
 end
 
 function AF:FormatMoney(copper, free)
 	if free then
-		return "Free commission"
+		return self:Text("FREE_COMMISSION")
 	end
 	copper = tonumber(copper) or 0
 	if copper <= 0 then
-		return "No price set"
+		return self:Text("NO_PRICE_SET")
 	end
 	if GetMoneyString then
 		return GetMoneyString(copper, true)
@@ -195,25 +360,91 @@ function AF:FormatCapability(entry)
 	end
 
 	local parts = {}
-	if entry.totalSkill and entry.recipeDifficulty then
-		table.insert(parts, "Skill " .. tostring(entry.totalSkill) .. " / Difficulty " .. tostring(entry.recipeDifficulty))
-	elseif entry.totalSkill then
-		table.insert(parts, "Skill " .. tostring(entry.totalSkill))
-	elseif entry.recipeDifficulty then
-		table.insert(parts, "Difficulty " .. tostring(entry.recipeDifficulty))
+	local normalQuality = tonumber(entry.quality)
+	local bestQuality = tonumber(entry.bestQuality)
+	local baseText
+	if normalQuality and normalQuality > 0 then
+		baseText = self:Text("BASE_QUALITY", self:GetQualityIconMarkup(normalQuality, entry.qualityAtlas, 16) or ("Q" .. normalQuality))
+	end
+	if baseText then
+		table.insert(parts, baseText)
 	end
 
-	local normalQuality = tonumber(entry.quality)
-	local concentrationQuality = tonumber(entry.concentrationQuality)
-	if normalQuality and normalQuality > 0 and concentrationQuality and concentrationQuality > normalQuality then
-		table.insert(parts, "Q" .. normalQuality .. ", Q" .. concentrationQuality .. " with Concentration")
-	elseif normalQuality and normalQuality > 0 then
-		table.insert(parts, "Q" .. normalQuality)
-	elseif concentrationQuality and concentrationQuality > 0 then
-		table.insert(parts, "Q" .. concentrationQuality .. " with Concentration")
+	if bestQuality and bestQuality > 0 then
+		table.insert(parts, self:Text("RECOMMENDED_REAGENTS_QUALITY", self:GetQualityIconMarkup(bestQuality, entry.bestQualityAtlas, 16) or ("Q" .. bestQuality)))
 	end
 
 	return table.concat(parts, " - ")
+end
+
+function AF:AddCapabilityTooltipLines(tooltip, entry)
+	if not tooltip or not entry then
+		return
+	end
+
+	if entry.bestReagentSummary and entry.bestReagentSummary ~= "" then
+		tooltip:AddLine(" ")
+		tooltip:AddLine(self:Text("SUGGESTED_REAGENTS"), 1, 0.82, 0)
+		self:AddReagentSummaryTooltipLines(tooltip, entry.bestReagentSummary, entry.bestReagentTruncated)
+	elseif entry.bestReagentPendingNames then
+		tooltip:AddLine(" ")
+		tooltip:AddLine(self:Text("SUGGESTED_REAGENTS"), 1, 0.82, 0)
+		tooltip:AddLine(self:Text("LOADING_REAGENT_NAMES"), 0.75, 0.75, 0.75, true)
+	else
+		tooltip:AddLine(" ")
+		tooltip:AddLine(self:Text("NO_REAGENT_RECOMMENDATION"), 0.75, 0.75, 0.75, true)
+	end
+
+end
+
+function AF:AddReagentSummaryTooltipLines(tooltip, summary, truncated)
+	local added = false
+	for reagentText in tostring(summary or ""):gmatch("[^;\n]+") do
+		reagentText = reagentText:match("^%s*(.-)%s*$")
+		local hasBrokenTextureMarkup = reagentText:find("|T", 1, true) and not reagentText:find("|t", 1, true)
+		if reagentText ~= "" and not hasBrokenTextureMarkup and not reagentText:match("^Item%s+%d+") then
+			tooltip:AddLine(reagentText, 1, 1, 1, true)
+			added = true
+		end
+	end
+	if not added then
+		tooltip:AddLine(self:Text("LOADING_REAGENT_NAMES"), 0.75, 0.75, 0.75, true)
+	end
+end
+
+function AF:StyleCustomerTooltip(tooltip)
+	if not tooltip or not tooltip.GetName or not tooltip.NumLines then
+		return
+	end
+	local name = tooltip:GetName()
+	for i = 1, tooltip:NumLines() do
+		local left = _G[name .. "TextLeft" .. i]
+		local right = _G[name .. "TextRight" .. i]
+		if left and left.SetFontObject then
+			left:SetFontObject(i == 1 and GameFontNormalLarge or GameFontHighlight)
+		end
+		if right and right.SetFontObject then
+			right:SetFontObject(GameFontHighlight)
+		end
+	end
+end
+
+function AF:GetItemIconMarkup(itemID, size)
+	itemID = tonumber(itemID)
+	size = size or 16
+	if not itemID then
+		return nil
+	end
+	local texture
+	if C_Item and C_Item.GetItemIconByID then
+		texture = C_Item.GetItemIconByID(itemID)
+	elseif GetItemIcon then
+		texture = GetItemIcon(itemID)
+	end
+	if texture and CreateTextureMarkup then
+		return CreateTextureMarkup(texture, size, size, size, size, 0, 1, 0, 1)
+	end
+	return nil
 end
 
 function AF:GetItemIDFromLink(link)
@@ -241,7 +472,7 @@ function AF:GetItemName(itemID)
 end
 
 function AF:GetDisplayItemName(itemID, fallback)
-	return self:GetItemName(itemID) or fallback or ("Item " .. tostring(itemID or "?"))
+	return self:GetItemName(itemID) or fallback or self:Text("ITEM_FALLBACK")
 end
 
 function AF:TableCount(tbl)
@@ -255,42 +486,72 @@ end
 function AF:GetProfessionName(professionID)
 	local profile = self.db and self.db.artisanProfile
 	local info = profile and profile.professions and profile.professions[tostring(professionID or "")]
-	return info and info.name or ("Profession " .. tostring(professionID or "?"))
+	return info and info.name or self:Text("PROFESSION_FALLBACK", tostring(professionID or "?"))
 end
 
 function AF:GetItemPrice(itemID, professionID)
 	local profile = self.db.artisanProfile
 	local item = profile.items[tostring(itemID or "")]
-	if item and (item.priceCopper or item.freeCommission or item.note) then
-		return tonumber(item.priceCopper) or 0, item.freeCommission == true, item.note or ""
+	local professionPrice = self:GetProfessionPriceEntry(professionID)
+	local priceCopper, freeCommission = self:GetEntryCommission(item)
+	local note = self:GetEntryNote(item)
+	if not priceCopper then
+		priceCopper, freeCommission = self:GetEntryCommission(professionPrice)
 	end
-
-	local professionPrice = profile.professionPrices[tostring(professionID or "")]
-	if professionPrice then
-		return tonumber(professionPrice.priceCopper) or 0, professionPrice.freeCommission == true, professionPrice.note or ""
+	if not note then
+		note = self:GetEntryNote(professionPrice)
 	end
-
-	return 0, false, ""
+	return tonumber(priceCopper) or 0, freeCommission == true, note or ""
 end
 
-function AF:SetItemPrice(itemID, priceCopper, freeCommission, note)
+function AF:SetItemPrice(itemID, priceCopper, freeCommission, note, commissionState)
 	local item = self.db.artisanProfile.items[tostring(itemID or "")]
 	if not item then
 		return
 	end
-	item.priceCopper = tonumber(priceCopper) or 0
-	item.freeCommission = freeCommission == true
+	self:SetCommissionFields(item, priceCopper, freeCommission, commissionState)
 	item.note = note or ""
 	item.updatedAt = self:Now()
 end
 
-function AF:SetProfessionPrice(professionID, priceCopper, freeCommission, note)
-	self.db.artisanProfile.professionPrices[tostring(professionID or "")] = {
-		priceCopper = tonumber(priceCopper) or 0,
-		freeCommission = freeCommission == true,
-		note = note or "",
-		updatedAt = self:Now(),
-	}
+function AF:SetProfessionPrice(professionID, priceCopper, freeCommission, note, commissionState)
+	local entry = self.db.artisanProfile.professionPrices[tostring(professionID or "")] or {}
+	self.db.artisanProfile.professionPrices[tostring(professionID or "")] = entry
+	self:SetCommissionFields(entry, priceCopper, freeCommission, commissionState)
+	entry.note = note or ""
+	entry.updatedAt = self:Now()
+end
+
+local function GetSortQuality(entry)
+	return tonumber(entry and entry.bestQuality)
+		or tonumber(entry and entry.quality)
+		or 0
+end
+
+local function GetCertificationSort(entry)
+	return entry and entry.tradeLead and 1 or 0
+end
+
+local function GetTradeLeadMatchSort(entry)
+	if not entry or not entry.tradeLead then
+		return 0
+	end
+	return entry.tradeProfessionMatch and 0 or 1
+end
+
+local function GetCommissionSort(entry)
+	if entry and entry.freeCommission == true then
+		return 0, 0
+	end
+	local priceCopper = tonumber(entry and entry.priceCopper) or 0
+	if priceCopper > 0 then
+		return 1, priceCopper
+	end
+	return 2, 0
+end
+
+local function GetSortName(entry)
+	return tostring(entry and entry.name or ""):lower()
 end
 
 function AF:GetCachedArtisans(itemID, filterText, sortMode, queryToken)
@@ -307,41 +568,81 @@ function AF:GetCachedArtisans(itemID, filterText, sortMode, queryToken)
 				entry.note or "",
 				self:FormatMoney(entry.priceCopper, entry.freeCommission),
 				self:FormatCapability(entry),
+				entry.bestReagentSummary or "",
 			}, " "):lower()
 			if filterText == "" or haystack:find(filterText, 1, true) then
 				table.insert(rows, entry)
+				entry.certified = true
+				entry.tradeLead = false
 			end
+		end
+	end
+
+	local seenNames = {}
+	for _, entry in ipairs(rows) do
+		seenNames[entry.name] = true
+	end
+	if self.GetTradeLeadRows then
+		for _, entry in ipairs(self:GetTradeLeadRows(itemID, self.currentCustomerProfessionID, filterText, seenNames)) do
+			table.insert(rows, entry)
 		end
 	end
 
 	sortMode = sortMode or "best"
 	table.sort(rows, function(a, b)
-		if sortMode == "price" then
-			if (a.freeCommission == true) ~= (b.freeCommission == true) then
-				return a.freeCommission == true
+		local aCertified = GetCertificationSort(a)
+		local bCertified = GetCertificationSort(b)
+		if aCertified ~= bCertified then
+			return aCertified < bCertified
+		end
+		local aTradeMatch = GetTradeLeadMatchSort(a)
+		local bTradeMatch = GetTradeLeadMatchSort(b)
+		if aTradeMatch ~= bTradeMatch then
+			return aTradeMatch < bTradeMatch
+		end
+
+		local aCommissionRank, aPrice = GetCommissionSort(a)
+		local bCommissionRank, bPrice = GetCommissionSort(b)
+		local aQuality = GetSortQuality(a)
+		local bQuality = GetSortQuality(b)
+
+		if sortMode == "commission" or sortMode == "price" then
+			if aCommissionRank ~= bCommissionRank then
+				return aCommissionRank < bCommissionRank
 			end
-			if (tonumber(a.priceCopper) or 0) ~= (tonumber(b.priceCopper) or 0) then
-				return (tonumber(a.priceCopper) or 0) < (tonumber(b.priceCopper) or 0)
+			if aPrice ~= bPrice then
+				return aPrice < bPrice
+			end
+			if aQuality ~= bQuality then
+				return aQuality > bQuality
 			end
 		elseif sortMode == "quality" then
-			local aQuality = tonumber(a.concentrationQuality) or tonumber(a.quality) or 0
-			local bQuality = tonumber(b.concentrationQuality) or tonumber(b.quality) or 0
 			if aQuality ~= bQuality then
 				return aQuality > bQuality
 			end
-		elseif sortMode == "recent" then
-			return (a.updatedAt or 0) > (b.updatedAt or 0)
+			if aCommissionRank ~= bCommissionRank then
+				return aCommissionRank < bCommissionRank
+			end
+			if aPrice ~= bPrice then
+				return aPrice < bPrice
+			end
 		else
-			if (a.freeCommission == true) ~= (b.freeCommission == true) then
-				return a.freeCommission == true
+			if aCommissionRank == 0 or bCommissionRank == 0 then
+				if aCommissionRank ~= bCommissionRank then
+					return aCommissionRank < bCommissionRank
+				end
 			end
-			local aQuality = tonumber(a.concentrationQuality) or tonumber(a.quality) or 0
-			local bQuality = tonumber(b.concentrationQuality) or tonumber(b.quality) or 0
 			if aQuality ~= bQuality then
 				return aQuality > bQuality
+			end
+			if aCommissionRank ~= bCommissionRank then
+				return aCommissionRank < bCommissionRank
+			end
+			if aPrice ~= bPrice then
+				return aPrice < bPrice
 			end
 		end
-		return (a.updatedAt or 0) > (b.updatedAt or 0)
+		return GetSortName(a) < GetSortName(b)
 	end)
 	return rows
 end
