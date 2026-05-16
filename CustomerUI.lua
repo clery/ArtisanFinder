@@ -404,8 +404,7 @@ function AF:RefreshCustomerResults(statusOverride)
 	local sortMode = SORT_MODES[self.customerSortIndex or 1].key
 	local filterText = frame.search and frame.search:GetText() or ""
 	local queryToken = self.currentCustomerQueryToken
-	local professionID = self.currentCustomerProfessionID
-	local rows = itemID and self:GetCachedArtisans(itemID, filterText, sortMode, queryToken, professionID) or {}
+	local rows = itemID and self:GetCachedArtisans(itemID, filterText, sortMode, queryToken) or {}
 	frame.status:SetText(statusOverride or (itemID and ("Available artisans for " .. itemName) or "Select an order item."))
 	self:EnsureCustomerRows(#rows)
 	frame.content:SetHeight(math.max(1, #rows * ROW_HEIGHT))
@@ -430,7 +429,7 @@ function AF:RefreshCustomerResults(statusOverride)
 	if #rows == 0 and itemID then
 		local hasAvailableUnfiltered = false
 		if filterText ~= "" then
-			hasAvailableUnfiltered = #self:GetCachedArtisans(itemID, "", sortMode, queryToken, professionID) > 0
+			hasAvailableUnfiltered = #self:GetCachedArtisans(itemID, "", sortMode, queryToken) > 0
 		end
 		if self.db.debugSelfResults and not self.db.artisanProfile.items[tostring(itemID)] then
 			frame.status:SetText("Debug on, but this character has not scanned " .. itemName .. ".")

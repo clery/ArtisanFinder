@@ -99,9 +99,6 @@ function AF:HandleQuery(parts, sender)
 	if not item then
 		return
 	end
-	if professionID ~= 0 and tonumber(item.professionID) ~= professionID then
-		return
-	end
 
 	local throttleKey = table.concat({ sender, itemID, professionID, queryToken }, ":")
 	local lastSent = self.db.responseThrottle[throttleKey]
@@ -168,7 +165,6 @@ function AF:HandleResponse(parts, sender)
 		and self.currentCustomerQueryToken
 		and queryToken == tonumber(self.currentCustomerQueryToken)
 		and itemID == tonumber(self.currentCustomerQueryItemID)
-		and ((tonumber(self.currentCustomerQueryProfessionID) or 0) == 0 or professionID == tonumber(self.currentCustomerQueryProfessionID))
 
 	local itemKey = tostring(itemID)
 	self.db.customerCache[itemKey] = self.db.customerCache[itemKey] or {}

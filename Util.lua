@@ -293,17 +293,14 @@ function AF:SetProfessionPrice(professionID, priceCopper, freeCommission, note)
 	}
 end
 
-function AF:GetCachedArtisans(itemID, filterText, sortMode, queryToken, professionID)
+function AF:GetCachedArtisans(itemID, filterText, sortMode, queryToken)
 	local itemCache = self.db.customerCache[tostring(itemID or "")]
 	local rows = {}
 	local now = self:Now()
 	filterText = tostring(filterText or ""):lower()
-	professionID = tonumber(professionID) or 0
 	for _, entry in pairs(itemCache or {}) do
-		local entryProfessionID = tonumber(entry.professionID) or 0
-		local professionMatches = professionID == 0 or entryProfessionID == professionID
 		local verifiedForQuery = queryToken and tonumber(entry.lastQueryToken) == tonumber(queryToken) and entry.verifiedAt
-		if verifiedForQuery and professionMatches and entry.updatedAt and now - entry.updatedAt <= self.CACHE_MAX_AGE then
+		if verifiedForQuery and entry.updatedAt and now - entry.updatedAt <= self.CACHE_MAX_AGE then
 			local haystack = table.concat({
 				entry.name or "",
 				entry.professionName or "",
