@@ -7,7 +7,8 @@ AF.PREFIX = "ARTFIND1"
 AF.PROTOCOL_VERSION = "1"
 AF.CHANNEL_NAME = "ArtisanFinder"
 AF.CACHE_MAX_AGE = 14 * 24 * 60 * 60
-AF.RESPONSE_THROTTLE = 24 * 60 * 60
+AF.RESPONSE_THROTTLE = 60
+AF.LIVE_QUERY_TIMEOUT = 6
 AF.MAX_NOTE_BYTES = 80
 AF.MAX_LINK_BYTES = 96
 
@@ -292,13 +293,17 @@ function AF:SetProfessionPrice(professionID, priceCopper, freeCommission, note)
 	}
 end
 
-function AF:GetCachedArtisans(itemID, filterText, sortMode)
+function AF:GetCachedArtisans(itemID, filterText, sortMode, queryToken, professionID)
 	local itemCache = self.db.customerCache[tostring(itemID or "")]
 	local rows = {}
 	local now = self:Now()
 	filterText = tostring(filterText or ""):lower()
+	professionID = tonumber(professionID) or 0
 	for _, entry in pairs(itemCache or {}) do
-		if entry.updatedAt and now - entry.updatedAt <= self.CACHE_MAX_AGE then
+		local entryProfessionID = tonumber(entry.professionID) or 0
+		local professionMatches = professionID == 0 or entryProfessionID == professionID
+		local verifiedForQuery = queryToken and tonumber(entry.lastQueryToken) == tonumber(queryToken) and entry.verifiedAt
+		if verifiedForQuery and professionMatches and entry.updatedAt and now - entry.updatedAt <= self.CACHE_MAX_AGE then
 			local haystack = table.concat({
 				entry.name or "",
 				entry.professionName or "",

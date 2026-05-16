@@ -306,6 +306,9 @@ function AF:InjectDebugSelfResult(itemID, professionID)
 	if not self.db.debugSelfResults then
 		return
 	end
+	if not self.currentCustomerQueryToken then
+		return
+	end
 
 	local item = self.db.artisanProfile.items[tostring(itemID or "")]
 	if not item then
@@ -317,6 +320,7 @@ function AF:InjectDebugSelfResult(itemID, professionID)
 
 	local basePriceCopper, freeCommission, note = self:GetItemPrice(itemID, item.professionID)
 	local itemKey = tostring(itemID)
+	local now = self:Now()
 	self.db.customerCache[itemKey] = self.db.customerCache[itemKey] or {}
 	for i = 1, 50 do
 		local isFree = i % 7 == 0 or freeCommission
@@ -336,7 +340,10 @@ function AF:InjectDebugSelfResult(itemID, professionID)
 			concentrationQuality = tonumber(item.concentrationQuality) and math.min(5, tonumber(item.concentrationQuality) + (i % 3 == 0 and 0 or -1)) or nil,
 			concentrationCost = item.concentrationCost,
 			professionLink = item.professionLink,
-			updatedAt = self:Now() - (i * 37),
+			updatedAt = now,
+			verifiedAt = now,
+			lastQueryToken = self.currentCustomerQueryToken,
+			lastQueryAt = self.lastQueryAt,
 			debug = true,
 		}
 	end
@@ -353,6 +360,10 @@ function AF:RefreshCustomerQuery(force)
 	if not context then
 		self.currentCustomerItemID = nil
 		self.currentCustomerItemName = nil
+		self.currentCustomerProfessionID = nil
+		self.currentCustomerQueryToken = nil
+		self.currentCustomerQueryItemID = nil
+		self.currentCustomerQueryProfessionID = nil
 		self:RefreshCustomerResults("Select an order item.")
 		return
 	end
@@ -362,7 +373,7 @@ function AF:RefreshCustomerQuery(force)
 	self.currentCustomerItemName = context.itemName
 	self.currentCustomerProfessionID = context.professionID
 
-	if changed or force then
+	if changed or force or not self.currentCustomerQueryToken then
 		self:BroadcastQuery(context.itemID, context.professionID)
 	end
 	self:InjectDebugSelfResult(context.itemID, context.professionID)
@@ -392,8 +403,10 @@ function AF:RefreshCustomerResults(statusOverride)
 	local itemName = self.currentCustomerItemName or self:GetDisplayItemName(itemID)
 	local sortMode = SORT_MODES[self.customerSortIndex or 1].key
 	local filterText = frame.search and frame.search:GetText() or ""
-	local rows = itemID and self:GetCachedArtisans(itemID, filterText, sortMode) or {}
-	frame.status:SetText(statusOverride or (itemID and ("Showing artisans for " .. itemName) or "Select an order item."))
+	local queryToken = self.currentCustomerQueryToken
+	local professionID = self.currentCustomerProfessionID
+	local rows = itemID and self:GetCachedArtisans(itemID, filterText, sortMode, queryToken, professionID) or {}
+	frame.status:SetText(statusOverride or (itemID and ("Available artisans for " .. itemName) or "Select an order item."))
 	self:EnsureCustomerRows(#rows)
 	frame.content:SetHeight(math.max(1, #rows * ROW_HEIGHT))
 
@@ -415,14 +428,18 @@ function AF:RefreshCustomerResults(statusOverride)
 	end
 
 	if #rows == 0 and itemID then
+		local hasAvailableUnfiltered = false
+		if filterText ~= "" then
+			hasAvailableUnfiltered = #self:GetCachedArtisans(itemID, "", sortMode, queryToken, professionID) > 0
+		end
 		if self.db.debugSelfResults and not self.db.artisanProfile.items[tostring(itemID)] then
 			frame.status:SetText("Debug on, but this character has not scanned " .. itemName .. ".")
-		elseif filterText ~= "" then
-			frame.status:SetText("No artisans match the filter for " .. itemName .. ".")
-		elseif self.lastQueryAt and self:Now() - self.lastQueryAt < 6 then
-			frame.status:SetText("Searching for artisans for " .. itemName .. "...")
+		elseif filterText ~= "" and hasAvailableUnfiltered then
+			frame.status:SetText("No available artisans match the filter for " .. itemName .. ".")
+		elseif self.lastQueryAt and self:Now() - self.lastQueryAt < self.LIVE_QUERY_TIMEOUT then
+			frame.status:SetText("Checking available artisans for " .. itemName .. "...")
 		else
-			frame.status:SetText("No artisans found yet for " .. itemName .. ".")
+			frame.status:SetText("No available artisans found for " .. itemName .. ".")
 		end
 	end
 end

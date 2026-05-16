@@ -34,6 +34,15 @@ function AF:BroadcastQuery(itemID, professionID)
 	if not itemID then
 		return false
 	end
+	local requestTime = self:Now()
+	local normalizedProfessionID = tonumber(professionID) or 0
+	self.lastQueryItemID = itemID
+	self.lastQueryProfessionID = normalizedProfessionID
+	self.lastQueryAt = requestTime
+	self.currentCustomerQueryToken = requestTime
+	self.currentCustomerQueryItemID = itemID
+	self.currentCustomerQueryProfessionID = normalizedProfessionID
+
 	local channelID = self:GetDiscoveryChannelID()
 	if not channelID or channelID == 0 then
 		return false
@@ -43,13 +52,10 @@ function AF:BroadcastQuery(itemID, professionID)
 		"Q",
 		self.PROTOCOL_VERSION,
 		itemID,
-		tonumber(professionID) or 0,
-		self:Now(),
+		normalizedProfessionID,
+		requestTime,
 	}, "|")
 
-	self.lastQueryItemID = itemID
-	self.lastQueryProfessionID = tonumber(professionID) or 0
-	self.lastQueryAt = self:Now()
 	self:SendAddon(payload, "CHANNEL", tostring(channelID))
 	return true
 end
@@ -84,6 +90,7 @@ function AF:HandleQuery(parts, sender)
 
 	local itemID = tonumber(parts[3])
 	local professionID = tonumber(parts[4]) or 0
+	local queryToken = tonumber(parts[5]) or self:Now()
 	if not itemID then
 		return
 	end
@@ -121,6 +128,7 @@ function AF:HandleQuery(parts, sender)
 		tonumber(item.concentrationQuality) or "",
 		tonumber(item.concentrationCost) or "",
 		encodedLink,
+		queryToken,
 	}
 	local payload = table.concat(payloadParts, "|")
 	if #payload > 255 then
@@ -150,10 +158,17 @@ function AF:HandleResponse(parts, sender)
 	local concentrationQuality = tonumber(parts[13])
 	local concentrationCost = tonumber(parts[14])
 	local professionLink = self:DecodeField(parts[15])
+	local queryToken = tonumber(parts[16])
 
 	if not itemID then
 		return
 	end
+
+	local verifiedForCurrentQuery = queryToken
+		and self.currentCustomerQueryToken
+		and queryToken == tonumber(self.currentCustomerQueryToken)
+		and itemID == tonumber(self.currentCustomerQueryItemID)
+		and ((tonumber(self.currentCustomerQueryProfessionID) or 0) == 0 or professionID == tonumber(self.currentCustomerQueryProfessionID))
 
 	local itemKey = tostring(itemID)
 	self.db.customerCache[itemKey] = self.db.customerCache[itemKey] or {}
@@ -173,6 +188,9 @@ function AF:HandleResponse(parts, sender)
 		concentrationCost = concentrationCost,
 		professionLink = professionLink ~= "" and professionLink or nil,
 		updatedAt = timestamp,
+		verifiedAt = verifiedForCurrentQuery and self:Now() or nil,
+		lastQueryToken = queryToken,
+		lastQueryAt = verifiedForCurrentQuery and self.lastQueryAt or nil,
 	}
 
 	if self.RefreshCustomerResults then
