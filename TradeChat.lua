@@ -199,9 +199,10 @@ function AF:OnTradeChatMessage(message, sender)
 	end
 
 	local now = self:Now()
+	self.db.tradeLeadCache = self.db.tradeLeadCache or {}
 	for index, linkInfo in ipairs(links) do
 		local leadKey = name .. ":" .. tostring(linkInfo.key or index)
-		self.tradeLeads[leadKey] = {
+		local lead = {
 			name = name,
 			target = name,
 			professionLink = linkInfo.link,
@@ -211,6 +212,8 @@ function AF:OnTradeChatMessage(message, sender)
 			tradeLead = true,
 			certified = false,
 		}
+		self.tradeLeads[leadKey] = lead
+		self.db.tradeLeadCache[leadKey] = lead
 	end
 
 	if self.RefreshCustomerResults then
@@ -230,6 +233,53 @@ function AF:PruneTradeLeads()
 			self.tradeLeads[name] = nil
 		end
 	end
+end
+
+function AF:GetCachedTradeLeadFallbackRows(itemID, professionID, filterText, seenNames, recipeID)
+	local rows = {}
+	local now = self:Now()
+	local normalizedProfessionID = tonumber(professionID) or 0
+	local recipeProfessionCandidates = self:GetCustomerRecipeProfessionCandidates(recipeID, normalizedProfessionID)
+	local hasRecipeProfessionCandidates = next(recipeProfessionCandidates) ~= nil
+	filterText = tostring(filterText or ""):lower()
+
+	for cacheKey, lead in pairs(self.db and self.db.tradeLeadCache or {}) do
+		local updatedAt = tonumber(lead and lead.updatedAt) or 0
+		local hasProfessionCandidates = lead.professionCandidates and next(lead.professionCandidates) ~= nil
+		local exactProfessionMatch = hasRecipeProfessionCandidates
+			and hasProfessionCandidates
+			and HasIntersection(lead.professionCandidates, recipeProfessionCandidates)
+		if exactProfessionMatch
+			and updatedAt > 0
+			and now - updatedAt <= self.CACHE_MAX_AGE
+			and not (seenNames and (seenNames[cacheKey] or seenNames[lead.name] or seenNames[lead.target]))
+		then
+			local row = {
+				name = lead.name,
+				target = lead.target,
+				itemID = itemID,
+				professionID = normalizedProfessionID,
+				professionName = lead.professionName,
+				professionLink = lead.professionLink,
+				updatedAt = lead.updatedAt,
+				tradeLead = true,
+				certified = false,
+				tradeProfessionMatch = true,
+				offlineCached = true,
+				note = self:Text("MISSING_ADDON_DATA"),
+			}
+			local haystack = table.concat({
+				row.name or "",
+				row.professionName or "",
+				row.note or "",
+			}, " "):lower()
+			if filterText == "" or haystack:find(filterText, 1, true) then
+				table.insert(rows, row)
+			end
+		end
+	end
+
+	return rows
 end
 
 function AF:GetCustomerRecipeProfessionCandidates(recipeID, professionID)

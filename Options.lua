@@ -16,6 +16,24 @@ local TRADE_LEAD_OPTIONS = {
 	{ minutes = 60, labelKey = "OPTIONS_TRADE_LEADS_60_MINUTES" },
 }
 
+local OFFLINE_FALLBACK_RESULT_OPTIONS = {
+	{ count = 0, labelKey = "OPTIONS_OFFLINE_FALLBACK_DISABLED" },
+	{ count = 5, labelKey = "OPTIONS_OFFLINE_FALLBACK_5" },
+	{ count = 10, labelKey = "OPTIONS_OFFLINE_FALLBACK_10" },
+	{ count = 15, labelKey = "OPTIONS_OFFLINE_FALLBACK_15" },
+	{ count = 20, labelKey = "OPTIONS_OFFLINE_FALLBACK_20" },
+	{ count = 25, labelKey = "OPTIONS_OFFLINE_FALLBACK_25" },
+	{ count = 30, labelKey = "OPTIONS_OFFLINE_FALLBACK_30" },
+}
+
+local OFFLINE_FALLBACK_MAX_OPTIONS = {
+	{ count = 10, labelKey = "OPTIONS_OFFLINE_FALLBACK_10" },
+	{ count = 20, labelKey = "OPTIONS_OFFLINE_FALLBACK_20" },
+	{ count = 30, labelKey = "OPTIONS_OFFLINE_FALLBACK_30" },
+	{ count = 40, labelKey = "OPTIONS_OFFLINE_FALLBACK_40" },
+	{ count = 50, labelKey = "OPTIONS_OFFLINE_FALLBACK_50" },
+}
+
 local function CreateSortOptions()
 	local options = {}
 	for _, option in ipairs(AF:GetCustomerSortOptions()) do
@@ -50,6 +68,19 @@ local function CreateTradeLeadOptions()
 			label = AF:Text(option.labelKey),
 			text = AF:Text(option.labelKey),
 			value = option.minutes,
+		})
+	end
+	return options
+end
+
+local function CreateCountOptions(optionTable)
+	local options = {}
+	for _, option in ipairs(optionTable) do
+		table.insert(options, {
+			controlType = Settings.ControlType.Radio,
+			label = AF:Text(option.labelKey),
+			text = AF:Text(option.labelKey),
+			value = option.count,
 		})
 	end
 	return options
@@ -109,6 +140,44 @@ function AF:InitializeOptions()
 		end
 	)
 	Settings.CreateDropdown(category, cleanupFrequency, CreateCleanupOptions, self:Text("OPTIONS_CLEANUP_FREQUENCY_DESC"))
+
+	local offlineFallbackResults = RegisterProxySetting(
+		"ArtisanFinder_OfflineFallbackResults",
+		Settings.VarType.Number,
+		"OPTIONS_OFFLINE_FALLBACK_RESULTS",
+		10,
+		function()
+			return tonumber(AF.db.offlineFallbackResults) or 10
+		end,
+		function(value)
+			AF.db.offlineFallbackResults = tonumber(value) or 0
+			if AF.RefreshCustomerResults then
+				AF:RefreshCustomerResults()
+			end
+		end
+	)
+	Settings.CreateDropdown(category, offlineFallbackResults, function()
+		return CreateCountOptions(OFFLINE_FALLBACK_RESULT_OPTIONS)
+	end, self:Text("OPTIONS_OFFLINE_FALLBACK_RESULTS_DESC"))
+
+	local offlineFallbackMax = RegisterProxySetting(
+		"ArtisanFinder_OfflineFallbackMax",
+		Settings.VarType.Number,
+		"OPTIONS_OFFLINE_FALLBACK_MAX",
+		20,
+		function()
+			return tonumber(AF.db.offlineFallbackMax) or 20
+		end,
+		function(value)
+			AF.db.offlineFallbackMax = tonumber(value) or 20
+			if AF.RefreshCustomerResults then
+				AF:RefreshCustomerResults()
+			end
+		end
+	)
+	Settings.CreateDropdown(category, offlineFallbackMax, function()
+		return CreateCountOptions(OFFLINE_FALLBACK_MAX_OPTIONS)
+	end, self:Text("OPTIONS_OFFLINE_FALLBACK_MAX_DESC"))
 
 	AddSection("OPTIONS_SECTION_TRADE_LEADS")
 	local tradeLeadLifetime = RegisterProxySetting(

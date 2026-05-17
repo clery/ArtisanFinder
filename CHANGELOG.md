@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.0.7 - 2026-05-18
+
+### Added
+
+- Added configurable offline cached artisan fallback rows when customer results are sparse.
+- Added options for when offline fallback starts and the maximum number of offline rows shown.
+- Added long-lived cached trade-chat leads so older matching profession links can appear as offline fallback results.
+- Added a scan completion message showing how many reagent recommendations were actually updated.
+
+### Changed
+
+- Profession scans now use lightweight per-recipe skill probes before running expensive reagent recommendation scans.
+- Profession skill, tool, and specialization changes now rescan only recipes whose customer-visible capability changed.
+- Cached trade-chat leads now use the same cleanup age as other cached customer fallback data.
+
+### Fixed
+
+- Fixed profession panel reopen events starting unnecessary scans.
+- Fixed specialization point staging triggering scans before knowledge changes were applied.
+- Removed the noisy chat message while waiting for knowledge changes to apply.
+
 ## 1.0.6 - 2026-05-17
 
 ### Changed

@@ -4,6 +4,8 @@ local MAX_REAGENT_COMBINATIONS = 72
 local MAX_REAGENT_SUMMARY_BYTES = 900
 local MAX_OPTIONAL_REAGENTS_PER_SLOT = 8
 local SCAN_SIGNATURE_VERSION = 22
+local SKILL_PROBE_SIGNATURE_VERSION = 1
+local FULL_SCAN_SIGNATURE_VERSION = 1
 local GetOperationQuality
 local GetRecipeDisplayQuality
 local GetRecipeDisplayQualityInfo
@@ -153,6 +155,10 @@ local function GetOperationTotalSkill(operationInfo)
 	end
 	local totalSkill = (tonumber(operationInfo.baseSkill) or 0) + (tonumber(operationInfo.bonusSkill) or 0)
 	return totalSkill > 0 and totalSkill or nil
+end
+
+local function GetOperationUpperThreshold(operationInfo)
+	return operationInfo and (operationInfo.upperSkillTreshold or operationInfo.upperSkillThreshold) or nil
 end
 
 local function FormatOperationDebug(operationInfo)
@@ -399,6 +405,11 @@ function AF:GetRecipeCapability(recipeID)
 	local ok, operationInfo = pcall(C_TradeSkillUI.GetCraftingOperationInfo, recipeID, {}, nil, false)
 	if ok and type(operationInfo) == "table" then
 		capability.recipeDifficulty = operationInfo.baseDifficulty
+		capability.baseSkill = operationInfo.baseSkill
+		capability.bonusSkill = operationInfo.bonusSkill
+		capability.bonusDifficulty = operationInfo.bonusDifficulty
+		capability.lowerSkillThreshold = operationInfo.lowerSkillThreshold
+		capability.upperSkillThreshold = GetOperationUpperThreshold(operationInfo)
 		local totalSkill = (tonumber(operationInfo.baseSkill) or 0) + (tonumber(operationInfo.bonusSkill) or 0)
 		if totalSkill > 0 then
 			capability.totalSkill = totalSkill
@@ -458,7 +469,112 @@ function AF:GetRecipeCapability(recipeID)
 	end
 
 	capability.professionLink = self:GetProfessionLink()
+	capability.skillProbeSignature = self:BuildSkillProbeSignature(recipeID, capability)
 	return capability
+end
+
+function AF:GetRecipeSkillProbe(recipeID)
+	if not C_TradeSkillUI or not C_TradeSkillUI.GetCraftingOperationInfo then
+		return nil
+	end
+	local ok, operationInfo = pcall(C_TradeSkillUI.GetCraftingOperationInfo, recipeID, {}, nil, false)
+	if not ok or type(operationInfo) ~= "table" then
+		return nil
+	end
+
+	local probe = {
+		recipeDifficulty = operationInfo.baseDifficulty,
+		baseSkill = operationInfo.baseSkill,
+		bonusSkill = operationInfo.bonusSkill,
+		bonusDifficulty = operationInfo.bonusDifficulty,
+		lowerSkillThreshold = operationInfo.lowerSkillThreshold,
+		upperSkillThreshold = GetOperationUpperThreshold(operationInfo),
+		totalSkill = GetOperationTotalSkill(operationInfo),
+		rawQuality = GetOperationQuality(operationInfo),
+		debugBaseOperation = FormatOperationDebug(operationInfo),
+	}
+	probe.quality, probe.qualityAtlas = GetRecipeDisplayQualityInfo(recipeID, operationInfo, {})
+	probe.skillProbeSignature = self:BuildSkillProbeSignature(recipeID, probe)
+	return probe
+end
+
+function AF:BuildSkillProbeSignature(recipeID, probe)
+	if not recipeID or not probe then
+		return nil
+	end
+	return table.concat({
+		"SP" .. SKILL_PROBE_SIGNATURE_VERSION,
+		tonumber(recipeID) or 0,
+		tonumber(probe.recipeDifficulty) or 0,
+		tonumber(probe.bonusDifficulty) or 0,
+		tonumber(probe.lowerSkillThreshold) or 0,
+		tonumber(probe.upperSkillThreshold) or 0,
+		tonumber(probe.baseSkill) or 0,
+		tonumber(probe.bonusSkill) or 0,
+		tonumber(probe.totalSkill) or 0,
+		tonumber(probe.rawQuality) or 0,
+		tonumber(probe.quality) or 0,
+		tostring(probe.qualityAtlas or ""),
+	}, ":")
+end
+
+function AF:BuildFullScanSignature(recipeID, itemID, skillProbeSignature)
+	if not recipeID or not itemID or not skillProbeSignature then
+		return nil
+	end
+	return table.concat({
+		"FS" .. FULL_SCAN_SIGNATURE_VERSION,
+		tonumber(recipeID) or 0,
+		tonumber(itemID) or 0,
+		skillProbeSignature,
+	}, ":")
+end
+
+function AF:ApplyRecipeSkillProbe(item, recipeID, probe)
+	if not item or not recipeID or not probe then
+		return
+	end
+	item.recipeDifficulty = probe.recipeDifficulty
+	item.baseSkill = probe.baseSkill
+	item.bonusSkill = probe.bonusSkill
+	item.bonusDifficulty = probe.bonusDifficulty
+	item.lowerSkillThreshold = probe.lowerSkillThreshold
+	item.upperSkillThreshold = probe.upperSkillThreshold
+	item.totalSkill = probe.totalSkill
+	item.quality = probe.quality
+	item.qualityAtlas = probe.qualityAtlas
+	item.rawQuality = probe.rawQuality
+	item.debugBaseOperation = probe.debugBaseOperation
+	item.skillProbeSignature = probe.skillProbeSignature or self:BuildSkillProbeSignature(recipeID, probe)
+	item.skillProbeAt = self:Now()
+end
+
+function AF:ProbeRequiresFullScan(item, recipeID, itemID, probe)
+	if not item or not probe then
+		return true
+	end
+	if tonumber(item.recipeID) ~= tonumber(recipeID) or tonumber(item.itemID) ~= tonumber(itemID) then
+		return true
+	end
+	if not item.bestReagentSummary or item.bestReagentSummary == "" or item.bestReagentPendingNames then
+		return true
+	end
+	if not item.bestQuality then
+		return true
+	end
+	if tonumber(item.quality) ~= tonumber(probe.quality) then
+		return true
+	end
+	if tonumber(item.rawQuality) ~= tonumber(probe.rawQuality) then
+		return true
+	end
+	if tostring(item.qualityAtlas or "") ~= tostring(probe.qualityAtlas or "") then
+		return true
+	end
+	if tonumber(item.recipeDifficulty) ~= tonumber(probe.recipeDifficulty) then
+		return true
+	end
+	return false
 end
 
 function AF:GetProfessionRecipeSignature()
@@ -531,8 +647,7 @@ function AF:GetCurrentProfessionScanSignature(profession)
 		return nil
 	end
 
-	local specSignature = self:GetProfessionSpecSignature(profession.id)
-	return table.concat({ SCAN_SIGNATURE_VERSION, recipeSignature, specSignature }, "|")
+	return table.concat({ SCAN_SIGNATURE_VERSION, recipeSignature }, "|")
 end
 
 function AF:GetBestReagentCapability(recipeID)
@@ -759,10 +874,27 @@ function AF:ApplyRecipeCapability(item, recipeID)
 	item.debugBaseOperation = capability.debugBaseOperation
 	item.debugBestCandidateReason = capability.debugBestCandidateReason
 	item.professionLink = capability.professionLink or item.professionLink
+	self:ApplyRecipeSkillProbe(item, recipeID, capability)
+	item.fullScanSignature = self:BuildFullScanSignature(recipeID, item.itemID, item.skillProbeSignature)
+	item.fullScanAt = self:Now()
 end
 
 local function GetScanJobKey(recipeID, itemID)
 	return tostring(recipeID or 0) .. ":" .. tostring(itemID or 0)
+end
+
+local function GetRecommendationSnapshot(item)
+	if not item then
+		return ""
+	end
+	return table.concat({
+		tostring(item.bestReagentSummary or ""),
+		tostring(item.bestQuality or ""),
+		tostring(item.bestQualityAtlas or ""),
+		tostring(item.rawBestQuality or ""),
+		tostring(item.bestReagentTruncated == true),
+		tostring(item.bestReagentPendingNames == true),
+	}, "|")
 end
 
 function AF:PrepareProfessionForScan(profession)
@@ -783,18 +915,21 @@ function AF:PrepareProfessionForScan(profession)
 	return professionEntry
 end
 
-function AF:BuildScanProgress(profession, professionEntry, signature, force)
+function AF:BuildScanProgress(profession, professionEntry, signature, force, mode)
 	local recipeIDs = C_TradeSkillUI.GetAllRecipeIDs and C_TradeSkillUI.GetAllRecipeIDs()
 	if type(recipeIDs) ~= "table" then
 		return nil, self:Text("SCAN_NO_RECIPES")
 	end
 
+	mode = force and "full" or (mode or "probe")
+	local progressSignature = table.concat({ signature, mode }, "|")
 	local previous = professionEntry.scanProgress
 	local completed = {}
-	if not force and previous and previous.signature == signature and type(previous.completed) == "table" then
+	if not force and previous and previous.signature == progressSignature and type(previous.completed) == "table" then
 		completed = previous.completed
 	end
 
+	local profile = self.db.artisanProfile
 	local pending = {}
 	for _, recipeID in ipairs(recipeIDs) do
 		local recipeInfo = C_TradeSkillUI.GetRecipeInfo and C_TradeSkillUI.GetRecipeInfo(recipeID)
@@ -802,10 +937,19 @@ function AF:BuildScanProgress(profession, professionEntry, signature, force)
 		if learned then
 			local outputs = self:GetRecipeOutputItemIDs(recipeID)
 			for itemID in pairs(outputs) do
-				local key = GetScanJobKey(recipeID, itemID)
+				local key = mode .. ":" .. GetScanJobKey(recipeID, itemID)
+				local existing = profile.items[tostring(itemID)]
+				local needsFull = force
+					or not existing
+					or tonumber(existing.recipeID) ~= tonumber(recipeID)
+					or tonumber(existing.professionID) ~= tonumber(profession.id)
+					or not existing.bestReagentSummary
+					or existing.bestReagentSummary == ""
+					or existing.bestReagentPendingNames == true
 				if force or not completed[key] then
 					table.insert(pending, {
 						key = key,
+						kind = needsFull and "full" or mode,
 						recipeID = recipeID,
 						itemID = itemID,
 						recipeName = recipeInfo and recipeInfo.name,
@@ -816,11 +960,14 @@ function AF:BuildScanProgress(profession, professionEntry, signature, force)
 	end
 
 	professionEntry.scanProgress = {
-		signature = signature,
+		signature = progressSignature,
+		professionSignature = signature,
+		mode = mode,
 		pending = pending,
 		completed = completed,
 		total = #pending + self:TableCount(completed),
 		scanned = self:TableCount(completed),
+		recommendationsUpdated = previous and previous.signature == progressSignature and tonumber(previous.recommendationsUpdated) or 0,
 		startedAt = previous and previous.startedAt or self:Now(),
 		updatedAt = self:Now(),
 	}
@@ -838,7 +985,39 @@ function AF:ScanJob(profession, professionEntry, job)
 	existing.itemName = self:GetDisplayItemName(job.itemID, existing.itemName)
 	existing.professionID = profession.id
 	existing.professionName = profession.name
-	self:ApplyRecipeCapability(existing, job.recipeID)
+	if job.kind == "probe" then
+		local probe = self:GetRecipeSkillProbe(job.recipeID)
+		if probe then
+			local needsFull = self:ProbeRequiresFullScan(existing, job.recipeID, job.itemID, probe)
+			self:ApplyRecipeSkillProbe(existing, job.recipeID, probe)
+			if needsFull then
+				table.insert(professionEntry.scanProgress.pending, {
+					key = "full:" .. GetScanJobKey(job.recipeID, job.itemID),
+					kind = "full",
+					recipeID = job.recipeID,
+					itemID = job.itemID,
+					recipeName = job.recipeName,
+				})
+				professionEntry.scanProgress.total = professionEntry.scanProgress.total + 1
+			end
+		else
+			table.insert(professionEntry.scanProgress.pending, {
+				key = "full:" .. GetScanJobKey(job.recipeID, job.itemID),
+				kind = "full",
+				recipeID = job.recipeID,
+				itemID = job.itemID,
+				recipeName = job.recipeName,
+			})
+			professionEntry.scanProgress.total = professionEntry.scanProgress.total + 1
+		end
+	else
+		local beforeRecommendation = GetRecommendationSnapshot(existing)
+		self:ApplyRecipeCapability(existing, job.recipeID)
+		local afterRecommendation = GetRecommendationSnapshot(existing)
+		if beforeRecommendation ~= afterRecommendation and existing.bestReagentSummary and existing.bestReagentSummary ~= "" then
+			professionEntry.scanProgress.recommendationsUpdated = (tonumber(professionEntry.scanProgress.recommendationsUpdated) or 0) + 1
+		end
+	end
 	existing.updatedAt = self:Now()
 	professionEntry.recipes[tostring(job.recipeID)] = true
 end
@@ -889,7 +1068,8 @@ function AF:RefreshScanProgressUI(force)
 end
 
 function AF:CompleteActiveScan(active, professionEntry, progress)
-	professionEntry.scanSignature = progress.signature
+	professionEntry.scanSignature = progress.professionSignature or progress.signature
+	professionEntry.scanMode = progress.mode
 	professionEntry.scannedAt = self:Now()
 	professionEntry.scanProgress = nil
 	self.activeScan = nil
@@ -900,6 +1080,7 @@ function AF:CompleteActiveScan(active, professionEntry, progress)
 	}
 	self:RefreshScanProgressUI(true)
 	self:Print(self:Text("SCAN_COMPLETE", tonumber(progress.scanned) or 0, professionEntry.name))
+	self:Print(self:Text("SCAN_RECOMMENDATIONS_UPDATED", tonumber(progress.recommendationsUpdated) or 0, professionEntry.name))
 end
 
 function AF:ProcessScanQueue()
@@ -965,7 +1146,7 @@ function AF:PauseActiveProfessionScan(silent)
 	end
 end
 
-function AF:StartOrResumeCurrentProfessionScan(force, silent)
+function AF:StartOrResumeCurrentProfessionScan(force, silent, mode, forceProbe)
 	if self:IsInCombatLocked() then
 		self.deferredScanResume = true
 		return 0
@@ -994,8 +1175,9 @@ function AF:StartOrResumeCurrentProfessionScan(force, silent)
 	if not currentSignature then
 		return 0
 	end
+	mode = force and "full" or (mode or "probe")
 
-	if self.activeScan and tonumber(self.activeScan.professionID) == tonumber(profession.id) and self.activeScan.signature == currentSignature then
+	if self.activeScan and tonumber(self.activeScan.professionID) == tonumber(profession.id) then
 		return 0
 	end
 
@@ -1006,15 +1188,16 @@ function AF:StartOrResumeCurrentProfessionScan(force, silent)
 			professionEntry.scanProgress = nil
 		end
 	end
-	if not force and professionEntry.scanSignature == currentSignature and not professionEntry.scanProgress then
+	if not force and not forceProbe and professionEntry.scanSignature == currentSignature and not professionEntry.scanProgress then
 		return 0
 	end
 
 	local progress
-	if not force and professionEntry.scanProgress and professionEntry.scanProgress.signature == currentSignature then
+	local progressSignature = table.concat({ currentSignature, mode }, "|")
+	if not force and professionEntry.scanProgress and professionEntry.scanProgress.signature == progressSignature then
 		progress = professionEntry.scanProgress
 	else
-		progress = self:BuildScanProgress(profession, professionEntry, currentSignature, force)
+		progress = self:BuildScanProgress(profession, professionEntry, currentSignature, force, mode)
 	end
 	if not progress then
 		if not silent then
@@ -1024,6 +1207,7 @@ function AF:StartOrResumeCurrentProfessionScan(force, silent)
 	end
 	if #progress.pending == 0 then
 		professionEntry.scanSignature = currentSignature
+		professionEntry.scanMode = mode
 		professionEntry.scannedAt = self:Now()
 		professionEntry.scanProgress = nil
 		return 0
@@ -1031,7 +1215,7 @@ function AF:StartOrResumeCurrentProfessionScan(force, silent)
 
 	self.activeScan = {
 		professionID = profession.id,
-		signature = currentSignature,
+		signature = progress.signature,
 	}
 	professionEntry.scanSignature = nil
 	self:Print(self:Text(progress.scanned and progress.scanned > 0 and "SCAN_RESUMED" or "SCAN_STARTED", profession.name))
@@ -1040,11 +1224,47 @@ function AF:StartOrResumeCurrentProfessionScan(force, silent)
 end
 
 function AF:ScanCurrentProfession(silent)
-	return self:StartOrResumeCurrentProfessionScan(true, silent)
+	return self:StartOrResumeCurrentProfessionScan(true, silent, "full")
 end
 
 function AF:AutoScanCurrentProfession(force)
-	return self:StartOrResumeCurrentProfessionScan(force == true, true)
+	return self:StartOrResumeCurrentProfessionScan(force == true, true, force and "full" or "probe")
+end
+
+function AF:ProfessionHasPendingReagentNameWork(professionID)
+	local profile = self.db and self.db.artisanProfile
+	if not profile or not profile.items then
+		return false
+	end
+	for _, item in pairs(profile.items) do
+		if tonumber(item.professionID) == tonumber(professionID) and item.bestReagentPendingNames then
+			return true
+		end
+	end
+	return false
+end
+
+function AF:ShouldStartAutoScanForReason(reason, profession, currentSignature)
+	local professionEntry = self.db
+		and self.db.artisanProfile
+		and self.db.artisanProfile.professions
+		and self.db.artisanProfile.professions[tostring(profession.id)]
+	if not professionEntry then
+		return true, false
+	end
+	if professionEntry.scanProgress then
+		return true, false
+	end
+	if professionEntry.scanSignature ~= currentSignature then
+		return true, false
+	end
+	if reason == "ITEM_DATA_LOADED" then
+		return self:ProfessionHasPendingReagentNameWork(profession.id), true
+	end
+	if reason == "SKILL_LINES_CHANGED" or reason == "SPELLS_CHANGED" or reason == "TRAIT_CONFIG_UPDATED" or reason == "TRAIT_PENDING_APPLIED" then
+		return true, true
+	end
+	return false, false
 end
 
 function AF:IsKnowledgeApplyPending(professionID)
@@ -1066,6 +1286,11 @@ function AF:QueueAutoScanForChange(reason)
 	end
 	if self:IsLinkedProfessionOpen() then
 		self.pendingAutoScanReason = nil
+		return
+	end
+	if reason == "TRAIT_NODE_CHANGED" then
+		self.knowledgeApplyScanPending = true
+		self.pendingAutoScanReason = "TRAIT_PENDING_APPLIED"
 		return
 	end
 
@@ -1090,19 +1315,30 @@ function AF:QueueAutoScanForChange(reason)
 		if not profession then
 			return
 		end
+		local currentSignature = AF:GetCurrentProfessionScanSignature(profession)
+		if not currentSignature then
+			return
+		end
 		if AF:IsKnowledgeApplyPending(profession.id) then
-			if not AF.knowledgeScanWaitPrinted then
-				AF.knowledgeScanWaitPrinted = true
-				AF:Print(AF:Text("SCAN_WAITING_KNOWLEDGE", profession.name))
-			end
+			AF.knowledgeApplyScanPending = true
 			AF:QueueAutoScanForChange(AF.pendingAutoScanReason or "TRAIT_PENDING")
 			return
 		end
-		AF.knowledgeScanWaitPrinted = false
 		local reason = AF.pendingAutoScanReason
 		AF.pendingAutoScanReason = nil
+		if AF.knowledgeApplyScanPending then
+			reason = "TRAIT_PENDING_APPLIED"
+			AF.knowledgeApplyScanPending = nil
+		end
 		local force = reason == "FORCE"
-		AF:StartOrResumeCurrentProfessionScan(force, true)
+		if force then
+			AF:StartOrResumeCurrentProfessionScan(true, true, "full")
+			return
+		end
+		local shouldStart, forceProbe = AF:ShouldStartAutoScanForReason(reason, profession, currentSignature)
+		if shouldStart then
+			AF:StartOrResumeCurrentProfessionScan(false, true, "probe", forceProbe)
+		end
 	end)
 end
 

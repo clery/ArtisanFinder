@@ -4,6 +4,8 @@ function AF:BuildCustomerRowViewModel(entry)
 	local displayName = self:GetDisplayPlayerName(entry.name or "?")
 	if entry.unavailableFavorite then
 		displayName = displayName .. " |cff888888(" .. self:Text("UNAVAILABLE") .. ")|r"
+	elseif entry.offlineCached then
+		displayName = displayName .. " |cff888888" .. self:Text("OFFLINE_LAST_SEEN", self:FormatRelativeTime(entry.updatedAt)) .. "|r"
 	end
 
 	local detail

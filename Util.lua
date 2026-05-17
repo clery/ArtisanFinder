@@ -13,7 +13,7 @@ AF.REAGENT_DETAIL_CACHE_MAX_AGE = 60 * 60
 AF.LIVE_QUERY_TIMEOUT = 6
 AF.MAX_NOTE_BYTES = 80
 AF.MAX_LINK_BYTES = 96
-AF.SCHEMA_VERSION = 3
+AF.SCHEMA_VERSION = 5
 
 function AF:Print(message)
 	print("|cff33ff99ArtisanFinder:|r " .. tostring(message))
@@ -202,6 +202,22 @@ MIGRATIONS[3] = function(db)
 	db.tradeLeads = db.tradeLeads or {}
 end
 
+MIGRATIONS[4] = function(db)
+	db.artisanProfile = db.artisanProfile or {}
+	db.artisanProfile.professions = db.artisanProfile.professions or {}
+	db.artisanProfile.items = db.artisanProfile.items or {}
+end
+
+MIGRATIONS[5] = function(db)
+	db.tradeLeadCache = db.tradeLeadCache or {}
+	if db.offlineFallbackResults == nil then
+		db.offlineFallbackResults = 10
+	end
+	if db.offlineFallbackMax == nil then
+		db.offlineFallbackMax = 20
+	end
+end
+
 function AF:MigrateDB(db)
 	local version = tonumber(db.schemaVersion) or 0
 	while version < self.SCHEMA_VERSION do
@@ -229,6 +245,7 @@ function AF:EnsureDB()
 	db.favoriteArtisans = db.favoriteArtisans or {}
 	db.responseThrottle = db.responseThrottle or {}
 	db.tradeLeads = db.tradeLeads or {}
+	db.tradeLeadCache = db.tradeLeadCache or {}
 	if db.debugSelfResults == nil then
 		db.debugSelfResults = false
 	end
@@ -243,6 +260,12 @@ function AF:EnsureDB()
 	end
 	if db.tradeLeadMinutes == nil then
 		db.tradeLeadMinutes = 15
+	end
+	if db.offlineFallbackResults == nil then
+		db.offlineFallbackResults = 10
+	end
+	if db.offlineFallbackMax == nil then
+		db.offlineFallbackMax = 20
 	end
 	db.schemaVersion = self.SCHEMA_VERSION
 	db.minimap = db.minimap or { angle = 225, hide = false }
@@ -280,6 +303,13 @@ function AF:CleanupCustomerCache()
 			if next(itemCache) == nil then
 				self.db.customerCache[itemKey] = nil
 			end
+		end
+	end
+	for leadKey, entry in pairs(self.db.tradeLeadCache or {}) do
+		local updatedAt = tonumber(entry and entry.updatedAt) or 0
+		if updatedAt <= 0 or updatedAt < cutoff then
+			self.db.tradeLeadCache[leadKey] = nil
+			removed = removed + 1
 		end
 	end
 	if removed > 0 then
@@ -787,6 +817,33 @@ local function GetSortName(entry)
 	return tostring(entry and entry.name or ""):lower()
 end
 
+local function GetSeenKey(AF, entry)
+	if not entry then
+		return nil
+	end
+	if entry.tradeLead and entry.professionLink then
+		return "trade:" .. tostring(entry.target or entry.name or "") .. ":" .. tostring(entry.professionLink)
+	end
+	return AF:GetFavoriteArtisanKey(entry) or entry.target or entry.name
+end
+
+local function MarkSeen(AF, seenNames, entry)
+	local key = GetSeenKey(AF, entry)
+	if key then
+		seenNames[key] = true
+	end
+	local favoriteKey = AF:GetFavoriteArtisanKey(entry)
+	if favoriteKey then
+		seenNames[favoriteKey] = true
+	end
+	if entry and entry.name then
+		seenNames[entry.name] = true
+	end
+	if entry and entry.target then
+		seenNames[entry.target] = true
+	end
+end
+
 local function EntryMatchesCustomerFilter(AF, entry, filterText)
 	local haystack = table.concat({
 		entry.name or "",
@@ -822,13 +879,7 @@ function AF:GetCachedArtisans(itemID, filterText, sortMode, queryToken)
 				rowEntry.tradeLead = false
 				rowEntry.unavailableFavorite = nil
 				table.insert(rows, rowEntry)
-				local favoriteKey = self:GetFavoriteArtisanKey(rowEntry)
-				if favoriteKey then
-					seenNames[favoriteKey] = true
-				end
-				if rowEntry.name then
-					seenNames[rowEntry.name] = true
-				end
+				MarkSeen(self, seenNames, rowEntry)
 			end
 		end
 	end
@@ -841,15 +892,64 @@ function AF:GetCachedArtisans(itemID, filterText, sortMode, queryToken)
 			favoriteEntry.tradeLead = false
 			favoriteEntry.unavailableFavorite = true
 			table.insert(rows, favoriteEntry)
-			seenNames[favoriteKey] = true
-			if favoriteEntry.name then
-				seenNames[favoriteEntry.name] = true
-			end
+			MarkSeen(self, seenNames, favoriteEntry)
 		end
 	end
 	if self.GetTradeLeadRows then
 		for _, entry in ipairs(self:GetTradeLeadRows(itemID, self.currentCustomerProfessionID, filterText, seenNames, self.currentCustomerRecipeID)) do
 			table.insert(rows, entry)
+			MarkSeen(self, seenNames, entry)
+		end
+	end
+
+	local offlineTrigger = tonumber(self.db.offlineFallbackResults) or 10
+	local offlineMax = tonumber(self.db.offlineFallbackMax) or 20
+	if offlineTrigger > 0 and offlineMax > 0 and #rows < offlineTrigger then
+		local candidates = {}
+		for _, entry in pairs(itemCache or {}) do
+			local seenKey = GetSeenKey(self, entry)
+			local updatedAt = tonumber(entry and entry.updatedAt) or 0
+			local isDebug = entry and (entry.debug or tostring(entry.name or ""):find("__debug", 1, true))
+			if entry
+				and seenKey
+				and not seenNames[seenKey]
+				and not self:IsFavoriteArtisan(entry)
+				and not isDebug
+				and updatedAt > 0
+				and now - updatedAt <= self.CACHE_MAX_AGE
+				and EntryMatchesCustomerFilter(self, entry, filterText)
+			then
+				local offlineEntry = CopyCustomerEntry(entry)
+				offlineEntry.certified = true
+				offlineEntry.tradeLead = false
+				offlineEntry.offlineCached = true
+				table.insert(candidates, offlineEntry)
+			end
+		end
+		if self.GetCachedTradeLeadFallbackRows then
+			for _, entry in ipairs(self:GetCachedTradeLeadFallbackRows(itemID, self.currentCustomerProfessionID, filterText, seenNames, self.currentCustomerRecipeID)) do
+				table.insert(candidates, entry)
+			end
+		end
+		table.sort(candidates, function(a, b)
+			local aUpdated = tonumber(a.updatedAt) or 0
+			local bUpdated = tonumber(b.updatedAt) or 0
+			if aUpdated ~= bUpdated then
+				return aUpdated > bUpdated
+			end
+			return GetSortName(a) < GetSortName(b)
+		end)
+		local offlineAdded = 0
+		for _, entry in ipairs(candidates) do
+			if #rows >= offlineTrigger or offlineAdded >= offlineMax then
+				break
+			end
+			local seenKey = GetSeenKey(self, entry)
+			if seenKey and not seenNames[seenKey] then
+				table.insert(rows, entry)
+				MarkSeen(self, seenNames, entry)
+				offlineAdded = offlineAdded + 1
+			end
 		end
 	end
 
@@ -877,6 +977,18 @@ function AF:GetCachedArtisans(itemID, filterText, sortMode, queryToken)
 		local bTradeMatch = GetTradeLeadMatchSort(b)
 		if aTradeMatch ~= bTradeMatch then
 			return aTradeMatch < bTradeMatch
+		end
+		local aOffline = a.offlineCached and 1 or 0
+		local bOffline = b.offlineCached and 1 or 0
+		if aOffline ~= bOffline then
+			return aOffline < bOffline
+		end
+		if aOffline == 1 then
+			local aUpdated = tonumber(a.updatedAt) or 0
+			local bUpdated = tonumber(b.updatedAt) or 0
+			if aUpdated ~= bUpdated then
+				return aUpdated > bUpdated
+			end
 		end
 
 		local aCommissionRank, aPrice = GetCommissionSort(a)
