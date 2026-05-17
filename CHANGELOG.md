@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.0.5 - 2026-05-17
+
+### Changed
+
+- Reagent recommendation details are now requested when a customer opens a tooltip instead of being sent with every live response.
+- Customer row rendering and scan queue bookkeeping were refactored into smaller, clearer helpers.
+- Customer item selection queries are lightly debounced to reduce addon-message bursts while browsing orders.
+- README media was updated with the latest customer view popup and example animation.
+
+### Fixed
+
+- Added the missing customer row helper module referenced by the addon TOC.
+
 ## 1.0.4 - 2026-05-17
 
 ### Added
@@ -10,9 +23,6 @@
 
 - Updated LibDBIcon packaging to include only the library file instead of the full upstream repository hierarchy.
 - Customer result rows now show when addon-enabled crafters answered or trade-chat crafters were found.
-- Reagent recommendation details are now requested when a customer opens a tooltip instead of being sent with every live response.
-- Customer row rendering and scan queue bookkeeping were refactored into smaller, clearer helpers.
-- Customer item selection queries are lightly debounced to reduce addon-message bursts while browsing orders.
 
 ### Fixed
 
