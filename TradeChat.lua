@@ -37,13 +37,16 @@ local KNOWN_PROFESSION_SKILL_LINES = {
 	[773] = true, -- Inscription
 }
 
-local function ExtractTradeLink(message)
-	local link, name = tostring(message or ""):match("(|c%x+|Htrade:.-|h%[(.-)%]|h|r)")
-	if link then
-		return link, name
+local function ExtractTradeLinks(message)
+	local links = {}
+	message = tostring(message or "")
+	for link, name in message:gmatch("(|c%x%x%x%x%x%x%x%x|Htrade:[^|]+|h%[(.-)%]|h|r)") do
+		table.insert(links, { link = link, name = name })
 	end
-	link, name = tostring(message or ""):match("(|Htrade:.-|h%[(.-)%]|h)")
-	return link, name
+	for link, name in message:gmatch("(|Htrade:[^|]+|h%[(.-)%]|h)") do
+		table.insert(links, { link = link, name = name })
+	end
+	return links
 end
 
 local function GetTradeLinkProfessionCandidates(link)
@@ -156,8 +159,8 @@ function AF:InjectDebugTradeLeads()
 end
 
 function AF:OnTradeChatMessage(message, sender)
-	local link, professionName = ExtractTradeLink(message)
-	if not link or not sender then
+	local links = ExtractTradeLinks(message)
+	if #links == 0 or not sender then
 		return
 	end
 
@@ -167,16 +170,25 @@ function AF:OnTradeChatMessage(message, sender)
 	end
 
 	self.tradeLeads = self.tradeLeads or {}
-	self.tradeLeads[name] = {
-		name = name,
-		target = name,
-		professionLink = link,
-		professionName = professionName,
-		professionCandidates = GetTradeLinkProfessionCandidates(link),
-		updatedAt = self:Now(),
-		tradeLead = true,
-		certified = false,
-	}
+	for leadKey, lead in pairs(self.tradeLeads) do
+		if lead.target == name and not lead.debug then
+			self.tradeLeads[leadKey] = nil
+		end
+	end
+
+	local now = self:Now()
+	for index, linkInfo in ipairs(links) do
+		self.tradeLeads[name .. ":" .. tostring(index)] = {
+			name = name,
+			target = name,
+			professionLink = linkInfo.link,
+			professionName = linkInfo.name,
+			professionCandidates = GetTradeLinkProfessionCandidates(linkInfo.link),
+			updatedAt = now,
+			tradeLead = true,
+			certified = false,
+		}
+	end
 
 	if self.RefreshCustomerResults then
 		self:RefreshCustomerResults()

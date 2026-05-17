@@ -89,11 +89,25 @@ function AF:StyleMinimapButton()
 	self.minimapIcon:SetButtonIcon("ArtisanFinder", ICON, 31, "CENTER", 0, 0)
 	local button = self.minimapIcon:GetMinimapButton("ArtisanFinder")
 	if button then
-		button:SetHighlightTexture(nil)
+		button:SetHighlightTexture("Interface\\Buttons\\WHITE8x8", "ADD")
 		local highlight = button:GetHighlightTexture()
 		if highlight then
-			highlight:SetTexture(nil)
 			highlight:SetAlpha(0)
+		end
+		if not button.artisanFinderHoverStyled then
+			button.artisanFinderHoverStyled = true
+			button:HookScript("OnEnter", function(self)
+				if self.icon then
+					self.icon:SetVertexColor(1, 0.95, 0.72)
+					self.icon:SetScale(1.06)
+				end
+			end)
+			button:HookScript("OnLeave", function(self)
+				if self.icon then
+					self.icon:SetVertexColor(1, 1, 1)
+					self.icon:SetScale(1)
+				end
+			end)
 		end
 	end
 end
