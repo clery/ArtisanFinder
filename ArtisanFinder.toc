@@ -3,7 +3,7 @@
 ## Notes: Finds available artisans from the Crafting Order customer form.
 ## Author: clery
 ## Version: 1.0.1
-## IconTexture: Interface\AddOns\ArtisanFinder\Images\Icon.tga
+## IconTexture: Interface\AddOns\ArtisanFinder\Images\MinimapIcon.tga
 ## SavedVariables: ArtisanFinderDB
 
 Libs\LibStub\LibStub.lua
