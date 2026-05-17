@@ -1,6 +1,6 @@
 local _, AF = ...
 
-local ICON = "Interface\\Minimap\\Tracking\\Profession"
+local ICON = "Interface\\AddOns\\ArtisanFinder\\Images\\MinimapIcon.tga"
 local ICON_COORDS = { 0, 1, 0, 1 }
 
 local function OpenProfessionPanel()
@@ -76,7 +76,26 @@ function AF:InitializeMinimap()
 
 	icon:Register("ArtisanFinder", self.minimapBroker, self.db.minimap)
 	self.minimapIcon = icon
+	self:StyleMinimapButton()
 	self:RefreshMinimap()
+end
+
+function AF:StyleMinimapButton()
+	if not self.minimapIcon then
+		return
+	end
+	self.minimapIcon:RemoveButtonBorder("ArtisanFinder")
+	self.minimapIcon:RemoveButtonBackground("ArtisanFinder")
+	self.minimapIcon:SetButtonIcon("ArtisanFinder", ICON, 31, "CENTER", 0, 0)
+	local button = self.minimapIcon:GetMinimapButton("ArtisanFinder")
+	if button then
+		button:SetHighlightTexture(nil)
+		local highlight = button:GetHighlightTexture()
+		if highlight then
+			highlight:SetTexture(nil)
+			highlight:SetAlpha(0)
+		end
+	end
 end
 
 function AF:SetMinimapHidden(hidden)
@@ -98,23 +117,13 @@ function AF:RefreshMinimap()
 		return
 	end
 
-	local scanned = self:TableCount(self.db.artisanProfile.items)
-	if scanned == 0 then
-		self.minimapBroker.iconR = 0.65
-		self.minimapBroker.iconG = 0.65
-		self.minimapBroker.iconB = 0.65
-	elseif self.available then
-		self.minimapBroker.iconR = 0.3
-		self.minimapBroker.iconG = 1
-		self.minimapBroker.iconB = 0.3
-	else
-		self.minimapBroker.iconR = 1
-		self.minimapBroker.iconG = 0.78
-		self.minimapBroker.iconB = 0.25
-	end
+	self.minimapBroker.iconR = 1
+	self.minimapBroker.iconG = 1
+	self.minimapBroker.iconB = 1
 
 	if self.minimapIcon then
 		self.minimapIcon:Refresh("ArtisanFinder", self.db.minimap)
+		self:StyleMinimapButton()
 		if self.db.minimap.hide then
 			self.minimapIcon:Hide("ArtisanFinder")
 		else
