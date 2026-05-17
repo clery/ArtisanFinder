@@ -104,6 +104,21 @@ function AF:InitializeOptions()
 	)
 	Settings.CreateCheckbox(category, autoAvailability, self:Text("OPTIONS_AUTO_AVAILABILITY_DESC"))
 
+	AddSection("OPTIONS_SECTION_MINIMAP")
+	local hideMinimap = RegisterProxySetting(
+		"ArtisanFinder_HideMinimap",
+		Settings.VarType.Boolean,
+		"OPTIONS_HIDE_MINIMAP",
+		false,
+		function()
+			return AF.db.minimap and AF.db.minimap.hide == true
+		end,
+		function(value)
+			AF:SetMinimapHidden(value == true)
+		end
+	)
+	Settings.CreateCheckbox(category, hideMinimap, self:Text("OPTIONS_HIDE_MINIMAP_DESC"))
+
 	Settings.RegisterAddOnCategory(category)
 end
 

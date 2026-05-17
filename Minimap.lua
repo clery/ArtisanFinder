@@ -45,7 +45,9 @@ function AF:InitializeMinimap()
 		icon = ICON,
 		iconCoords = ICON_COORDS,
 		OnClick = function(_, button)
-			if button == "LeftButton" then
+			if IsShiftKeyDown() then
+				AF:SetMinimapHidden(true)
+			elseif button == "LeftButton" then
 				AF:ToggleAvailable()
 			elseif button == "MiddleButton" then
 				AF:ToggleAutoAvailability()
@@ -68,12 +70,27 @@ function AF:InitializeMinimap()
 			tooltip:AddLine(AF:Text("MINIMAP_LEFT_CLICK"), 0.65, 0.65, 0.65)
 			tooltip:AddLine(AF:Text("MINIMAP_MIDDLE_CLICK"), 0.65, 0.65, 0.65)
 			tooltip:AddLine(AF:Text("MINIMAP_RIGHT_CLICK"), 0.65, 0.65, 0.65)
+			tooltip:AddLine(AF:Text("MINIMAP_SHIFT_CLICK"), 0.65, 0.65, 0.65)
 		end,
 	})
 
 	icon:Register("ArtisanFinder", self.minimapBroker, self.db.minimap)
 	self.minimapIcon = icon
 	self:RefreshMinimap()
+end
+
+function AF:SetMinimapHidden(hidden)
+	self.db.minimap.hide = hidden == true
+	if self.minimapIcon then
+		if self.db.minimap.hide then
+			self.minimapIcon:Hide("ArtisanFinder")
+		else
+			self.minimapIcon:Show("ArtisanFinder")
+		end
+	end
+	if self.RefreshOptionsPanel then
+		self:RefreshOptionsPanel()
+	end
 end
 
 function AF:RefreshMinimap()
@@ -98,5 +115,10 @@ function AF:RefreshMinimap()
 
 	if self.minimapIcon then
 		self.minimapIcon:Refresh("ArtisanFinder", self.db.minimap)
+		if self.db.minimap.hide then
+			self.minimapIcon:Hide("ArtisanFinder")
+		else
+			self.minimapIcon:Show("ArtisanFinder")
+		end
 	end
 end
