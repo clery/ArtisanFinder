@@ -12,4 +12,5 @@ ignore:
   - tmp
   - Images/CrafterView.png
   - Images/CustomerView.png
+  - Images/CustomerViewPopup.png
   - Images/Options.png
