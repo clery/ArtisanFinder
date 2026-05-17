@@ -176,6 +176,10 @@ function AF:InjectDebugTradeLeads()
 end
 
 function AF:OnTradeChatMessage(message, sender)
+	if self:IsInCombatLocked() then
+		return
+	end
+
 	local links = ExtractTradeLinks(message)
 	if #links == 0 or not sender then
 		return

@@ -906,9 +906,17 @@ function AF:ProcessScanQueue()
 	if self.scanProcessing then
 		return
 	end
+	if self:IsInCombatLocked() then
+		self.deferredScanResume = true
+		return
+	end
 	self.scanProcessing = true
 	C_Timer.After(0.03, function()
 		AF.scanProcessing = false
+		if AF:IsInCombatLocked() then
+			AF.deferredScanResume = true
+			return
+		end
 
 		local active, professionEntry, progress = AF:GetActiveScanProgress()
 		if not active then
@@ -933,7 +941,7 @@ function AF:ProcessScanQueue()
 	end)
 end
 
-function AF:PauseActiveProfessionScan()
+function AF:PauseActiveProfessionScan(silent)
 	local active = self.activeScan
 	if not active or not active.professionID then
 		return
@@ -952,12 +960,16 @@ function AF:PauseActiveProfessionScan()
 	local remaining = progress and progress.pending and #progress.pending or 0
 	self.activeScan = nil
 
-	if remaining > 0 then
+	if remaining > 0 and not silent then
 		self:Print(self:Text("SCAN_PAUSED", professionEntry.name or self:Text("PROFESSION_FALLBACK", tostring(active.professionID)), remaining))
 	end
 end
 
 function AF:StartOrResumeCurrentProfessionScan(force, silent)
+	if self:IsInCombatLocked() then
+		self.deferredScanResume = true
+		return 0
+	end
 	if self:IsLinkedProfessionOpen() then
 		self.activeScan = nil
 		return 0
@@ -1048,6 +1060,10 @@ function AF:QueueAutoScan(force)
 end
 
 function AF:QueueAutoScanForChange(reason)
+	if self:IsInCombatLocked() then
+		self.deferredAutoScanReason = reason or self.deferredAutoScanReason
+		return
+	end
 	if self:IsLinkedProfessionOpen() then
 		self.pendingAutoScanReason = nil
 		return
@@ -1062,6 +1078,10 @@ function AF:QueueAutoScanForChange(reason)
 	self.pendingAutoScanReason = reason or self.pendingAutoScanReason
 	C_Timer.After(1.0, function()
 		AF.autoScanQueued = false
+		if AF:IsInCombatLocked() then
+			AF.deferredAutoScanReason = AF.pendingAutoScanReason
+			return
+		end
 		if AF:IsLinkedProfessionOpen() then
 			AF.pendingAutoScanReason = nil
 			return

@@ -11,6 +11,8 @@ end
 
 RegisterEvent(AF.frame, "ADDON_LOADED")
 RegisterEvent(AF.frame, "PLAYER_LOGIN")
+RegisterEvent(AF.frame, "PLAYER_REGEN_ENABLED")
+RegisterEvent(AF.frame, "PLAYER_REGEN_DISABLED")
 RegisterEvent(AF.frame, "PLAYER_ENTERING_WORLD")
 RegisterEvent(AF.frame, "ZONE_CHANGED")
 RegisterEvent(AF.frame, "ZONE_CHANGED_INDOORS")
@@ -156,6 +158,10 @@ function AF:RefreshAutoAvailability(silent)
 	if not self.db or not self.db.autoAvailability then
 		return
 	end
+	if self:IsInCombatLocked() then
+		self.deferredAutoAvailabilityRefresh = true
+		return
+	end
 	self:SetAvailable(self:ShouldAutoBeAvailable(), silent)
 end
 
@@ -163,9 +169,17 @@ function AF:QueueAutoAvailabilityRefresh()
 	if not self.db or not self.db.autoAvailability or self.autoAvailabilityQueued then
 		return
 	end
+	if self:IsInCombatLocked() then
+		self.deferredAutoAvailabilityRefresh = true
+		return
+	end
 	self.autoAvailabilityQueued = true
 	C_Timer.After(0.5, function()
 		AF.autoAvailabilityQueued = false
+		if AF:IsInCombatLocked() then
+			AF.deferredAutoAvailabilityRefresh = true
+			return
+		end
 		AF:RefreshAutoAvailability()
 	end)
 end
@@ -201,25 +215,73 @@ AF.frame:SetScript("OnEvent", function(_, event, ...)
 		AF:OnAddonLoaded(...)
 	elseif event == "PLAYER_LOGIN" then
 		AF:OnPlayerLogin()
+	elseif event == "PLAYER_REGEN_DISABLED" then
+		if AF.activeScan then
+			AF.deferredScanResume = true
+		end
+		if AF.PauseActiveProfessionScan then
+			AF:PauseActiveProfessionScan(true)
+		else
+			AF.activeScan = nil
+		end
+	elseif event == "PLAYER_REGEN_ENABLED" then
+		if AF.HideDiscoveryChannelFromChat then
+			AF:HideDiscoveryChannelFromChat()
+		end
+		if AF.deferredAutoAvailabilityRefresh then
+			AF.deferredAutoAvailabilityRefresh = nil
+			AF:QueueAutoAvailabilityRefresh()
+		end
+		if AF.deferredAutoScanReason and AF.QueueAutoScanForChange then
+			local reason = AF.deferredAutoScanReason
+			AF.deferredAutoScanReason = nil
+			AF:QueueAutoScanForChange(reason)
+		end
+		if AF.deferredScanResume and AF.ResumeCurrentProfessionScanIfNeeded then
+			AF.deferredScanResume = nil
+			AF:ResumeCurrentProfessionScanIfNeeded()
+		end
 	elseif event == "PLAYER_ENTERING_WORLD" or event == "ZONE_CHANGED" or event == "ZONE_CHANGED_INDOORS" or event == "ZONE_CHANGED_NEW_AREA" or event == "CHANNEL_UI_UPDATE" or event == "CHAT_MSG_CHANNEL_NOTICE" then
+		if AF:IsInCombatLocked() then
+			AF.deferredAutoAvailabilityRefresh = true
+			return
+		end
 		AF:QueueAutoAvailabilityRefresh()
 	elseif event == "CHAT_MSG_ADDON" then
+		if AF:IsInCombatLocked() then
+			return
+		end
 		if AF.OnAddonMessage then
 			AF:OnAddonMessage(...)
 		end
 	elseif event == "CHAT_MSG_CHANNEL" then
+		if AF:IsInCombatLocked() then
+			return
+		end
 		if AF.OnTradeChatMessage then
 			AF:OnTradeChatMessage(...)
 		end
 	elseif event == "CRAFTINGORDERS_SHOW_CUSTOMER" then
+		if AF:IsInCombatLocked() then
+			return
+		end
 		C_Timer.After(0, function()
+			if AF:IsInCombatLocked() then
+				return
+			end
 			AF:TryAttachProfessionUIs()
 			if AF.RefreshCustomerQuery then
 				AF:RefreshCustomerQuery()
 			end
 		end)
 	elseif event == "TRADE_SKILL_SHOW" or event == "TRADE_SKILL_DATA_SOURCE_CHANGED" then
+		if AF:IsInCombatLocked() then
+			return
+		end
 		C_Timer.After(0, function()
+			if AF:IsInCombatLocked() then
+				return
+			end
 			AF:TryAttachProfessionUIs()
 			if event == "TRADE_SKILL_SHOW" and AF.ResumeCurrentProfessionScanIfNeeded then
 				AF:ResumeCurrentProfessionScanIfNeeded()
@@ -238,6 +300,10 @@ AF.frame:SetScript("OnEvent", function(_, event, ...)
 			AF.activeScan = nil
 		end
 	elseif event == "TRADE_SKILL_LIST_UPDATE" or event == "SKILL_LINES_CHANGED" or event == "SPELLS_CHANGED" or event == "TRAIT_CONFIG_UPDATED" or event == "TRAIT_NODE_CHANGED" then
+		if AF:IsInCombatLocked() then
+			AF.deferredAutoScanReason = event
+			return
+		end
 		if AF.QueueAutoScanForChange then
 			AF:QueueAutoScanForChange(event)
 		end

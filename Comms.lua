@@ -33,6 +33,9 @@ function AF:HideDiscoveryChannelFromChat()
 	self.discoveryChannelHideQueued = true
 	C_Timer.After(0.25, function()
 		AF.discoveryChannelHideQueued = false
+		if AF:IsInCombatLocked() then
+			return
+		end
 		for i = 1, (NUM_CHAT_WINDOWS or 0) do
 			local chatFrame = _G["ChatFrame" .. i]
 			if chatFrame and ChatFrame_RemoveChannel then
@@ -46,11 +49,17 @@ function AF:HideDiscoveryChannelFromChat()
 end
 
 function AF:SendAddon(prefixPayload, chatType, target)
+	if self:IsInCombatLocked() then
+		return false
+	end
 	local result = C_ChatInfo.SendAddonMessage(self.PREFIX, prefixPayload, chatType, target)
 	return result
 end
 
 function AF:BroadcastQuery(itemID, professionID)
+	if self:IsInCombatLocked() then
+		return false
+	end
 	itemID = tonumber(itemID)
 	if not itemID then
 		return false
@@ -94,6 +103,9 @@ function AF:QueueBroadcastQuery(itemID, professionID)
 	self.customerQueryQueued = true
 	C_Timer.After(0.2, function()
 		AF.customerQueryQueued = false
+		if AF:IsInCombatLocked() then
+			return
+		end
 		local pendingItemID = AF.pendingCustomerQueryItemID
 		local pendingProfessionID = AF.pendingCustomerQueryProfessionID
 		AF.pendingCustomerQueryItemID = nil

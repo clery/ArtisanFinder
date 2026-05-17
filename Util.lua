@@ -160,6 +160,10 @@ function AF:Now()
 	return time()
 end
 
+function AF:IsInCombatLocked()
+	return InCombatLockdown and InCombatLockdown() == true
+end
+
 local MIGRATIONS = {}
 
 MIGRATIONS[1] = function(db)
