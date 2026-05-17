@@ -747,6 +747,7 @@ function AF:ApplyRecipeCapability(item, recipeID)
 	item.bestTotalSkill = capability.bestTotalSkill
 	item.bestConcentrationCost = capability.bestConcentrationCost
 	item.bestReagentSummary = capability.bestReagentSummary
+	item.bestReagentSummaryUpdatedAt = capability.bestReagentSummary and capability.bestReagentSummary ~= "" and self:Now() or nil
 	item.bestReagentTruncated = capability.bestReagentTruncated == true
 	item.bestReagentPendingNames = capability.bestReagentPendingNames == true
 	item.debugBestCandidateQuality = capability.debugBestCandidateQuality

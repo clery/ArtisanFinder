@@ -104,7 +104,9 @@ local function HasIntersection(left, right)
 end
 
 function AF:InitializeTradeChat()
-	self.tradeLeads = self.tradeLeads or {}
+	self.db.tradeLeads = self.db.tradeLeads or {}
+	self.tradeLeads = self.db.tradeLeads
+	self:PruneTradeLeads()
 end
 
 function AF:GetTradeLeadTTL()
@@ -113,6 +115,7 @@ function AF:GetTradeLeadTTL()
 end
 
 function AF:ClearDebugTradeLeads()
+	self.tradeLeads = self.tradeLeads or self.db and self.db.tradeLeads or {}
 	for key, lead in pairs(self.tradeLeads or {}) do
 		if lead.debug then
 			self.tradeLeads[key] = nil
@@ -121,7 +124,7 @@ function AF:ClearDebugTradeLeads()
 end
 
 function AF:InjectDebugTradeLeads()
-	self.tradeLeads = self.tradeLeads or {}
+	self.tradeLeads = self.tradeLeads or self.db and self.db.tradeLeads or {}
 	self:ClearDebugTradeLeads()
 	if not self.db or not self.db.debugSelfResults then
 		return
@@ -183,7 +186,8 @@ function AF:OnTradeChatMessage(message, sender)
 		return
 	end
 
-	self.tradeLeads = self.tradeLeads or {}
+	self.db.tradeLeads = self.db.tradeLeads or {}
+	self.tradeLeads = self.db.tradeLeads
 	for leadKey, lead in pairs(self.tradeLeads) do
 		if lead.target == name and not lead.debug then
 			self.tradeLeads[leadKey] = nil
@@ -211,6 +215,10 @@ function AF:OnTradeChatMessage(message, sender)
 end
 
 function AF:PruneTradeLeads()
+	if self.db then
+		self.db.tradeLeads = self.db.tradeLeads or {}
+		self.tradeLeads = self.db.tradeLeads
+	end
 	local now = self:Now()
 	local ttl = self:GetTradeLeadTTL()
 	for name, lead in pairs(self.tradeLeads or {}) do

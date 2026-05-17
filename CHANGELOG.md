@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.6 - 2026-05-17
+
+### Changed
+
+- Cached reagent recommendation details are now refreshed on tooltip hover when they are older than one hour, while fresh cached details are still shown immediately without extra addon messages.
+- Trade-chat artisan leads now persist across reloads and sessions while still expiring according to the configured lead duration.
+- Saved data schema was updated to preserve persistent trade-chat leads safely.
+
 ## 1.0.5 - 2026-05-17
 
 ### Changed

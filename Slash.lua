@@ -102,6 +102,7 @@ function AF:ClearAllData()
 	self.lastQueryProfessionID = nil
 	self.lastQueryAt = nil
 	self:EnsureDB()
+	self.tradeLeads = self.db.tradeLeads
 	if self.RefreshCustomerResults then
 		self:RefreshCustomerResults(self:Text("SELECT_ORDER_ITEM"))
 	end

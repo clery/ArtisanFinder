@@ -9,10 +9,11 @@ AF.CHANNEL_NAME = "ArtisanFinder"
 AF.CACHE_MAX_AGE = 14 * 24 * 60 * 60
 AF.RESPONSE_THROTTLE = 60
 AF.DETAIL_REQUEST_THROTTLE = 30
+AF.REAGENT_DETAIL_CACHE_MAX_AGE = 60 * 60
 AF.LIVE_QUERY_TIMEOUT = 6
 AF.MAX_NOTE_BYTES = 80
 AF.MAX_LINK_BYTES = 96
-AF.SCHEMA_VERSION = 2
+AF.SCHEMA_VERSION = 3
 
 function AF:Print(message)
 	print("|cff33ff99ArtisanFinder:|r " .. tostring(message))
@@ -193,6 +194,10 @@ MIGRATIONS[2] = function(db)
 	end
 end
 
+MIGRATIONS[3] = function(db)
+	db.tradeLeads = db.tradeLeads or {}
+end
+
 function AF:MigrateDB(db)
 	local version = tonumber(db.schemaVersion) or 0
 	while version < self.SCHEMA_VERSION do
@@ -219,6 +224,7 @@ function AF:EnsureDB()
 	db.customerCache = db.customerCache or {}
 	db.favoriteArtisans = db.favoriteArtisans or {}
 	db.responseThrottle = db.responseThrottle or {}
+	db.tradeLeads = db.tradeLeads or {}
 	if db.debugSelfResults == nil then
 		db.debugSelfResults = false
 	end

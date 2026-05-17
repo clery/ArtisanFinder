@@ -353,6 +353,7 @@ function AF:HandleResponse(parts, sender)
 		bestConcentrationCost = bestConcentrationCost,
 		bestReagentTruncated = bestReagentTruncated,
 		bestReagentSummary = previousRecipeID == recipeID and previous and previous.bestReagentSummary or nil,
+		bestReagentSummaryUpdatedAt = previousRecipeID == recipeID and previous and previous.bestReagentSummaryUpdatedAt or nil,
 		hasReagentSummary = hasReagentSummary,
 		professionLink = professionLink ~= "" and professionLink or nil,
 		updatedAt = timestamp,
@@ -371,8 +372,19 @@ function AF:GetReagentDetailKey(sender, itemID, recipeID, queryToken)
 	return table.concat({ sender, itemID or 0, recipeID or 0, queryToken or 0 }, ":")
 end
 
+function AF:IsReagentDetailCacheFresh(entry)
+	if not entry or not entry.bestReagentSummary or entry.bestReagentSummary == "" then
+		return false
+	end
+	local updatedAt = tonumber(entry.bestReagentSummaryUpdatedAt)
+	return updatedAt and self:Now() - updatedAt < self.REAGENT_DETAIL_CACHE_MAX_AGE
+end
+
 function AF:RequestReagentDetail(entry)
-	if not entry or entry.tradeLead or entry.bestReagentSummary or not entry.hasReagentSummary then
+	if not entry or entry.tradeLead or self:IsReagentDetailCacheFresh(entry) then
+		return false
+	end
+	if not entry.hasReagentSummary and not entry.bestReagentSummary then
 		return false
 	end
 	local itemID = tonumber(entry.itemID)
@@ -425,6 +437,7 @@ function AF:ApplyPendingReagentDetail(sender, itemID, recipeID, queryToken)
 	local entryRecipeID = tonumber(entry and entry.recipeID) or 0
 	if entry and tonumber(entry.lastQueryToken) == tonumber(queryToken) and entryRecipeID == (tonumber(recipeID) or 0) then
 		entry.bestReagentSummary = pending.summary
+		entry.bestReagentSummaryUpdatedAt = self:Now()
 		entry.reagentDetailRequested = nil
 		self.pendingReagentDetails[key] = nil
 	end
