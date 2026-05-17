@@ -47,6 +47,8 @@ function AF:InitializeMinimap()
 		OnClick = function(_, button)
 			if button == "LeftButton" then
 				AF:ToggleAvailable()
+			elseif button == "MiddleButton" then
+				AF:ToggleAutoAvailability()
 			elseif button == "RightButton" then
 				OpenProfessionPanel()
 			end
@@ -57,9 +59,14 @@ function AF:InitializeMinimap()
 			end
 			tooltip:AddLine("ArtisanFinder", 1, 0.82, 0)
 			tooltip:AddLine(AF.available and AF:Text("MINIMAP_AVAILABLE") or AF:Text("MINIMAP_UNAVAILABLE"), AF.available and 0.1 or 1, AF.available and 1 or 0.25, 0.1)
+			tooltip:AddLine(AF:Text("MINIMAP_AUTO_AVAILABILITY", AF.db.autoAvailability and AF:Text("ENABLED") or AF:Text("DISABLED")), 1, 1, 1)
+			if AF.db.autoAvailability then
+				tooltip:AddLine(AF:Text("MINIMAP_AUTO_HINT"), 0.65, 0.65, 0.65, true)
+			end
 			tooltip:AddLine(AF:Text("MINIMAP_SCANNED", AF:TableCount(AF.db.artisanProfile.items)), 1, 1, 1)
 			tooltip:AddLine(" ")
 			tooltip:AddLine(AF:Text("MINIMAP_LEFT_CLICK"), 0.65, 0.65, 0.65)
+			tooltip:AddLine(AF:Text("MINIMAP_MIDDLE_CLICK"), 0.65, 0.65, 0.65)
 			tooltip:AddLine(AF:Text("MINIMAP_RIGHT_CLICK"), 0.65, 0.65, 0.65)
 		end,
 	})

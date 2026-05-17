@@ -13,6 +13,7 @@ function AF:JoinDiscoveryChannel()
 			JoinChannelByName(self.CHANNEL_NAME)
 		end
 	end
+	self:HideDiscoveryChannelFromChat()
 end
 
 function AF:GetDiscoveryChannelID()
@@ -21,7 +22,27 @@ function AF:GetDiscoveryChannelID()
 		self:JoinDiscoveryChannel()
 		id = GetChannelName(self.CHANNEL_NAME)
 	end
+	self:HideDiscoveryChannelFromChat()
 	return id
+end
+
+function AF:HideDiscoveryChannelFromChat()
+	if self.discoveryChannelHideQueued then
+		return
+	end
+	self.discoveryChannelHideQueued = true
+	C_Timer.After(0.25, function()
+		AF.discoveryChannelHideQueued = false
+		for i = 1, (NUM_CHAT_WINDOWS or 0) do
+			local chatFrame = _G["ChatFrame" .. i]
+			if chatFrame and ChatFrame_RemoveChannel then
+				ChatFrame_RemoveChannel(chatFrame, AF.CHANNEL_NAME)
+			end
+			if RemoveChatWindowChannel then
+				RemoveChatWindowChannel(i, AF.CHANNEL_NAME)
+			end
+		end
+	end)
 end
 
 function AF:SendAddon(prefixPayload, chatType, target)

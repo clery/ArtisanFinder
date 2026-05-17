@@ -1,6 +1,14 @@
 local _, AF = ...
 
 local TRADE_LEAD_TTL = 5 * 60
+local DEBUG_TRADE_LEAD_COUNT = 5
+local DEBUG_TRADE_NAMES = {
+	"Marielle",
+	"Thorgann",
+	"Velindra",
+	"Orryn",
+	"Selwen",
+}
 local PROFESSION_SPELL_TO_SKILL_LINE = {
 	[2259] = 171, -- Alchemy
 	[2018] = 164, -- Blacksmithing
@@ -54,8 +62,97 @@ local function GetTradeLinkProfessionCandidates(link)
 	return candidates
 end
 
+local function AddCandidate(candidates, value)
+	value = tonumber(value)
+	if value and value ~= 0 then
+		candidates[value] = true
+	end
+end
+
+local function AddProfessionInfoCandidates(candidates, professionInfo)
+	if type(professionInfo) ~= "table" then
+		return
+	end
+	AddCandidate(candidates, professionInfo.profession)
+	AddCandidate(candidates, professionInfo.professionID)
+	AddCandidate(candidates, professionInfo.skillLineID)
+	AddCandidate(candidates, professionInfo.parentProfession)
+	AddCandidate(candidates, professionInfo.parentProfessionID)
+	AddCandidate(candidates, professionInfo.parentSkillLineID)
+	AddCandidate(candidates, professionInfo.sourceSkillLineID)
+end
+
+local function HasIntersection(left, right)
+	for key in pairs(left or {}) do
+		if right and right[key] then
+			return true
+		end
+	end
+	return false
+end
+
 function AF:InitializeTradeChat()
 	self.tradeLeads = self.tradeLeads or {}
+end
+
+function AF:ClearDebugTradeLeads()
+	for key, lead in pairs(self.tradeLeads or {}) do
+		if lead.debug then
+			self.tradeLeads[key] = nil
+		end
+	end
+end
+
+function AF:InjectDebugTradeLeads()
+	self.tradeLeads = self.tradeLeads or {}
+	self:ClearDebugTradeLeads()
+	if not self.db or not self.db.debugSelfResults then
+		return
+	end
+
+	local profile = self.db.artisanProfile
+	local now = self:Now()
+	local professions = {}
+	for professionKey, profession in pairs(profile and profile.professions or {}) do
+		local professionID = tonumber(profession.id) or tonumber(professionKey)
+		if professionID then
+			table.insert(professions, {
+				id = professionID,
+				link = profession.professionLink,
+				name = profession.name or self:GetProfessionName(professionID),
+			})
+		end
+	end
+	if #professions == 0 then
+		return
+	end
+
+	for index = 1, DEBUG_TRADE_LEAD_COUNT do
+		local profession = professions[((index - 1) % #professions) + 1]
+		local selectedProfessionID = tonumber(self.currentCustomerProfessionID)
+		if selectedProfessionID and selectedProfessionID ~= 0 then
+			for _, candidateProfession in ipairs(professions) do
+				if tonumber(candidateProfession.id) == selectedProfessionID then
+					profession = candidateProfession
+					break
+				end
+			end
+		end
+		local candidates = {}
+		candidates[profession.id] = true
+		local name = DEBUG_TRADE_NAMES[index] .. "-" .. (GetRealmName() or "")
+		self.tradeLeads["__debug_trade_" .. tostring(index)] = {
+			name = name,
+			target = name,
+			professionLink = profession.link,
+			professionName = profession.name,
+			professionCandidates = candidates,
+			updatedAt = now,
+			tradeLead = true,
+			certified = false,
+			debug = true,
+		}
+	end
 end
 
 function AF:OnTradeChatMessage(message, sender)
@@ -95,19 +192,34 @@ function AF:PruneTradeLeads()
 	end
 end
 
-function AF:GetTradeLeadRows(itemID, professionID, filterText, seenNames)
+function AF:GetCustomerRecipeProfessionCandidates(recipeID, professionID)
+	local candidates = {}
+	AddCandidate(candidates, professionID)
+
+	if recipeID and C_TradeSkillUI and C_TradeSkillUI.GetProfessionInfoByRecipeID then
+		local ok, professionInfo = pcall(C_TradeSkillUI.GetProfessionInfoByRecipeID, recipeID)
+		if ok then
+			AddProfessionInfoCandidates(candidates, professionInfo)
+		end
+	end
+
+	return candidates
+end
+
+function AF:GetTradeLeadRows(itemID, professionID, filterText, seenNames, recipeID)
 	self:PruneTradeLeads()
 	local rows = {}
 	local normalizedProfessionID = tonumber(professionID) or 0
+	local recipeProfessionCandidates = self:GetCustomerRecipeProfessionCandidates(recipeID, normalizedProfessionID)
+	local hasRecipeProfessionCandidates = next(recipeProfessionCandidates) ~= nil
 	filterText = tostring(filterText or ""):lower()
 
 	for name, lead in pairs(self.tradeLeads or {}) do
 		local hasProfessionCandidates = lead.professionCandidates and next(lead.professionCandidates) ~= nil
-		local exactProfessionMatch = normalizedProfessionID == 0
-			or not hasProfessionCandidates
-			or tonumber(lead.professionID) == normalizedProfessionID
-			or (lead.professionCandidates and lead.professionCandidates[normalizedProfessionID])
-		if not (seenNames and seenNames[name]) then
+		local exactProfessionMatch = hasRecipeProfessionCandidates
+			and hasProfessionCandidates
+			and HasIntersection(lead.professionCandidates, recipeProfessionCandidates)
+		if exactProfessionMatch and not (seenNames and seenNames[name]) then
 			local row = {
 				name = lead.name,
 				target = lead.target,

@@ -1,26 +1,90 @@
 local _, AF = ...
 
+local DEFAULT_COMMISSION_PANEL_WIDTH = 304
+local DEFAULT_COMMISSION_PANEL_HEIGHT = 150
+
+local function UpdatePlaceholder(box)
+	if not box or not box.Placeholder then
+		return
+	end
+	box.Placeholder:SetShown((box:GetText() or "") == "" and not box:HasFocus())
+end
+
 local function SetEditBoxText(box, text)
 	box.artisanFinderSettingText = true
 	box:SetText(text or "")
 	box:SetCursorPosition(0)
 	box.artisanFinderSettingText = false
+	UpdatePlaceholder(box)
 end
 
-local function AddGoldIcon(parent, anchor)
-	local icon = parent:CreateTexture(nil, "ARTWORK")
+local function AddGoldIcon(parent)
+	local icon = parent:CreateTexture(nil, "OVERLAY")
 	icon:SetSize(14, 14)
-	icon:SetPoint("LEFT", anchor, "RIGHT", 4, 0)
+	icon:SetPoint("RIGHT", -7, 0)
 	icon:SetTexture("Interface\\MoneyFrame\\UI-GoldIcon")
 	return icon
 end
 
 local function WatchEditBox(box, callback)
 	box:SetScript("OnTextChanged", function(self)
+		UpdatePlaceholder(self)
 		if not self.artisanFinderSettingText then
 			callback()
 		end
 	end)
+end
+
+local function CreateInsetEditBox(parent, width, placeholderKey, hasGoldIcon)
+	local field = CreateFrame("Frame", nil, parent, "BackdropTemplate")
+	field:SetSize(width, 24)
+	field.Background = field:CreateTexture(nil, "BACKGROUND")
+	field.Background:SetColorTexture(0.02, 0.018, 0.014, 0.72)
+	field.Background:SetPoint("TOPLEFT", 3, -3)
+	field.Background:SetPoint("BOTTOMRIGHT", -3, 3)
+	field.NineSlice = CreateFrame("Frame", nil, field, "NineSlicePanelTemplate")
+	field.NineSlice:SetAllPoints()
+	field.NineSlice.layoutType = "InsetFrameTemplate"
+	if NineSliceUtil and NineSliceUtil.ApplyLayoutByName then
+		NineSliceUtil.ApplyLayoutByName(field.NineSlice, field.NineSlice.layoutType)
+	end
+
+	local box = CreateFrame("EditBox", nil, field)
+	box.Field = field
+	box:SetPoint("LEFT", 8, 0)
+	box:SetPoint("RIGHT", hasGoldIcon and -25 or -8, 0)
+	box:SetHeight(20)
+	box:SetAutoFocus(false)
+	box:SetFontObject(GameFontHighlightSmall)
+	box:SetJustifyH("LEFT")
+
+	box.Placeholder = field:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+	box.Placeholder:SetPoint("LEFT", box, "LEFT", 0, 0)
+	box.Placeholder:SetPoint("RIGHT", box, "RIGHT", 0, 0)
+	box.Placeholder:SetJustifyH("LEFT")
+	box.Placeholder:SetText(AF:Text(placeholderKey))
+
+	if hasGoldIcon then
+		box.GoldIcon = AddGoldIcon(field)
+	end
+
+	box:SetScript("OnEditFocusGained", function(self)
+		UpdatePlaceholder(self)
+	end)
+	box:SetScript("OnEditFocusLost", function(self)
+		UpdatePlaceholder(self)
+	end)
+	UpdatePlaceholder(box)
+
+	return box
+end
+
+local function SetFieldPoint(box, ...)
+	box.Field:SetPoint(...)
+end
+
+local function SetFieldWidth(box, width)
+	box.Field:SetWidth(width)
 end
 
 local function SizeButtonForText(button, text, minWidth, maxWidth)
@@ -40,10 +104,19 @@ local function FitNoteAndSave(container, noteLabel, noteBox, saveButton, totalWi
 	local saveWidth = SizeButtonForText(saveButton, AF:Text("SAVE"), 54)
 	local noteWidth = math.max(minNoteWidth or 80, totalWidth - noteLabel:GetWidth() - 4 - 8 - saveWidth)
 	local fittedWidth = math.max(totalWidth, noteLabel:GetWidth() + 4 + noteWidth + 8 + saveWidth)
-	noteBox:SetWidth(noteWidth)
+	SetFieldWidth(noteBox, noteWidth)
 	saveButton:ClearAllPoints()
-	saveButton:SetPoint("LEFT", noteBox, "RIGHT", 8, 0)
+	saveButton:SetPoint("LEFT", noteBox.Field, "RIGHT", 8, 0)
 	container:SetWidth(fittedWidth)
+end
+
+local function FitStackedDefaultNoteAndSave(container, noteLabel, noteBox, saveButton)
+	local noteWidth = DEFAULT_COMMISSION_PANEL_WIDTH - 14 - noteLabel:GetWidth() - 4 - 14
+	SetFieldWidth(noteBox, noteWidth)
+	SizeButtonForText(saveButton, AF:Text("SAVE"), 54, noteWidth)
+	saveButton:ClearAllPoints()
+	saveButton:SetPoint("TOPLEFT", noteBox.Field, "BOTTOMLEFT", 0, -8)
+	container:SetSize(DEFAULT_COMMISSION_PANEL_WIDTH, DEFAULT_COMMISSION_PANEL_HEIGHT)
 end
 
 local function AddInfoButton(parent, tooltipTitle, tooltipText)
@@ -77,6 +150,30 @@ function AF:InitializeCrafterUI()
 	self:AttachCrafterUI()
 end
 
+function AF:RefreshCrafterLocale()
+	local frame = self.crafterFrame
+	local defaults = self.crafterDefaultsFrame
+	if frame then
+		frame.priceLabel:SetText(self:Text("COMMISSION"))
+		frame.noteLabel:SetText(self:Text("NOTE"))
+		frame.price.Placeholder:SetText(self:Text("COMMISSION_PLACEHOLDER"))
+		frame.note.Placeholder:SetText(self:Text("NOTE_PLACEHOLDER"))
+		UpdatePlaceholder(frame.price)
+		UpdatePlaceholder(frame.note)
+		FitNoteAndSave(frame, frame.noteLabel, frame.note, frame.save, 326, 120)
+	end
+	if defaults then
+		defaults.title:SetText(self:Text("DEFAULT_COMMISSION"))
+		defaults.priceLabel:SetText(self:Text("COMMISSION"))
+		defaults.noteLabel:SetText(self:Text("NOTE"))
+		defaults.price.Placeholder:SetText(self:Text("COMMISSION_PLACEHOLDER"))
+		defaults.note.Placeholder:SetText(self:Text("NOTE_PLACEHOLDER"))
+		UpdatePlaceholder(defaults.price)
+		UpdatePlaceholder(defaults.note)
+		FitStackedDefaultNoteAndSave(defaults, defaults.noteLabel, defaults.note, defaults.save)
+	end
+end
+
 function AF:GetCraftingSchematicForm()
 	if not ProfessionsFrame or not ProfessionsFrame.CraftingPage then
 		return nil
@@ -108,6 +205,11 @@ function AF:GetCurrentCraftingRecipeContext()
 	end
 
 	local recipeID = recipeInfo.recipeID
+	local isRecraft = recipeInfo.isRecraft == true or form.isRecraft == true
+	if not isRecraft and form.transaction and form.transaction.IsRecraft then
+		isRecraft = form.transaction:IsRecraft() == true
+	end
+
 	local itemID
 	local outputs = self:GetRecipeOutputItemIDs(recipeID)
 	for outputItemID in pairs(outputs) do
@@ -134,6 +236,7 @@ function AF:GetCurrentCraftingRecipeContext()
 		recipeID = recipeID,
 		recipeName = recipeInfo.name,
 		learned = recipeInfo.learned ~= false,
+		isRecraft = isRecraft,
 		professionID = professionID,
 		professionName = (professionInfo and professionInfo.professionName) or (fallbackProfession and fallbackProfession.name),
 	} or nil
@@ -191,11 +294,8 @@ function AF:AttachCrafterUI()
 	frame.priceLabel:SetJustifyH("LEFT")
 	frame.priceLabel:SetText(self:Text("COMMISSION"))
 
-	frame.price = CreateFrame("EditBox", nil, frame, "InputBoxTemplate")
-	frame.price:SetSize(58, 22)
-	frame.price:SetPoint("LEFT", frame.priceLabel, "RIGHT", 4, 0)
-	frame.price:SetAutoFocus(false)
-	frame.priceGold = AddGoldIcon(frame, frame.price)
+	frame.price = CreateInsetEditBox(frame, 78, "COMMISSION_PLACEHOLDER", true)
+	SetFieldPoint(frame.price, "LEFT", frame.priceLabel, "RIGHT", 4, 0)
 
 	frame.noteLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	frame.noteLabel:SetSize(74, 20)
@@ -203,17 +303,15 @@ function AF:AttachCrafterUI()
 	frame.noteLabel:SetJustifyH("LEFT")
 	frame.noteLabel:SetText(self:Text("NOTE"))
 
-	frame.note = CreateFrame("EditBox", nil, frame, "InputBoxTemplate")
-	frame.note:SetSize(170, 22)
-	frame.note:SetPoint("LEFT", frame.noteLabel, "RIGHT", 4, 0)
-	frame.note:SetAutoFocus(false)
+	frame.note = CreateInsetEditBox(frame, 170, "NOTE_PLACEHOLDER")
+	SetFieldPoint(frame.note, "LEFT", frame.noteLabel, "RIGHT", 4, 0)
 	frame.note:SetMaxLetters(AF.MAX_NOTE_BYTES)
 
 	frame.save = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
 	frame.save:SetSize(54, 22)
 	frame.save:SetPoint("LEFT", frame.note, "RIGHT", 8, 0)
 	FitNoteAndSave(frame, frame.noteLabel, frame.note, frame.save, 326, 120)
-	frame.save:Hide()
+	frame.save:Disable()
 	frame.save:SetScript("OnClick", function()
 		local context = AF:GetCurrentCraftingRecipeContext()
 		local item = AF:EnsureCurrentRecipeEntry(context)
@@ -231,27 +329,29 @@ function AF:AttachCrafterUI()
 		AF:RefreshCrafterUI()
 	end)
 
-	local defaults = CreateFrame("Frame", "ArtisanFinderProfessionDefaultsFrame", ProfessionsFrame, "BackdropTemplate")
-	defaults:SetSize(286, 108)
-	self:ApplyProfessionPanel(defaults)
-	defaults.title = defaults:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-	defaults.title:SetPoint("TOPLEFT", 12, -10)
+	local defaults = CreateFrame("Frame", "ArtisanFinderProfessionDefaultsFrame", ProfessionsFrame, "DefaultPanelTemplate")
+	defaults:SetSize(DEFAULT_COMMISSION_PANEL_WIDTH, DEFAULT_COMMISSION_PANEL_HEIGHT)
+	self:ApplyCustomerSidePanel(defaults)
+	local defaultsTitleParent = defaults.TitleContainer or defaults
+	defaults.title = defaults.TitleText or defaultsTitleParent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	defaults.title:SetParent(defaultsTitleParent)
+	defaults.title:ClearAllPoints()
+	defaults.title:SetPoint("TOP", defaultsTitleParent, "TOP", 0, -5)
+	defaults.title:SetPoint("LEFT", defaultsTitleParent, "LEFT", 0, 0)
+	defaults.title:SetPoint("RIGHT", defaultsTitleParent, "RIGHT", 0, 0)
+	defaults.title:SetJustifyH("CENTER")
 	defaults.title:SetText(self:Text("DEFAULT_COMMISSION"))
 	defaults.info = AddInfoButton(defaults, "DEFAULT_COMMISSION", "DEFAULT_COMMISSION_TOOLTIP")
-	defaults.info:SetPoint("TOPRIGHT", -10, -8)
-	defaults.divider = self:AddDivider(defaults, defaults.title, -7)
+	defaults.info:SetPoint("TOPRIGHT", -12, -28)
 
 	defaults.priceLabel = defaults:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	defaults.priceLabel:SetSize(74, 20)
-	defaults.priceLabel:SetPoint("TOPLEFT", defaults.divider, "BOTTOMLEFT", 0, -8)
+	defaults.priceLabel:SetPoint("TOPLEFT", defaults, "TOPLEFT", 14, -37)
 	defaults.priceLabel:SetJustifyH("LEFT")
 	defaults.priceLabel:SetText(self:Text("COMMISSION"))
 
-	defaults.price = CreateFrame("EditBox", nil, defaults, "InputBoxTemplate")
-	defaults.price:SetSize(58, 22)
-	defaults.price:SetPoint("LEFT", defaults.priceLabel, "RIGHT", 4, 0)
-	defaults.price:SetAutoFocus(false)
-	defaults.priceGold = AddGoldIcon(defaults, defaults.price)
+	defaults.price = CreateInsetEditBox(defaults, 78, "COMMISSION_PLACEHOLDER", true)
+	SetFieldPoint(defaults.price, "LEFT", defaults.priceLabel, "RIGHT", 4, 0)
 
 	defaults.noteLabel = defaults:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	defaults.noteLabel:SetSize(74, 20)
@@ -259,17 +359,14 @@ function AF:AttachCrafterUI()
 	defaults.noteLabel:SetJustifyH("LEFT")
 	defaults.noteLabel:SetText(self:Text("NOTE"))
 
-	defaults.note = CreateFrame("EditBox", nil, defaults, "InputBoxTemplate")
-	defaults.note:SetSize(128, 22)
-	defaults.note:SetPoint("LEFT", defaults.noteLabel, "RIGHT", 4, 0)
-	defaults.note:SetAutoFocus(false)
+	defaults.note = CreateInsetEditBox(defaults, 128, "NOTE_PLACEHOLDER")
+	SetFieldPoint(defaults.note, "LEFT", defaults.noteLabel, "RIGHT", 4, 0)
 	defaults.note:SetMaxLetters(AF.MAX_NOTE_BYTES)
 
 	defaults.save = CreateFrame("Button", nil, defaults, "UIPanelButtonTemplate")
 	defaults.save:SetSize(54, 22)
-	defaults.save:SetPoint("LEFT", defaults.note, "RIGHT", 8, 0)
-	FitNoteAndSave(defaults, defaults.noteLabel, defaults.note, defaults.save, 286, 88)
-	defaults.save:Hide()
+	FitStackedDefaultNoteAndSave(defaults, defaults.noteLabel, defaults.note, defaults.save)
+	defaults.save:Disable()
 	defaults.save:SetScript("OnClick", function()
 		local context = AF:GetCurrentCraftingRecipeContext()
 		local professionID = context and context.professionID
@@ -355,7 +452,7 @@ function AF:PositionCrafterUI()
 	end
 
 	defaults:ClearAllPoints()
-	defaults:SetPoint("BOTTOMLEFT", ProfessionsFrame, "BOTTOMRIGHT", 8, 24)
+	defaults:SetPoint("BOTTOMLEFT", ProfessionsFrame, "BOTTOMRIGHT", -5, 24)
 end
 
 function AF:UpdateCrafterDirtyState()
@@ -373,9 +470,9 @@ function AF:UpdateCrafterDirtyState()
 			or (frame.note:GetText() or "") ~= (item.note or "")
 	end
 	if itemDirty then
-		frame.save:Show()
+		frame.save:Enable()
 	else
-		frame.save:Hide()
+		frame.save:Disable()
 	end
 
 	local professionID = context and context.professionID
@@ -388,9 +485,9 @@ function AF:UpdateCrafterDirtyState()
 	local defaultDirty = self:IsCommissionInputDirty(defaults.price:GetText(), default)
 		or (defaults.note:GetText() or "") ~= defaultNote
 	if defaultDirty then
-		defaults.save:Show()
+		defaults.save:Enable()
 	else
-		defaults.save:Hide()
+		defaults.save:Disable()
 	end
 end
 
@@ -414,7 +511,7 @@ function AF:RefreshCrafterUI()
 	local context = self:GetCurrentCraftingRecipeContext()
 	local profession = self:GetCurrentProfessionInfo()
 	local professionID = context and context.professionID or (profession and profession.id)
-	if not context or context.learned == false then
+	if not context or context.learned == false or context.isRecraft then
 		frame:Hide()
 	else
 		local item = self:EnsureCurrentRecipeEntry(context)

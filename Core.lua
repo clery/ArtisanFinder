@@ -11,6 +11,12 @@ end
 
 RegisterEvent(AF.frame, "ADDON_LOADED")
 RegisterEvent(AF.frame, "PLAYER_LOGIN")
+RegisterEvent(AF.frame, "PLAYER_ENTERING_WORLD")
+RegisterEvent(AF.frame, "ZONE_CHANGED")
+RegisterEvent(AF.frame, "ZONE_CHANGED_INDOORS")
+RegisterEvent(AF.frame, "ZONE_CHANGED_NEW_AREA")
+RegisterEvent(AF.frame, "CHANNEL_UI_UPDATE")
+RegisterEvent(AF.frame, "CHAT_MSG_CHANNEL_NOTICE")
 RegisterEvent(AF.frame, "CHAT_MSG_ADDON")
 RegisterEvent(AF.frame, "CHAT_MSG_CHANNEL")
 RegisterEvent(AF.frame, "CRAFTINGORDERS_SHOW_CUSTOMER")
@@ -53,11 +59,19 @@ function AF:OnPlayerLogin()
 	if self.InitializeTradeChat then
 		self:InitializeTradeChat()
 	end
+	if self.InitializeOptions then
+		self:InitializeOptions()
+	end
+	if self.CleanupCustomerCache then
+		self:CleanupCustomerCache()
+	end
 
 	self:Print(self:Text("ADDON_LOADED"))
+	self:QueueAutoAvailabilityRefresh()
 end
 
-function AF:SetAvailable(value)
+function AF:SetAvailable(value, silent)
+	local wasAvailable = self.available == true
 	self.available = value == true
 	if self.RefreshCrafterUI then
 		self:RefreshCrafterUI()
@@ -65,11 +79,112 @@ function AF:SetAvailable(value)
 	if self.RefreshMinimap then
 		self:RefreshMinimap()
 	end
-	self:Print(self:Text("AVAILABILITY_CHANGED", self.available and self:Text("ENABLED") or self:Text("DISABLED")))
+	if not silent and wasAvailable ~= self.available then
+		self:Print(self:Text("AVAILABILITY_CHANGED", self.available and self:Text("ENABLED") or self:Text("DISABLED")))
+	end
 end
 
 function AF:ToggleAvailable()
 	self:SetAvailable(not self.available)
+end
+
+local TRADE_CHANNEL_PATTERNS = {
+	"trade",
+	"commerce",
+	"handel",
+	"comercio",
+	"торгов",
+	"Торгов",
+	"торг",
+	"Торг",
+	"交易",
+	"貿易",
+}
+
+local function IsTradeChannelName(name)
+	name = tostring(name or ""):lower()
+	if name == "" then
+		return false
+	end
+	local globalTrade = tostring(_G.TRADE or _G.CHAT_MSG_TRADE or "")
+	if globalTrade ~= "" and name:find(globalTrade:lower(), 1, true) then
+		return true
+	end
+	for _, pattern in ipairs(TRADE_CHANNEL_PATTERNS) do
+		if name:find(pattern, 1, true) then
+			return true
+		end
+	end
+	return false
+end
+
+function AF:HasTradeChatAccess()
+	if GetChannelName then
+		local globalTrade = tostring(_G.TRADE or "Trade")
+		if globalTrade ~= "" and GetChannelName(globalTrade) and GetChannelName(globalTrade) ~= 0 then
+			return true
+		end
+	end
+	if GetChannelList then
+		local channels = { GetChannelList() }
+		for _, value in ipairs(channels) do
+			if type(value) == "string" and IsTradeChannelName(value) then
+				return true
+			end
+		end
+	end
+	if EnumerateServerChannels then
+		local channels = { EnumerateServerChannels() }
+		for _, channelName in ipairs(channels) do
+			if IsTradeChannelName(channelName) then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+function AF:ShouldAutoBeAvailable()
+	local inInstance = IsInInstance and IsInInstance()
+	if inInstance then
+		return false
+	end
+	return self:HasTradeChatAccess()
+end
+
+function AF:RefreshAutoAvailability(silent)
+	if not self.db or not self.db.autoAvailability then
+		return
+	end
+	self:SetAvailable(self:ShouldAutoBeAvailable(), silent)
+end
+
+function AF:QueueAutoAvailabilityRefresh()
+	if not self.db or not self.db.autoAvailability or self.autoAvailabilityQueued then
+		return
+	end
+	self.autoAvailabilityQueued = true
+	C_Timer.After(0.5, function()
+		AF.autoAvailabilityQueued = false
+		AF:RefreshAutoAvailability()
+	end)
+end
+
+function AF:SetAutoAvailability(enabled)
+	self.db.autoAvailability = enabled == true
+	self:Print(self:Text("AUTO_AVAILABILITY_CHANGED", self.db.autoAvailability and self:Text("ENABLED") or self:Text("DISABLED")))
+	if self.db.autoAvailability then
+		self:QueueAutoAvailabilityRefresh()
+	elseif self.RefreshMinimap then
+		self:RefreshMinimap()
+	end
+	if self.RefreshOptionsPanel then
+		self:RefreshOptionsPanel()
+	end
+end
+
+function AF:ToggleAutoAvailability()
+	self:SetAutoAvailability(not self.db.autoAvailability)
 end
 
 function AF:TryAttachProfessionUIs()
@@ -86,6 +201,8 @@ AF.frame:SetScript("OnEvent", function(_, event, ...)
 		AF:OnAddonLoaded(...)
 	elseif event == "PLAYER_LOGIN" then
 		AF:OnPlayerLogin()
+	elseif event == "PLAYER_ENTERING_WORLD" or event == "ZONE_CHANGED" or event == "ZONE_CHANGED_INDOORS" or event == "ZONE_CHANGED_NEW_AREA" or event == "CHANNEL_UI_UPDATE" or event == "CHAT_MSG_CHANNEL_NOTICE" then
+		AF:QueueAutoAvailabilityRefresh()
 	elseif event == "CHAT_MSG_ADDON" then
 		if AF.OnAddonMessage then
 			AF:OnAddonMessage(...)

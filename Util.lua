@@ -11,6 +11,7 @@ AF.RESPONSE_THROTTLE = 60
 AF.LIVE_QUERY_TIMEOUT = 6
 AF.MAX_NOTE_BYTES = 80
 AF.MAX_LINK_BYTES = 96
+AF.SCHEMA_VERSION = 1
 
 function AF:Print(message)
 	print("|cff33ff99ArtisanFinder:|r " .. tostring(message))
@@ -48,6 +49,84 @@ function AF:ApplyProfessionInset(frame)
 	frame:SetBackdropBorderColor(0.45, 0.36, 0.18, 0.75)
 end
 
+function AF:ApplyCustomerSidePanel(frame)
+	if frame.TitleText then
+		frame.TitleText:SetText("ArtisanFinder")
+	end
+
+	if frame.SetBackdrop then
+		frame:SetBackdrop(nil)
+	end
+
+	if frame.Bg then
+		frame.Bg:SetAtlas("auctionhouse-background-index", false)
+		frame.Bg:ClearAllPoints()
+		frame.Bg:SetPoint("TOPLEFT", 6, -21)
+		frame.Bg:SetPoint("BOTTOMRIGHT", -2, 2)
+	end
+	if frame.TopTileStreaks then
+		frame.TopTileStreaks:Hide()
+	end
+end
+
+function AF:ApplyCustomerListInset(frame)
+	if frame.SetBackdrop then
+		frame:SetBackdrop(nil)
+	end
+
+	if not frame.Background then
+		frame.Background = frame:CreateTexture(nil, "BACKGROUND")
+		frame.Background:SetAtlas("auctionhouse-background-index", false)
+		frame.Background:SetPoint("TOPLEFT", 3, 0)
+		frame.Background:SetPoint("BOTTOMRIGHT", -30, 0)
+	end
+
+	if not frame.NineSlice then
+		frame.NineSlice = CreateFrame("Frame", nil, frame, "NineSlicePanelTemplate")
+		frame.NineSlice:SetPoint("TOPLEFT", 0, 0)
+		frame.NineSlice:SetPoint("BOTTOMRIGHT", -27, 0)
+		frame.NineSlice:SetFrameLevel(frame:GetFrameLevel())
+		frame.NineSlice.layoutType = "InsetFrameTemplate"
+		if NineSliceUtil and NineSliceUtil.ApplyLayoutByName then
+			NineSliceUtil.ApplyLayoutByName(frame.NineSlice, frame.NineSlice.layoutType)
+		end
+	end
+end
+
+function AF:ApplyCustomerPopupPanel(frame)
+	if frame.SetBackdrop then
+		frame:SetBackdrop(nil)
+	end
+
+	if not frame.Background then
+		frame.Background = frame:CreateTexture(nil, "BACKGROUND")
+	end
+	frame.Background:SetAtlas("auctionhouse-background-index", false)
+	frame.Background:ClearAllPoints()
+	frame.Background:SetPoint("TOPLEFT", 3, -3)
+	frame.Background:SetPoint("BOTTOMRIGHT", -3, 3)
+
+	if not frame.NineSlice then
+		frame.NineSlice = CreateFrame("Frame", nil, frame, "NineSlicePanelTemplate")
+		frame.NineSlice:SetPoint("TOPLEFT", 0, 0)
+		frame.NineSlice:SetPoint("BOTTOMRIGHT", 0, 0)
+		frame.NineSlice:SetFrameLevel(frame:GetFrameLevel())
+		frame.NineSlice.layoutType = "InsetFrameTemplate"
+		if NineSliceUtil and NineSliceUtil.ApplyLayoutByName then
+			NineSliceUtil.ApplyLayoutByName(frame.NineSlice, frame.NineSlice.layoutType)
+		end
+	end
+
+	if not frame.TopDivider then
+		frame.TopDivider = frame:CreateTexture(nil, "ARTWORK")
+		frame.TopDivider:SetAtlas("Options_HorizontalDivider", true)
+		frame.TopDivider:SetPoint("TOPLEFT", 10, -5)
+		frame.TopDivider:SetPoint("TOPRIGHT", -10, -5)
+		frame.TopDivider:SetHeight(2)
+		frame.TopDivider:SetAlpha(0.35)
+	end
+end
+
 function AF:StyleListRow(row)
 	if row.SetBackdrop then
 		row:SetBackdrop(nil)
@@ -79,9 +158,48 @@ function AF:Now()
 	return time()
 end
 
+local MIGRATIONS = {}
+
+MIGRATIONS[1] = function(db)
+	db.artisanProfile = db.artisanProfile or {}
+	db.artisanProfile.professions = db.artisanProfile.professions or {}
+	db.artisanProfile.items = db.artisanProfile.items or {}
+	db.artisanProfile.professionPrices = db.artisanProfile.professionPrices or {}
+	db.customerCache = db.customerCache or {}
+	db.favoriteArtisans = db.favoriteArtisans or {}
+	db.responseThrottle = db.responseThrottle or {}
+	if db.defaultSort == nil then
+		db.defaultSort = "best"
+	end
+	if db.cacheCleanupDays == nil then
+		db.cacheCleanupDays = 7
+	end
+	if db.autoAvailability == nil then
+		db.autoAvailability = false
+	end
+	if db.debugSelfResults == nil then
+		db.debugSelfResults = false
+	end
+	db.minimap = db.minimap or { angle = 225, hide = false }
+end
+
+function AF:MigrateDB(db)
+	local version = tonumber(db.schemaVersion) or 0
+	while version < self.SCHEMA_VERSION do
+		local nextVersion = version + 1
+		local migration = MIGRATIONS[nextVersion]
+		if migration then
+			migration(db)
+		end
+		db.schemaVersion = nextVersion
+		version = nextVersion
+	end
+end
+
 function AF:EnsureDB()
 	ArtisanFinderDB = ArtisanFinderDB or {}
 	local db = ArtisanFinderDB
+	self:MigrateDB(db)
 
 	db.artisanProfile = db.artisanProfile or {}
 	db.artisanProfile.professions = db.artisanProfile.professions or {}
@@ -89,10 +207,21 @@ function AF:EnsureDB()
 	db.artisanProfile.professionPrices = db.artisanProfile.professionPrices or {}
 
 	db.customerCache = db.customerCache or {}
+	db.favoriteArtisans = db.favoriteArtisans or {}
 	db.responseThrottle = db.responseThrottle or {}
 	if db.debugSelfResults == nil then
 		db.debugSelfResults = false
 	end
+	if db.autoAvailability == nil then
+		db.autoAvailability = false
+	end
+	if db.defaultSort == nil then
+		db.defaultSort = "best"
+	end
+	if db.cacheCleanupDays == nil then
+		db.cacheCleanupDays = 7
+	end
+	db.schemaVersion = self.SCHEMA_VERSION
 	db.minimap = db.minimap or { angle = 225, hide = false }
 	if db.minimap.angle == nil then
 		db.minimap.angle = 225
@@ -104,6 +233,36 @@ function AF:EnsureDB()
 	self.db = db
 	self.available = false
 	return db
+end
+
+function AF:CleanupCustomerCache()
+	if not self.db or not self.db.customerCache then
+		return 0
+	end
+	local days = tonumber(self.db.cacheCleanupDays) or 7
+	if days <= 0 then
+		return 0
+	end
+	local cutoff = self:Now() - (days * 24 * 60 * 60)
+	local removed = 0
+	for itemKey, itemCache in pairs(self.db.customerCache) do
+		if type(itemCache) == "table" then
+			for cacheKey, entry in pairs(itemCache) do
+				local updatedAt = tonumber(entry and entry.updatedAt) or 0
+				if (updatedAt <= 0 or updatedAt < cutoff) and not self:IsFavoriteArtisan(entry) then
+					itemCache[cacheKey] = nil
+					removed = removed + 1
+				end
+			end
+			if next(itemCache) == nil then
+				self.db.customerCache[itemKey] = nil
+			end
+		end
+	end
+	if removed > 0 then
+		self:Print(self:Text("CACHE_CLEANUP_DONE", removed, days))
+	end
+	return removed
 end
 
 function AF:GetPlayerFullName()
@@ -143,6 +302,30 @@ function AF:GetDisplayPlayerName(name)
 		return playerName
 	end
 	return name
+end
+
+function AF:GetFavoriteArtisanKey(entryOrName)
+	local name = type(entryOrName) == "table" and (entryOrName.target or entryOrName.name) or entryOrName
+	return self:NormalizeName(name)
+end
+
+function AF:IsFavoriteArtisan(entryOrName)
+	local key = self:GetFavoriteArtisanKey(entryOrName)
+	return key and self.db and self.db.favoriteArtisans and self.db.favoriteArtisans[key] == true
+end
+
+function AF:SetFavoriteArtisan(entryOrName, favorite)
+	local key = self:GetFavoriteArtisanKey(entryOrName)
+	if not key then
+		return
+	end
+	self.db.favoriteArtisans[key] = favorite == true or nil
+end
+
+function AF:ToggleFavoriteArtisan(entryOrName)
+	local favorite = not self:IsFavoriteArtisan(entryOrName)
+	self:SetFavoriteArtisan(entryOrName, favorite)
+	return favorite
 end
 
 function AF:EncodeNote(note)
@@ -554,42 +737,86 @@ local function GetSortName(entry)
 	return tostring(entry and entry.name or ""):lower()
 end
 
+local function EntryMatchesCustomerFilter(AF, entry, filterText)
+	local haystack = table.concat({
+		entry.name or "",
+		entry.professionName or "",
+		entry.note or "",
+		AF:FormatMoney(entry.priceCopper, entry.freeCommission),
+		AF:FormatCapability(entry),
+		entry.bestReagentSummary or "",
+	}, " "):lower()
+	return filterText == "" or haystack:find(filterText, 1, true)
+end
+
+local function CopyCustomerEntry(entry)
+	local copy = {}
+	for key, value in pairs(entry or {}) do
+		copy[key] = value
+	end
+	return copy
+end
+
 function AF:GetCachedArtisans(itemID, filterText, sortMode, queryToken)
 	local itemCache = self.db.customerCache[tostring(itemID or "")]
 	local rows = {}
 	local now = self:Now()
 	filterText = tostring(filterText or ""):lower()
+	local seenNames = {}
 	for _, entry in pairs(itemCache or {}) do
 		local verifiedForQuery = queryToken and tonumber(entry.lastQueryToken) == tonumber(queryToken) and entry.verifiedAt
 		if verifiedForQuery and entry.updatedAt and now - entry.updatedAt <= self.CACHE_MAX_AGE then
-			local haystack = table.concat({
-				entry.name or "",
-				entry.professionName or "",
-				entry.note or "",
-				self:FormatMoney(entry.priceCopper, entry.freeCommission),
-				self:FormatCapability(entry),
-				entry.bestReagentSummary or "",
-			}, " "):lower()
-			if filterText == "" or haystack:find(filterText, 1, true) then
+			if EntryMatchesCustomerFilter(self, entry, filterText) then
 				table.insert(rows, entry)
 				entry.certified = true
 				entry.tradeLead = false
+				entry.unavailableFavorite = nil
+				local favoriteKey = self:GetFavoriteArtisanKey(entry)
+				if favoriteKey then
+					seenNames[favoriteKey] = true
+				end
+				if entry.name then
+					seenNames[entry.name] = true
+				end
 			end
 		end
 	end
 
-	local seenNames = {}
-	for _, entry in ipairs(rows) do
-		seenNames[entry.name] = true
+	for _, entry in pairs(itemCache or {}) do
+		local favoriteKey = self:GetFavoriteArtisanKey(entry)
+		if favoriteKey and not seenNames[favoriteKey] and self:IsFavoriteArtisan(entry) and EntryMatchesCustomerFilter(self, entry, filterText) then
+			local favoriteEntry = CopyCustomerEntry(entry)
+			favoriteEntry.certified = true
+			favoriteEntry.tradeLead = false
+			favoriteEntry.unavailableFavorite = true
+			table.insert(rows, favoriteEntry)
+			seenNames[favoriteKey] = true
+			if favoriteEntry.name then
+				seenNames[favoriteEntry.name] = true
+			end
+		end
 	end
 	if self.GetTradeLeadRows then
-		for _, entry in ipairs(self:GetTradeLeadRows(itemID, self.currentCustomerProfessionID, filterText, seenNames)) do
+		for _, entry in ipairs(self:GetTradeLeadRows(itemID, self.currentCustomerProfessionID, filterText, seenNames, self.currentCustomerRecipeID)) do
 			table.insert(rows, entry)
 		end
 	end
 
 	sortMode = sortMode or "best"
 	table.sort(rows, function(a, b)
+		local aFavorite = self:IsFavoriteArtisan(a) and 0 or 1
+		local bFavorite = self:IsFavoriteArtisan(b) and 0 or 1
+		if aFavorite ~= bFavorite then
+			return aFavorite < bFavorite
+		end
+		if aFavorite == 0 then
+			local aUnavailable = a.unavailableFavorite and 1 or 0
+			local bUnavailable = b.unavailableFavorite and 1 or 0
+			if aUnavailable ~= bUnavailable then
+				return aUnavailable < bUnavailable
+			end
+		end
+
 		local aCertified = GetCertificationSort(a)
 		local bCertified = GetCertificationSort(b)
 		if aCertified ~= bCertified then

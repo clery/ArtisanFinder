@@ -18,6 +18,7 @@ Locales\ruRU.lua
 Locales\zhCN.lua
 
 Util.lua
+Options.lua
 Core.lua
 Comms.lua
 TradeChat.lua

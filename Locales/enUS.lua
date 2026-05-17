@@ -1,12 +1,15 @@
 local _, AF = ...
 
-AF.L = AF.L or {}
-local L = AF.L
+AF.Locales = AF.Locales or {}
+local L = {}
+AF.Locales.enUS = L
+AF.L = L
 
 L.ADDON_LOADED = "loaded. Crafter availability is off for this session."
 L.AVAILABILITY_CHANGED = "crafter availability %s."
 L.ENABLED = "enabled"
 L.DISABLED = "disabled"
+L.UNAVAILABLE = "unavailable"
 L.EVENT_UNAVAILABLE = "skipping unavailable event %s."
 L.MINIMAP_LIBS_MISSING = "minimap libraries were not available."
 
@@ -33,6 +36,8 @@ L.NO_FILTER_MATCH = "No available artisans match the filter for %s."
 L.CHECKING_ARTISANS = "Checking available artisans for %s..."
 L.NO_ARTISANS_FOUND = "No available artisans found for %s."
 L.WHISPER = "Whisper"
+L.FAVORITE = "Favorite"
+L.UNFAVORITE = "Unfavorite"
 L.PERSONAL_ORDER = "Personal Order"
 L.PROFESSION = "Profession"
 L.REFRESH = "Refresh"
@@ -47,6 +52,8 @@ L.DEFAULT_COMMISSION = "Default commission"
 L.DEFAULT_COMMISSION_TOOLTIP = "These fields apply to crafts in the current profession when no item-specific commission is specified."
 L.COMMISSION = "Commission"
 L.NOTE = "Note"
+L.COMMISSION_PLACEHOLDER = "0, -1, or gold"
+L.NOTE_PLACEHOLDER = "Optional note"
 L.SAVE = "Save"
 L.COMMISSION_HELP_0 = "0: unspecified."
 L.COMMISSION_HELP_FREE = "-1: free commission."
@@ -68,10 +75,20 @@ L.RECIPE_FALLBACK = "Recipe %s"
 
 L.MINIMAP_AVAILABLE = "Available this session"
 L.MINIMAP_UNAVAILABLE = "Unavailable this session"
+L.MINIMAP_AUTO_AVAILABILITY = "Auto availability: %s"
+L.MINIMAP_AUTO_HINT = "Automatically enables availability in trade-chat areas and disables it in instances."
 L.MINIMAP_SCANNED = "Scanned items: %d"
 L.MINIMAP_LEFT_CLICK = "Left-click: toggle availability"
+L.MINIMAP_MIDDLE_CLICK = "Middle-click: toggle auto availability"
 L.MINIMAP_RIGHT_CLICK = "Right-click: open profession panel"
 
+L.AUTO_AVAILABILITY_CHANGED = "auto availability %s."
+L.AUTO_AVAILABILITY_STATE = "auto availability is %s."
+L.AUTO_AVAILABILITY_UNKNOWN = "unknown auto availability command: %s"
+L.AUTO_AVAILABILITY_HELP_ON = "/af auto on - enable automatic availability in trade-chat areas"
+L.AUTO_AVAILABILITY_HELP_OFF = "/af auto off - disable automatic availability"
+L.AUTO_AVAILABILITY_HELP_TOGGLE = "/af auto toggle - toggle automatic availability"
+L.AUTO_AVAILABILITY_HELP_STATE = "/af auto - show current automatic availability state"
 L.DEBUG_SELF_CHANGED = "debug self results %s."
 L.DEBUG_SELF_STATE = "debug self results are %s."
 L.DEBUG_UNKNOWN = "unknown debug command: %s"
@@ -79,11 +96,69 @@ L.DEBUG_HELP_ON = "/af debug on - show this character in customer results when s
 L.DEBUG_HELP_OFF = "/af debug off - disable debug self results"
 L.DEBUG_HELP_TOGGLE = "/af debug toggle - toggle debug self results"
 L.DEBUG_HELP_STATE = "/af debug - show current debug state"
+L.LOCALE_HELP = "/af locale <locale|reset> - preview a locale this session"
+L.LOCALE_CHANGED = "locale preview set to %s."
+L.LOCALE_RESET = "locale preview reset to %s."
+L.LOCALE_UNKNOWN = "unknown locale '%s'. Available: %s"
+L.CLEAR_HELP = "/af clear confirm - clear all ArtisanFinder data"
+L.CLEAR_CONFIRM = "This clears all ArtisanFinder data. Type /af clear confirm to continue."
+L.CLEAR_DONE = "all ArtisanFinder data cleared."
+L.CACHE_CLEANUP_DONE = "removed %d cached artisans older than %d days."
+L.OPTIONS_SECTION_CUSTOMER = "Customer results"
+L.OPTIONS_SECTION_CACHE = "Cache"
+L.OPTIONS_SECTION_AVAILABILITY = "Availability"
+L.OPTIONS_DEFAULT_SORT = "Default sort order"
+L.OPTIONS_DEFAULT_SORT_DESC = "Choose the sort mode used when the customer results panel opens."
+L.OPTIONS_CLEANUP_FREQUENCY = "Cache cleanup"
+L.OPTIONS_CLEANUP_FREQUENCY_DESC = "Remove non-favorite cached artisans that have not refreshed recently."
+L.OPTIONS_AUTO_AVAILABILITY = "Automatic availability"
+L.OPTIONS_AUTO_AVAILABILITY_DESC = "Automatically become available in trade-chat areas and unavailable in instances."
+L.OPTIONS_CLEANUP_DISABLED = "Disabled"
+L.OPTIONS_CLEANUP_1_DAY = "1 day"
+L.OPTIONS_CLEANUP_7_DAYS = "7 days"
+L.OPTIONS_CLEANUP_14_DAYS = "14 days"
+L.OPTIONS_CLEANUP_30_DAYS = "30 days"
 
 function AF:Text(key, ...)
-	local text = self.L and self.L[key] or key
+	local override = self.localeOverride
+	local overrideTable = override and self.Locales and self.Locales[override]
+	local text = (overrideTable and overrideTable[key])
+		or (self.L and self.L[key])
+		or (self.Locales and self.Locales.enUS and self.Locales.enUS[key])
+		or key
 	if select("#", ...) > 0 then
 		return string.format(text, ...)
 	end
 	return text
+end
+
+function AF:NormalizeLocale(locale)
+	locale = tostring(locale or ""):match("^%s*(.-)%s*$")
+	local lower = locale:lower()
+	if lower == "enus" then
+		return "enUS"
+	end
+	if lower == "frfr" then
+		return "frFR"
+	end
+	if lower == "dede" then
+		return "deDE"
+	end
+	if lower == "eses" or lower == "esmx" then
+		return "esES"
+	end
+	if lower == "ruru" then
+		return "ruRU"
+	end
+	if lower == "zhcn" or lower == "zhtw" then
+		return "zhCN"
+	end
+	return locale
+end
+
+function AF:GetCurrentTextLocale()
+	if self.localeOverride then
+		return self.localeOverride
+	end
+	return self:NormalizeLocale(GetLocale()) or "enUS"
 end
