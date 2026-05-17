@@ -1,9 +1,24 @@
-## Interface: 120005
+## Interface: 120005, 120007
+
 ## Title: ArtisanFinder
-## Notes: Finds available artisans from the Crafting Order customer form.
+## Notes: Find available artisans from Crafting Orders and manage crafter availability from Professions.
+## Notes-frFR: Trouvez des artisans disponibles depuis les commandes d'artisanat et gerez votre disponibilité depuis les metiers.
+## Notes-deDE: Findet verfuegbare Handwerker ueber Handwerksauftraege und verwaltet die Verfuegbarkeit ueber Berufe.
+## Notes-esES: Encuentra artesanos disponibles desde los pedidos de fabricacion y gestiona la disponibilidad desde las profesiones.
+## Notes-esMX: Encuentra artesanos disponibles desde los pedidos de fabricacion y gestiona la disponibilidad desde las profesiones.
+## Notes-ruRU: Находите доступных ремесленников через заказы на изготовление и управляйте доступностью через профессии.
+## Notes-zhCN: 从制造订单中查找可用工匠，并在专业界面管理工匠可用状态。
+## Notes-zhTW: 從製造訂單中尋找可用工匠，並在專業技能介面管理工匠可用狀態。
+## IconTexture: Interface\AddOns\ArtisanFinder\Images\AddOnIcon.tga
 ## Author: clery
-## Version: 1.0.1
-## IconTexture: Interface\AddOns\ArtisanFinder\Images\MinimapIcon.tga
+## Version: @project-version@
+
+## X-Credits: clery
+## X-Category: Professions
+## X-License: All Rights Reserved: You are free to fork and modify on GitHub, please ask us about anything else.
+## X-Website: https://github.com/clery/ArtisanFinder
+## X-Curse-Project-ID: 1545540
+
 ## SavedVariables: ArtisanFinderDB
 
 Libs\LibStub\LibStub.lua

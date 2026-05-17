@@ -1,0 +1,14 @@
+package-as: ArtisanFinder
+
+externals:
+  Libs/LibStub: https://repos.curseforge.com/wow/libstub/trunk
+  Libs/CallbackHandler-1.0: https://repos.curseforge.com/wow/callbackhandler/trunk/CallbackHandler-1.0
+  Libs/LibDataBroker-1.1: https://repos.curseforge.com/wow/libdatabroker-1-1
+  Libs/LibDBIcon-1.0: https://repos.curseforge.com/wow/libdbicon-1-0
+
+ignore:
+  - .githooks
+  - tmp
+  - Images/CrafterView.png
+  - Images/CustomerView.png
+  - Images/Options.png
