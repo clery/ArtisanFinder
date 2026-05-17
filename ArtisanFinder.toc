@@ -2,7 +2,7 @@
 ## Title: ArtisanFinder
 ## Notes: Finds available artisans from the Crafting Order customer form.
 ## Author: clery
-## Version: 0.1.0
+## Version: 1.0.0
 ## IconTexture: Interface\AddOns\ArtisanFinder\Images\Icon.tga
 ## SavedVariables: ArtisanFinderDB
 
