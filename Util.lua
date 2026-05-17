@@ -11,7 +11,7 @@ AF.RESPONSE_THROTTLE = 60
 AF.LIVE_QUERY_TIMEOUT = 6
 AF.MAX_NOTE_BYTES = 80
 AF.MAX_LINK_BYTES = 96
-AF.SCHEMA_VERSION = 1
+AF.SCHEMA_VERSION = 2
 
 function AF:Print(message)
 	print("|cff33ff99ArtisanFinder:|r " .. tostring(message))
@@ -177,10 +177,19 @@ MIGRATIONS[1] = function(db)
 	if db.autoAvailability == nil then
 		db.autoAvailability = false
 	end
+	if db.tradeLeadMinutes == nil then
+		db.tradeLeadMinutes = 15
+	end
 	if db.debugSelfResults == nil then
 		db.debugSelfResults = false
 	end
 	db.minimap = db.minimap or { angle = 225, hide = false }
+end
+
+MIGRATIONS[2] = function(db)
+	if db.tradeLeadMinutes == nil then
+		db.tradeLeadMinutes = 15
+	end
 end
 
 function AF:MigrateDB(db)
@@ -220,6 +229,9 @@ function AF:EnsureDB()
 	end
 	if db.cacheCleanupDays == nil then
 		db.cacheCleanupDays = 7
+	end
+	if db.tradeLeadMinutes == nil then
+		db.tradeLeadMinutes = 15
 	end
 	db.schemaVersion = self.SCHEMA_VERSION
 	db.minimap = db.minimap or { angle = 225, hide = false }

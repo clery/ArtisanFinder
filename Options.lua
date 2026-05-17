@@ -8,6 +8,14 @@ local CLEANUP_OPTIONS = {
 	{ days = 30, labelKey = "OPTIONS_CLEANUP_30_DAYS" },
 }
 
+local TRADE_LEAD_OPTIONS = {
+	{ minutes = 5, labelKey = "OPTIONS_TRADE_LEADS_5_MINUTES" },
+	{ minutes = 10, labelKey = "OPTIONS_TRADE_LEADS_10_MINUTES" },
+	{ minutes = 15, labelKey = "OPTIONS_TRADE_LEADS_15_MINUTES" },
+	{ minutes = 30, labelKey = "OPTIONS_TRADE_LEADS_30_MINUTES" },
+	{ minutes = 60, labelKey = "OPTIONS_TRADE_LEADS_60_MINUTES" },
+}
+
 local function CreateSortOptions()
 	local options = {}
 	for _, option in ipairs(AF:GetCustomerSortOptions()) do
@@ -29,6 +37,19 @@ local function CreateCleanupOptions()
 			label = AF:Text(option.labelKey),
 			text = AF:Text(option.labelKey),
 			value = option.days,
+		})
+	end
+	return options
+end
+
+local function CreateTradeLeadOptions()
+	local options = {}
+	for _, option in ipairs(TRADE_LEAD_OPTIONS) do
+		table.insert(options, {
+			controlType = Settings.ControlType.Radio,
+			label = AF:Text(option.labelKey),
+			text = AF:Text(option.labelKey),
+			value = option.minutes,
 		})
 	end
 	return options
@@ -88,6 +109,27 @@ function AF:InitializeOptions()
 		end
 	)
 	Settings.CreateDropdown(category, cleanupFrequency, CreateCleanupOptions, self:Text("OPTIONS_CLEANUP_FREQUENCY_DESC"))
+
+	AddSection("OPTIONS_SECTION_TRADE_LEADS")
+	local tradeLeadLifetime = RegisterProxySetting(
+		"ArtisanFinder_TradeLeadMinutes",
+		Settings.VarType.Number,
+		"OPTIONS_TRADE_LEADS_LIFETIME",
+		15,
+		function()
+			return tonumber(AF.db.tradeLeadMinutes) or 15
+		end,
+		function(value)
+			AF.db.tradeLeadMinutes = tonumber(value) or 15
+			if AF.PruneTradeLeads then
+				AF:PruneTradeLeads()
+			end
+			if AF.RefreshCustomerResults then
+				AF:RefreshCustomerResults()
+			end
+		end
+	)
+	Settings.CreateDropdown(category, tradeLeadLifetime, CreateTradeLeadOptions, self:Text("OPTIONS_TRADE_LEADS_LIFETIME_DESC"))
 
 	AddSection("OPTIONS_SECTION_AVAILABILITY")
 	local autoAvailability = RegisterProxySetting(

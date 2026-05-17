@@ -1,6 +1,6 @@
 local _, AF = ...
 
-local TRADE_LEAD_TTL = 5 * 60
+local DEFAULT_TRADE_LEAD_MINUTES = 15
 local DEBUG_TRADE_LEAD_COUNT = 5
 local DEBUG_TRADE_NAMES = {
 	"Marielle",
@@ -96,6 +96,11 @@ end
 
 function AF:InitializeTradeChat()
 	self.tradeLeads = self.tradeLeads or {}
+end
+
+function AF:GetTradeLeadTTL()
+	local minutes = tonumber(self.db and self.db.tradeLeadMinutes) or DEFAULT_TRADE_LEAD_MINUTES
+	return minutes * 60
 end
 
 function AF:ClearDebugTradeLeads()
@@ -197,8 +202,9 @@ end
 
 function AF:PruneTradeLeads()
 	local now = self:Now()
+	local ttl = self:GetTradeLeadTTL()
 	for name, lead in pairs(self.tradeLeads or {}) do
-		if not lead.updatedAt or now - lead.updatedAt > TRADE_LEAD_TTL then
+		if not lead.updatedAt or now - lead.updatedAt > ttl then
 			self.tradeLeads[name] = nil
 		end
 	end
