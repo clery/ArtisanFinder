@@ -853,6 +853,54 @@ function AF:IsCurrentProfessionScanAvailable(professionID)
 	return current and tonumber(current.id) == tonumber(professionID)
 end
 
+function AF:GetActiveScanProgress()
+	local active = self.activeScan
+	if not active or not active.professionID then
+		return nil
+	end
+	if not self:IsCurrentProfessionScanAvailable(active.professionID) then
+		self.activeScan = nil
+		return nil
+	end
+
+	local profile = self.db and self.db.artisanProfile
+	local professionEntry = profile and profile.professions and profile.professions[tostring(active.professionID)]
+	local progress = professionEntry and professionEntry.scanProgress
+	if not progress or progress.signature ~= active.signature then
+		self.activeScan = nil
+		return nil
+	end
+
+	return active, professionEntry, progress
+end
+
+function AF:RefreshScanProgressUI(force)
+	self.scanRefreshCounter = (self.scanRefreshCounter or 0) + 1
+	if force or self.scanRefreshCounter >= 8 then
+		self.scanRefreshCounter = 0
+		if self.RefreshCrafterUI then
+			self:RefreshCrafterUI()
+		end
+		if self.RefreshMinimap then
+			self:RefreshMinimap()
+		end
+	end
+end
+
+function AF:CompleteActiveScan(active, professionEntry, progress)
+	professionEntry.scanSignature = progress.signature
+	professionEntry.scannedAt = self:Now()
+	professionEntry.scanProgress = nil
+	self.activeScan = nil
+	self.lastCompletedScan = {
+		professionID = active.professionID,
+		signature = progress.signature,
+		completedAt = self:Now(),
+	}
+	self:RefreshScanProgressUI(true)
+	self:Print(self:Text("SCAN_COMPLETE", tonumber(progress.scanned) or 0, professionEntry.name))
+end
+
 function AF:ProcessScanQueue()
 	if self.scanProcessing then
 		return
@@ -861,20 +909,8 @@ function AF:ProcessScanQueue()
 	C_Timer.After(0.03, function()
 		AF.scanProcessing = false
 
-		local active = AF.activeScan
-		if not active or not active.professionID then
-			return
-		end
-		if not AF:IsCurrentProfessionScanAvailable(active.professionID) then
-			AF.activeScan = nil
-			return
-		end
-
-		local profile = AF.db and AF.db.artisanProfile
-		local professionEntry = profile and profile.professions and profile.professions[tostring(active.professionID)]
-		local progress = professionEntry and professionEntry.scanProgress
-		if not progress or progress.signature ~= active.signature then
-			AF.activeScan = nil
+		local active, professionEntry, progress = AF:GetActiveScanProgress()
+		if not active then
 			return
 		end
 
@@ -885,35 +921,11 @@ function AF:ProcessScanQueue()
 			progress.completed[job.key] = true
 			progress.scanned = (tonumber(progress.scanned) or 0) + 1
 			progress.updatedAt = AF:Now()
-			AF.scanRefreshCounter = (AF.scanRefreshCounter or 0) + 1
-			if AF.scanRefreshCounter >= 8 then
-				AF.scanRefreshCounter = 0
-				if AF.RefreshCrafterUI then
-					AF:RefreshCrafterUI()
-				end
-				if AF.RefreshMinimap then
-					AF:RefreshMinimap()
-				end
-			end
+			AF:RefreshScanProgressUI()
 		end
 
 		if #progress.pending == 0 then
-			professionEntry.scanSignature = progress.signature
-			professionEntry.scannedAt = AF:Now()
-			professionEntry.scanProgress = nil
-			AF.activeScan = nil
-			AF.lastCompletedScan = {
-				professionID = active.professionID,
-				signature = progress.signature,
-				completedAt = AF:Now(),
-			}
-			if AF.RefreshCrafterUI then
-				AF:RefreshCrafterUI()
-			end
-			if AF.RefreshMinimap then
-				AF:RefreshMinimap()
-			end
-			AF:Print(AF:Text("SCAN_COMPLETE", tonumber(progress.scanned) or 0, professionEntry.name))
+			AF:CompleteActiveScan(active, professionEntry, progress)
 		else
 			AF:ProcessScanQueue()
 		end

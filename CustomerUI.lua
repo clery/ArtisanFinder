@@ -434,6 +434,7 @@ local function CreateCustomerRow(parent)
 			end
 			GameTooltip:AddLine(buttonFrame.entry.tradeLead and AF:Text("MISSING_ADDON_DATA") or AF:Text("CERTIFIED_ADDON_DATA"), buttonFrame.entry.tradeLead and 0.75 or 0.35, buttonFrame.entry.tradeLead and 0.75 or 1, buttonFrame.entry.tradeLead and 0.75 or 0.35, true)
 			if not buttonFrame.entry.tradeLead then
+				AF:RequestReagentDetail(buttonFrame.entry)
 				AF:AddCapabilityTooltipLines(GameTooltip, buttonFrame.entry)
 			end
 			AF:StyleCustomerTooltip(GameTooltip)
@@ -1146,8 +1147,13 @@ function AF:RefreshCustomerQuery(force)
 	self.currentCustomerProfessionID = context.professionID
 	self.currentCustomerRecipeID = context.recipeID
 
-	if changed or force or not self.currentCustomerQueryToken then
+	if force then
 		self:BroadcastQuery(context.itemID, context.professionID)
+	elseif changed or not self.currentCustomerQueryToken then
+		self.currentCustomerQueryToken = nil
+		self.currentCustomerQueryItemID = nil
+		self.currentCustomerQueryProfessionID = nil
+		self:QueueBroadcastQuery(context.itemID, context.professionID)
 	end
 	self:InjectDebugSelfResult(context.itemID, context.professionID)
 	if self.InjectDebugTradeLeads then
@@ -1202,33 +1208,10 @@ function AF:RefreshCustomerResults(statusOverride)
 			row:ClearAllPoints()
 			row:SetPoint("TOPLEFT", 0, -contentHeight)
 			row:SetWidth(math.max(280, frame.scroll:GetWidth() - 4))
-			if entry.tradeLead then
-				row.certified:Hide()
-			else
-				row.certified:Show()
-			end
-			row.favorite:SetShown(self:IsFavoriteArtisan(entry))
 			row.name:ClearAllPoints()
 			row.name:SetPoint("TOPLEFT", row.certified, "TOPRIGHT", 4, 0)
 			row.name:SetPoint("RIGHT", -40, 0)
-			local displayName = self:GetDisplayPlayerName(entry.name or "?")
-			if entry.unavailableFavorite then
-				displayName = displayName .. " |cff888888(" .. self:Text("UNAVAILABLE") .. ")|r"
-			end
-			row.name:SetText(displayName)
-			row.updatedAt:SetText(self:FormatCustomerRowUpdatedAt(entry))
-			if entry.tradeLead then
-				row.detail:SetText(entry.note or self:Text("MISSING_ADDON_DATA"))
-				row.capability:SetText(entry.professionName or "")
-			else
-				local note = entry.note and entry.note ~= "" and (" - " .. entry.note) or ""
-				row.detail:SetText(self:FormatMoney(entry.priceCopper, entry.freeCommission) .. note)
-				row.capability:SetText(self:FormatCapability(entry))
-			end
-			local rowHeight = math.max(
-				ROW_HEIGHT,
-				6 + row.name:GetStringHeight() + 3 + row.detail:GetStringHeight() + 3 + row.capability:GetStringHeight() + ROW_BOTTOM_PADDING
-			)
+			local rowHeight = self:ApplyCustomerRowViewModel(row, self:BuildCustomerRowViewModel(entry), ROW_HEIGHT, ROW_BOTTOM_PADDING)
 			row:SetHeight(rowHeight)
 			contentHeight = contentHeight + rowHeight
 			row:Show()
@@ -1251,7 +1234,7 @@ function AF:RefreshCustomerResults(statusOverride)
 			self:SetCustomerStatusItem(itemID, itemName, "DEBUG_NOT_SCANNED")
 		elseif filterText ~= "" and hasAvailableUnfiltered then
 			self:SetCustomerStatusItem(itemID, itemName, "NO_FILTER_MATCH")
-		elseif self.lastQueryAt and self:Now() - self.lastQueryAt < self.LIVE_QUERY_TIMEOUT then
+		elseif self.pendingCustomerQueryItemID == itemID or (self.lastQueryAt and self:Now() - self.lastQueryAt < self.LIVE_QUERY_TIMEOUT) then
 			self:SetCustomerStatusItem(itemID, itemName, "CHECKING_ARTISANS")
 		else
 			self:SetCustomerStatusItem(itemID, itemName, "NO_ARTISANS_FOUND")

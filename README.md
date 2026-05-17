@@ -20,6 +20,8 @@ The addon is built around a simple idea: customers should be able to find the ri
 *   Official Options -> AddOns configuration panel.
 *   Localization for English, French, German, Spanish, Russian, and Chinese.
 
+![Addon features gif](Images/Example.gif)
+
 ## For Customers
 
 When you open the Crafting Order form and choose an item, ArtisanFinder checks for artisans who are currently available for that craft. Addon-enabled crafters only appear after they respond to the current search, so old cached results are not shown as if they were online.

@@ -39,6 +39,7 @@ Core.lua
 Comms.lua
 TradeChat.lua
 Scanner.lua
+CustomerRows.lua
 CustomerUI.lua
 CrafterUI.lua
 Minimap.lua

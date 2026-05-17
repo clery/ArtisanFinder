@@ -8,6 +8,7 @@ AF.PROTOCOL_VERSION = "1"
 AF.CHANNEL_NAME = "ArtisanFinder"
 AF.CACHE_MAX_AGE = 14 * 24 * 60 * 60
 AF.RESPONSE_THROTTLE = 60
+AF.DETAIL_REQUEST_THROTTLE = 30
 AF.LIVE_QUERY_TIMEOUT = 6
 AF.MAX_NOTE_BYTES = 80
 AF.MAX_LINK_BYTES = 96
@@ -608,7 +609,7 @@ function AF:AddCapabilityTooltipLines(tooltip, entry)
 		tooltip:AddLine(" ")
 		tooltip:AddLine(self:Text("SUGGESTED_REAGENTS"), 1, 0.82, 0)
 		self:AddReagentSummaryTooltipLines(tooltip, entry.bestReagentSummary, entry.bestReagentTruncated)
-	elseif entry.bestReagentPendingNames then
+	elseif entry.bestReagentPendingNames or entry.reagentDetailRequested then
 		tooltip:AddLine(" ")
 		tooltip:AddLine(self:Text("SUGGESTED_REAGENTS"), 1, 0.82, 0)
 		tooltip:AddLine(self:Text("LOADING_REAGENT_NAMES"), 0.75, 0.75, 0.75, true)
@@ -806,16 +807,17 @@ function AF:GetCachedArtisans(itemID, filterText, sortMode, queryToken)
 		local verifiedForQuery = queryToken and tonumber(entry.lastQueryToken) == tonumber(queryToken) and entry.verifiedAt
 		if verifiedForQuery and entry.updatedAt and now - entry.updatedAt <= self.CACHE_MAX_AGE then
 			if EntryMatchesCustomerFilter(self, entry, filterText) then
-				table.insert(rows, entry)
-				entry.certified = true
-				entry.tradeLead = false
-				entry.unavailableFavorite = nil
-				local favoriteKey = self:GetFavoriteArtisanKey(entry)
+				local rowEntry = CopyCustomerEntry(entry)
+				rowEntry.certified = true
+				rowEntry.tradeLead = false
+				rowEntry.unavailableFavorite = nil
+				table.insert(rows, rowEntry)
+				local favoriteKey = self:GetFavoriteArtisanKey(rowEntry)
 				if favoriteKey then
 					seenNames[favoriteKey] = true
 				end
-				if entry.name then
-					seenNames[entry.name] = true
+				if rowEntry.name then
+					seenNames[rowEntry.name] = true
 				end
 			end
 		end
