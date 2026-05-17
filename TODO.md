@@ -1,1 +1,2 @@
 [] Add a multi-character system, to allow crafters to show if they are available but on a alt character
+[] Add guild functionnality so that if a guild member is connected and has the right profession, they show up in the customer view in a way that indicates they are guild members.

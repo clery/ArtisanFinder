@@ -549,6 +549,33 @@ function AF:FormatMoney(copper, free)
 	return string.format("%.2fg", copper / 10000)
 end
 
+function AF:FormatRelativeTime(timestamp)
+	timestamp = tonumber(timestamp)
+	if not timestamp or timestamp <= 0 then
+		return ""
+	end
+
+	local elapsed = math.max(0, self:Now() - timestamp)
+	if elapsed < 60 then
+		return self:Text("TIME_SECONDS_AGO", math.max(1, math.floor(elapsed)))
+	end
+	if elapsed < 3600 then
+		return self:Text("TIME_MINUTES_AGO", math.floor(elapsed / 60))
+	end
+	if elapsed < 86400 then
+		return self:Text("TIME_HOURS_AGO", math.floor(elapsed / 3600))
+	end
+	return self:Text("TIME_DAYS_AGO", math.floor(elapsed / 86400))
+end
+
+function AF:FormatCustomerRowUpdatedAt(entry)
+	local relative = self:FormatRelativeTime(entry and entry.updatedAt)
+	if relative == "" then
+		return ""
+	end
+	return self:Text(entry and entry.tradeLead and "FOUND_TIME_AGO" or "ANSWERED_TIME_AGO", relative)
+end
+
 function AF:FormatCapability(entry)
 	if not entry then
 		return ""

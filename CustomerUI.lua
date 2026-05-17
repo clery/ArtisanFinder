@@ -391,6 +391,11 @@ local function CreateCustomerRow(parent)
 	row.name:SetJustifyH("LEFT")
 	row.name:SetWordWrap(false)
 
+	row.updatedAt = row:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	row.updatedAt:SetPoint("TOPRIGHT", -40, -6)
+	row.updatedAt:SetJustifyH("RIGHT")
+	row.updatedAt:SetWordWrap(false)
+
 	row.detail = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 	row.detail:SetPoint("TOPLEFT", row.name, "BOTTOMLEFT", 0, -3)
 	row.detail:SetPoint("RIGHT", -40, 0)
@@ -1211,6 +1216,7 @@ function AF:RefreshCustomerResults(statusOverride)
 				displayName = displayName .. " |cff888888(" .. self:Text("UNAVAILABLE") .. ")|r"
 			end
 			row.name:SetText(displayName)
+			row.updatedAt:SetText(self:FormatCustomerRowUpdatedAt(entry))
 			if entry.tradeLead then
 				row.detail:SetText(entry.note or self:Text("MISSING_ADDON_DATA"))
 				row.capability:SetText(entry.professionName or "")

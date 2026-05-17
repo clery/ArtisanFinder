@@ -5,12 +5,11 @@
 ### Added
 
 - Added a configurable trade-chat lead duration with 5, 10, 15, 30, and 60 minute options.
-- Added CurseForge changelog metadata so release notes appear on CurseForge file pages.
 
 ### Changed
 
 - Updated LibDBIcon packaging to include only the library file instead of the full upstream repository hierarchy.
-- Updated release packaging metadata and icon assets for the packaged addon.
+- Customer result rows now show when addon-enabled crafters answered or trade-chat crafters were found.
 
 ### Fixed
 
