@@ -39,12 +39,21 @@ local KNOWN_PROFESSION_SKILL_LINES = {
 
 local function ExtractTradeLinks(message)
 	local links = {}
+	local seen = {}
 	message = tostring(message or "")
 	for link, name in message:gmatch("(|c%x%x%x%x%x%x%x%x|Htrade:[^|]+|h%[(.-)%]|h|r)") do
-		table.insert(links, { link = link, name = name })
+		local key = link:match("|Htrade:([^|]+)|h") or link
+		if not seen[key] then
+			seen[key] = true
+			table.insert(links, { link = link, name = name, key = key })
+		end
 	end
 	for link, name in message:gmatch("(|Htrade:[^|]+|h%[(.-)%]|h)") do
-		table.insert(links, { link = link, name = name })
+		local key = link:match("|Htrade:([^|]+)|h") or link
+		if not seen[key] then
+			seen[key] = true
+			table.insert(links, { link = link, name = name, key = key })
+		end
 	end
 	return links
 end
@@ -183,7 +192,8 @@ function AF:OnTradeChatMessage(message, sender)
 
 	local now = self:Now()
 	for index, linkInfo in ipairs(links) do
-		self.tradeLeads[name .. ":" .. tostring(index)] = {
+		local leadKey = name .. ":" .. tostring(linkInfo.key or index)
+		self.tradeLeads[leadKey] = {
 			name = name,
 			target = name,
 			professionLink = linkInfo.link,
@@ -258,6 +268,15 @@ function AF:GetTradeLeadRows(itemID, professionID, filterText, seenNames, recipe
 			}, " "):lower()
 			if filterText == "" or haystack:find(filterText, 1, true) then
 				table.insert(rows, row)
+				if seenNames then
+					seenNames[name] = true
+					if row.name then
+						seenNames[row.name] = true
+					end
+					if row.target then
+						seenNames[row.target] = true
+					end
+				end
 			end
 		end
 	end

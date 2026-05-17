@@ -1,4 +1,5 @@
 package-as: ArtisanFinder
+manual-changelog: CHANGELOG.md
 
 externals:
   Libs/LibStub: https://repos.curseforge.com/wow/libstub/trunk

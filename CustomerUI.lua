@@ -547,7 +547,7 @@ function AF:SetCustomerStatusText(text)
 	end
 end
 
-function AF:SetCustomerStatusItem(itemID, itemName)
+function AF:SetCustomerStatusItem(itemID, itemName, templateKey)
 	local frame = self.customerFrame
 	if not frame or not frame.statusPrefix or not itemID then
 		self:SetCustomerStatusText(self:Text("SELECT_ORDER_ITEM"))
@@ -555,7 +555,7 @@ function AF:SetCustomerStatusItem(itemID, itemName)
 	end
 
 	itemName = itemName or self:GetDisplayItemName(itemID)
-	local prefix, suffix = SplitAroundPlaceholder(self:Text("AVAILABLE_ARTISANS_FOR", "%s"))
+	local prefix, suffix = SplitAroundPlaceholder(self:Text(templateKey or "AVAILABLE_ARTISANS_FOR", "%s"))
 	frame.statusPrefix:ClearAllPoints()
 	frame.statusPrefix:SetPoint("TOPLEFT", frame, "TOPLEFT", 14, -32)
 	frame.statusPrefix:SetText(prefix)
@@ -1242,13 +1242,13 @@ function AF:RefreshCustomerResults(statusOverride)
 			hasAvailableUnfiltered = #self:GetCachedArtisans(itemID, "", sortMode, queryToken) > 0
 		end
 		if self.db.debugSelfResults and not self.db.artisanProfile.items[tostring(itemID)] then
-			self:SetCustomerStatusText(self:Text("DEBUG_NOT_SCANNED", itemName))
+			self:SetCustomerStatusItem(itemID, itemName, "DEBUG_NOT_SCANNED")
 		elseif filterText ~= "" and hasAvailableUnfiltered then
-			self:SetCustomerStatusText(self:Text("NO_FILTER_MATCH", itemName))
+			self:SetCustomerStatusItem(itemID, itemName, "NO_FILTER_MATCH")
 		elseif self.lastQueryAt and self:Now() - self.lastQueryAt < self.LIVE_QUERY_TIMEOUT then
-			self:SetCustomerStatusText(self:Text("CHECKING_ARTISANS", itemName))
+			self:SetCustomerStatusItem(itemID, itemName, "CHECKING_ARTISANS")
 		else
-			self:SetCustomerStatusText(self:Text("NO_ARTISANS_FOUND", itemName))
+			self:SetCustomerStatusItem(itemID, itemName, "NO_ARTISANS_FOUND")
 		end
 	end
 end
