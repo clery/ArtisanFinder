@@ -9,13 +9,15 @@ The addon is built around a simple idea: customers should be able to find the ri
 *   Live artisan search from the Crafting Orders form.
 *   Crafter availability toggles from the minimap button.
 *   Optional automatic availability in trade-chat areas, with automatic disable when entering instances.
+*   Multi-character crafter profiles for advertising scanned professions from your alts while you are online.
+*   Per-character profession advertising options.
 *   Item-specific and profession-default commissions and notes.
 *   Favorite artisans that stay visible at the top of customer results.
 *   Search and sorting for busy artisan lists.
 *   Personal order field helper for recipient and commission review.
 *   Profession-link opening from customer results.
 *   Reagent recommendations with reagent icons in tooltips.
-*   Temporary trade-chat profession leads for crafters who do not use the addon.
+*   Trade-chat profession leads for crafters who do not use the addon, with configurable duration and offline fallback.
 *   Background recipe scanning that resumes if the profession window closes.
 *   Official Options -> AddOns configuration panel.
 *   Localization for English, French, German, Spanish, Russian, and Chinese.
@@ -36,7 +38,9 @@ The results help answer the questions that usually slow down personal orders:
 
 Each certified result can include the crafter's profession, commission, note, base craft quality, and recommended reagents when that information is available. You can search and sort the list when many artisans are available, mark favorite artisans, and use the row action button to whisper the crafter, open their profession link, or fill personal order fields for review.
 
-ArtisanFinder can also notice profession links posted in trade chat. These crafters are shown as potential leads for matching professions for a short time, but they are not marked as certified addon data. They are useful when you want more crafters to contact, while addon-enabled results remain the source for exact prices, qualities, and reagent recommendations.
+If a crafter is online on an alt, ArtisanFinder can still show the character who actually owns the matching profession. The row makes it clear which character is online for whispers, while personal order fields are filled for the character who can craft the item.
+
+ArtisanFinder can also notice profession links posted in trade chat. These crafters are shown as potential leads for matching professions. They are useful when you want more crafters to contact, even if they don't have the addon installed, but they won't be able to show exact prices, qualities, and reagent recommendations.
 
 ArtisanFinder does not place orders for you. It only helps fill or open the right information so you can review everything before submitting an order yourself.
 
@@ -57,6 +61,8 @@ Item-specific values are useful when a craft is expensive, rare, or otherwise di
 Availability is session-based and resets off after login or reload, so you decide when you want to appear in customer searches. The minimap button gives you a quick way to toggle availability without digging through menus. If you prefer, automatic availability can mark you as available in capital or trade-chat areas and mark you unavailable when entering instances.
 
 ArtisanFinder scans your known recipes in the background and resumes unfinished work later if the profession window closes. This keeps your craft data up to date while avoiding long freezes when opening a large profession. You can also force a fresh scan of the currently open profession with `/af scan`.
+
+If you craft on multiple characters, scan each character's professions once. When you are online and available on any character, ArtisanFinder can advertise the scanned professions from your other characters too. Customers will see the actual crafter character in the result list, with a note showing which character is currently online for whispers. You can enable or disable advertising for each character's profession from the addon options.
 
 ![ArtisanFinder crafter view](Images/CrafterView.png)
 
@@ -82,9 +88,14 @@ ArtisanFinder has an Options -> AddOns panel where you can configure:
 
 *   Default customer result sorting.
 *   Cache cleanup frequency.
+*   Offline cached artisan fallback.
+*   Trade-chat lead duration.
+*   Which character professions are advertised.
 *   Automatic availability mode.
+*   Minimap button visibility.
 
-![ArtisanFinder options](Images/Options.png)
+![ArtisanFinder options](Images/Options1.png)
+![ArtisanFinder options](Images/Options2.png)
 
 ## Languages
 
