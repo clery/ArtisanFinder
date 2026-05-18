@@ -37,6 +37,25 @@ local KNOWN_PROFESSION_SKILL_LINES = {
 	[773] = true, -- Inscription
 }
 
+local TRADE_CHANNEL_PATTERNS = {
+	"trade",
+	"commerce",
+	"comercio",
+	"handel",
+	"торговля",
+	"交易",
+}
+
+local function IsTradeChannelName(name)
+	name = tostring(name or ""):lower()
+	for _, pattern in ipairs(TRADE_CHANNEL_PATTERNS) do
+		if name:find(pattern, 1, true) then
+			return true
+		end
+	end
+	return false
+end
+
 local function ExtractTradeLinks(message)
 	local links = {}
 	local seen = {}
@@ -56,6 +75,14 @@ local function ExtractTradeLinks(message)
 		end
 	end
 	return links
+end
+
+local function SafeExtractTradeLinks(message)
+	local ok, links = pcall(ExtractTradeLinks, message)
+	if ok and type(links) == "table" then
+		return links
+	end
+	return {}
 end
 
 local function GetTradeLinkProfessionCandidates(link)
@@ -175,12 +202,18 @@ function AF:InjectDebugTradeLeads()
 	end
 end
 
-function AF:OnTradeChatMessage(message, sender)
+function AF:OnTradeChatMessage(message, sender, _, channelName, _, _, _, _, channelBaseName)
 	if self:IsInCombatLocked() then
 		return
 	end
+	if IsInInstance and IsInInstance() then
+		return
+	end
+	if not IsTradeChannelName(channelName) and not IsTradeChannelName(channelBaseName) then
+		return
+	end
 
-	local links = ExtractTradeLinks(message)
+	local links = SafeExtractTradeLinks(message)
 	if #links == 0 or not sender then
 		return
 	end
