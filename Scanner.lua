@@ -2,8 +2,10 @@ local _, AF = ...
 
 local SCAN_PROBE_JOB_DELAY = 0.05
 local SCAN_FULL_JOB_DELAY = 0.25
-local FAST_SCAN_PROBE_JOB_DELAY = 0.01
-local FAST_SCAN_FULL_JOB_DELAY = 0.03
+local FAST_SCAN_PROBE_JOB_DELAY = 0
+local FAST_SCAN_FULL_JOB_DELAY = 0
+local FAST_SCAN_PROBE_JOBS_PER_TICK = 25
+local FAST_SCAN_FULL_JOBS_PER_TICK = 4
 
 local function GetScanJobKey(recipeID, itemID)
 	return tostring(recipeID or 0) .. ":" .. tostring(itemID or 0)
@@ -477,6 +479,16 @@ function AF:GetScanJobDelay(job)
 	return SCAN_PROBE_JOB_DELAY
 end
 
+function AF:GetScanJobsPerTick(job)
+	if not self.db or self.db.fastScan ~= true then
+		return 1
+	end
+	if job and job.kind == "full" then
+		return FAST_SCAN_FULL_JOBS_PER_TICK
+	end
+	return FAST_SCAN_PROBE_JOBS_PER_TICK
+end
+
 function AF:CompleteActiveScan(active, professionEntry, progress)
 	professionEntry.scanSignature = progress.professionSignature or progress.signature
 	professionEntry.scanMode = progress.mode
@@ -534,15 +546,19 @@ function AF:ProcessScanQueue()
 			return
 		end
 
-		local job = table.remove(progress.pending, 1)
-		if job then
-			local profession = { id = active.professionID, name = professionEntry.name }
+		local jobsToProcess = AF:GetScanJobsPerTick(progress.pending and progress.pending[1])
+		local profession = { id = active.professionID, name = professionEntry.name }
+		for _ = 1, jobsToProcess do
+			local job = table.remove(progress.pending, 1)
+			if not job then
+				break
+			end
 			AF:ScanJob(profession, professionEntry, job)
 			progress.completed[job.key] = true
 			progress.scanned = (tonumber(progress.scanned) or 0) + 1
 			progress.updatedAt = AF:Now()
-			AF:RefreshScanProgressUI()
 		end
+		AF:RefreshScanProgressUI()
 
 		if #progress.pending == 0 then
 			AF:CompleteActiveScan(active, professionEntry, progress)

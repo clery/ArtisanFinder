@@ -60,30 +60,14 @@ function AF:ApplyProfessionPanel(frame)
 end
 
 function AF:ApplyCustomerSidePanel(frame)
-	if frame.TitleText then
-		frame.TitleText:SetText("ArtisanFinder")
-	end
-
-	if frame.SetBackdrop then
-		frame:SetBackdrop(nil)
-	end
-
-	if frame.Bg then
-		frame.Bg:SetAtlas("auctionhouse-background-index", false)
-		frame.Bg:ClearAllPoints()
-		frame.Bg:SetPoint("TOPLEFT", 6, -21)
-		frame.Bg:SetPoint("BOTTOMRIGHT", -2, 2)
-	end
-	if frame.TopTileStreaks then
-		frame.TopTileStreaks:Hide()
-	end
+	frame.Bg:SetAtlas("auctionhouse-background-index", false)
+	frame.Bg:ClearAllPoints()
+	frame.Bg:SetPoint("TOPLEFT", 6, -21)
+	frame.Bg:SetPoint("BOTTOMRIGHT", -2, 2)
+	frame.TopTileStreaks:Hide()
 end
 
 function AF:ApplyCustomerListInset(frame)
-	if frame.SetBackdrop then
-		frame:SetBackdrop(nil)
-	end
-
 	if not frame.Background then
 		frame.Background = frame:CreateTexture(nil, "BACKGROUND")
 		frame.Background:SetAtlas("auctionhouse-background-index", false)
@@ -104,10 +88,6 @@ function AF:ApplyCustomerListInset(frame)
 end
 
 function AF:ApplyCustomerPopupPanel(frame)
-	if frame.SetBackdrop then
-		frame:SetBackdrop(nil)
-	end
-
 	if not frame.Background then
 		frame.Background = frame:CreateTexture(nil, "BACKGROUND")
 	end
@@ -138,9 +118,6 @@ function AF:ApplyCustomerPopupPanel(frame)
 end
 
 function AF:StyleListRow(row)
-	if row.SetBackdrop then
-		row:SetBackdrop(nil)
-	end
 	row:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
 	local highlight = row:GetHighlightTexture()
 	if highlight then

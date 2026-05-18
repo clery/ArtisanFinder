@@ -55,9 +55,12 @@ L.PERSONAL_ORDER_FILLED = "filled personal order fields. Please review before pl
 
 L.ITEM_SPECIFIC_COMMISSION = "Item-specific commission"
 L.ITEM_SPECIFIC_TOOLTIP = "These fields apply only to the selected craft and override the profession default when specified."
-L.DEFAULT_COMMISSION = "Default commission"
-L.DEFAULT_COMMISSION_TOOLTIP = "These fields apply to crafts in the current profession when no item-specific commission is specified."
-L.COMMISSION = "Commission"
+	L.DEFAULT_COMMISSION = "Default commission"
+	L.DEFAULT_COMMISSION_TOOLTIP = "These fields apply to crafts in the current profession when no item-specific commission is specified."
+	L.CRAFTER_PANEL_SCAN_SECTION = "Scanning"
+	L.CRAFTER_PANEL_ADVERTISING_SECTION = "Availability listing"
+	L.CRAFTER_PANEL_ADVERTISE_PROFESSION = "Advertise this profession"
+	L.COMMISSION = "Commission"
 L.NOTE = "Note"
 L.COMMISSION_PLACEHOLDER = "0, -1, or gold"
 L.NOTE_PLACEHOLDER = "Optional note"
@@ -161,8 +164,10 @@ L.OPTIONS_TRADE_LEADS_60_MINUTES = "60 minutes"
 L.OPTIONS_FAST_SCAN = "Fast foreground scan"
 L.OPTIONS_FAST_SCAN_DESC = "Scan recipes faster while the profession window is open. This can reduce frame rate during reagent recommendation calculations."
 L.FAST_SCAN_BUTTON = "Fast scan"
-L.FAST_SCAN_ENABLED_BUTTON = "Fast scan on"
+L.FAST_SCAN_ENABLED_BUTTON = "Fast scan"
 L.FAST_SCAN_TOOLTIP = "Toggle faster scanning for active profession scans. Faster scans finish sooner but can lower frame rate."
+L.FORCE_RESCAN_BUTTON = "Rescan"
+L.FORCE_RESCAN_TOOLTIP = "Force a fresh scan of the currently open profession."
 
 function AF:Text(key, ...)
 	local override = self.localeOverride

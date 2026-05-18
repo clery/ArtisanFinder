@@ -1,12 +1,9 @@
 local _, AF = ...
 
-local DEFAULT_COMMISSION_PANEL_WIDTH = 304
-local DEFAULT_COMMISSION_PANEL_HEIGHT = 150
+local DEFAULT_COMMISSION_PANEL_WIDTH = 356
+local DEFAULT_COMMISSION_PANEL_HEIGHT = 276
 
 local function UpdatePlaceholder(box)
-	if not box or not box.Placeholder then
-		return
-	end
 	box.Placeholder:SetShown((box:GetText() or "") == "" and not box:HasFocus())
 end
 
@@ -53,9 +50,7 @@ local function PrepareInsetEditBox(field, width, placeholderKey, hasGoldIcon)
 	box.Placeholder:SetText(AF:Text(placeholderKey))
 
 	box.GoldIcon = field.GoldIcon
-	if box.GoldIcon then
-		box.GoldIcon:SetShown(hasGoldIcon == true)
-	end
+	box.GoldIcon:SetShown(hasGoldIcon == true)
 
 	box:SetScript("OnEditFocusGained", function(self)
 		UpdatePlaceholder(self)
@@ -126,33 +121,6 @@ local function ConfigureInfoButton(button, tooltipTitle, tooltipText)
 	return button
 end
 
-local function FindTrackRecipeControl(form)
-	local candidates = {
-		form and form.TrackRecipeCheckBox,
-		form and form.TrackRecipeCheckbox,
-		form and form.TrackRecipe,
-		form and form.TrackRecipeButton,
-	}
-	for _, candidate in ipairs(candidates) do
-		if candidate and candidate.GetObjectType and candidate:IsShown() then
-			return candidate
-		end
-	end
-	if not form or not form.GetChildren then
-		return nil
-	end
-	local trackText = tostring(TRACK_RECIPE or ""):lower()
-	for _, child in ipairs({ form:GetChildren() }) do
-		if child and child.GetObjectType and child:GetObjectType() == "CheckButton" and child:IsShown() then
-			local text = child.Text and child.Text.GetText and child.Text:GetText()
-			if trackText ~= "" and text and tostring(text):lower() == trackText then
-				return child
-			end
-		end
-	end
-	return nil
-end
-
 local function ParseCommissionOrWarn(box)
 	local copper, free, state = AF:NormalizeCommissionInput(box:GetText())
 	if not copper then
@@ -179,14 +147,19 @@ function AF:RefreshCrafterLocale()
 		FitNoteAndSave(frame, frame.noteLabel, frame.note, frame.save, 326, 120)
 	end
 	if defaults then
-		defaults.title:SetText(self:Text("DEFAULT_COMMISSION"))
+		defaults.title:SetText("ArtisanFinder")
+		defaults.defaultsHeader:SetText(self:Text("DEFAULT_COMMISSION"))
+		defaults.scanHeader:SetText(self:Text("CRAFTER_PANEL_SCAN_SECTION"))
+		defaults.advertisingHeader:SetText(self:Text("CRAFTER_PANEL_ADVERTISING_SECTION"))
 		defaults.priceLabel:SetText(self:Text("COMMISSION"))
 		defaults.noteLabel:SetText(self:Text("NOTE"))
 		defaults.price.Placeholder:SetText(self:Text("COMMISSION_PLACEHOLDER"))
 		defaults.note.Placeholder:SetText(self:Text("NOTE_PLACEHOLDER"))
+		defaults.advertiseCheck.Text:SetText(self:Text("CRAFTER_PANEL_ADVERTISE_PROFESSION"))
 		UpdatePlaceholder(defaults.price)
 		UpdatePlaceholder(defaults.note)
 		FitStackedDefaultNoteAndSave(defaults, defaults.noteLabel, defaults.note, defaults.save)
+		self:UpdateFastScanButton()
 	end
 end
 
@@ -198,15 +171,7 @@ function AF:GetCraftingSchematicForm()
 end
 
 function AF:IsLinkedProfessionOpen()
-	if C_TradeSkillUI and C_TradeSkillUI.IsTradeSkillLinked then
-		local ok, linked = pcall(C_TradeSkillUI.IsTradeSkillLinked)
-		return ok and linked == true
-	end
-	if IsTradeSkillLinked then
-		local ok, linked = pcall(IsTradeSkillLinked)
-		return ok and linked == true
-	end
-	return false
+	return C_TradeSkillUI and C_TradeSkillUI.IsTradeSkillLinked and C_TradeSkillUI.IsTradeSkillLinked() == true or false
 end
 
 function AF:GetCurrentCraftingRecipeContext()
@@ -236,10 +201,7 @@ function AF:GetCurrentCraftingRecipeContext()
 
 	local professionInfo
 	if C_TradeSkillUI and C_TradeSkillUI.GetProfessionInfoByRecipeID then
-		local ok, info = pcall(C_TradeSkillUI.GetProfessionInfoByRecipeID, recipeID)
-		if ok then
-			professionInfo = info
-		end
+		professionInfo = C_TradeSkillUI.GetProfessionInfoByRecipeID(recipeID)
 	end
 
 	local fallbackProfession = self:GetCurrentProfessionInfo()
@@ -336,15 +298,11 @@ function AF:AttachCrafterUI()
 
 	local defaults = CreateFrame("Frame", "ArtisanFinderProfessionDefaultsFrame", ProfessionsFrame, "ArtisanFinderProfessionDefaultsTemplate")
 	self:ApplyCustomerSidePanel(defaults)
-	local defaultsTitleParent = defaults.TitleContainer or defaults
-	defaults.title = defaults.TitleText or defaultsTitleParent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-	defaults.title:SetParent(defaultsTitleParent)
-	defaults.title:ClearAllPoints()
-	defaults.title:SetPoint("TOP", defaultsTitleParent, "TOP", 0, -5)
-	defaults.title:SetPoint("LEFT", defaultsTitleParent, "LEFT", 0, 0)
-	defaults.title:SetPoint("RIGHT", defaultsTitleParent, "RIGHT", 0, 0)
-	defaults.title:SetJustifyH("CENTER")
-	defaults.title:SetText(self:Text("DEFAULT_COMMISSION"))
+	defaults.title = defaults.TitleContainer.TitleText
+	defaults.title:SetText("ArtisanFinder")
+	defaults.defaultsHeader:SetText(self:Text("DEFAULT_COMMISSION"))
+	defaults.scanHeader:SetText(self:Text("CRAFTER_PANEL_SCAN_SECTION"))
+	defaults.advertisingHeader:SetText(self:Text("CRAFTER_PANEL_ADVERTISING_SECTION"))
 	defaults.info = ConfigureInfoButton(defaults.info, "DEFAULT_COMMISSION", "DEFAULT_COMMISSION_TOOLTIP")
 	defaults.priceLabel:SetJustifyH("LEFT")
 	defaults.priceLabel:SetText(self:Text("COMMISSION"))
@@ -382,20 +340,7 @@ function AF:AttachCrafterUI()
 		AF:RefreshCrafterUI()
 	end)
 
-	local markItemDirty = function()
-		AF:UpdateCrafterDirtyState()
-	end
-	local markDefaultDirty = function()
-		AF:UpdateCrafterDirtyState()
-	end
-	WatchEditBox(frame.price, markItemDirty)
-	WatchEditBox(frame.note, markItemDirty)
-	WatchEditBox(defaults.price, markDefaultDirty)
-	WatchEditBox(defaults.note, markDefaultDirty)
-
-	local fastScanButton = CreateFrame("Button", "ArtisanFinderFastScanButton", form, "UIPanelButtonTemplate")
-	fastScanButton:SetSize(96, 22)
-	fastScanButton:SetFrameStrata("HIGH")
+	local fastScanButton = defaults.fastScanButton
 	fastScanButton:SetScript("OnClick", function()
 		AF:SetFastScan(not (AF.db and AF.db.fastScan == true))
 	end)
@@ -409,9 +354,45 @@ function AF:AttachCrafterUI()
 		GameTooltip:Hide()
 	end)
 
+	local forceRescanButton = defaults.forceRescanButton
+	forceRescanButton:SetScript("OnClick", function()
+		AF:StartOrResumeCurrentProfessionScan(true, false)
+		AF:RefreshCrafterUI()
+	end)
+	forceRescanButton:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		GameTooltip:SetText(AF:Text("FORCE_RESCAN_BUTTON"), 1, 0.82, 0)
+		GameTooltip:AddLine(AF:Text("FORCE_RESCAN_TOOLTIP"), 1, 1, 1, true)
+		GameTooltip:Show()
+	end)
+	forceRescanButton:SetScript("OnLeave", function()
+		GameTooltip:Hide()
+	end)
+
+	defaults.advertiseCheck.Text:SetText(self:Text("CRAFTER_PANEL_ADVERTISE_PROFESSION"))
+	defaults.advertiseCheck.Text:SetPoint("LEFT", defaults.advertiseCheck, "RIGHT", 2, 0)
+	defaults.advertiseCheck:SetScript("OnClick", function(self)
+		local profession = AF:GetCurrentProfessionInfo()
+		if profession and profession.id then
+			AF:SetProfessionAdvertised(AF.playerName, profession.id, self:GetChecked() == true)
+		end
+	end)
+
+	local markItemDirty = function()
+		AF:UpdateCrafterDirtyState()
+	end
+	local markDefaultDirty = function()
+		AF:UpdateCrafterDirtyState()
+	end
+	WatchEditBox(frame.price, markItemDirty)
+	WatchEditBox(frame.note, markItemDirty)
+	WatchEditBox(defaults.price, markDefaultDirty)
+	WatchEditBox(defaults.note, markDefaultDirty)
+
 	self.crafterFrame = frame
 	self.crafterDefaultsFrame = defaults
 	self.crafterFastScanButton = fastScanButton
+	self.crafterForceRescanButton = forceRescanButton
 
 	if form.RegisterCallback and ProfessionsRecipeSchematicFormMixin then
 		local refresh = function()
@@ -433,7 +414,6 @@ end
 function AF:PositionCrafterUI()
 	local frame = self.crafterFrame
 	local defaults = self.crafterDefaultsFrame
-	local fastScanButton = self.crafterFastScanButton
 	local form = self:GetCraftingSchematicForm()
 	if not frame or not defaults or not form then
 		return
@@ -465,31 +445,35 @@ function AF:PositionCrafterUI()
 
 	defaults:ClearAllPoints()
 	defaults:SetPoint("BOTTOMLEFT", ProfessionsFrame, "BOTTOMRIGHT", -5, 24)
-
-	if fastScanButton then
-		fastScanButton:ClearAllPoints()
-		local track = FindTrackRecipeControl(form)
-		if track then
-			fastScanButton:SetPoint("TOPRIGHT", track, "BOTTOMRIGHT", 0, -5)
-		else
-			fastScanButton:SetPoint("TOPRIGHT", form, "TOPRIGHT", -12, -82)
-		end
-	end
 end
 
 function AF:UpdateFastScanButton()
 	local button = self.crafterFastScanButton
-	if not button then
+	local forceRescanButton = self.crafterForceRescanButton
+	local defaults = self.crafterDefaultsFrame
+	if not button or not defaults then
 		return
 	end
 	local active = self.activeScan
 	local currentProfession = self:GetCurrentProfessionInfo()
 	local isCurrentScan = active and currentProfession and tonumber(active.professionID) == tonumber(currentProfession.id)
+	SizeButtonForText(button, self:Text("FAST_SCAN_BUTTON"), 96, 120)
 	if isCurrentScan then
-		SizeButtonForText(button, self.db.fastScan and self:Text("FAST_SCAN_ENABLED_BUTTON") or self:Text("FAST_SCAN_BUTTON"), 96, 150)
-		button:Show()
+		button:Enable()
 	else
-		button:Hide()
+		button:Disable()
+	end
+	button:SetShown(defaults:IsShown())
+	if forceRescanButton then
+		SizeButtonForText(forceRescanButton, self:Text("FORCE_RESCAN_BUTTON"), 76, 120)
+		forceRescanButton:ClearAllPoints()
+		forceRescanButton:SetPoint("LEFT", button, "RIGHT", 6, 0)
+		if currentProfession and not active then
+			forceRescanButton:Enable()
+		else
+			forceRescanButton:Disable()
+		end
+		forceRescanButton:SetShown(defaults:IsShown())
 	end
 end
 
@@ -541,9 +525,6 @@ function AF:RefreshCrafterUI()
 	if not ProfessionsFrame:IsShown() or not form or not form:IsVisible() or self:IsLinkedProfessionOpen() then
 		frame:Hide()
 		defaults:Hide()
-		if self.crafterFastScanButton then
-			self.crafterFastScanButton:Hide()
-		end
 		return
 	end
 
@@ -564,6 +545,7 @@ function AF:RefreshCrafterUI()
 
 	if professionID then
 		defaults:Show()
+		defaults.advertiseCheck:SetChecked(self:IsProfessionAdvertised(self.playerName, professionID))
 		local default = self.db.artisanProfile.professionPrices[tostring(professionID)]
 		if default then
 			SetEditBoxText(defaults.price, self:FormatCommissionInput(default))
@@ -576,6 +558,7 @@ function AF:RefreshCrafterUI()
 		defaults:Hide()
 	end
 
+	self:UpdateFastScanButton()
 	self:UpdateCrafterDirtyState()
 end
 

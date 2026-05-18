@@ -46,30 +46,14 @@ function AF:OnPlayerLogin()
 	self:SelectActiveArtisanProfile(self.playerName)
 	self.available = false
 
-	if self.InitializeComms then
-		self:InitializeComms()
-	end
-	if self.InitializeMinimap then
-		self:InitializeMinimap()
-	end
-	if self.InitializeCustomerUI then
-		self:InitializeCustomerUI()
-	end
-	if self.InitializeCrafterUI then
-		self:InitializeCrafterUI()
-	end
-	if self.InitializeSlashCommands then
-		self:InitializeSlashCommands()
-	end
-	if self.InitializeTradeChat then
-		self:InitializeTradeChat()
-	end
-	if self.InitializeOptions then
-		self:InitializeOptions()
-	end
-	if self.CleanupCustomerCache then
-		self:CleanupCustomerCache()
-	end
+	self:InitializeComms()
+	self:InitializeMinimap()
+	self:InitializeCustomerUI()
+	self:InitializeCrafterUI()
+	self:InitializeSlashCommands()
+	self:InitializeTradeChat()
+	self:InitializeOptions()
+	self:CleanupCustomerCache()
 
 	self:Print(self:Text("ADDON_LOADED"))
 	self:QueueAutoAvailabilityRefresh()

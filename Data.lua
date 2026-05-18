@@ -2,14 +2,28 @@ local _, AF = ...
 
 local MIGRATIONS = {}
 
-MIGRATIONS[1] = function(db)
-	db.artisanProfile = db.artisanProfile or {}
-	db.artisanProfile.professions = db.artisanProfile.professions or {}
-	db.artisanProfile.items = db.artisanProfile.items or {}
-	db.artisanProfile.professionPrices = db.artisanProfile.professionPrices or {}
+local function EnsureProfileContainers(profile)
+	profile = profile or {}
+	profile.professions = profile.professions or {}
+	profile.items = profile.items or {}
+	profile.professionPrices = profile.professionPrices or {}
+	return profile
+end
+
+local function ApplyDBDefaults(db)
+	db.artisanProfile = EnsureProfileContainers(db.artisanProfile)
+	db.artisanCharacters = db.artisanCharacters or {}
+	db.advertising = db.advertising or {}
 	db.customerCache = db.customerCache or {}
 	db.favoriteArtisans = db.favoriteArtisans or {}
 	db.responseThrottle = db.responseThrottle or {}
+	db.tradeLeads = db.tradeLeads or {}
+	db.tradeLeadCache = db.tradeLeadCache or {}
+	db.minimap = db.minimap or { angle = 225, hide = false }
+
+	if db.debugSelfResults == nil then
+		db.debugSelfResults = false
+	end
 	if db.defaultSort == nil then
 		db.defaultSort = "best"
 	end
@@ -19,13 +33,28 @@ MIGRATIONS[1] = function(db)
 	if db.autoAvailability == nil then
 		db.autoAvailability = false
 	end
+	if db.fastScan == nil then
+		db.fastScan = false
+	end
 	if db.tradeLeadMinutes == nil then
 		db.tradeLeadMinutes = 15
 	end
-	if db.debugSelfResults == nil then
-		db.debugSelfResults = false
+	if db.offlineFallbackResults == nil then
+		db.offlineFallbackResults = 10
 	end
-	db.minimap = db.minimap or { angle = 225, hide = false }
+	if db.offlineFallbackMax == nil then
+		db.offlineFallbackMax = 20
+	end
+	if db.minimap.angle == nil then
+		db.minimap.angle = 225
+	end
+	if db.minimap.hide == nil then
+		db.minimap.hide = false
+	end
+end
+
+MIGRATIONS[1] = function(db)
+	ApplyDBDefaults(db)
 end
 
 MIGRATIONS[2] = function(db)
@@ -39,9 +68,7 @@ MIGRATIONS[3] = function(db)
 end
 
 MIGRATIONS[4] = function(db)
-	db.artisanProfile = db.artisanProfile or {}
-	db.artisanProfile.professions = db.artisanProfile.professions or {}
-	db.artisanProfile.items = db.artisanProfile.items or {}
+	db.artisanProfile = EnsureProfileContainers(db.artisanProfile)
 end
 
 MIGRATIONS[5] = function(db)
@@ -83,50 +110,8 @@ function AF:EnsureDB()
 	local db = ArtisanFinderDB
 	self:MigrateDB(db)
 
-	db.artisanProfile = db.artisanProfile or {}
-	db.artisanProfile.professions = db.artisanProfile.professions or {}
-	db.artisanProfile.items = db.artisanProfile.items or {}
-	db.artisanProfile.professionPrices = db.artisanProfile.professionPrices or {}
-	db.artisanCharacters = db.artisanCharacters or {}
-	db.advertising = db.advertising or {}
-
-	db.customerCache = db.customerCache or {}
-	db.favoriteArtisans = db.favoriteArtisans or {}
-	db.responseThrottle = db.responseThrottle or {}
-	db.tradeLeads = db.tradeLeads or {}
-	db.tradeLeadCache = db.tradeLeadCache or {}
-	if db.debugSelfResults == nil then
-		db.debugSelfResults = false
-	end
-	if db.autoAvailability == nil then
-		db.autoAvailability = false
-	end
-	if db.fastScan == nil then
-		db.fastScan = false
-	end
-	if db.defaultSort == nil then
-		db.defaultSort = "best"
-	end
-	if db.cacheCleanupDays == nil then
-		db.cacheCleanupDays = 7
-	end
-	if db.tradeLeadMinutes == nil then
-		db.tradeLeadMinutes = 15
-	end
-	if db.offlineFallbackResults == nil then
-		db.offlineFallbackResults = 10
-	end
-	if db.offlineFallbackMax == nil then
-		db.offlineFallbackMax = 20
-	end
+	ApplyDBDefaults(db)
 	db.schemaVersion = self.SCHEMA_VERSION
-	db.minimap = db.minimap or { angle = 225, hide = false }
-	if db.minimap.angle == nil then
-		db.minimap.angle = 225
-	end
-	if db.minimap.hide == nil then
-		db.minimap.hide = false
-	end
 
 	self.db = db
 	self.available = false
@@ -275,6 +260,12 @@ function AF:SetProfessionAdvertised(characterName, professionID, enabled)
 	end
 	if self.RefreshMinimap then
 		self:RefreshMinimap()
+	end
+	if self.RefreshCrafterUI then
+		self:RefreshCrafterUI()
+	end
+	if self.RefreshOptionsPanel then
+		self:RefreshOptionsPanel()
 	end
 end
 

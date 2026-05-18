@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.1.1 - 2026-05-18
+
+### Added
+
+- Added a crafter-side scanning section with an in-panel Fast scan toggle, a Rescan button, and per-profession availability advertising controls.
+- Added an Options setting for fast foreground scanning.
+
+### Changed
+
+- Fast scan now runs much more aggressively by processing multiple scan jobs per tick.
+- Profession equipment upgrades now interrupt an active scan, discard incomplete progress, and restart with a fresh equipment-change scan.
+- Profession scans now skip full recommendation recalculation for equipment-change scans when the recipe skill did not improve.
+- Crafter panel layout now groups default commission, scanning, and availability listing controls in the ArtisanFinder side frame.
+
+### Fixed
+
+- Fixed customer row favorite icons not vertically aligning with the certified checkmark.
+- Fixed overlap between offline/last-seen text in customer rows.
+- Fixed active profession equipment changes not forcing already-parsed incomplete scan items back through the new scan pass.
+
 ## 1.1.0 - 2026-05-18
 
 ### Added

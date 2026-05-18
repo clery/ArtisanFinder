@@ -100,14 +100,14 @@ local function HasNoteValue(entry)
 	return entry and entry.note and entry.note ~= ""
 end
 
-local function GetEntryCommission(entry)
+local function ReadEntryCommission(entry)
 	if HasCommissionValue(entry) then
 		return tonumber(entry.priceCopper) or 0, entry.freeCommission == true
 	end
 	return nil
 end
 
-local function GetEntryNote(entry)
+local function ReadEntryNote(entry)
 	if HasNoteValue(entry) then
 		return entry.note
 	end
@@ -148,17 +148,13 @@ function AF:SetCommissionFields(entry, priceCopper, freeCommission, state)
 	end
 end
 
-function AF:CommissionStateFromInput(text)
-	return self:ParseCopperFromGoldText(text)
-end
-
 function AF:FormatCommissionInput(entry)
 	local _, copper, free = self:GetSavedCommissionState(entry)
 	return self:GetCommissionInputText(copper, free)
 end
 
 function AF:IsCommissionInputDirty(text, entry)
-	local copper, free, state = self:CommissionStateFromInput(text)
+	local copper, free, state = self:ParseCopperFromGoldText(text)
 	if not copper then
 		return true
 	end
@@ -167,7 +163,7 @@ function AF:IsCommissionInputDirty(text, entry)
 end
 
 function AF:NormalizeCommissionInput(text)
-	local copper, free, state = self:CommissionStateFromInput(text)
+	local copper, free, state = self:ParseCopperFromGoldText(text)
 	if not copper then
 		return nil
 	end
@@ -175,11 +171,11 @@ function AF:NormalizeCommissionInput(text)
 end
 
 function AF:GetEntryCommission(entry)
-	return GetEntryCommission(entry)
+	return ReadEntryCommission(entry)
 end
 
 function AF:GetEntryNote(entry)
-	return GetEntryNote(entry)
+	return ReadEntryNote(entry)
 end
 
 function AF:FormatMoney(copper, free)
@@ -343,4 +339,3 @@ end
 function AF:GetDisplayItemName(itemID, fallback)
 	return self:GetItemName(itemID) or fallback or self:Text("ITEM_FALLBACK")
 end
-

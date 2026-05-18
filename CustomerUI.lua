@@ -41,7 +41,7 @@ end
 function AF:SetDefaultSort(key)
 	self.db.defaultSort = GetSortMode(GetSortIndexByKey(key)).key
 	self.customerSortIndex = GetSortIndexByKey(self.db.defaultSort)
-	if self.customerFrame and self.customerFrame.sort then
+	if self.customerFrame then
 		self.customerFrame.sort:SetText(self:Text("SORT_BUTTON", GetSortLabel(self.customerSortIndex)))
 	end
 	if self.RefreshCustomerResults then
@@ -91,21 +91,10 @@ local function Clamp(value, minValue, maxValue)
 end
 
 local function SetButtonAtlas(button, normalAtlas, pushedAtlas, disabledAtlas, highlightAtlas)
-	if not button then
-		return
-	end
-	if button.SetNormalAtlas then
-		button:SetNormalAtlas(normalAtlas)
-	end
-	if button.SetPushedAtlas then
-		button:SetPushedAtlas(pushedAtlas)
-	end
-	if button.SetDisabledAtlas then
-		button:SetDisabledAtlas(disabledAtlas or normalAtlas)
-	end
-	if button.SetHighlightAtlas then
-		button:SetHighlightAtlas(highlightAtlas or normalAtlas, "ADD")
-	end
+	button:SetNormalAtlas(normalAtlas)
+	button:SetPushedAtlas(pushedAtlas)
+	button:SetDisabledAtlas(disabledAtlas or normalAtlas)
+	button:SetHighlightAtlas(highlightAtlas or normalAtlas, "ADD")
 end
 
 local function TrySetTextureAtlas(texture, atlas, useAtlasSize)
@@ -116,8 +105,8 @@ local function TrySetTextureAtlas(texture, atlas, useAtlasSize)
 		return false
 	end
 	if texture.SetAtlas then
-		local ok = pcall(texture.SetAtlas, texture, atlas, useAtlasSize)
-		return ok == true
+		texture:SetAtlas(atlas, useAtlasSize)
+		return true
 	end
 	return false
 end
@@ -320,10 +309,13 @@ local function CreateCustomerRow(parent)
 	row:EnableMouse(true)
 	row:RegisterForClicks("LeftButtonUp")
 
-	if not TrySetTextureAtlas(row.favorite, "PetJournal-FavoritesIcon", true)
-		and not TrySetTextureAtlas(row.favorite, "communities-icon-heart", true) then
+	if not TrySetTextureAtlas(row.favorite, "PetJournal-FavoritesIcon", false)
+		and not TrySetTextureAtlas(row.favorite, "communities-icon-heart", false) then
 		row.favorite:SetTexture("Interface\\Common\\FavoritesIcon")
 	end
+	row.favorite:ClearAllPoints()
+	row.favorite:SetSize(15, 15)
+	row.favorite:SetPoint("TOP", row.certified, "BOTTOM", 0, -2)
 	row.favorite:Hide()
 
 	row.name:ClearAllPoints()
@@ -464,25 +456,21 @@ end
 
 function AF:SetCustomerStatusText(text)
 	local frame = self.customerFrame
-	if not frame or not frame.statusPrefix then
+	if not frame then
 		return
 	end
 	frame.statusPrefix:SetText(text or "")
 	frame.statusPrefix:ClearAllPoints()
 	frame.statusPrefix:SetPoint("TOPLEFT", frame, "TOPLEFT", 14, -32)
 	frame.statusPrefix:SetPoint("RIGHT", frame, "RIGHT", -14, 0)
-	if frame.itemLink then
-		frame.itemLink:Hide()
-		frame.itemLink.itemLinkText = nil
-	end
-	if frame.statusSuffix then
-		frame.statusSuffix:SetText("")
-	end
+	frame.itemLink:Hide()
+	frame.itemLink.itemLinkText = nil
+	frame.statusSuffix:SetText("")
 end
 
 function AF:SetCustomerStatusItem(itemID, itemName, templateKey)
 	local frame = self.customerFrame
-	if not frame or not frame.statusPrefix or not itemID then
+	if not frame or not itemID then
 		self:SetCustomerStatusText(self:Text("SELECT_ORDER_ITEM"))
 		return
 	end
@@ -524,37 +512,19 @@ function AF:SetCustomerPanelCollapsed(collapsed)
 		region:SetShown(not frame.collapsed)
 	end
 
-	if frame.title then
-		frame.title:SetShown(not frame.collapsed)
-	end
-	if frame.TitleContainer then
-		frame.TitleContainer:SetShown(not frame.collapsed)
-	end
-	if frame.NineSlice then
-		frame.NineSlice:SetShown(not frame.collapsed)
-	end
-	if frame.Bg then
-		frame.Bg:SetShown(not frame.collapsed)
-	end
-	if frame.TopTileStreaks then
-		frame.TopTileStreaks:SetShown(not frame.collapsed)
-	end
-	if frame.collapsedRail then
-		frame.collapsedRail:SetShown(frame.collapsed)
-	end
-	if frame.collapseButton then
-		frame.collapseButton:ClearAllPoints()
-		if frame.collapsed then
-			frame.collapseButton:SetPoint("TOP", frame.collapsedRail or frame, "TOP", 0, 0)
-			if frame.collapseButton.SetMaximizedLook then
-				frame.collapseButton:SetMaximizedLook()
-			end
-		else
-			frame.collapseButton:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 1, 0)
-			if frame.collapseButton.SetMinimizedLook then
-				frame.collapseButton:SetMinimizedLook()
-			end
-		end
+	frame.title:SetShown(not frame.collapsed)
+	frame.TitleContainer:SetShown(not frame.collapsed)
+	frame.NineSlice:SetShown(not frame.collapsed)
+	frame.Bg:SetShown(not frame.collapsed)
+	frame.TopTileStreaks:SetShown(not frame.collapsed)
+	frame.collapsedRail:SetShown(frame.collapsed)
+	frame.collapseButton:ClearAllPoints()
+	if frame.collapsed then
+		frame.collapseButton:SetPoint("TOP", frame.collapsedRail, "TOP", 0, 0)
+		frame.collapseButton:SetMaximizedLook()
+	else
+		frame.collapseButton:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 1, 0)
+		frame.collapseButton:SetMinimizedLook()
 	end
 
 	if frame.collapsed then
@@ -577,18 +547,12 @@ function AF:RefreshCustomerLocale()
 		return
 	end
 	self.customerSortIndex = SORT_MODES[self.customerSortIndex or 1] and self.customerSortIndex or 1
-	if frame.sort then
-		frame.sort:SetText(self:Text("SORT_BUTTON", GetSortLabel(self.customerSortIndex)))
-	end
-	if frame.refresh then
-		frame.refresh:SetText(self:Text("REFRESH"))
-	end
-	if frame.menu then
-		frame.menu.favorite:SetText(self:Text(frame.menu.entry and self:IsFavoriteArtisan(frame.menu.entry) and "UNFAVORITE" or "FAVORITE"))
-		frame.menu.whisper:SetText(self:Text("WHISPER"))
-		frame.menu.personal:SetText(self:Text("PERSONAL_ORDER"))
-		frame.menu.link:SetText(self:Text("PROFESSION"))
-	end
+	frame.sort:SetText(self:Text("SORT_BUTTON", GetSortLabel(self.customerSortIndex)))
+	frame.refresh:SetText(self:Text("REFRESH"))
+	frame.menu.favorite:SetText(self:Text(frame.menu.entry and self:IsFavoriteArtisan(frame.menu.entry) and "UNFAVORITE" or "FAVORITE"))
+	frame.menu.whisper:SetText(self:Text("WHISPER"))
+	frame.menu.personal:SetText(self:Text("PERSONAL_ORDER"))
+	frame.menu.link:SetText(self:Text("PROFESSION"))
 end
 
 function AF:AttachCustomerUI()
@@ -610,17 +574,10 @@ function AF:AttachCustomerUI()
 	self:ApplyCustomerSidePanel(frame)
 	frame:Hide()
 
-	local titleParent = frame.TitleContainer or frame
-	frame.title = frame.TitleText or titleParent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-	frame.title:SetParent(titleParent)
-	frame.title:ClearAllPoints()
-	frame.title:SetPoint("TOP", titleParent, "TOP", 0, -5)
-	frame.title:SetPoint("LEFT", titleParent, "LEFT", 0, 0)
-	frame.title:SetPoint("RIGHT", titleParent, "RIGHT", 0, 0)
-	frame.title:SetJustifyH("CENTER")
+	frame.title = frame.TitleContainer.TitleText
 	frame.title:SetText("ArtisanFinder")
 
-	frame.collapseButton:SetFrameLevel((frame.TitleContainer and frame.TitleContainer:GetFrameLevel() or frame:GetFrameLevel()) + 5)
+	frame.collapseButton:SetFrameLevel(frame:GetFrameLevel() + 5)
 	frame.collapseButton:SetOnMinimizedCallback(function()
 		AF:SetCustomerPanelCollapsed(true)
 	end)
@@ -701,9 +658,7 @@ function AF:AttachCustomerUI()
 	frame.scroll:SetFrameLevel(frame:GetFrameLevel() + 2)
 	frame.content = CreateFrame("Frame", nil, frame.scroll)
 	frame.content:SetSize(394, 1)
-	if frame.content.SetClipsChildren then
-		frame.content:SetClipsChildren(true)
-	end
+	frame.content:SetClipsChildren(true)
 	frame.scroll:SetScrollChild(frame.content)
 	frame.scrollInset:ClearAllPoints()
 	frame.scrollInset:SetPoint("TOPLEFT", frame.scroll, "TOPLEFT", -4, 4)
@@ -711,13 +666,11 @@ function AF:AttachCustomerUI()
 	frame.scrollInset:SetFrameLevel(frame:GetFrameLevel() + 1)
 	self:ApplyCustomerListInset(frame.scrollInset)
 	frame.scrollBar = GetScrollBar(frame.scroll)
-	if frame.scrollBar then
-		HideLegacyScrollBar(frame.scrollBar)
-		frame.modernScrollBar = CreateCustomerMinimalScrollBar(frame, frame.scroll, frame.scrollBar)
-		frame.modernScrollBar:SetPoint("TOPLEFT", frame.scrollInset, "TOPRIGHT", -18, -4)
-		frame.modernScrollBar:SetPoint("BOTTOMLEFT", frame.scrollInset, "BOTTOMRIGHT", -18, 4)
-		frame.modernScrollBar:SetFrameLevel(frame:GetFrameLevel() + 6)
-	end
+	HideLegacyScrollBar(frame.scrollBar)
+	frame.modernScrollBar = CreateCustomerMinimalScrollBar(frame, frame.scroll, frame.scrollBar)
+	frame.modernScrollBar:SetPoint("TOPLEFT", frame.scrollInset, "TOPRIGHT", -18, -4)
+	frame.modernScrollBar:SetPoint("BOTTOMLEFT", frame.scrollInset, "BOTTOMRIGHT", -18, 4)
+	frame.modernScrollBar:SetFrameLevel(frame:GetFrameLevel() + 6)
 
 	frame.menuBlocker = CreateFrame("Button", "ArtisanFinderCustomerMenuBlocker", UIParent)
 	frame.menuBlocker:SetAllPoints(UIParent)
@@ -825,12 +778,8 @@ function AF:HideCustomerMenu()
 	if not frame then
 		return
 	end
-	if frame.menu then
-		frame.menu:Hide()
-	end
-	if frame.menuBlocker then
-		frame.menuBlocker:Hide()
-	end
+	frame.menu:Hide()
+	frame.menuBlocker:Hide()
 end
 
 function AF:ShowCustomerMenu(entry, owner)
@@ -863,42 +812,29 @@ function AF:GetCustomerOrderItemContext()
 	local professionID
 
 	if transaction and transaction.GetRecipeID then
-		local ok, value = pcall(transaction.GetRecipeID, transaction)
-		if ok then
-			recipeID = value
-		end
+		recipeID = transaction:GetRecipeID()
 	end
 	recipeID = recipeID or (transaction and transaction.recipeID)
 	if transaction and transaction.GetRecipeSchematic then
-		local ok, schematic = pcall(transaction.GetRecipeSchematic, transaction)
-		if ok and schematic then
-			recipeID = recipeID or schematic.recipeID
-		end
+		local schematic = transaction:GetRecipeSchematic()
+		recipeID = recipeID or (schematic and schematic.recipeID)
 	end
 
 	if not recipeID and form.GetRecipeInfo then
-		local ok, recipeInfo = pcall(form.GetRecipeInfo, form)
-		if ok and recipeInfo then
-			recipeID = recipeInfo.recipeID
-		end
+		local recipeInfo = form:GetRecipeInfo()
+		recipeID = recipeInfo and recipeInfo.recipeID
 	end
 
-	if recipeID and C_TradeSkillUI then
-		local ok, outputs = pcall(function()
-			return self:GetRecipeOutputItemIDs(recipeID)
-		end)
-		if ok and outputs then
-			for outputItemID in pairs(outputs) do
-				if not itemID or tonumber(outputItemID) < tonumber(itemID) then
-					itemID = outputItemID
-				end
+	if recipeID then
+		local outputs = self:GetRecipeOutputItemIDs(recipeID)
+		for outputItemID in pairs(outputs) do
+			if not itemID or tonumber(outputItemID) < tonumber(itemID) then
+				itemID = outputItemID
 			end
 		end
 		if C_TradeSkillUI.GetProfessionInfoByRecipeID then
-			local okProfession, professionInfo = pcall(C_TradeSkillUI.GetProfessionInfoByRecipeID, recipeID)
-			if okProfession and professionInfo then
-				professionID = professionInfo.profession or professionInfo.professionID or professionInfo.skillLineID
-			end
+			local professionInfo = C_TradeSkillUI.GetProfessionInfoByRecipeID(recipeID)
+			professionID = professionInfo and (professionInfo.profession or professionInfo.professionID or professionInfo.skillLineID)
 		end
 	end
 
@@ -974,7 +910,7 @@ function AF:RefreshCustomerResults(statusOverride)
 	local itemID = self.currentCustomerItemID
 	local itemName = self.currentCustomerItemName or self:GetDisplayItemName(itemID)
 	local sortMode = GetSortMode(self.customerSortIndex).key
-	local filterText = frame.search and frame.search:GetText() or ""
+	local filterText = frame.search:GetText() or ""
 	local queryToken = self.currentCustomerQueryToken
 	local rows = itemID and self:GetCachedArtisans(itemID, filterText, sortMode, queryToken) or {}
 	if statusOverride then
@@ -986,10 +922,8 @@ function AF:RefreshCustomerResults(statusOverride)
 	end
 	self:EnsureCustomerRows(#rows)
 	frame.content:SetWidth(math.max(1, frame.scroll:GetWidth() - 4))
-	if frame.scrollBar then
-		frame.scrollBar:SetShown(true)
-		frame.scrollBar:SetAlpha(0)
-	end
+	frame.scrollBar:SetShown(true)
+	frame.scrollBar:SetAlpha(0)
 
 	local contentHeight = ROW_TOP_PADDING
 	for i, row in ipairs(self.customerRows or {}) do
@@ -1012,9 +946,7 @@ function AF:RefreshCustomerResults(statusOverride)
 		end
 	end
 	frame.content:SetHeight(math.max(1, contentHeight))
-	if frame.modernScrollBar then
-		UpdateCustomerScrollBar(frame.modernScrollBar)
-	end
+	UpdateCustomerScrollBar(frame.modernScrollBar)
 
 	if #rows == 0 and itemID then
 		local hasAvailableUnfiltered = false

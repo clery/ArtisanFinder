@@ -301,10 +301,8 @@ function AF:GetCustomerRecipeProfessionCandidates(recipeID, professionID)
 	AddCandidate(candidates, professionID)
 
 	if recipeID and C_TradeSkillUI and C_TradeSkillUI.GetProfessionInfoByRecipeID then
-		local ok, professionInfo = pcall(C_TradeSkillUI.GetProfessionInfoByRecipeID, recipeID)
-		if ok then
-			AddProfessionInfoCandidates(candidates, professionInfo)
-		end
+		local professionInfo = C_TradeSkillUI.GetProfessionInfoByRecipeID(recipeID)
+		AddProfessionInfoCandidates(candidates, professionInfo)
 	end
 
 	return candidates

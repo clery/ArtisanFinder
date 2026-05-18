@@ -221,19 +221,48 @@
 	</Frame>
 
 	<Frame name="ArtisanFinderProfessionDefaultsTemplate" virtual="true" inherits="DefaultPanelTemplate">
-		<Size x="304" y="150"/>
+		<Size x="356" y="276"/>
 		<Layers>
 			<Layer level="OVERLAY">
+				<FontString parentKey="defaultsHeader" inherits="GameFontNormalSmall" justifyH="LEFT">
+					<Anchors>
+						<Anchor point="TOPLEFT" x="14" y="-33"/>
+					</Anchors>
+				</FontString>
 				<FontString parentKey="priceLabel" inherits="GameFontHighlightSmall" justifyH="LEFT">
 					<Size x="74" y="20"/>
 					<Anchors>
-						<Anchor point="TOPLEFT" x="14" y="-37"/>
+						<Anchor point="TOPLEFT" x="14" y="-55"/>
 					</Anchors>
 				</FontString>
 				<FontString parentKey="noteLabel" inherits="GameFontHighlightSmall" justifyH="LEFT">
 					<Size x="74" y="20"/>
 					<Anchors>
-						<Anchor point="TOPLEFT" x="14" y="-66"/>
+						<Anchor point="TOPLEFT" x="14" y="-84"/>
+					</Anchors>
+				</FontString>
+				<Texture parentKey="defaultsDivider" atlas="Options_HorizontalDivider">
+					<Size y="2"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="12" y="-145"/>
+						<Anchor point="TOPRIGHT" x="-12" y="-145"/>
+					</Anchors>
+				</Texture>
+				<FontString parentKey="scanHeader" inherits="GameFontNormalSmall" justifyH="LEFT">
+					<Anchors>
+						<Anchor point="TOPLEFT" x="14" y="-170"/>
+					</Anchors>
+				</FontString>
+				<Texture parentKey="scanDivider" atlas="Options_HorizontalDivider">
+					<Size y="2"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="12" y="-197"/>
+						<Anchor point="TOPRIGHT" x="-12" y="-197"/>
+					</Anchors>
+				</Texture>
+				<FontString parentKey="advertisingHeader" inherits="GameFontNormalSmall" justifyH="LEFT">
+					<Anchors>
+						<Anchor point="TOPLEFT" x="14" y="-210"/>
 					</Anchors>
 				</FontString>
 			</Layer>
@@ -241,24 +270,42 @@
 		<Frames>
 			<Button parentKey="info" inherits="UIPanelInfoButton">
 				<Anchors>
-					<Anchor point="TOPRIGHT" x="-12" y="-28"/>
+					<Anchor point="TOPRIGHT" x="-12" y="-49"/>
 				</Anchors>
 			</Button>
 			<Frame parentKey="priceField" inherits="ArtisanFinderInsetEditBoxTemplate">
 				<Size x="78" y="24"/>
 				<Anchors>
-					<Anchor point="TOPLEFT" x="92" y="-35"/>
+					<Anchor point="TOPLEFT" x="92" y="-53"/>
 				</Anchors>
 			</Frame>
 			<Frame parentKey="noteField" inherits="ArtisanFinderInsetEditBoxTemplate">
 				<Size x="128" y="24"/>
 				<Anchors>
-					<Anchor point="TOPLEFT" x="92" y="-64"/>
+					<Anchor point="TOPLEFT" x="92" y="-82"/>
 				</Anchors>
 			</Frame>
 			<Button parentKey="save" inherits="UIPanelButtonTemplate">
 				<Size x="54" y="22"/>
 			</Button>
+			<Button parentKey="fastScanButton" inherits="UIPanelButtonTemplate">
+				<Size x="96" y="22"/>
+				<Anchors>
+					<Anchor point="TOPLEFT" x="92" y="-165"/>
+				</Anchors>
+			</Button>
+			<Button parentKey="forceRescanButton" inherits="UIPanelButtonTemplate">
+				<Size x="76" y="22"/>
+				<Anchors>
+					<Anchor point="TOPLEFT" x="194" y="-165"/>
+				</Anchors>
+			</Button>
+			<CheckButton parentKey="advertiseCheck" inherits="UICheckButtonTemplate">
+				<Size x="24" y="24"/>
+				<Anchors>
+					<Anchor point="TOPLEFT" x="10" y="-227"/>
+				</Anchors>
+			</CheckButton>
 		</Frames>
 	</Frame>
 </Ui>
