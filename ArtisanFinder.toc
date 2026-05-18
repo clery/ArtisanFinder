@@ -29,11 +29,7 @@
 
 ## SavedVariables: ArtisanFinderDB
 
-Libs\LibStub\LibStub.lua
-Libs\CallbackHandler-1.0\CallbackHandler-1.0.lua
-Libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
-Libs\LibDBIcon-1.0\LibDBIcon-1.0.lua
-Libs\ChatThrottleLib\ChatThrottleLib.lua
+embeds.xml
 
 Locales\enUS.lua
 Locales\frFR.lua
