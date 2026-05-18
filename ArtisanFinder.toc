@@ -35,13 +35,18 @@ Locales\ruRU.lua
 Locales\zhCN.lua
 
 Util.lua
+Formatting.lua
+Data.lua
+CustomerCache.lua
 Options.lua
 Core.lua
 Comms.lua
 TradeChat.lua
+RecipeCapability.lua
 Scanner.lua
 ArtisanFinder.xml
 CustomerRows.lua
+CustomerDebug.lua
 CustomerUI.lua
 CrafterUI.lua
 Minimap.lua
