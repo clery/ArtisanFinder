@@ -48,12 +48,14 @@ function AF:HideDiscoveryChannelFromChat()
 	end)
 end
 
-function AF:SendAddon(prefixPayload, chatType, target)
+function AF:SendAddon(prefixPayload, chatType, target, priority, queueName)
 	if self:IsInCombatLocked() then
 		return false
 	end
-	local result = C_ChatInfo.SendAddonMessage(self.PREFIX, prefixPayload, chatType, target)
-	return result
+	priority = priority or "NORMAL"
+	queueName = queueName or table.concat({ self.PREFIX, chatType or "", target or "" }, ":")
+	ChatThrottleLib:SendAddonMessage(priority, self.PREFIX, prefixPayload, chatType, target, queueName)
+	return true
 end
 
 function AF:BroadcastQuery(itemID, professionID)
@@ -86,8 +88,7 @@ function AF:BroadcastQuery(itemID, professionID)
 		requestTime,
 	}, "|")
 
-	self:SendAddon(payload, "CHANNEL", tostring(channelID))
-	return true
+	return self:SendAddon(payload, "CHANNEL", tostring(channelID), "NORMAL", table.concat({ "Q", itemID, normalizedProfessionID }, ":"))
 end
 
 function AF:QueueBroadcastQuery(itemID, professionID)
@@ -269,8 +270,9 @@ function AF:HandleQuery(parts, sender)
 				payload = table.concat(payloadParts, "|")
 			end
 
-			self:SendAddon(payload, "WHISPER", sender)
-			self.db.responseThrottle[throttleKey] = self:Now()
+			if self:SendAddon(payload, "WHISPER", sender, "NORMAL", "R:" .. tostring(sender)) then
+				self.db.responseThrottle[throttleKey] = self:Now()
+			end
 		end
 	end
 end
@@ -299,14 +301,15 @@ function AF:HandleReagentDetailRequest(parts, sender)
 		return
 	end
 
-	self:SendReagentDetail(item, sender, queryToken, crafterName)
-	self.db.responseThrottle[throttleKey] = self:Now()
+	if self:SendReagentDetail(item, sender, queryToken, crafterName) then
+		self.db.responseThrottle[throttleKey] = self:Now()
+	end
 end
 
 function AF:SendReagentDetail(item, target, queryToken, crafterName)
 	local summary = item and item.bestReagentSummary
 	if not summary or summary == "" then
-		return
+		return false
 	end
 
 	local encodedSummary = self:EncodeReagentSummary(summary, 1050)
@@ -318,6 +321,7 @@ function AF:SendReagentDetail(item, target, queryToken, crafterName)
 		offset = offset + maxChunkBytes
 	end
 
+	local sent = false
 	for index, chunk in ipairs(chunks) do
 		local payload = table.concat({
 			"D",
@@ -330,8 +334,10 @@ function AF:SendReagentDetail(item, target, queryToken, crafterName)
 			chunk,
 			self:EncodeField(crafterName, 48),
 		}, "|")
-		self:SendAddon(payload, "WHISPER", target)
+		local queueName = table.concat({ "D", target or "", crafterName or "", item.itemID or 0, item.recipeID or 0, queryToken or 0 }, ":")
+		sent = self:SendAddon(payload, "WHISPER", target, "BULK", queueName) or sent
 	end
+	return sent
 end
 
 function AF:EncodeReagentSummary(summary, maxBytes)
@@ -472,14 +478,6 @@ function AF:RequestReagentDetail(entry)
 		return false
 	end
 
-	self.reagentDetailRequests[key] = now
-	entry.reagentDetailRequested = true
-	local itemCache = self.db and self.db.customerCache and self.db.customerCache[tostring(itemID)]
-	local cachedEntry = itemCache and itemCache[crafterName or target]
-	if cachedEntry then
-		cachedEntry.reagentDetailRequested = true
-	end
-
 	local payload = table.concat({
 		"DR",
 		self.PROTOCOL_VERSION,
@@ -488,7 +486,17 @@ function AF:RequestReagentDetail(entry)
 		queryToken,
 		self:EncodeField(crafterName, 48),
 	}, "|")
-	self:SendAddon(payload, "WHISPER", target)
+	if not self:SendAddon(payload, "WHISPER", target, "NORMAL", table.concat({ "DR", target or "", crafterName or "", itemID, recipeID }, ":")) then
+		return false
+	end
+
+	self.reagentDetailRequests[key] = now
+	entry.reagentDetailRequested = true
+	local itemCache = self.db and self.db.customerCache and self.db.customerCache[tostring(itemID)]
+	local cachedEntry = itemCache and itemCache[crafterName or target]
+	if cachedEntry then
+		cachedEntry.reagentDetailRequested = true
+	end
 	return true
 end
 
