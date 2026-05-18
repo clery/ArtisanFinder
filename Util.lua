@@ -19,12 +19,32 @@ function AF:Print(message)
 	print("|cff33ff99ArtisanFinder:|r " .. tostring(message))
 end
 
-function AF:ApplyPanelBackdrop(frame)
-	self:ApplyProfessionPanel(frame)
-end
+local TRADE_CHANNEL_PATTERNS = {
+	"trade",
+	"commerce",
+	"comercio",
+	"handel",
+	"торгов",
+	"торг",
+	"交易",
+	"貿易",
+}
 
-function AF:ApplyInsetBackdrop(frame)
-	self:ApplyProfessionInset(frame)
+function AF:IsTradeChannelName(name)
+	name = tostring(name or ""):lower()
+	if name == "" then
+		return false
+	end
+	local globalTrade = tostring(_G.TRADE or _G.CHAT_MSG_TRADE or "")
+	if globalTrade ~= "" and name:find(globalTrade:lower(), 1, true) then
+		return true
+	end
+	for _, pattern in ipairs(TRADE_CHANNEL_PATTERNS) do
+		if name:find(pattern, 1, true) then
+			return true
+		end
+	end
+	return false
 end
 
 function AF:ApplyProfessionPanel(frame)
@@ -37,18 +57,6 @@ function AF:ApplyProfessionPanel(frame)
 	})
 	frame:SetBackdropColor(0.02, 0.018, 0.014, 0.82)
 	frame:SetBackdropBorderColor(0.62, 0.51, 0.27, 0.9)
-end
-
-function AF:ApplyProfessionInset(frame)
-	frame:SetBackdrop({
-		bgFile = "Interface\\Buttons\\WHITE8x8",
-		edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-		tile = false,
-		edgeSize = 8,
-		insets = { left = 2, right = 2, top = 2, bottom = 2 },
-	})
-	frame:SetBackdropColor(0, 0, 0, 0.28)
-	frame:SetBackdropBorderColor(0.45, 0.36, 0.18, 0.75)
 end
 
 function AF:ApplyCustomerSidePanel(frame)
@@ -660,19 +668,6 @@ function AF:NormalizeCommissionInput(text)
 	return copper, free, state
 end
 
-function AF:GetProfessionPriceEntry(professionID)
-	local profile = self.db and self.db.artisanProfile
-	return profile and profile.professionPrices[tostring(professionID or "")]
-end
-
-function AF:EntryHasCommissionValue(entry)
-	return HasCommissionValue(entry)
-end
-
-function AF:EntryHasNoteValue(entry)
-	return HasNoteValue(entry)
-end
-
 function AF:GetEntryCommission(entry)
 	return GetEntryCommission(entry)
 end
@@ -920,14 +915,6 @@ function AF:GetScannedProfessionRows()
 		return tostring(a.professionName or "") < tostring(b.professionName or "")
 	end)
 	return rows
-end
-
-function AF:GetTotalScannedItemCount()
-	local count = 0
-	self:ForEachArtisanProfile(function(_, profile)
-		count = count + self:TableCount(profile.items)
-	end)
-	return count
 end
 
 function AF:GetProfessionName(professionID, profile)

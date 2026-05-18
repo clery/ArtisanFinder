@@ -1226,14 +1226,6 @@ function AF:StartOrResumeCurrentProfessionScan(force, silent, mode, forceProbe)
 	return #progress.pending
 end
 
-function AF:ScanCurrentProfession(silent)
-	return self:StartOrResumeCurrentProfessionScan(true, silent, "full")
-end
-
-function AF:AutoScanCurrentProfession(force)
-	return self:StartOrResumeCurrentProfessionScan(force == true, true, force and "full" or "probe")
-end
-
 function AF:ProfessionHasPendingReagentNameWork(professionID)
 	local profile = self.db and self.db.artisanProfile
 	if not profile or not profile.items then

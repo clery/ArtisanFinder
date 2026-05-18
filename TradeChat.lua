@@ -37,25 +37,6 @@ local KNOWN_PROFESSION_SKILL_LINES = {
 	[773] = true, -- Inscription
 }
 
-local TRADE_CHANNEL_PATTERNS = {
-	"trade",
-	"commerce",
-	"comercio",
-	"handel",
-	"торговля",
-	"交易",
-}
-
-local function IsTradeChannelName(name)
-	name = tostring(name or ""):lower()
-	for _, pattern in ipairs(TRADE_CHANNEL_PATTERNS) do
-		if name:find(pattern, 1, true) then
-			return true
-		end
-	end
-	return false
-end
-
 local function ExtractTradeLinks(message)
 	local links = {}
 	local seen = {}
@@ -209,7 +190,7 @@ function AF:OnTradeChatMessage(message, sender, _, channelName, _, _, _, _, chan
 	if IsInInstance and IsInInstance() then
 		return
 	end
-	if not IsTradeChannelName(channelName) and not IsTradeChannelName(channelBaseName) then
+	if not self:IsTradeChannelName(channelName) and not self:IsTradeChannelName(channelBaseName) then
 		return
 	end
 

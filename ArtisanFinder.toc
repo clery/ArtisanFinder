@@ -39,6 +39,7 @@ Core.lua
 Comms.lua
 TradeChat.lua
 Scanner.lua
+ArtisanFinder.xml
 CustomerRows.lua
 CustomerUI.lua
 CrafterUI.lua

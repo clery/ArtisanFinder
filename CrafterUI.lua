@@ -18,14 +18,6 @@ local function SetEditBoxText(box, text)
 	UpdatePlaceholder(box)
 end
 
-local function AddGoldIcon(parent)
-	local icon = parent:CreateTexture(nil, "OVERLAY")
-	icon:SetSize(14, 14)
-	icon:SetPoint("RIGHT", -7, 0)
-	icon:SetTexture("Interface\\MoneyFrame\\UI-GoldIcon")
-	return icon
-end
-
 local function WatchEditBox(box, callback)
 	box:SetScript("OnTextChanged", function(self)
 		UpdatePlaceholder(self)
@@ -35,22 +27,17 @@ local function WatchEditBox(box, callback)
 	end)
 end
 
-local function CreateInsetEditBox(parent, width, placeholderKey, hasGoldIcon)
-	local field = CreateFrame("Frame", nil, parent, "BackdropTemplate")
+local function PrepareInsetEditBox(field, width, placeholderKey, hasGoldIcon)
 	field:SetSize(width, 24)
-	field.Background = field:CreateTexture(nil, "BACKGROUND")
-	field.Background:SetColorTexture(0.02, 0.018, 0.014, 0.72)
-	field.Background:SetPoint("TOPLEFT", 3, -3)
-	field.Background:SetPoint("BOTTOMRIGHT", -3, 3)
-	field.NineSlice = CreateFrame("Frame", nil, field, "NineSlicePanelTemplate")
 	field.NineSlice:SetAllPoints()
 	field.NineSlice.layoutType = "InsetFrameTemplate"
 	if NineSliceUtil and NineSliceUtil.ApplyLayoutByName then
 		NineSliceUtil.ApplyLayoutByName(field.NineSlice, field.NineSlice.layoutType)
 	end
 
-	local box = CreateFrame("EditBox", nil, field)
+	local box = field.Box
 	box.Field = field
+	box:ClearAllPoints()
 	box:SetPoint("LEFT", 8, 0)
 	box:SetPoint("RIGHT", hasGoldIcon and -25 or -8, 0)
 	box:SetHeight(20)
@@ -58,14 +45,16 @@ local function CreateInsetEditBox(parent, width, placeholderKey, hasGoldIcon)
 	box:SetFontObject(GameFontHighlightSmall)
 	box:SetJustifyH("LEFT")
 
-	box.Placeholder = field:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+	box.Placeholder = field.Placeholder
+	box.Placeholder:ClearAllPoints()
 	box.Placeholder:SetPoint("LEFT", box, "LEFT", 0, 0)
 	box.Placeholder:SetPoint("RIGHT", box, "RIGHT", 0, 0)
 	box.Placeholder:SetJustifyH("LEFT")
 	box.Placeholder:SetText(AF:Text(placeholderKey))
 
-	if hasGoldIcon then
-		box.GoldIcon = AddGoldIcon(field)
+	box.GoldIcon = field.GoldIcon
+	if box.GoldIcon then
+		box.GoldIcon:SetShown(hasGoldIcon == true)
 	end
 
 	box:SetScript("OnEditFocusGained", function(self)
@@ -80,6 +69,7 @@ local function CreateInsetEditBox(parent, width, placeholderKey, hasGoldIcon)
 end
 
 local function SetFieldPoint(box, ...)
+	box.Field:ClearAllPoints()
 	box.Field:SetPoint(...)
 end
 
@@ -119,8 +109,7 @@ local function FitStackedDefaultNoteAndSave(container, noteLabel, noteBox, saveB
 	container:SetSize(DEFAULT_COMMISSION_PANEL_WIDTH, DEFAULT_COMMISSION_PANEL_HEIGHT)
 end
 
-local function AddInfoButton(parent, tooltipTitle, tooltipText)
-	local button = CreateFrame("Button", nil, parent, "UIPanelInfoButton")
+local function ConfigureInfoButton(button, tooltipTitle, tooltipText)
 	button:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 		GameTooltip:SetText(AF:Text(tooltipTitle), 1, 0.82, 0)
@@ -283,32 +272,21 @@ function AF:AttachCrafterUI()
 		return
 	end
 
-	local frame = CreateFrame("Frame", "ArtisanFinderCrafterFrame", form)
-	frame:SetSize(326, 58)
-	frame.info = AddInfoButton(frame, "ITEM_SPECIFIC_COMMISSION", "ITEM_SPECIFIC_TOOLTIP")
-	frame.info:SetPoint("TOPRIGHT", -2, -2)
-
-	frame.priceLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	frame.priceLabel:SetSize(74, 20)
-	frame.priceLabel:SetPoint("TOPLEFT", 0, -2)
+	local frame = CreateFrame("Frame", "ArtisanFinderCrafterFrame", form, "ArtisanFinderCrafterItemTemplate")
+	frame.info = ConfigureInfoButton(frame.info, "ITEM_SPECIFIC_COMMISSION", "ITEM_SPECIFIC_TOOLTIP")
 	frame.priceLabel:SetJustifyH("LEFT")
 	frame.priceLabel:SetText(self:Text("COMMISSION"))
 
-	frame.price = CreateInsetEditBox(frame, 78, "COMMISSION_PLACEHOLDER", true)
+	frame.price = PrepareInsetEditBox(frame.priceField, 78, "COMMISSION_PLACEHOLDER", true)
 	SetFieldPoint(frame.price, "LEFT", frame.priceLabel, "RIGHT", 4, 0)
 
-	frame.noteLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	frame.noteLabel:SetSize(74, 20)
-	frame.noteLabel:SetPoint("TOPLEFT", frame.priceLabel, "BOTTOMLEFT", 0, -9)
 	frame.noteLabel:SetJustifyH("LEFT")
 	frame.noteLabel:SetText(self:Text("NOTE"))
 
-	frame.note = CreateInsetEditBox(frame, 170, "NOTE_PLACEHOLDER")
+	frame.note = PrepareInsetEditBox(frame.noteField, 170, "NOTE_PLACEHOLDER")
 	SetFieldPoint(frame.note, "LEFT", frame.noteLabel, "RIGHT", 4, 0)
 	frame.note:SetMaxLetters(AF.MAX_NOTE_BYTES)
 
-	frame.save = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-	frame.save:SetSize(54, 22)
 	frame.save:SetPoint("LEFT", frame.note, "RIGHT", 8, 0)
 	FitNoteAndSave(frame, frame.noteLabel, frame.note, frame.save, 326, 120)
 	frame.save:Disable()
@@ -329,8 +307,7 @@ function AF:AttachCrafterUI()
 		AF:RefreshCrafterUI()
 	end)
 
-	local defaults = CreateFrame("Frame", "ArtisanFinderProfessionDefaultsFrame", ProfessionsFrame, "DefaultPanelTemplate")
-	defaults:SetSize(DEFAULT_COMMISSION_PANEL_WIDTH, DEFAULT_COMMISSION_PANEL_HEIGHT)
+	local defaults = CreateFrame("Frame", "ArtisanFinderProfessionDefaultsFrame", ProfessionsFrame, "ArtisanFinderProfessionDefaultsTemplate")
 	self:ApplyCustomerSidePanel(defaults)
 	local defaultsTitleParent = defaults.TitleContainer or defaults
 	defaults.title = defaults.TitleText or defaultsTitleParent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -341,30 +318,20 @@ function AF:AttachCrafterUI()
 	defaults.title:SetPoint("RIGHT", defaultsTitleParent, "RIGHT", 0, 0)
 	defaults.title:SetJustifyH("CENTER")
 	defaults.title:SetText(self:Text("DEFAULT_COMMISSION"))
-	defaults.info = AddInfoButton(defaults, "DEFAULT_COMMISSION", "DEFAULT_COMMISSION_TOOLTIP")
-	defaults.info:SetPoint("TOPRIGHT", -12, -28)
-
-	defaults.priceLabel = defaults:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	defaults.priceLabel:SetSize(74, 20)
-	defaults.priceLabel:SetPoint("TOPLEFT", defaults, "TOPLEFT", 14, -37)
+	defaults.info = ConfigureInfoButton(defaults.info, "DEFAULT_COMMISSION", "DEFAULT_COMMISSION_TOOLTIP")
 	defaults.priceLabel:SetJustifyH("LEFT")
 	defaults.priceLabel:SetText(self:Text("COMMISSION"))
 
-	defaults.price = CreateInsetEditBox(defaults, 78, "COMMISSION_PLACEHOLDER", true)
+	defaults.price = PrepareInsetEditBox(defaults.priceField, 78, "COMMISSION_PLACEHOLDER", true)
 	SetFieldPoint(defaults.price, "LEFT", defaults.priceLabel, "RIGHT", 4, 0)
 
-	defaults.noteLabel = defaults:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	defaults.noteLabel:SetSize(74, 20)
-	defaults.noteLabel:SetPoint("TOPLEFT", defaults.priceLabel, "BOTTOMLEFT", 0, -9)
 	defaults.noteLabel:SetJustifyH("LEFT")
 	defaults.noteLabel:SetText(self:Text("NOTE"))
 
-	defaults.note = CreateInsetEditBox(defaults, 128, "NOTE_PLACEHOLDER")
+	defaults.note = PrepareInsetEditBox(defaults.noteField, 128, "NOTE_PLACEHOLDER")
 	SetFieldPoint(defaults.note, "LEFT", defaults.noteLabel, "RIGHT", 4, 0)
 	defaults.note:SetMaxLetters(AF.MAX_NOTE_BYTES)
 
-	defaults.save = CreateFrame("Button", nil, defaults, "UIPanelButtonTemplate")
-	defaults.save:SetSize(54, 22)
 	FitStackedDefaultNoteAndSave(defaults, defaults.noteLabel, defaults.note, defaults.save)
 	defaults.save:Disable()
 	defaults.save:SetScript("OnClick", function()

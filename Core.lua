@@ -91,36 +91,6 @@ function AF:ToggleAvailable()
 	self:SetAvailable(not self.available)
 end
 
-local TRADE_CHANNEL_PATTERNS = {
-	"trade",
-	"commerce",
-	"handel",
-	"comercio",
-	"торгов",
-	"Торгов",
-	"торг",
-	"Торг",
-	"交易",
-	"貿易",
-}
-
-local function IsTradeChannelName(name)
-	name = tostring(name or ""):lower()
-	if name == "" then
-		return false
-	end
-	local globalTrade = tostring(_G.TRADE or _G.CHAT_MSG_TRADE or "")
-	if globalTrade ~= "" and name:find(globalTrade:lower(), 1, true) then
-		return true
-	end
-	for _, pattern in ipairs(TRADE_CHANNEL_PATTERNS) do
-		if name:find(pattern, 1, true) then
-			return true
-		end
-	end
-	return false
-end
-
 function AF:HasTradeChatAccess()
 	if GetChannelName then
 		local globalTrade = tostring(_G.TRADE or "Trade")
@@ -131,7 +101,7 @@ function AF:HasTradeChatAccess()
 	if GetChannelList then
 		local channels = { GetChannelList() }
 		for _, value in ipairs(channels) do
-			if type(value) == "string" and IsTradeChannelName(value) then
+			if type(value) == "string" and self:IsTradeChannelName(value) then
 				return true
 			end
 		end
@@ -139,7 +109,7 @@ function AF:HasTradeChatAccess()
 	if EnumerateServerChannels then
 		local channels = { EnumerateServerChannels() }
 		for _, channelName in ipairs(channels) do
-			if IsTradeChannelName(channelName) then
+			if self:IsTradeChannelName(channelName) then
 				return true
 			end
 		end
