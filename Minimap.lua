@@ -1,6 +1,6 @@
 local _, AF = ...
 
-local ICON = "Interface\\AddOns\\ArtisanFinder\\Images\\MinimapIcon.tga"
+local ICON = 7548932 -- inv-12-profession-blacksmithing-repairhammer-purple
 local ICON_COORDS = { 0, 1, 0, 1 }
 
 local function OpenProfessionPanel()

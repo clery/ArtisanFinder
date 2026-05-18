@@ -9,9 +9,17 @@
 ## Notes-ruRU: Находите доступных ремесленников через заказы на изготовление и управляйте доступностью через профессии.
 ## Notes-zhCN: 从制造订单中查找可用工匠，并在专业界面管理工匠可用状态。
 ## Notes-zhTW: 從製造訂單中尋找可用工匠，並在專業技能介面管理工匠可用狀態。
-## IconTexture: Interface\AddOns\ArtisanFinder\Images\AddOnIcon.tga
+## IconTexture: Interface\Icons\inv_12_profession_blacksmithing_repairhammer_purple
 ## Author: clery
 ## Version: @project-version@
+## Category: Professions
+## Category-deDE: Berufe
+## Category-esES: Profesiones
+## Category-esMX: Profesiones
+## Category-frFR: Métiers
+## Category-ruRU: Профессии
+## Category-zhCN: 专业
+## Category-zhTW: 專業技能
 
 ## X-Credits: clery
 ## X-Category: Professions
