@@ -286,6 +286,8 @@ function AF:GetCurrentProfessionInfo()
 	return {
 		id = professionID,
 		name = info.professionName or info.parentProfessionName or self:Text("PROFESSION_FALLBACK", tostring(professionID)),
+		parentProfessionID = info.parentProfession or info.parentProfessionID,
+		skillLineID = info.skillLineID,
 	}
 end
 
@@ -878,4 +880,3 @@ function AF:ApplyRecipeCapability(item, recipeID)
 	item.fullScanSignature = self:BuildFullScanSignature(recipeID, item.itemID, item.skillProbeSignature)
 	item.fullScanAt = self:Now()
 end
-

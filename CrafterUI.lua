@@ -126,6 +126,33 @@ local function ConfigureInfoButton(button, tooltipTitle, tooltipText)
 	return button
 end
 
+local function FindTrackRecipeControl(form)
+	local candidates = {
+		form and form.TrackRecipeCheckBox,
+		form and form.TrackRecipeCheckbox,
+		form and form.TrackRecipe,
+		form and form.TrackRecipeButton,
+	}
+	for _, candidate in ipairs(candidates) do
+		if candidate and candidate.GetObjectType and candidate:IsShown() then
+			return candidate
+		end
+	end
+	if not form or not form.GetChildren then
+		return nil
+	end
+	local trackText = tostring(TRACK_RECIPE or ""):lower()
+	for _, child in ipairs({ form:GetChildren() }) do
+		if child and child.GetObjectType and child:GetObjectType() == "CheckButton" and child:IsShown() then
+			local text = child.Text and child.Text.GetText and child.Text:GetText()
+			if trackText ~= "" and text and tostring(text):lower() == trackText then
+				return child
+			end
+		end
+	end
+	return nil
+end
+
 local function ParseCommissionOrWarn(box)
 	local copper, free, state = AF:NormalizeCommissionInput(box:GetText())
 	if not copper then
@@ -366,8 +393,25 @@ function AF:AttachCrafterUI()
 	WatchEditBox(defaults.price, markDefaultDirty)
 	WatchEditBox(defaults.note, markDefaultDirty)
 
+	local fastScanButton = CreateFrame("Button", "ArtisanFinderFastScanButton", form, "UIPanelButtonTemplate")
+	fastScanButton:SetSize(96, 22)
+	fastScanButton:SetFrameStrata("HIGH")
+	fastScanButton:SetScript("OnClick", function()
+		AF:SetFastScan(not (AF.db and AF.db.fastScan == true))
+	end)
+	fastScanButton:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		GameTooltip:SetText(AF:Text("FAST_SCAN_BUTTON"), 1, 0.82, 0)
+		GameTooltip:AddLine(AF:Text("FAST_SCAN_TOOLTIP"), 1, 1, 1, true)
+		GameTooltip:Show()
+	end)
+	fastScanButton:SetScript("OnLeave", function()
+		GameTooltip:Hide()
+	end)
+
 	self.crafterFrame = frame
 	self.crafterDefaultsFrame = defaults
+	self.crafterFastScanButton = fastScanButton
 
 	if form.RegisterCallback and ProfessionsRecipeSchematicFormMixin then
 		local refresh = function()
@@ -389,6 +433,7 @@ end
 function AF:PositionCrafterUI()
 	local frame = self.crafterFrame
 	local defaults = self.crafterDefaultsFrame
+	local fastScanButton = self.crafterFastScanButton
 	local form = self:GetCraftingSchematicForm()
 	if not frame or not defaults or not form then
 		return
@@ -420,6 +465,32 @@ function AF:PositionCrafterUI()
 
 	defaults:ClearAllPoints()
 	defaults:SetPoint("BOTTOMLEFT", ProfessionsFrame, "BOTTOMRIGHT", -5, 24)
+
+	if fastScanButton then
+		fastScanButton:ClearAllPoints()
+		local track = FindTrackRecipeControl(form)
+		if track then
+			fastScanButton:SetPoint("TOPRIGHT", track, "BOTTOMRIGHT", 0, -5)
+		else
+			fastScanButton:SetPoint("TOPRIGHT", form, "TOPRIGHT", -12, -82)
+		end
+	end
+end
+
+function AF:UpdateFastScanButton()
+	local button = self.crafterFastScanButton
+	if not button then
+		return
+	end
+	local active = self.activeScan
+	local currentProfession = self:GetCurrentProfessionInfo()
+	local isCurrentScan = active and currentProfession and tonumber(active.professionID) == tonumber(currentProfession.id)
+	if isCurrentScan then
+		SizeButtonForText(button, self.db.fastScan and self:Text("FAST_SCAN_ENABLED_BUTTON") or self:Text("FAST_SCAN_BUTTON"), 96, 150)
+		button:Show()
+	else
+		button:Hide()
+	end
 end
 
 function AF:UpdateCrafterDirtyState()
@@ -470,10 +541,14 @@ function AF:RefreshCrafterUI()
 	if not ProfessionsFrame:IsShown() or not form or not form:IsVisible() or self:IsLinkedProfessionOpen() then
 		frame:Hide()
 		defaults:Hide()
+		if self.crafterFastScanButton then
+			self.crafterFastScanButton:Hide()
+		end
 		return
 	end
 
 	self:PositionCrafterUI()
+	self:UpdateFastScanButton()
 
 	local context = self:GetCurrentCraftingRecipeContext()
 	local profession = self:GetCurrentProfessionInfo()

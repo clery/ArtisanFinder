@@ -59,6 +59,12 @@ MIGRATIONS[6] = function(db)
 	db.advertising = db.advertising or {}
 end
 
+MIGRATIONS[7] = function(db)
+	if db.fastScan == nil then
+		db.fastScan = false
+	end
+end
+
 function AF:MigrateDB(db)
 	local version = tonumber(db.schemaVersion) or 0
 	while version < self.SCHEMA_VERSION do
@@ -94,6 +100,9 @@ function AF:EnsureDB()
 	end
 	if db.autoAvailability == nil then
 		db.autoAvailability = false
+	end
+	if db.fastScan == nil then
+		db.fastScan = false
 	end
 	if db.defaultSort == nil then
 		db.defaultSort = "best"

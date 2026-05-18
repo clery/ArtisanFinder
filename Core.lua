@@ -28,6 +28,8 @@ RegisterEvent(AF.frame, "TRADE_SKILL_LIST_UPDATE")
 RegisterEvent(AF.frame, "TRADE_SKILL_DATA_SOURCE_CHANGED")
 RegisterEvent(AF.frame, "SKILL_LINES_CHANGED")
 RegisterEvent(AF.frame, "SPELLS_CHANGED")
+RegisterEvent(AF.frame, "PLAYER_EQUIPMENT_CHANGED")
+RegisterEvent(AF.frame, "PROFESSION_EQUIPMENT_CHANGED")
 RegisterEvent(AF.frame, "TRAIT_CONFIG_UPDATED")
 RegisterEvent(AF.frame, "TRAIT_NODE_CHANGED")
 
@@ -172,6 +174,21 @@ function AF:ToggleAutoAvailability()
 	self:SetAutoAvailability(not self.db.autoAvailability)
 end
 
+function AF:SetFastScan(enabled)
+	self.db.fastScan = enabled == true
+	if self.activeScan and self.ProcessScanQueue then
+		self.scanProcessing = false
+		self.scanQueueToken = (self.scanQueueToken or 0) + 1
+		self:ProcessScanQueue()
+	end
+	if self.RefreshCrafterUI then
+		self:RefreshCrafterUI()
+	end
+	if self.RefreshOptionsPanel then
+		self:RefreshOptionsPanel()
+	end
+end
+
 function AF:TryAttachProfessionUIs()
 	if self.AttachCustomerUI then
 		self:AttachCustomerUI()
@@ -206,6 +223,10 @@ AF.frame:SetScript("OnEvent", function(_, event, ...)
 		if AF.deferredAutoScanReason and AF.QueueAutoScanForChange then
 			local reason = AF.deferredAutoScanReason
 			AF.deferredAutoScanReason = nil
+			if reason == "PROFESSION_EQUIPMENT_CHANGED" then
+				AF.pendingProfessionEquipmentSkillLineID = AF.deferredProfessionEquipmentSkillLineID
+				AF.deferredProfessionEquipmentSkillLineID = nil
+			end
 			AF:QueueAutoScanForChange(reason)
 		end
 		if AF.deferredScanResume and AF.ResumeCurrentProfessionScanIfNeeded then
@@ -254,6 +275,12 @@ AF.frame:SetScript("OnEvent", function(_, event, ...)
 				return
 			end
 			AF:TryAttachProfessionUIs()
+			if event == "TRADE_SKILL_DATA_SOURCE_CHANGED" and AF.QueueProfessionDataSourceProbe then
+				AF:QueueProfessionDataSourceProbe()
+			end
+			if event == "TRADE_SKILL_SHOW" and AF.StartProfessionEquipmentWatch then
+				AF:StartProfessionEquipmentWatch()
+			end
 			if event == "TRADE_SKILL_SHOW" and AF.ResumeCurrentProfessionScanIfNeeded then
 				AF:ResumeCurrentProfessionScanIfNeeded()
 			end
@@ -265,18 +292,28 @@ AF.frame:SetScript("OnEvent", function(_, event, ...)
 			end
 		end)
 	elseif event == "TRADE_SKILL_CLOSE" then
+		if AF.StopProfessionEquipmentWatch then
+			AF:StopProfessionEquipmentWatch()
+		end
 		if AF.PauseActiveProfessionScan then
 			AF:PauseActiveProfessionScan()
 		else
 			AF.activeScan = nil
 		end
-	elseif event == "TRADE_SKILL_LIST_UPDATE" or event == "SKILL_LINES_CHANGED" or event == "SPELLS_CHANGED" or event == "TRAIT_CONFIG_UPDATED" or event == "TRAIT_NODE_CHANGED" then
+	elseif event == "TRADE_SKILL_LIST_UPDATE" or event == "SKILL_LINES_CHANGED" or event == "SPELLS_CHANGED" or event == "PLAYER_EQUIPMENT_CHANGED" or event == "PROFESSION_EQUIPMENT_CHANGED" or event == "TRAIT_CONFIG_UPDATED" or event == "TRAIT_NODE_CHANGED" then
 		if AF:IsInCombatLocked() then
 			AF.deferredAutoScanReason = event
+			if event == "PROFESSION_EQUIPMENT_CHANGED" then
+				AF.deferredProfessionEquipmentSkillLineID = ...
+			end
 			return
 		end
+		if event == "PROFESSION_EQUIPMENT_CHANGED" then
+			AF.pendingProfessionEquipmentSkillLineID = ...
+			AF.pendingProfessionEquipmentScan = true
+		end
 		if AF.QueueAutoScanForChange then
-			AF:QueueAutoScanForChange(event)
+			AF:QueueAutoScanForChange(event == "PLAYER_EQUIPMENT_CHANGED" and "PROFESSION_EQUIPMENT_CHANGED" or event)
 		end
 		if AF.TrySelectPendingProfessionRecipe then
 			AF:TrySelectPendingProfessionRecipe()
