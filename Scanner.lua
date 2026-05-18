@@ -1079,6 +1079,9 @@ function AF:CompleteActiveScan(active, professionEntry, progress)
 		completedAt = self:Now(),
 	}
 	self:RefreshScanProgressUI(true)
+	if self.RefreshOptionsPanel then
+		self:RefreshOptionsPanel()
+	end
 	self:Print(self:Text("SCAN_COMPLETE", tonumber(progress.scanned) or 0, professionEntry.name))
 	self:Print(self:Text("SCAN_RECOMMENDATIONS_UPDATED", tonumber(progress.recommendationsUpdated) or 0, professionEntry.name))
 end

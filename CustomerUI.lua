@@ -38,6 +38,12 @@ local DEBUG_NOTES = {
 	"/w if mats are ready",
 }
 
+local DEBUG_ALT_NAMES = {
+	"Altora",
+	"Bellwyn",
+	"Craftelle",
+}
+
 local function GetSortMode(index)
 	return SORT_MODES[index or 1] or SORT_MODES[1]
 end
@@ -1031,6 +1037,9 @@ function AF:InjectDebugSelfResult(itemID, professionID)
 	if professionID and professionID ~= 0 and tonumber(item.professionID) ~= tonumber(professionID) then
 		return
 	end
+	if not self:IsProfessionAdvertised(self:GetPlayerFullName(), item.professionID) then
+		return
+	end
 
 	local itemKey = tostring(itemID)
 	local now = self:Now()
@@ -1041,6 +1050,7 @@ function AF:InjectDebugSelfResult(itemID, professionID)
 	self.db.customerCache[itemKey].__debug_self_actual = {
 		name = actualName,
 		target = actualName,
+		orderTarget = actualName,
 		itemID = itemID,
 		professionID = item.professionID,
 		professionName = item.professionName or self:GetProfessionName(item.professionID),
@@ -1074,6 +1084,50 @@ function AF:InjectDebugSelfResult(itemID, professionID)
 		debugActual = true,
 	}
 
+	for i, altBaseName in ipairs(DEBUG_ALT_NAMES) do
+		local altName = altBaseName .. "-" .. (GetRealmName() or "")
+		local priceCopper = i == 1 and 0 or (i * 12500000)
+		local baseQuality = math.min(5, 2 + i)
+		local bestQuality = math.min(5, baseQuality + 1)
+		self:SetFavoriteArtisan(altName, i == 1)
+		self.db.customerCache[itemKey]["__debug_alt_" .. i] = {
+			name = altName,
+			target = actualName,
+			orderTarget = altName,
+			itemID = itemID,
+			professionID = item.professionID,
+			professionName = item.professionName or self:GetProfessionName(item.professionID),
+			priceCopper = priceCopper,
+			freeCommission = priceCopper == 0,
+			note = i == 1 and "Alt crafter, whisper main" or "",
+			recipeID = item.recipeID,
+			recipeDifficulty = item.recipeDifficulty,
+			totalSkill = item.totalSkill,
+			quality = baseQuality,
+			rawQuality = baseQuality,
+			qualityAtlas = "Professions-Icon-Quality-Tier" .. baseQuality .. "-Small",
+			concentrationQuality = nil,
+			concentrationCost = nil,
+			bestQuality = bestQuality,
+			rawBestQuality = bestQuality,
+			bestQualityAtlas = "Professions-Icon-Quality-Tier" .. bestQuality .. "-Small",
+			bestConcentrationQuality = nil,
+			bestTotalSkill = item.bestTotalSkill,
+			bestConcentrationCost = nil,
+			bestReagentSummary = item.bestReagentSummary,
+			bestReagentSummaryUpdatedAt = item.bestReagentSummaryUpdatedAt or now,
+			bestReagentTruncated = item.bestReagentTruncated,
+			bestReagentPendingNames = item.bestReagentPendingNames,
+			professionLink = item.professionLink,
+			updatedAt = now,
+			verifiedAt = now,
+			lastQueryToken = self.currentCustomerQueryToken,
+			lastQueryAt = self.lastQueryAt,
+			debug = true,
+			debugAlt = true,
+		}
+	end
+
 	for i = 1, DEBUG_CERTIFIED_COUNT - 1 do
 		local priceCopper, isFree = GetDebugCommissionCopper(i)
 		local baseQuality = GetDebugQuality(i)
@@ -1088,6 +1142,7 @@ function AF:InjectDebugSelfResult(itemID, professionID)
 		self.db.customerCache[itemKey]["__debug_self_" .. i] = {
 			name = debugName,
 			target = debugName,
+			orderTarget = debugName,
 			itemID = itemID,
 			professionID = item.professionID,
 			professionName = item.professionName or self:GetProfessionName(item.professionID),
@@ -1311,7 +1366,7 @@ function AF:FillPersonalOrder(entry)
 	end
 
 	local form = ProfessionsCustomerOrdersFrame.Form
-	local recipient = self:NormalizeName(entry.target or entry.name)
+	local recipient = self:NormalizeName(entry.orderTarget or entry.name or entry.target)
 	form:SetOrderRecipient(Enum.CraftingOrderType.Personal)
 	form.OrderRecipientDropdown:SetText(PROFESSIONS_CRAFTING_FORM_ORDER_RECIPIENT_PRIVATE)
 	form.OrderRecipientTarget:SetText(recipient)

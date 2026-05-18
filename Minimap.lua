@@ -65,7 +65,24 @@ function AF:InitializeMinimap()
 			if AF.db.autoAvailability then
 				tooltip:AddLine(AF:Text("MINIMAP_AUTO_HINT"), 0.65, 0.65, 0.65, true)
 			end
-			tooltip:AddLine(AF:Text("MINIMAP_SCANNED", AF:TableCount(AF.db.artisanProfile.items)), 1, 1, 1)
+			local professionRows = AF:GetScannedProfessionRows()
+			if #professionRows > 0 then
+				local currentCharacter
+				for _, row in ipairs(professionRows) do
+					if row.characterName ~= currentCharacter then
+						currentCharacter = row.characterName
+						tooltip:AddLine(AF:GetDisplayPlayerName(currentCharacter), 1, 0.82, 0)
+					end
+					local text = AF:Text("MINIMAP_PROFESSION_SCANNED", row.professionName, row.count)
+					if row.advertised then
+						tooltip:AddLine("  " .. text, 1, 1, 1)
+					else
+						tooltip:AddLine("  " .. text .. " |cff888888(" .. AF:Text("MINIMAP_NOT_ADVERTISED") .. ")|r", 0.65, 0.65, 0.65)
+					end
+				end
+			else
+				tooltip:AddLine(AF:Text("MINIMAP_SCANNED", 0), 1, 1, 1)
+			end
 			tooltip:AddLine(" ")
 			tooltip:AddLine(AF:Text("MINIMAP_LEFT_CLICK"), 0.65, 0.65, 0.65)
 			tooltip:AddLine(AF:Text("MINIMAP_MIDDLE_CLICK"), 0.65, 0.65, 0.65)

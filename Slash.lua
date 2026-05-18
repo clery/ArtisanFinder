@@ -102,6 +102,7 @@ function AF:ClearAllData()
 	self.lastQueryProfessionID = nil
 	self.lastQueryAt = nil
 	self:EnsureDB()
+	self:SelectActiveArtisanProfile(self.playerName or self:GetPlayerFullName())
 	self.tradeLeads = self.db.tradeLeads
 	if self.RefreshCustomerResults then
 		self:RefreshCustomerResults(self:Text("SELECT_ORDER_ITEM"))
@@ -111,6 +112,9 @@ function AF:ClearAllData()
 	end
 	if self.RefreshMinimap then
 		self:RefreshMinimap()
+	end
+	if self.RefreshOptionsPanel then
+		self:RefreshOptionsPanel()
 	end
 	self:Print(self:Text("CLEAR_DONE"))
 end

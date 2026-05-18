@@ -9,8 +9,8 @@ externals:
 
 ignore:
   - .githooks
-  - tmp
   - Images/CrafterView.png
   - Images/CustomerView.png
   - Images/CustomerViewPopup.png
+  - Images/Example.gif
   - Images/Options.png

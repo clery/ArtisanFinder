@@ -86,6 +86,53 @@ local function CreateCountOptions(optionTable)
 	return options
 end
 
+local function RegisterAdvertisingOptions(self, category)
+	local advertisingRows = self:GetScannedProfessionRows()
+	if #advertisingRows == 0 then
+		return
+	end
+	self.advertisingOptionRegistered = self.advertisingOptionRegistered or {}
+	if not self.advertisingOptionsSectionRegistered then
+		local initializer = CreateSettingsListSectionHeaderInitializer(self:Text("OPTIONS_SECTION_ADVERTISING"), self:Text("OPTIONS_SECTION_ADVERTISING_DESC"))
+		if initializer.AddShownPredicate then
+			initializer:AddShownPredicate(function()
+				return #AF:GetScannedProfessionRows() > 0
+			end)
+		end
+		Settings.RegisterInitializer(category, initializer)
+		self.advertisingOptionsSectionRegistered = true
+	end
+	for _, row in ipairs(advertisingRows) do
+		local characterName = row.characterName
+		local professionID = row.professionID
+		local key = tostring(characterName) .. ":" .. tostring(professionID)
+		if not self.advertisingOptionRegistered[key] then
+			local label = self:GetDisplayPlayerName(characterName) .. " - " .. tostring(row.professionName)
+			local variable = "ArtisanFinder_Advertise_" .. key:gsub("[^%w_]", "_")
+			local advertiseProfession = Settings.RegisterProxySetting(
+				category,
+				variable,
+				Settings.VarType.Boolean,
+				label,
+				true,
+				function()
+					return AF:IsProfessionAdvertised(characterName, professionID)
+				end,
+				function(value)
+					AF:SetProfessionAdvertised(characterName, professionID, value == true)
+				end
+			)
+			local initializer = Settings.CreateCheckbox(category, advertiseProfession, self:Text("OPTIONS_ADVERTISE_PROFESSION_DESC"))
+			if initializer and initializer.AddShownPredicate then
+				initializer:AddShownPredicate(function()
+					return AF:HasScannedProfession(characterName, professionID)
+				end)
+			end
+			self.advertisingOptionRegistered[key] = true
+		end
+	end
+end
+
 function AF:InitializeOptions()
 	if self.optionsInitialized then
 		return
@@ -230,8 +277,13 @@ function AF:InitializeOptions()
 	)
 	Settings.CreateCheckbox(category, hideMinimap, self:Text("OPTIONS_HIDE_MINIMAP_DESC"))
 
+	RegisterAdvertisingOptions(self, category)
+
 	Settings.RegisterAddOnCategory(category)
 end
 
 function AF:RefreshOptionsPanel()
+	if self.optionsCategory then
+		RegisterAdvertisingOptions(self, self.optionsCategory)
+	end
 end

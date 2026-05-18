@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.1.0 - 2026-05-18
+
+### Added
+
+- Added account-level multi-character artisan profiles so an online character can advertise scanned professions from other characters on the same account.
+- Added per-character profession advertising checkboxes in Options -> AddOns -> ArtisanFinder.
+- Added minimap tooltip breakdowns showing scanned recipe counts per profession for each stored character.
+- Added cross-character customer rows that show the actual crafter while whispering the currently online character.
+- Added multi-character debug rows for testing alt-crafter behavior locally.
+
+### Changed
+
+- Personal Order filling now targets the actual crafter character while Whisper targets the online contact character.
+- Favorites now follow the actual crafter character instead of whichever alt answered the query.
+- Reagent detail requests now include crafter identity so cached tooltip recommendations attach to the correct cross-character row.
+- The `Online as ...` customer-row indicator now appears as a separate green line.
+
+### Fixed
+
+- Fixed multi-character advertising options appearing in the wrong options section after scanning a new alt.
+- Fixed disabled advertising checkboxes not persisting after reload.
+- Fixed `/af clear confirm` leaving stale character profession options visible in the current settings session.
+
 ## 1.0.7 - 2026-05-18
 
 ### Added

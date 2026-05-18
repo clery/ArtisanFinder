@@ -10,6 +10,12 @@ function AF:BuildCustomerRowViewModel(entry)
 
 	local detail
 	local capability
+	local onlineAs
+	local crafterName = self:NormalizeName(entry.orderTarget or entry.name)
+	local contactName = self:NormalizeName(entry.target)
+	if contactName and crafterName and contactName ~= crafterName and not entry.offlineCached and not entry.unavailableFavorite then
+		onlineAs = self:Text("ONLINE_AS", self:GetDisplayPlayerName(contactName))
+	end
 	if entry.tradeLead then
 		detail = entry.note or self:Text("MISSING_ADDON_DATA")
 		capability = entry.professionName or ""
@@ -17,6 +23,9 @@ function AF:BuildCustomerRowViewModel(entry)
 		local note = entry.note and entry.note ~= "" and (" - " .. entry.note) or ""
 		detail = self:FormatMoney(entry.priceCopper, entry.freeCommission) .. note
 		capability = self:FormatCapability(entry)
+		if onlineAs then
+			capability = "|cff33ff99" .. onlineAs .. "|r" .. (capability ~= "" and ("\n" .. capability) or "")
+		end
 	end
 
 	return {

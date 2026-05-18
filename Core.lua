@@ -41,6 +41,7 @@ end
 function AF:OnPlayerLogin()
 	self:EnsureDB()
 	self.playerName = self:GetPlayerFullName()
+	self:SelectActiveArtisanProfile(self.playerName)
 	self.available = false
 
 	if self.InitializeComms then

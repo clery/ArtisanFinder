@@ -147,6 +147,54 @@ function AF:OnAddonMessage(prefix, message, channel, sender)
 	end
 end
 
+local function ItemMatchesQuery(item, itemID, professionID)
+	if not item then
+		return false
+	end
+	if item.itemID and tonumber(item.itemID) ~= tonumber(itemID) then
+		return false
+	end
+	return professionID == 0 or tonumber(item.professionID) == tonumber(professionID)
+end
+
+function AF:GetAdvertisedItemMatches(itemID, professionID)
+	local matches = {}
+	self:ForEachArtisanProfile(function(characterName, profile)
+		local item = profile.items and profile.items[tostring(itemID)]
+		if ItemMatchesQuery(item, itemID, professionID) and self:IsProfessionAdvertised(characterName, item.professionID) then
+			table.insert(matches, {
+				characterName = characterName,
+				profile = profile,
+				item = item,
+			})
+		end
+	end)
+	return matches
+end
+
+function AF:FindProfileItem(characterName, itemID, recipeID)
+	characterName = self:NormalizeName(characterName)
+	local function matches(item)
+		return item
+			and (not item.itemID or tonumber(item.itemID) == tonumber(itemID))
+			and ((tonumber(recipeID) or 0) == 0 or tonumber(item.recipeID) == tonumber(recipeID))
+	end
+	if characterName and self.db and self.db.artisanCharacters then
+		local profile = self.db.artisanCharacters[characterName]
+		local item = profile and profile.items and profile.items[tostring(itemID)]
+		if matches(item) then
+			return item, profile, characterName
+		end
+	end
+	for foundName, profile in pairs(self.db and self.db.artisanCharacters or {}) do
+		local item = profile and profile.items and profile.items[tostring(itemID)]
+		if matches(item) then
+			return item, profile, foundName
+		end
+	end
+	return nil
+end
+
 function AF:HandleQuery(parts, sender)
 	if not self.available then
 		return
@@ -159,69 +207,72 @@ function AF:HandleQuery(parts, sender)
 		return
 	end
 
-	local item = self.db.artisanProfile.items[tostring(itemID)]
-	if not item then
+	local matches = self:GetAdvertisedItemMatches(itemID, professionID)
+	if #matches == 0 then
 		return
 	end
 
-	local throttleKey = table.concat({ sender, itemID, professionID, queryToken }, ":")
-	local lastSent = self.db.responseThrottle[throttleKey]
-	if lastSent and self:Now() - lastSent < self.RESPONSE_THROTTLE then
-		return
-	end
+	for _, match in ipairs(matches) do
+		local item = match.item
+		local crafterName = match.characterName
+		local throttleKey = table.concat({ sender, crafterName, itemID, professionID, queryToken }, ":")
+		local lastSent = self.db.responseThrottle[throttleKey]
+		if not lastSent or self:Now() - lastSent >= self.RESPONSE_THROTTLE then
+			local priceCopper, freeCommission, note = self:GetItemPriceForProfile(match.profile, itemID, item.professionID)
+			local encodedNote = self:EncodeNote(note)
+			local encodedLink = self:EncodeField(item.professionLink)
+			local payloadParts = {
+				"R",
+				self.PROTOCOL_VERSION,
+				itemID,
+				tonumber(item.professionID) or 0,
+				tonumber(priceCopper) or 0,
+				freeCommission and 1 or 0,
+				encodedNote,
+				tonumber(item.recipeID) or 0,
+				self:Now(),
+				tonumber(item.recipeDifficulty) or "",
+				tonumber(item.totalSkill) or "",
+				tonumber(item.quality) or "",
+				tonumber(item.concentrationQuality) or "",
+				tonumber(item.concentrationCost) or "",
+				encodedLink,
+				queryToken,
+				tonumber(item.bestQuality) or "",
+				tonumber(item.bestConcentrationQuality) or "",
+				tonumber(item.bestTotalSkill) or "",
+				tonumber(item.bestConcentrationCost) or "",
+				item.bestReagentTruncated and 1 or 0,
+				self:EncodeField(item.qualityAtlas, 48),
+				self:EncodeField(item.bestQualityAtlas, 48),
+				item.bestReagentSummary and item.bestReagentSummary ~= "" and 1 or 0,
+				self:EncodeField(crafterName, 48),
+			}
+			local payload = table.concat(payloadParts, "|")
+			if #payload > 255 then
+				payloadParts[15] = ""
+				payload = table.concat(payloadParts, "|")
+			end
+			if #payload > 255 then
+				payloadParts[7] = self:EncodeField(note, 32)
+				payload = table.concat(payloadParts, "|")
+			end
+			if #payload > 255 then
+				payloadParts[17] = ""
+				payloadParts[18] = ""
+				payloadParts[19] = ""
+				payloadParts[20] = ""
+				payloadParts[21] = ""
+				payloadParts[22] = ""
+				payloadParts[23] = ""
+				payloadParts[24] = ""
+				payload = table.concat(payloadParts, "|")
+			end
 
-	local priceCopper, freeCommission, note = self:GetItemPrice(itemID, item.professionID)
-	local encodedNote = self:EncodeNote(note)
-	local encodedLink = self:EncodeField(item.professionLink)
-	local payloadParts = {
-		"R",
-		self.PROTOCOL_VERSION,
-		itemID,
-		tonumber(item.professionID) or 0,
-		tonumber(priceCopper) or 0,
-		freeCommission and 1 or 0,
-		encodedNote,
-		tonumber(item.recipeID) or 0,
-		self:Now(),
-		tonumber(item.recipeDifficulty) or "",
-		tonumber(item.totalSkill) or "",
-		tonumber(item.quality) or "",
-		tonumber(item.concentrationQuality) or "",
-		tonumber(item.concentrationCost) or "",
-		encodedLink,
-		queryToken,
-		tonumber(item.bestQuality) or "",
-		tonumber(item.bestConcentrationQuality) or "",
-		tonumber(item.bestTotalSkill) or "",
-		tonumber(item.bestConcentrationCost) or "",
-		item.bestReagentTruncated and 1 or 0,
-		self:EncodeField(item.qualityAtlas, 48),
-		self:EncodeField(item.bestQualityAtlas, 48),
-		item.bestReagentSummary and item.bestReagentSummary ~= "" and 1 or 0,
-	}
-	local payload = table.concat(payloadParts, "|")
-	if #payload > 255 then
-		payloadParts[15] = ""
-		payload = table.concat(payloadParts, "|")
+			self:SendAddon(payload, "WHISPER", sender)
+			self.db.responseThrottle[throttleKey] = self:Now()
+		end
 	end
-	if #payload > 255 then
-		payloadParts[7] = self:EncodeField(note, 32)
-		payload = table.concat(payloadParts, "|")
-	end
-	if #payload > 255 then
-		payloadParts[17] = ""
-		payloadParts[18] = ""
-		payloadParts[19] = ""
-		payloadParts[20] = ""
-		payloadParts[21] = ""
-		payloadParts[22] = ""
-		payloadParts[23] = ""
-		payloadParts[24] = ""
-		payload = table.concat(payloadParts, "|")
-	end
-
-	self:SendAddon(payload, "WHISPER", sender)
-	self.db.responseThrottle[throttleKey] = self:Now()
 end
 
 function AF:HandleReagentDetailRequest(parts, sender)
@@ -232,29 +283,27 @@ function AF:HandleReagentDetailRequest(parts, sender)
 	local itemID = tonumber(parts[3])
 	local recipeID = tonumber(parts[4]) or 0
 	local queryToken = tonumber(parts[5])
+	local crafterName = self:NormalizeName(self:DecodeField(parts[6]))
 	if not itemID or not queryToken then
 		return
 	end
 
-	local item = self.db.artisanProfile.items[tostring(itemID)]
+	local item = self:FindProfileItem(crafterName, itemID, recipeID)
 	if not item or not item.bestReagentSummary or item.bestReagentSummary == "" then
 		return
 	end
-	if recipeID ~= 0 and tonumber(item.recipeID) ~= recipeID then
-		return
-	end
 
-	local throttleKey = table.concat({ "D", sender, itemID, recipeID, queryToken }, ":")
+	local throttleKey = table.concat({ "D", sender, crafterName or "", itemID, recipeID, queryToken }, ":")
 	local lastSent = self.db.responseThrottle[throttleKey]
 	if lastSent and self:Now() - lastSent < self.DETAIL_REQUEST_THROTTLE then
 		return
 	end
 
-	self:SendReagentDetail(item, sender, queryToken)
+	self:SendReagentDetail(item, sender, queryToken, crafterName)
 	self.db.responseThrottle[throttleKey] = self:Now()
 end
 
-function AF:SendReagentDetail(item, target, queryToken)
+function AF:SendReagentDetail(item, target, queryToken, crafterName)
 	local summary = item and item.bestReagentSummary
 	if not summary or summary == "" then
 		return
@@ -279,6 +328,7 @@ function AF:SendReagentDetail(item, target, queryToken)
 			index,
 			#chunks,
 			chunk,
+			self:EncodeField(crafterName, 48),
 		}, "|")
 		self:SendAddon(payload, "WHISPER", target)
 	end
@@ -329,6 +379,8 @@ function AF:HandleResponse(parts, sender)
 	local qualityAtlas = self:DecodeField(parts[22])
 	local bestQualityAtlas = self:DecodeField(parts[23])
 	local hasReagentSummary = tonumber(parts[24]) == 1
+	local crafterName = self:NormalizeName(self:DecodeField(parts[25])) or sender
+	local cacheKey = crafterName
 
 	if not itemID then
 		return
@@ -341,13 +393,16 @@ function AF:HandleResponse(parts, sender)
 
 	local itemKey = tostring(itemID)
 	self.db.customerCache[itemKey] = self.db.customerCache[itemKey] or {}
-	local previous = self.db.customerCache[itemKey][sender]
+	local previous = self.db.customerCache[itemKey][cacheKey]
 	local previousRecipeID = tonumber(previous and previous.recipeID) or 0
-	self.db.customerCache[itemKey][sender] = {
-		name = sender,
+	local professionName = professionLink ~= "" and professionLink:match("%[(.-)%]") or self:GetProfessionName(professionID)
+	self.db.customerCache[itemKey][cacheKey] = {
+		name = crafterName,
+		target = sender,
+		orderTarget = crafterName,
 		itemID = itemID,
 		professionID = professionID,
-		professionName = self:GetProfessionName(professionID),
+		professionName = professionName,
 		priceCopper = priceCopper,
 		freeCommission = freeCommission,
 		note = note,
@@ -373,15 +428,15 @@ function AF:HandleResponse(parts, sender)
 		lastQueryToken = queryToken,
 		lastQueryAt = verifiedForCurrentQuery and self.lastQueryAt or nil,
 	}
-	self:ApplyPendingReagentDetail(sender, itemID, recipeID, queryToken)
+	self:ApplyPendingReagentDetail(sender, itemID, recipeID, queryToken, crafterName)
 
 	if self.RefreshCustomerResults then
 		self:RefreshCustomerResults()
 	end
 end
 
-function AF:GetReagentDetailKey(sender, itemID, recipeID, queryToken)
-	return table.concat({ sender, itemID or 0, recipeID or 0, queryToken or 0 }, ":")
+function AF:GetReagentDetailKey(sender, itemID, recipeID, queryToken, crafterName)
+	return table.concat({ sender, crafterName or "", itemID or 0, recipeID or 0, queryToken or 0 }, ":")
 end
 
 function AF:IsReagentDetailCacheFresh(entry)
@@ -403,11 +458,12 @@ function AF:RequestReagentDetail(entry)
 	local recipeID = tonumber(entry.recipeID) or 0
 	local queryToken = tonumber(entry.lastQueryToken or self.currentCustomerQueryToken)
 	local target = self:NormalizeName(entry.target or entry.name)
+	local crafterName = self:NormalizeName(entry.orderTarget or entry.name)
 	if not itemID or not queryToken or not target then
 		return false
 	end
 
-	local key = self:GetReagentDetailKey(target, itemID, recipeID, queryToken)
+	local key = self:GetReagentDetailKey(target, itemID, recipeID, queryToken, crafterName)
 	self.reagentDetailRequests = self.reagentDetailRequests or {}
 	local now = self:Now()
 	local lastRequested = self.reagentDetailRequests[key]
@@ -419,7 +475,7 @@ function AF:RequestReagentDetail(entry)
 	self.reagentDetailRequests[key] = now
 	entry.reagentDetailRequested = true
 	local itemCache = self.db and self.db.customerCache and self.db.customerCache[tostring(itemID)]
-	local cachedEntry = itemCache and itemCache[target]
+	local cachedEntry = itemCache and itemCache[crafterName or target]
 	if cachedEntry then
 		cachedEntry.reagentDetailRequested = true
 	end
@@ -430,22 +486,24 @@ function AF:RequestReagentDetail(entry)
 		itemID,
 		recipeID,
 		queryToken,
+		self:EncodeField(crafterName, 48),
 	}, "|")
 	self:SendAddon(payload, "WHISPER", target)
 	return true
 end
 
-function AF:ApplyPendingReagentDetail(sender, itemID, recipeID, queryToken)
+function AF:ApplyPendingReagentDetail(sender, itemID, recipeID, queryToken, crafterName)
 	if not self.pendingReagentDetails then
 		return
 	end
-	local key = self:GetReagentDetailKey(sender, itemID, recipeID, queryToken)
+	crafterName = self:NormalizeName(crafterName) or sender
+	local key = self:GetReagentDetailKey(sender, itemID, recipeID, queryToken, crafterName)
 	local pending = self.pendingReagentDetails[key]
 	if not pending or not pending.summary then
 		return
 	end
 	local itemCache = self.db.customerCache[tostring(itemID)]
-	local entry = itemCache and itemCache[sender]
+	local entry = itemCache and itemCache[crafterName]
 	local entryRecipeID = tonumber(entry and entry.recipeID) or 0
 	if entry and tonumber(entry.lastQueryToken) == tonumber(queryToken) and entryRecipeID == (tonumber(recipeID) or 0) then
 		entry.bestReagentSummary = pending.summary
@@ -462,6 +520,7 @@ function AF:HandleReagentDetail(parts, sender)
 	local seq = tonumber(parts[6])
 	local total = tonumber(parts[7])
 	local payload = parts[8]
+	local crafterName = self:NormalizeName(self:DecodeField(parts[9])) or sender
 	if not itemID or not queryToken or not seq or not total or not payload then
 		return
 	end
@@ -473,7 +532,7 @@ function AF:HandleReagentDetail(parts, sender)
 	end
 
 	self.pendingReagentDetails = self.pendingReagentDetails or {}
-	local key = self:GetReagentDetailKey(sender, itemID, recipeID, queryToken)
+	local key = self:GetReagentDetailKey(sender, itemID, recipeID, queryToken, crafterName)
 	local pending = self.pendingReagentDetails[key]
 	if not pending or pending.total ~= total then
 		pending = { total = total, chunks = {}, received = 0 }
@@ -487,7 +546,7 @@ function AF:HandleReagentDetail(parts, sender)
 	if pending.received == pending.total then
 		local combined = table.concat(pending.chunks, "")
 		pending.summary = self:DecodeField(combined)
-		self:ApplyPendingReagentDetail(sender, itemID, recipeID, queryToken)
+		self:ApplyPendingReagentDetail(sender, itemID, recipeID, queryToken, crafterName)
 		if self.RefreshCustomerResults then
 			self:RefreshCustomerResults()
 		end
