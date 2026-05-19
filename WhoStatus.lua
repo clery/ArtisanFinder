@@ -7,12 +7,66 @@ local function GetLibWho()
 	return LibStub and LibStub:GetLibrary("LibWho-2.0", true)
 end
 
+local function IsWhoCountSystemMessage(message)
+	if type(message) ~= "string" then
+		return false
+	end
+	if WHO_NUM_RESULTS then
+		local pattern = tostring(WHO_NUM_RESULTS):gsub("%%d", "%%d+")
+		if message:find(pattern) then
+			return true
+		end
+	end
+	return message:match("^%d+ players? total$") ~= nil
+end
+
+local function IsWhoResultSystemMessage(message)
+	if type(message) ~= "string" then
+		return false
+	end
+	local plain = message
+		:gsub("|c%x%x%x%x%x%x%x%x", "")
+		:gsub("|r", "")
+		:gsub("|H.-|h(.-)|h", "%1")
+	local whoNames = AF.suppressWhoSystemNames
+	if plain:match("%[[^%]]+%].*:") then
+		return true
+	end
+	if not whoNames then
+		return false
+	end
+	for name in pairs(whoNames) do
+		if plain:lower():find(tostring(name):lower(), 1, true) then
+			return true
+		end
+	end
+	return false
+end
+
+local function SuppressOwnWhoSystemMessage(_, _, message)
+	if AF.suppressWhoSystemUntil and AF:Now() <= AF.suppressWhoSystemUntil and (IsWhoCountSystemMessage(message) or IsWhoResultSystemMessage(message)) then
+		return true
+	end
+	return false
+end
+
 local function GetEntryWhoName(entry)
 	return AF:NormalizeName(entry and (entry.orderTarget or entry.name or entry.target))
 end
 
 local function GetWhoResultName(result)
 	return AF:NormalizeName(result and (result.fullName or result.Name or result.name))
+end
+
+local function NormalizeWhoQueryName(name, preserveRealmless)
+	if not name or name == "" then
+		return nil
+	end
+	name = tostring(name):gsub("%s+", "")
+	if preserveRealmless and not name:find("-", 1, true) then
+		return name
+	end
+	return AF:NormalizeName(name)
 end
 
 local function IsWhoResultMatch(requestedName, result)
@@ -72,6 +126,10 @@ end
 function AF:InitializeWhoStatus()
 	self.whoStatus = self.whoStatus or {}
 	self.whoStatusDebug = self.whoStatusDebug == true
+	if ChatFrame_AddMessageEventFilter and not self.whoStatusChatFilterRegistered then
+		ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", SuppressOwnWhoSystemMessage)
+		self.whoStatusChatFilterRegistered = true
+	end
 end
 
 function AF:SetWhoStatusDebug(enabled)
@@ -110,8 +168,8 @@ function AF:IsCustomerEntryOffline(entry)
 	return self:GetWhoStatus(GetEntryWhoName(entry), true) == false
 end
 
-function AF:QueueWhoStatusCheck(name)
-	name = self:NormalizeName(name)
+function AF:QueueWhoStatusCheck(name, preserveRealmless)
+	name = NormalizeWhoQueryName(name, preserveRealmless)
 	local lib = GetLibWho()
 	if not name or not lib or not lib.UserInfo then
 		DebugPrint("who unavailable for", tostring(name))
@@ -139,6 +197,7 @@ function AF:QueueWhoStatusCheck(name)
 	DebugPrint("who queue", name)
 
 	local query = 'n-"' .. name .. '"'
+	local baseName = tostring(name):match("^([^-]+)") or name
 	local function onWhoResult(_, results, complete)
 		local resultStatus = AF.whoStatus and AF.whoStatus[name]
 		if not resultStatus then
@@ -148,12 +207,14 @@ function AF:QueueWhoStatusCheck(name)
 		local hasResults = results and #results > 0
 		if not complete and not hasResults then
 			DebugPrint("who result", name, FormatWhoStatus(resultStatus.online), "incomplete")
+			AF.suppressWhoSystemUntil = AF:Now() + 0.5
 			if AF.RefreshCustomerResults then
 				AF:RefreshCustomerResults()
 			end
 			return
 		end
 		resultStatus.checkedAt = AF:Now()
+		AF.suppressWhoSystemUntil = resultStatus.checkedAt + 0.5
 		if complete and not hasResults then
 			resultStatus.online = false
 		else
@@ -183,6 +244,11 @@ function AF:QueueWhoStatusCheck(name)
 		status.online = nil
 		return false
 	end
+	self.suppressWhoSystemUntil = now + 15
+	self.suppressWhoSystemNames = {
+		[name] = true,
+		[baseName] = true,
+	}
 	return true
 end
 
@@ -220,14 +286,14 @@ function AF:QueueCustomerWhoStatusChecks(rows, startQueue, batchSeen)
 end
 
 function AF:CheckWhoStatusNow(name)
-	name = self:NormalizeName(name)
+	name = NormalizeWhoQueryName(name, true)
 	if not name then
 		self:Print(self:Text("WHO_USAGE"))
 		return
 	end
 	self.whoStatus = self.whoStatus or {}
 	self.whoStatus[name] = nil
-	if self:QueueWhoStatusCheck(name) then
+	if self:QueueWhoStatusCheck(name, true) then
 		KickWhoQueue(name)
 		self:Print(self:Text("WHO_CHECK_STARTED", name))
 	else

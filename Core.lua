@@ -105,8 +105,7 @@ function AF:HasTradeChatAccess()
 end
 
 function AF:ShouldAutoBeAvailable()
-	local inInstance = IsInInstance and IsInInstance()
-	if inInstance then
+	if self:IsInUnavailableActivity() then
 		return false
 	end
 	return self:HasTradeChatAccess()
@@ -202,6 +201,10 @@ AF.frame:SetScript("OnEvent", function(_, event, ...)
 		if AF.HideDiscoveryChannelFromChat then
 			AF:HideDiscoveryChannelFromChat()
 		end
+		if AF.deferredDiscoveryChannelJoin and AF.QueueDiscoveryChannelJoin then
+			AF.deferredDiscoveryChannelJoin = nil
+			AF:QueueDiscoveryChannelJoin(1)
+		end
 		if AF.deferredAutoAvailabilityRefresh then
 			AF.deferredAutoAvailabilityRefresh = nil
 			AF:QueueAutoAvailabilityRefresh()
@@ -223,6 +226,9 @@ AF.frame:SetScript("OnEvent", function(_, event, ...)
 		if AF:IsInCombatLocked() then
 			AF.deferredAutoAvailabilityRefresh = true
 			return
+		end
+		if event == "PLAYER_ENTERING_WORLD" and AF.QueueDiscoveryChannelJoin then
+			AF:QueueDiscoveryChannelJoin(8)
 		end
 		AF:QueueAutoAvailabilityRefresh()
 	elseif event == "CHAT_MSG_ADDON" then

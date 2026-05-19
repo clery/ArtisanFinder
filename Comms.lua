@@ -2,16 +2,27 @@ local _, AF = ...
 
 function AF:InitializeComms()
 	C_ChatInfo.RegisterAddonMessagePrefix(self.PREFIX)
-	self:JoinDiscoveryChannel()
+	self:QueueDiscoveryChannelJoin(8)
+end
+
+function AF:QueueDiscoveryChannelJoin(delay)
+	if self.discoveryChannelJoinQueued or GetChannelName(self.CHANNEL_NAME) ~= 0 then
+		return
+	end
+	self.discoveryChannelJoinQueued = true
+	C_Timer.After(delay or 8, function()
+		AF.discoveryChannelJoinQueued = false
+		if AF:IsInCombatLocked() then
+			AF.deferredDiscoveryChannelJoin = true
+			return
+		end
+		AF:JoinDiscoveryChannel()
+	end)
 end
 
 function AF:JoinDiscoveryChannel()
 	if GetChannelName(self.CHANNEL_NAME) == 0 then
-		if JoinTemporaryChannel then
-			JoinTemporaryChannel(self.CHANNEL_NAME)
-		else
-			JoinChannelByName(self.CHANNEL_NAME)
-		end
+		JoinTemporaryChannel(self.CHANNEL_NAME)
 	end
 	self:HideDiscoveryChannelFromChat()
 end

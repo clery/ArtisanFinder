@@ -82,8 +82,8 @@ lib.CacheQueue = {}
 lib.SetWhoToUIState = false
 
 
-lib.MinInterval = 0.5
-lib.MaxInterval = 2
+lib.MinInterval = 2.5
+lib.MaxInterval = 10
 
 ---
 --- locale
@@ -477,7 +477,7 @@ function lib:AskWhoNext()
     			self.hooked.SetWhoToUi(args.gui and true or false)
 			end
 		else
-			self.hooked.SetWhoToUi(true)
+			self.hooked.SetWhoToUi(false)
 			self.Quiet = true		
 		end
 
@@ -757,23 +757,6 @@ function lib:TriggerEvent(event, ...)
 end
 
 ---
---- slash commands
----
-
-SlashCmdList['WHO'] = function(msg)
-	dbg("console /who: "..msg)
-	-- new /who function
-	--local self = lib
-	
-	if(msg == '')then
-		lib:GuiWho(WhoFrame_GetDefaultWhoCommand())
-	elseif(WhoFrame:IsVisible())then
-		lib:GuiWho(msg)
-	else
-		lib:ConsoleWho(msg)
-	end
-end
-	
 SlashCmdList['WHOLIB_DEBUG'] = function()
 	-- /wholibdebug: toggle debug on/off
 	local self = lib
@@ -788,58 +771,10 @@ SLASH_WHOLIB_DEBUG1 = '/wholibdebug'
 --- hook activation
 ---
 
--- functions to hook
-local hooks = {
-	'WhoFrameEditBox_OnEnterPressed',
---	'FriendsFrame_OnEvent',
-}
-
--- hook all functions (which are not yet hooked)
-for _, name in pairs(hooks) do
-	if not lib['hooked'][name] then
-		lib['hooked'][name] = _G[name]
-		_G[name] = function(...)
-			lib.hook[name](lib, ...)
-		end -- function
-	end -- if
-end -- for
-
-
--- C_FriendList functions to hook
-local CFL_hooks = {
-	'SendWho',
-	'SetWhoToUi',
-}
-
--- hook all C_FriendList functions (which are not yet hooked)
-for _, name in pairs(CFL_hooks) do
-	if not lib['hooked'][name] then
-		lib['hooked'][name] = _G["C_FriendList"][name]
-		_G["C_FriendList"][name] = function(...)
-			lib.hook[name](lib, ...)
-		end -- function
-	end -- if
-end -- for
-
-
--- fake 'WhoFrame:Hide' as hooked
-table.insert(hooks, 'WhoFrame_Hide')
-
--- check for unused hooks -> remove function
-for name, _ in pairs(lib['hook']) do
-	if not hooks[name] then
-		lib['hook'][name] = function() end
-	end -- if
-end -- for
-
--- secure hook 'WhoFrame:Hide'
-if not lib['hooked']['WhoFrame_Hide'] then
-	lib['hooked']['WhoFrame_Hide'] = true
-	hooksecurefunc(WhoFrame, 'Hide', function(...)
-			lib['hook']['WhoFrame_Hide'](lib, ...)
-		end -- function
-	)
-end -- if
+-- ArtisanFinder uses LibWho only for quiet, explicit addon checks. Keep the
+-- normal Blizzard /who command and Who UI untouched.
+lib['hooked']['SendWho'] = lib['hooked']['SendWho'] or C_FriendList.SendWho
+lib['hooked']['SetWhoToUi'] = lib['hooked']['SetWhoToUi'] or C_FriendList.SetWhoToUi
 
 
 
@@ -880,21 +815,6 @@ function lib.hook.WhoFrameEditBox_OnEnterPressed(self)
 	lib:GuiWho(WhoFrameEditBox:GetText())
 end
 
---[[
-function lib.hook.FriendsFrame_OnEvent(self, ...)
-	if event ~= 'WHO_LIST_UPDATE' or not lib.Quiet then
-		lib.hooked.FriendsFrame_OnEvent(...)
-	end
-end
-]]
-
-hooksecurefunc(FriendsFrame, 'RegisterEvent', function(self, event)
-		if(event == "WHO_LIST_UPDATE") then
-			self:UnregisterEvent("WHO_LIST_UPDATE");
-		end
-	end);
-
-
 function lib.hook.SetWhoToUi(self, state)
 	lib.SetWhoToUIState = state
 end
@@ -918,8 +838,6 @@ function lib:CHAT_MSG_SYSTEM(arg1)
 		lib:ProcessWhoResults()
 	end
 end
-
-FriendsFrame:UnregisterEvent("WHO_LIST_UPDATE")
 
 function lib:WHO_LIST_UPDATE()
     if not lib.Quiet then

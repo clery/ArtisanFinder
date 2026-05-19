@@ -196,7 +196,7 @@ function AF:OnTradeChatMessage(message, sender, _, channelName, _, _, _, _, chan
 	if self:IsInCombatLocked() then
 		return
 	end
-	if IsInInstance and IsInInstance() then
+	if self:IsInUnavailableActivity() then
 		return
 	end
 	if not self:IsTradeChannelName(channelName) and not self:IsTradeChannelName(channelBaseName) then

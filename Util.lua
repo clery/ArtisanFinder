@@ -50,6 +50,23 @@ function AF:IsTradeChannelName(name)
 	return false
 end
 
+function AF:IsInUnavailableActivity()
+	if C_PartyInfo and C_PartyInfo.IsDelveInProgress and C_PartyInfo.IsDelveInProgress() then
+		return true
+	end
+	if not IsInInstance then
+		return false
+	end
+	local inInstance, instanceType = IsInInstance()
+	if not inInstance then
+		return false
+	end
+	return instanceType == "party"
+		or instanceType == "raid"
+		or instanceType == "pvp"
+		or instanceType == "arena"
+end
+
 function AF:ApplyProfessionPanel(frame)
 	frame:SetBackdrop({
 		bgFile = "Interface\\Buttons\\WHITE8x8",
