@@ -5,6 +5,16 @@ function AF:InitializeComms()
 	self:QueueDiscoveryChannelJoin(8)
 end
 
+function AF:HasJoinedServerChannel()
+	local channels = { GetChannelList() }
+	for _, value in ipairs(channels) do
+		if type(value) == "string" and value ~= self.CHANNEL_NAME then
+			return true
+		end
+	end
+	return false
+end
+
 function AF:QueueDiscoveryChannelJoin(delay)
 	if self.discoveryChannelJoinQueued or GetChannelName(self.CHANNEL_NAME) ~= 0 then
 		return
@@ -16,6 +26,10 @@ function AF:QueueDiscoveryChannelJoin(delay)
 			AF.deferredDiscoveryChannelJoin = true
 			return
 		end
+		if not AF:HasJoinedServerChannel() then
+			AF:QueueDiscoveryChannelJoin(2)
+			return
+		end
 		AF:JoinDiscoveryChannel()
 	end)
 end
@@ -25,11 +39,18 @@ function AF:JoinDiscoveryChannel()
 		JoinTemporaryChannel(self.CHANNEL_NAME)
 	end
 	self:HideDiscoveryChannelFromChat()
+	self:HideDiscoveryChannelFromChat(0.5)
+	self:HideDiscoveryChannelFromChat(2)
+	self:HideDiscoveryChannelFromChat(5)
 end
 
 function AF:GetDiscoveryChannelID()
 	local id = GetChannelName(self.CHANNEL_NAME)
 	if id == 0 then
+		if not self:HasJoinedServerChannel() then
+			self:QueueDiscoveryChannelJoin(2)
+			return 0
+		end
 		self:JoinDiscoveryChannel()
 		id = GetChannelName(self.CHANNEL_NAME)
 	end
@@ -37,13 +58,8 @@ function AF:GetDiscoveryChannelID()
 	return id
 end
 
-function AF:HideDiscoveryChannelFromChat()
-	if self.discoveryChannelHideQueued then
-		return
-	end
-	self.discoveryChannelHideQueued = true
-	C_Timer.After(0.25, function()
-		AF.discoveryChannelHideQueued = false
+function AF:HideDiscoveryChannelFromChat(delay)
+	C_Timer.After(delay or 0.25, function()
 		if AF:IsInCombatLocked() then
 			return
 		end

@@ -228,6 +228,10 @@ AF.frame:SetScript("OnEvent", function(_, event, ...)
 		if event == "PLAYER_ENTERING_WORLD" and AF.QueueDiscoveryChannelJoin then
 			AF:QueueDiscoveryChannelJoin(8)
 		end
+		if (event == "CHANNEL_UI_UPDATE" or event == "CHAT_MSG_CHANNEL_NOTICE") and AF.HideDiscoveryChannelFromChat then
+			AF:HideDiscoveryChannelFromChat()
+			AF:HideDiscoveryChannelFromChat(0.5)
+		end
 		AF:QueueAutoAvailabilityRefresh()
 	elseif event == "CHAT_MSG_ADDON" then
 		if AF:IsInCombatLocked() then
