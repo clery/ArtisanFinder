@@ -85,6 +85,9 @@ local function ShouldWhoCheckEntry(entry)
 	if not entry or entry.ownAlt then
 		return false
 	end
+	if entry.guildMember then
+		return false
+	end
 	if entry.tradeLead or entry.offlineCached or entry.unavailableFavorite then
 		return true
 	end
@@ -159,12 +162,18 @@ function AF:IsCustomerEntryOnline(entry)
 	if not entry or entry.ownAlt then
 		return false
 	end
+	if entry.guildMember then
+		return entry.guildOnline == true
+	end
 	return self:GetWhoStatus(GetEntryWhoName(entry), true) == true
 end
 
 function AF:IsCustomerEntryOffline(entry)
 	if not entry or entry.ownAlt then
 		return false
+	end
+	if entry.guildMember then
+		return entry.guildOnline == false
 	end
 	if self.HasProfessionOpenFailed and self:HasProfessionOpenFailed(entry) then
 		return true

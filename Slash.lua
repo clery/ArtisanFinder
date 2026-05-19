@@ -58,6 +58,7 @@ function AF:PrintClearHelp()
 	self:Print(self:Text("CLEAR_HELP_SCANS"))
 	self:Print(self:Text("CLEAR_HELP_ARTISANS"))
 	self:Print(self:Text("CLEAR_HELP_ARTISANS_FAVORITE"))
+	self:Print(self:Text("CLEAR_HELP_GUILD"))
 end
 
 function AF:GetAvailableLocaleText()
@@ -179,6 +180,13 @@ function AF:ClearFavoriteArtisans()
 	self:Print(self:Text("CLEAR_ARTISANS_FAVORITE_DONE"))
 end
 
+function AF:ClearGuildCaches()
+	if self.ClearGuildMemberData then
+		self:ClearGuildMemberData(false)
+	end
+	self:Print(self:Text("CLEAR_GUILD_DONE"))
+end
+
 function AF:HandleSlash(message)
 	local command, rest = NormalizeCommand(message)
 	if command == "scan" then
@@ -213,6 +221,8 @@ function AF:HandleSlash(message)
 			self:ClearExternalArtisans()
 		elseif rest == "artisans favorite" then
 			self:ClearFavoriteArtisans()
+		elseif rest == "guild" then
+			self:ClearGuildCaches()
 		else
 			self:PrintClearHelp()
 		end

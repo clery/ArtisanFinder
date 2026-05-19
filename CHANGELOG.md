@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.0 - 2026-05-19
+
+### Added
+
+- Added guild crafter discovery for selected customer order recipes, including guild member rows, guild order filling, and guild profession opening when roster data is available.
+
 ## 1.1.4 - 2026-05-19
 
 ### Changed

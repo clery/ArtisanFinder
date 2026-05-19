@@ -293,7 +293,7 @@ function AF:FormatRelativeTime(timestamp)
 
 	local elapsed = math.max(0, self:Now() - timestamp)
 	if elapsed < 60 then
-		return self:Text("TIME_SECONDS_AGO", math.max(1, math.floor(elapsed)))
+		return self:Text("TIME_NOW")
 	end
 	if elapsed < 3600 then
 		return self:Text("TIME_MINUTES_AGO", math.floor(elapsed / 60))
@@ -309,7 +309,7 @@ function AF:FormatCustomerRowUpdatedAt(entry)
 	if relative == "" then
 		return ""
 	end
-	return self:Text(entry and entry.tradeLead and "FOUND_TIME_AGO" or "ANSWERED_TIME_AGO", relative)
+	return relative
 end
 
 function AF:FormatCapability(entry)

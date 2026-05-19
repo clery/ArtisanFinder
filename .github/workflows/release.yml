@@ -4,12 +4,6 @@ on:
   push:
     tags:
       - 'v*'
-  workflow_dispatch:
-    ref: main
-    repository: clery/ArtisanFinder
-    sender: clery
-    workflow: Package and release
-    inputs: null
 
 jobs:    
   release:
@@ -20,17 +14,10 @@ jobs:
                                                  # for your own token, the name cannot start with "GITHUB_"
     steps:
       - name: Checkout repository and submodules
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           submodules: recursive
           fetch-depth: 0  # gets entire git history, needed for automatic changelogs
 
-      # we first have to clone the AddOn project, this is a required step
-      #- name: Clone project
-       # uses: actions/checkout@v3
-       # with:
-         # fetch-depth: 0  # gets entire git history, needed for automatic changelogs
-
-      # once cloned, we just run the GitHub Action for the packager project
       - name: Package and release
         uses: BigWigsMods/packager@v2

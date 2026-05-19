@@ -194,6 +194,10 @@ local function ApplyDBDefaults(db)
 	db.professionLinks = db.professionLinks or {}
 	db.tradeLeads = db.tradeLeads or {}
 	db.tradeLeadCache = db.tradeLeadCache or {}
+	db.guildCache = db.guildCache or {}
+	db.guildCache.rosterByName = db.guildCache.rosterByName or {}
+	db.guildCache.recipeMembers = db.guildCache.recipeMembers or {}
+	db.guildCache.professionMembers = db.guildCache.professionMembers or {}
 	db.minimap = db.minimap or { angle = 225, hide = false }
 
 	if db.debugSelfResults == nil then
@@ -622,6 +626,50 @@ function AF:NormalizeName(name)
 		end
 	end
 	return name
+end
+
+local function GetRealmKey(realm)
+	return tostring(realm or ""):gsub("%s+", ""):lower()
+end
+
+function AF:GetNameRealm(name)
+	name = self:NormalizeName(name)
+	return name and name:match("^[^-]+%-(.+)$") or nil
+end
+
+function AF:IsNameOnConnectedRealm(name)
+	local targetRealm = GetRealmKey(self:GetNameRealm(name))
+	if targetRealm == "" then
+		return true
+	end
+
+	local currentRealm = GetRealmKey(GetRealmName())
+	if targetRealm == currentRealm then
+		return true
+	end
+	if GetNormalizedRealmName and targetRealm == GetRealmKey(GetNormalizedRealmName()) then
+		return true
+	end
+	if GetAutoCompleteRealms then
+		local realms = { GetAutoCompleteRealms() }
+		realms = type(realms[1]) == "table" and realms[1] or realms
+		for _, realm in ipairs(realms) do
+			if targetRealm == GetRealmKey(realm) then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+function AF:IsGuildOrderEntry(entry)
+	if not entry or not entry.guildMember then
+		return false
+	end
+	if entry.ownAlt and self:IsNameOnConnectedRealm(entry.orderTarget or entry.name or entry.target) then
+		return false
+	end
+	return Enum and Enum.CraftingOrderType and Enum.CraftingOrderType.Guild ~= nil
 end
 
 function AF:GetDisplayPlayerName(name)

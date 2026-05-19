@@ -410,7 +410,11 @@ local function CreateCustomerRow(parent)
 			if professionName then
 				GameTooltip:AddLine(professionName, 1, 1, 1)
 			end
-			GameTooltip:AddLine(buttonFrame.entry.tradeLead and AF:Text("MISSING_ADDON_DATA") or AF:Text("CERTIFIED_ADDON_DATA"), buttonFrame.entry.tradeLead and 0.75 or 0.35, buttonFrame.entry.tradeLead and 0.75 or 1, buttonFrame.entry.tradeLead and 0.75 or 0.35, true)
+			if buttonFrame.entry.guildMember then
+				GameTooltip:AddLine(AF:Text("GUILD_MEMBER_TOOLTIP"), 0.35, 1, 0.35, true)
+			else
+				GameTooltip:AddLine(buttonFrame.entry.tradeLead and AF:Text("MISSING_ADDON_DATA") or AF:Text("CERTIFIED_ADDON_DATA"), buttonFrame.entry.tradeLead and 0.75 or 0.35, buttonFrame.entry.tradeLead and 0.75 or 1, buttonFrame.entry.tradeLead and 0.75 or 0.35, true)
+			end
 			if not buttonFrame.entry.tradeLead then
 				AF:RequestReagentDetail(buttonFrame.entry)
 				AF:AddCapabilityTooltipLines(GameTooltip, buttonFrame.entry)
@@ -629,7 +633,7 @@ function AF:RefreshCustomerLocale()
 	frame.refresh:SetText(self:Text("REFRESH"))
 	frame.menu.favorite:SetText(self:Text(frame.menu.entry and self:IsFavoriteArtisan(frame.menu.entry) and "UNFAVORITE" or "FAVORITE"))
 	frame.menu.whisper:SetText(self:Text("WHISPER"))
-	frame.menu.personal:SetText(self:Text("PERSONAL_ORDER"))
+	frame.menu.personal:SetText(self:Text(self:IsGuildOrderEntry(frame.menu.entry) and "GUILD_ORDER" or "PERSONAL_ORDER"))
 	frame.menu.link:SetText(self:Text("PROFESSION"))
 end
 
@@ -998,6 +1002,7 @@ function AF:ShowCustomerMenu(entry, owner)
 	end
 	menu.entry = entry
 	menu.favorite:SetText(self:Text(self:IsFavoriteArtisan(entry) and "UNFAVORITE" or "FAVORITE"))
+	menu.personal:SetText(self:Text(self:IsGuildOrderEntry(entry) and "GUILD_ORDER" or "PERSONAL_ORDER"))
 	if entry.ownAlt then
 		menu.whisper:Disable()
 	else
@@ -1097,6 +1102,15 @@ function AF:RefreshCustomerQuery(force)
 		self.currentCustomerQueryProfessionID = nil
 		self:QueueBroadcastQuery(context.itemID, context.professionID)
 	end
+	if force or changed then
+		if self.QueueGuildRecipeMemberQuery then
+			self:QueueGuildRecipeMemberQuery(context.professionID, context.recipeID)
+		end
+		if self.RefreshGuildTradeSkills then
+			self.guildTradeSkillLastRefresh = 0
+			self:RefreshGuildTradeSkills()
+		end
+	end
 	if changed and self.StartCustomerWhoStatusChecks then
 		self:StartCustomerWhoStatusChecks()
 	end
@@ -1124,8 +1138,11 @@ function AF:CanReliablyOpenProfession(entry)
 	if not entry then
 		return false
 	end
-	if entry.ownAlt then
+	if entry.ownAlt and not self:IsGuildOrderEntry(entry) then
 		return false
+	end
+	if self:IsGuildOrderEntry(entry) then
+		return entry.guildMemberGUID ~= nil or self:GetGuildMemberGUID(entry.orderTarget or entry.name) ~= nil
 	end
 	if entry.offline then
 		return false
@@ -1228,6 +1245,22 @@ function AF:OpenCrafterProfession(entry)
 		return
 	end
 
+	if self:IsGuildOrderEntry(entry) then
+		local guid = entry.guildMemberGUID or self:GetGuildMemberGUID(entry.orderTarget or entry.name)
+		local professionID = tonumber(entry.professionID)
+		if not guid or not professionID or not C_GuildInfo or not C_GuildInfo.QueryGuildMemberRecipes then
+			self:SetProfessionButtonTooltip(self:Text("PROFESSION_LINK_UNAVAILABLE_TOOLTIP"), 6)
+			return
+		end
+		local ok = pcall(C_GuildInfo.QueryGuildMemberRecipes, guid, professionID)
+		if not ok then
+			self:SetProfessionButtonTooltip(self:Text("PROFESSION_LINK_UNAVAILABLE_TOOLTIP"), 6)
+			return
+		end
+		self:HideCustomerMenu()
+		return
+	end
+
 	local professionLink = entry.professionLink or self:GetRememberedProfessionLink(entry.orderTarget or entry.name, entry.professionID)
 	if not professionLink then
 		self:MarkProfessionOpenFailed(entry)
@@ -1324,16 +1357,30 @@ function AF:TrySelectPendingProfessionRecipe()
 end
 
 function AF:FillPersonalOrder(entry)
-	if not entry then
+	if not entry or not ProfessionsCustomerOrdersFrame or not ProfessionsCustomerOrdersFrame.Form then
 		self:Print(self:Text("PERSONAL_ORDER_NO_FORM"))
 		return
 	end
 
 	local form = ProfessionsCustomerOrdersFrame.Form
-	local recipient = self:NormalizeName(entry.orderTarget or entry.name or entry.target)
-	form:SetOrderRecipient(Enum.CraftingOrderType.Personal)
-	form.OrderRecipientDropdown:SetText(PROFESSIONS_CRAFTING_FORM_ORDER_RECIPIENT_PRIVATE)
-	form.OrderRecipientTarget:SetText(recipient)
+	local isGuildOrder = self:IsGuildOrderEntry(entry)
+	local orderType = isGuildOrder and Enum.CraftingOrderType.Guild or Enum.CraftingOrderType.Personal
+	local orderLabel = isGuildOrder
+		and (_G.PROFESSIONS_CRAFTING_FORM_ORDER_RECIPIENT_GUILD or _G.PROFESSIONS_CRAFTING_FORM_ORDER_RECIPIENT_GUILD_ORDER or self:Text("GUILD_ORDER"))
+		or (_G.PROFESSIONS_CRAFTING_FORM_ORDER_RECIPIENT_PRIVATE or self:Text("PERSONAL_ORDER"))
+
+	form:SetOrderRecipient(orderType)
+	if form.OrderRecipientDropdown then
+		form.OrderRecipientDropdown:SetText(orderLabel)
+	end
+	if form.OrderRecipientTarget then
+		if isGuildOrder then
+			form.OrderRecipientTarget:SetText("")
+		else
+			local recipient = self:NormalizeName(entry.orderTarget or entry.name or entry.target)
+			form.OrderRecipientTarget:SetText(recipient)
+		end
+	end
 
 	local commissionCopper = 0
 	if not entry.freeCommission and tonumber(entry.priceCopper) and tonumber(entry.priceCopper) > 0 then
@@ -1345,5 +1392,5 @@ function AF:FillPersonalOrder(entry)
 	end
 
 	form:UpdateListOrderButton()
-	self:Print(self:Text("PERSONAL_ORDER_FILLED"))
+	self:Print(self:Text(isGuildOrder and "GUILD_ORDER_FILLED" or "PERSONAL_ORDER_FILLED"))
 end

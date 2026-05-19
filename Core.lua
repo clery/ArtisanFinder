@@ -21,6 +21,9 @@ RegisterEvent(AF.frame, "CHANNEL_UI_UPDATE")
 RegisterEvent(AF.frame, "CHAT_MSG_CHANNEL_NOTICE")
 RegisterEvent(AF.frame, "CHAT_MSG_ADDON")
 RegisterEvent(AF.frame, "CHAT_MSG_CHANNEL")
+RegisterEvent(AF.frame, "GUILD_ROSTER_UPDATE")
+RegisterEvent(AF.frame, "GUILD_TRADESKILL_UPDATE")
+RegisterEvent(AF.frame, "GUILD_RECIPE_KNOWN_BY_MEMBERS")
 RegisterEvent(AF.frame, "CRAFTINGORDERS_SHOW_CUSTOMER")
 RegisterEvent(AF.frame, "TRADE_SKILL_SHOW")
 RegisterEvent(AF.frame, "TRADE_SKILL_CLOSE")
@@ -48,6 +51,7 @@ function AF:OnPlayerLogin()
 
 	self:InitializeComms()
 	self:InitializeWhoStatus()
+	self:InitializeGuild()
 	self:InitializeMinimap()
 	self:InitializeCustomerUI()
 	self:InitializeCrafterUI()
@@ -238,6 +242,21 @@ AF.frame:SetScript("OnEvent", function(_, event, ...)
 		end
 		if AF.OnTradeChatMessage then
 			AF:OnTradeChatMessage(...)
+		end
+	elseif event == "GUILD_ROSTER_UPDATE" then
+		if AF.RefreshGuildRosterCache then
+			AF:RefreshGuildRosterCache(false)
+		end
+		if AF.RefreshCustomerResults then
+			AF:RefreshCustomerResults()
+		end
+	elseif event == "GUILD_TRADESKILL_UPDATE" then
+		if AF.RefreshCustomerResults then
+			AF:RefreshCustomerResults()
+		end
+	elseif event == "GUILD_RECIPE_KNOWN_BY_MEMBERS" then
+		if AF.HandleGuildRecipeKnownByMembers then
+			AF:HandleGuildRecipeKnownByMembers(...)
 		end
 	elseif event == "CRAFTINGORDERS_SHOW_CUSTOMER" then
 		if AF:IsInCombatLocked() then

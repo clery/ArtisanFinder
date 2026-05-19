@@ -105,12 +105,18 @@ function AF:BuildCustomerRowViewModel(entry)
 	if entry.tradeLead then
 		detail = entry.note or self:Text("MISSING_ADDON_DATA")
 		capability = (entry.professionID and self:GetProfessionName(entry.professionID)) or entry.professionName or ""
+		if entry.guildMember then
+			capability = "|cff33ff99" .. self:Text("GUILD_MEMBER") .. "|r" .. (capability ~= "" and ("\n" .. capability) or "")
+		end
 	else
 		detailNote = entry.note and entry.note ~= "" and entry.note or ""
 		detail = self:FormatMoney(entry.priceCopper, entry.freeCommission)
 		capability = self:FormatCapability(entry)
 		if entry.ownAlt then
 			capability = "|cff33ff99" .. self:Text("YOUR_ALT") .. "|r" .. (capability ~= "" and ("\n" .. capability) or "")
+		end
+		if entry.guildMember then
+			capability = "|cff33ff99" .. self:Text("GUILD_MEMBER") .. "|r" .. (capability ~= "" and ("\n" .. capability) or "")
 		end
 		if onlineAs then
 			capability = "|cff33ff99" .. onlineAs .. "|r" .. (capability ~= "" and ("\n" .. capability) or "")

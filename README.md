@@ -10,6 +10,7 @@ The addon is built around a simple idea: customers should be able to find the ri
 *   Crafter availability toggles from the minimap button.
 *   Optional automatic availability in trade-chat areas, with automatic disable when entering instances.
 *   Multi-character crafter profiles for advertising scanned professions from your alts while you are online.
+*   Guild crafter discovery for matching recipes, with guild order helpers when available.
 *   Per-character profession advertising options.
 *   Item-specific and profession-default commissions and notes.
 *   Favorite artisans that stay visible at the top of customer results.
@@ -40,6 +41,8 @@ The results help answer the questions that usually slow down personal orders:
 Each certified result can include the crafter's profession, commission, note, base craft quality, and recommended reagents when that information is available. You can search and sort the list when many artisans are available, mark favorite artisans, and use the row action button to whisper the crafter, open their profession link, or fill personal order fields for review.
 
 If a crafter is online on an alt, ArtisanFinder can still show the character who actually owns the matching profession. The row makes it clear which character is online for whispers, while personal order fields are filled for the character who can craft the item.
+
+If you are in a guild, ArtisanFinder can also use guild recipe information to show guild members who know the selected craft. Guild rows can fill a Guild Order instead of a Personal Order, and own alts remain Personal Orders unless that alt is on a different connected-realm set where a guild order is required.
 
 ArtisanFinder can also notice profession links posted in trade chat. These crafters are shown as potential leads for matching professions. They are useful when you want more crafters to contact, even if they don't have the addon installed, but they won't be able to show exact prices, qualities, and reagent recommendations.
 
@@ -116,6 +119,7 @@ ArtisanFinder includes localization support for English, French, German, Spanish
 *   `/af clear scans`: clear this character's scanned craft data.
 *   `/af clear artisans`: clear cached external artisan data.
 *   `/af clear artisans favorite`: clear favorite artisan marks.
+*   `/af clear guild`: clear cached guild member data.
 
 ## Inspiration
 

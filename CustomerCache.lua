@@ -6,15 +6,54 @@ local function GetSortQuality(entry)
 		or 0
 end
 
-local function GetCertificationSort(entry)
-	return entry and entry.tradeLead and 1 or 0
-end
-
 local function GetTradeLeadMatchSort(entry)
 	if not entry or not entry.tradeLead then
 		return 0
 	end
 	return entry.tradeProfessionMatch and 0 or 1
+end
+
+local function IsAddonEnabledEntry(entry)
+	return entry and not entry.tradeLead
+end
+
+local function GetPinnedCategorySort(AF, entry)
+	if AF:IsFavoriteArtisan(entry) then
+		return 0
+	end
+	if entry and entry.ownAlt then
+		return 1
+	end
+	return 2
+end
+
+local function GetSourceCategorySort(_, entry)
+	if IsAddonEnabledEntry(entry) then
+		return entry.guildMember and 0 or 1
+	end
+	if entry and entry.guildMember then
+		return 2
+	end
+	return 3
+end
+
+local function GetAvailabilitySort(AF, entry)
+	if not entry then
+		return 3
+	end
+	if entry.ownAlt then
+		return 0
+	end
+	if entry.unavailableFavorite then
+		return 2
+	end
+	if AF:IsCustomerEntryOnline(entry) then
+		return 0
+	end
+	if AF:IsCustomerEntryOffline(entry) or entry.offlineCached then
+		return 2
+	end
+	return 1
 end
 
 local function GetCommissionSort(entry)
@@ -71,12 +110,46 @@ local function EntryMatchesCustomerFilter(AF, entry, filterText)
 	return filterText == "" or haystack:find(filterText, 1, true)
 end
 
+function AF:CustomerEntryMatchesFilter(entry, filterText)
+	return EntryMatchesCustomerFilter(self, entry, filterText)
+end
+
 local function CopyCustomerEntry(entry)
 	local copy = {}
 	for key, value in pairs(entry or {}) do
 		copy[key] = value
 	end
 	return copy
+end
+
+local function MarkGuildAffiliation(AF, entry)
+	if not entry or not AF.GetGuildRosterEntry then
+		if entry then
+			entry.guildMember = nil
+			entry.guildOnline = nil
+			entry.guildMemberGUID = nil
+		end
+		return entry
+	end
+	if entry.ownAlt and AF:IsNameOnConnectedRealm(entry.orderTarget or entry.name or entry.target) then
+		entry.guildMember = nil
+		entry.guildOnline = nil
+		entry.guildMemberGUID = nil
+		return entry
+	end
+
+	local rosterEntry = AF:GetGuildRosterEntry(entry.orderTarget or entry.name or entry.target)
+	if rosterEntry then
+		entry.guildMember = true
+		entry.guildOnline = rosterEntry.online
+		entry.guildMemberGUID = rosterEntry.guid
+		return entry
+	end
+
+	entry.guildMember = nil
+	entry.guildOnline = nil
+	entry.guildMemberGUID = nil
+	return entry
 end
 
 function AF:GetOwnAltRows(itemID, professionID, filterText, seenNames, recipeID)
@@ -151,6 +224,7 @@ function AF:GetOwnAltRows(itemID, professionID, filterText, seenNames, recipeID)
 		if EntryMatchesCustomerFilter(self, entry, filterText) then
 			local seenKey = GetSeenKey(self, entry)
 			if seenKey and not seenNames[seenKey] then
+				MarkGuildAffiliation(self, entry)
 				table.insert(rows, entry)
 				MarkSeen(self, seenNames, entry)
 			end
@@ -179,6 +253,7 @@ function AF:GetCachedArtisans(itemID, filterText, sortMode, queryToken)
 				rowEntry.tradeLead = false
 				rowEntry.unavailableFavorite = nil
 				rowEntry.professionLink = rowEntry.professionLink or self:GetRememberedProfessionLink(rowEntry.orderTarget or rowEntry.name, rowEntry.professionID)
+				MarkGuildAffiliation(self, rowEntry)
 				table.insert(rows, rowEntry)
 				MarkSeen(self, seenNames, rowEntry)
 			end
@@ -194,8 +269,15 @@ function AF:GetCachedArtisans(itemID, filterText, sortMode, queryToken)
 			favoriteEntry.unavailableFavorite = true
 			favoriteEntry.target = favoriteEntry.orderTarget or favoriteEntry.name
 			favoriteEntry.professionLink = favoriteEntry.professionLink or self:GetRememberedProfessionLink(favoriteEntry.orderTarget or favoriteEntry.name, favoriteEntry.professionID)
+			MarkGuildAffiliation(self, favoriteEntry)
 			table.insert(rows, favoriteEntry)
 			MarkSeen(self, seenNames, favoriteEntry)
+		end
+	end
+	if self.GetGuildProfessionRows then
+		for _, entry in ipairs(self:GetGuildProfessionRows(itemID, self.currentCustomerProfessionID, filterText, seenNames, self.currentCustomerRecipeID)) do
+			table.insert(rows, entry)
+			MarkSeen(self, seenNames, entry)
 		end
 	end
 	if self.GetTradeLeadRows then
@@ -228,6 +310,7 @@ function AF:GetCachedArtisans(itemID, filterText, sortMode, queryToken)
 				offlineEntry.offlineCached = true
 				offlineEntry.target = offlineEntry.orderTarget or offlineEntry.name
 				offlineEntry.professionLink = offlineEntry.professionLink or self:GetRememberedProfessionLink(offlineEntry.orderTarget or offlineEntry.name, offlineEntry.professionID)
+				MarkGuildAffiliation(self, offlineEntry)
 				table.insert(candidates, offlineEntry)
 			end
 		end
@@ -260,44 +343,23 @@ function AF:GetCachedArtisans(itemID, filterText, sortMode, queryToken)
 
 	sortMode = sortMode or "best"
 	table.sort(rows, function(a, b)
-		local aOwnAlt = a.ownAlt and 0 or 1
-		local bOwnAlt = b.ownAlt and 0 or 1
-		if aOwnAlt ~= bOwnAlt then
-			return aOwnAlt < bOwnAlt
-		end
-		local aFavorite = self:IsFavoriteArtisan(a) and 0 or 1
-		local bFavorite = self:IsFavoriteArtisan(b) and 0 or 1
-		if aFavorite ~= bFavorite then
-			return aFavorite < bFavorite
-		end
-		if aFavorite == 0 then
-			local aUnavailable = a.unavailableFavorite and 1 or 0
-			local bUnavailable = b.unavailableFavorite and 1 or 0
-			if aUnavailable ~= bUnavailable then
-				return aUnavailable < bUnavailable
-			end
+		local aPinned = GetPinnedCategorySort(self, a)
+		local bPinned = GetPinnedCategorySort(self, b)
+		if aPinned ~= bPinned then
+			return aPinned < bPinned
 		end
 
-		local aCertified = GetCertificationSort(a)
-		local bCertified = GetCertificationSort(b)
-		if aCertified ~= bCertified then
-			return aCertified < bCertified
+		local aAvailability = GetAvailabilitySort(self, a)
+		local bAvailability = GetAvailabilitySort(self, b)
+		if aAvailability ~= bAvailability then
+			return aAvailability < bAvailability
 		end
-		local aTradeMatch = GetTradeLeadMatchSort(a)
-		local bTradeMatch = GetTradeLeadMatchSort(b)
-		if aTradeMatch ~= bTradeMatch then
-			return aTradeMatch < bTradeMatch
-		end
-		local aOffline = a.offlineCached and 1 or 0
-		local bOffline = b.offlineCached and 1 or 0
-		if aOffline ~= bOffline then
-			return aOffline < bOffline
-		end
-		if aOffline == 1 then
-			local aUpdated = tonumber(a.updatedAt) or 0
-			local bUpdated = tonumber(b.updatedAt) or 0
-			if aUpdated ~= bUpdated then
-				return aUpdated > bUpdated
+
+		if aPinned == 2 then
+			local aCategory = GetSourceCategorySort(self, a)
+			local bCategory = GetSourceCategorySort(self, b)
+			if aCategory ~= bCategory then
+				return aCategory < bCategory
 			end
 		end
 
@@ -341,6 +403,16 @@ function AF:GetCachedArtisans(itemID, filterText, sortMode, queryToken)
 			if aPrice ~= bPrice then
 				return aPrice < bPrice
 			end
+		end
+		local aTradeMatch = GetTradeLeadMatchSort(a)
+		local bTradeMatch = GetTradeLeadMatchSort(b)
+		if aTradeMatch ~= bTradeMatch then
+			return aTradeMatch < bTradeMatch
+		end
+		local aUpdated = tonumber(a.updatedAt) or 0
+		local bUpdated = tonumber(b.updatedAt) or 0
+		if aUpdated ~= bUpdated then
+			return aUpdated > bUpdated
 		end
 		return GetSortName(a) < GetSortName(b)
 	end)

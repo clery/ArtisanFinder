@@ -227,6 +227,8 @@ end
 
 function AF:IsLinkedProfessionOpen()
 	return C_TradeSkillUI.IsTradeSkillLinked() == true
+		or (C_TradeSkillUI.IsTradeSkillGuildMember and C_TradeSkillUI.IsTradeSkillGuildMember() == true)
+		or (C_TradeSkillUI.IsTradeSkillGuild and C_TradeSkillUI.IsTradeSkillGuild() == true)
 end
 
 function AF:IsOwnProfessionWindowOpen()

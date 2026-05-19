@@ -44,6 +44,7 @@ Util.lua
 Formatting.lua
 Data.lua
 CustomerCache.lua
+Guild.lua
 WhoStatus.lua
 Options.lua
 Core.lua
