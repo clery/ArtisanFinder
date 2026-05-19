@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.1.4 - 2026-05-19
+
+### Changed
+
+- Manual Refresh can now check one-by-one, every five seconds, whether non-addon users are offline or not.
+
+### Fixed
+
+- Fixed the hidden discovery channel changing the player's chat channel ordering.
+
 ## 1.1.3 - 2026-05-19
 
 ### Added

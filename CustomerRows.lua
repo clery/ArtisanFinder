@@ -84,11 +84,12 @@ end
 
 function AF:BuildCustomerRowViewModel(entry)
 	local displayName = self:GetDisplayPlayerName(entry.name or "?")
+	local isOnline = self:IsCustomerEntryOnline(entry)
 	if self:IsCustomerEntryOffline(entry) then
 		displayName = displayName .. " |cff888888(" .. self:Text("OFFLINE") .. ")|r"
-	elseif entry.unavailableFavorite then
+	elseif entry.unavailableFavorite and not isOnline then
 		displayName = displayName .. " |cff888888(" .. self:Text("UNAVAILABLE") .. ")|r"
-	elseif entry.offlineCached then
+	elseif entry.offlineCached and not isOnline then
 		displayName = displayName .. " |cff888888(" .. self:Text("UNAVAILABLE") .. ")|r"
 	end
 

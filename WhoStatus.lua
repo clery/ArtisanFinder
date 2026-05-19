@@ -2,6 +2,8 @@ local _, AF = ...
 
 local WHO_STATUS_TTL = 300
 local WHO_STATUS_LIMIT = 5
+local WHO_SYSTEM_SUPPRESS_AFTER_QUERY = 30
+local WHO_SYSTEM_SUPPRESS_AFTER_RESULT = 0.5
 
 local function GetLibWho()
 	return LibStub and LibStub:GetLibrary("LibWho-2.0", true)
@@ -108,17 +110,8 @@ local function KickWhoQueue(label)
 		return
 	end
 	DebugPrint("who start", label or "")
+	AF.suppressWhoSystemUntil = AF:Now() + WHO_SYSTEM_SUPPRESS_AFTER_QUERY
 	pcall(lib.AskWhoNext, lib)
-	C_Timer.After(0.1, function()
-		local currentLib = GetLibWho()
-		if currentLib and currentLib.AskWhoNext then
-			if currentLib.WhoInProgress or not currentLib.readyForNext or (currentLib.frame and currentLib.frame:IsShown()) then
-				return
-			end
-			DebugPrint("who start delayed", label or "")
-			pcall(currentLib.AskWhoNext, currentLib)
-		end
-	end)
 end
 
 function AF:InitializeWhoStatus()
@@ -156,6 +149,19 @@ function AF:GetWhoStatus(name, includeExpired)
 	return status.online
 end
 
+function AF:IsWhoStatusPending(name)
+	name = self:NormalizeName(name)
+	local status = name and self.whoStatus and self.whoStatus[name]
+	return status and status.pending == true
+end
+
+function AF:IsCustomerEntryOnline(entry)
+	if not entry or entry.ownAlt then
+		return false
+	end
+	return self:GetWhoStatus(GetEntryWhoName(entry), true) == true
+end
+
 function AF:IsCustomerEntryOffline(entry)
 	if not entry or entry.ownAlt then
 		return false
@@ -178,10 +184,8 @@ function AF:QueueWhoStatusCheck(name, preserveRealmless)
 	local now = self:Now()
 	local status = self.whoStatus[name]
 	if status and status.pending then
-		if now - (status.queuedAt or now) <= 15 then
-			return false
-		end
-		status.pending = nil
+		DebugPrint("who already queued", name)
+		return false
 	end
 	if status and status.checkedAt and now - status.checkedAt <= WHO_STATUS_TTL then
 		DebugPrint("who cached", name, FormatWhoStatus(status.online))
@@ -205,15 +209,18 @@ function AF:QueueWhoStatusCheck(name, preserveRealmless)
 		local hasResults = results and #results > 0
 		if not complete and not hasResults then
 			DebugPrint("who result", name, FormatWhoStatus(resultStatus.online), "incomplete")
-			AF.suppressWhoSystemUntil = AF:Now() + 0.5
+			AF.suppressWhoSystemUntil = AF:Now() + WHO_SYSTEM_SUPPRESS_AFTER_RESULT
 			if AF.RefreshCustomerResults then
 				AF:RefreshCustomerResults()
 			end
 			return
 		end
+		local previousCheckedAt = resultStatus.checkedAt
 		resultStatus.checkedAt = AF:Now()
-		AF.suppressWhoSystemUntil = resultStatus.checkedAt + 0.5
-		if complete and not hasResults then
+		AF.suppressWhoSystemUntil = resultStatus.checkedAt + WHO_SYSTEM_SUPPRESS_AFTER_RESULT
+		local wasOnline = resultStatus.online == true
+		local matched = false
+		if complete and not hasResults and not wasOnline then
 			resultStatus.online = false
 		else
 			resultStatus.online = nil
@@ -221,8 +228,13 @@ function AF:QueueWhoStatusCheck(name, preserveRealmless)
 		for _, result in ipairs(results or {}) do
 			if IsWhoResultMatch(name, result) then
 				resultStatus.online = true
+				matched = true
 				break
 			end
+		end
+		if wasOnline and not matched then
+			resultStatus.online = true
+			resultStatus.checkedAt = previousCheckedAt or resultStatus.checkedAt
 		end
 		DebugPrint("who result", name, FormatWhoStatus(resultStatus.online), "complete", tostring(complete))
 		if AF.RefreshCustomerResults then
@@ -242,7 +254,7 @@ function AF:QueueWhoStatusCheck(name, preserveRealmless)
 		status.online = nil
 		return false
 	end
-	self.suppressWhoSystemUntil = now + 15
+	self.suppressWhoSystemUntil = now + WHO_SYSTEM_SUPPRESS_AFTER_QUERY
 	self.suppressWhoSystemNames = {
 		[name] = true,
 		[baseName] = true,
@@ -250,7 +262,7 @@ function AF:QueueWhoStatusCheck(name, preserveRealmless)
 	return true
 end
 
-function AF:QueueCustomerWhoStatusChecks(rows, startQueue, batchSeen)
+function AF:QueueCustomerWhoStatusChecks(rows, startQueue, batchSeen, kickPending)
 	local lib = GetLibWho()
 	if not lib then
 		DebugPrint("LibWho not loaded")
@@ -261,23 +273,31 @@ function AF:QueueCustomerWhoStatusChecks(rows, startQueue, batchSeen)
 	end
 
 	local queued = 0
+	local skippedPending = 0
 	local seen = {}
 	batchSeen = batchSeen or {}
 	for _, entry in ipairs(rows or {}) do
 		local name = GetEntryWhoName(entry)
 		if name and not seen[name] and not batchSeen[name] and ShouldWhoCheckEntry(entry) then
 			seen[name] = true
-			batchSeen[name] = true
-			if self:QueueWhoStatusCheck(name) then
+			if self:IsWhoStatusPending(name) then
+				if kickPending then
+					DebugPrint("who skip queued", name)
+				end
+				skippedPending = skippedPending + 1
+			elseif self:QueueWhoStatusCheck(name) then
+				batchSeen[name] = true
 				queued = queued + 1
 				if queued >= WHO_STATUS_LIMIT then
 					break
 				end
+			else
+				batchSeen[name] = true
 			end
 		end
 	end
 
-	if queued > 0 then
+	if queued > 0 or (kickPending and skippedPending > 0) then
 		KickWhoQueue(tostring(queued))
 	end
 	return queued

@@ -1100,6 +1100,7 @@ function AF:RefreshCustomerQuery(force)
 	if changed and self.StartCustomerWhoStatusChecks then
 		self:StartCustomerWhoStatusChecks()
 	end
+	self.customerWhoStatusKickPending = force == true
 	self:InjectDebugSelfResult(context.itemID, context.professionID)
 	if self.InjectDebugTradeLeads then
 		self:InjectDebugTradeLeads()
@@ -1191,8 +1192,9 @@ function AF:RefreshCustomerResults(statusOverride)
 	UpdateCustomerScrollBar(frame.modernScrollBar)
 	if itemID and self.QueueCustomerWhoStatusChecks then
 		if startWhoChecks then
-			self:QueueCustomerWhoStatusChecks(rows, true, self.customerWhoStatusBatchSeen)
+			self:QueueCustomerWhoStatusChecks(rows, true, self.customerWhoStatusBatchSeen, self.customerWhoStatusKickPending)
 		end
+		self.customerWhoStatusKickPending = nil
 		if #rows > 0 then
 			self.customerWhoStatusStartUntil = nil
 			self.customerWhoStatusBatchSeen = nil
