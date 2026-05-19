@@ -199,6 +199,7 @@ local function ApplyDBDefaults(db)
 	db.guildCache.recipeMembers = db.guildCache.recipeMembers or {}
 	db.guildCache.professionMembers = db.guildCache.professionMembers or {}
 	db.minimap = db.minimap or { angle = 225, hide = false }
+	db.tutorial = db.tutorial or {}
 
 	if db.debugSelfResults == nil then
 		db.debugSelfResults = false
@@ -223,6 +224,9 @@ local function ApplyDBDefaults(db)
 	end
 	if db.offlineFallbackMax == nil then
 		db.offlineFallbackMax = 20
+	end
+	if db.showUncertifiedPeople == nil then
+		db.showUncertifiedPeople = true
 	end
 	if db.minimap.angle == nil then
 		db.minimap.angle = 225
@@ -281,6 +285,10 @@ MIGRATIONS[9] = function(db)
 	PreserveEffectiveAdvertising(db)
 	NormalizeProfessionKeyedSettings(db)
 	InvalidateScannedData(db)
+end
+
+MIGRATIONS[10] = function(db)
+	db.tutorial = db.tutorial or {}
 end
 
 function AF:MigrateDB(db)

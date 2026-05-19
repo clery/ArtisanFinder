@@ -83,6 +83,18 @@ local function SetFittedDetailText(row, commissionText, note)
 end
 
 function AF:BuildCustomerRowViewModel(entry)
+	if entry and entry.tutorialFake then
+		return {
+			displayName = entry.name or self:Text("TUTORIAL_FAKE_ARTISAN_NAME"),
+			detail = entry.note or self:Text("TUTORIAL_FAKE_ARTISAN_NOTE"),
+			detailNote = "",
+			capability = entry.capabilityText or self:Text("TUTORIAL_FAKE_ARTISAN_CAPABILITY"),
+			updatedAt = "",
+			certified = true,
+			favorite = self.customerTutorialFavorite == true,
+		}
+	end
+
 	local displayName = self:GetDisplayPlayerName(entry.name or "?")
 	local isOnline = self:IsCustomerEntryOnline(entry)
 	if self:IsCustomerEntryOffline(entry) then

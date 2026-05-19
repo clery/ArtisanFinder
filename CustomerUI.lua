@@ -405,6 +405,13 @@ local function CreateCustomerRow(parent)
 	row:SetScript("OnEnter", function(buttonFrame)
 		if buttonFrame.entry then
 			GameTooltip:SetOwner(buttonFrame, "ANCHOR_RIGHT")
+			if buttonFrame.entry.tutorialFake then
+				GameTooltip:SetText(buttonFrame.entry.name or AF:Text("TUTORIAL_FAKE_ARTISAN_NAME"), 1, 0.82, 0)
+				GameTooltip:AddLine(AF:Text("TUTORIAL_FAKE_ARTISAN_TOOLTIP"), 1, 1, 1, true)
+				AF:StyleCustomerTooltip(GameTooltip)
+				GameTooltip:Show()
+				return
+			end
 			GameTooltip:SetText(AF:GetDisplayPlayerName(buttonFrame.entry.name or "?"), 1, 0.82, 0)
 			local professionName = buttonFrame.entry.professionID and AF:GetProfessionName(buttonFrame.entry.professionID) or buttonFrame.entry.professionName
 			if professionName then
@@ -658,6 +665,9 @@ function AF:AttachCustomerUI()
 
 	frame.title = frame.TitleContainer.TitleText
 	frame.title:SetText("ArtisanFinder")
+	if self.SetupCustomerTutorialButton then
+		self:SetupCustomerTutorialButton(frame)
+	end
 
 	frame.collapseButton:Hide()
 	local collapseButton = CreateFrame("Frame", "ArtisanFinderCustomerCollapseButton", ordersFrame, "MaximizeMinimizeButtonFrameTemplate")
@@ -789,7 +799,14 @@ function AF:AttachCustomerUI()
 	frame.menu.favorite:SetText(self:Text("FAVORITE"))
 	frame.menu.favorite:SetScript("OnClick", function()
 		if frame.menu.entry then
-			AF:ToggleFavoriteArtisan(frame.menu.entry)
+			if frame.menu.entry.tutorialFake then
+				AF.customerTutorialFavorite = not AF.customerTutorialFavorite
+				frame.menu.favorite:SetText(AF:Text(AF.customerTutorialFavorite and "UNFAVORITE" or "FAVORITE"))
+				AF:RefreshCustomerResults()
+				return
+			else
+				AF:ToggleFavoriteArtisan(frame.menu.entry)
+			end
 			AF:RefreshCustomerResults()
 		end
 		AF:HideCustomerMenu()
@@ -797,7 +814,7 @@ function AF:AttachCustomerUI()
 
 	frame.menu.whisper:SetText(self:Text("WHISPER"))
 	frame.menu.whisper:SetScript("OnClick", function()
-		if frame.menu.entry and not frame.menu.entry.ownAlt then
+		if frame.menu.entry and not frame.menu.entry.tutorialFake and not frame.menu.entry.ownAlt then
 			AF:OpenWhisper(frame.menu.entry.target or frame.menu.entry.name)
 		end
 		AF:HideCustomerMenu()
@@ -805,7 +822,7 @@ function AF:AttachCustomerUI()
 
 	frame.menu.personal:SetText(self:Text("PERSONAL_ORDER"))
 	frame.menu.personal:SetScript("OnClick", function()
-		if frame.menu.entry then
+		if frame.menu.entry and not frame.menu.entry.tutorialFake then
 			AF:FillPersonalOrder(frame.menu.entry)
 		end
 		AF:HideCustomerMenu()
@@ -829,6 +846,7 @@ function AF:AttachCustomerUI()
 	end)
 
 	frame.collapsibleRegions = {
+		frame.tutorialButton,
 		frame.status,
 		frame.divider,
 		frame.search,
@@ -849,6 +867,9 @@ function AF:AttachCustomerUI()
 				AF:StartCustomerWhoStatusChecks()
 			end
 			AF:RefreshCustomerQuery()
+			if AF.MaybeShowCustomerTutorial then
+				AF:MaybeShowCustomerTutorial()
+			end
 		end
 	end)
 	frame:SetScript("OnUpdate", function(_, elapsed)
@@ -874,6 +895,9 @@ function AF:AttachCustomerUI()
 				AF:StartCustomerWhoStatusChecks()
 			end
 			AF:RefreshCustomerQuery()
+			if AF.MaybeShowCustomerTutorial then
+				AF:MaybeShowCustomerTutorial()
+			end
 		end
 	end)
 	parent:HookScript("OnHide", function()
@@ -891,6 +915,9 @@ function AF:AttachCustomerUI()
 		self:QueueCustomerSidePanelLayout()
 		if not frame.collapsed then
 			self:RefreshCustomerQuery()
+			if self.MaybeShowCustomerTutorial then
+				self:MaybeShowCustomerTutorial()
+			end
 		end
 	end
 end
@@ -1003,17 +1030,28 @@ function AF:ShowCustomerMenu(entry, owner)
 	menu.entry = entry
 	menu.favorite:SetText(self:Text(self:IsFavoriteArtisan(entry) and "UNFAVORITE" or "FAVORITE"))
 	menu.personal:SetText(self:Text(self:IsGuildOrderEntry(entry) and "GUILD_ORDER" or "PERSONAL_ORDER"))
-	if entry.ownAlt then
+	if entry.tutorialFake then
+		menu.favorite:SetText(self:Text(self.customerTutorialFavorite and "UNFAVORITE" or "FAVORITE"))
+		menu.whisper:Disable()
+		menu.personal:Disable()
+		menu.link:Disable()
+		self:SetProfessionButtonTooltip(self:Text("TUTORIAL_FAKE_ACTION_TOOLTIP"))
+	elseif entry.ownAlt then
 		menu.whisper:Disable()
 	else
 		menu.whisper:Enable()
 	end
-	if self:CanReliablyOpenProfession(entry) then
+	if entry.tutorialFake then
+		-- Keep Favorite interactive for the tutorial row; all real side effects stay disabled.
+	elseif self:CanReliablyOpenProfession(entry) then
 		menu.link:Enable()
 		self:ClearProfessionButtonTooltip()
 	else
 		menu.link:Disable()
 		self:SetProfessionButtonTooltip(self:Text("PROFESSION_LINK_UNAVAILABLE_TOOLTIP"))
+	end
+	if not entry.tutorialFake then
+		menu.personal:Enable()
 	end
 	menu:ClearAllPoints()
 	menu:SetPoint("TOPLEFT", owner, "TOPRIGHT", 2, 0)
@@ -1072,6 +1110,10 @@ function AF:RefreshCustomerQuery(force)
 	self:QueueCustomerSidePanelLayout()
 	local frame = self.customerFrame
 	if not frame or not frame:IsShown() then
+		return
+	end
+	if self.customerTutorialActive then
+		self:RefreshCustomerResults()
 		return
 	end
 
@@ -1138,6 +1180,9 @@ function AF:CanReliablyOpenProfession(entry)
 	if not entry then
 		return false
 	end
+	if entry.tutorialFake then
+		return false
+	end
 	if entry.ownAlt and not self:IsGuildOrderEntry(entry) then
 		return false
 	end
@@ -1167,13 +1212,16 @@ function AF:RefreshCustomerResults(statusOverride)
 	local sortMode = GetSortMode(self.customerSortIndex).key
 	local filterText = frame.search:GetText() or ""
 	local queryToken = self.currentCustomerQueryToken
-	local rows = itemID and self:GetCachedArtisans(itemID, filterText, sortMode, queryToken) or {}
+	local tutorialActive = self.customerTutorialActive == true
+	local rows = tutorialActive and { self:GetCustomerTutorialRow() } or (itemID and self:GetCachedArtisans(itemID, filterText, sortMode, queryToken) or {})
 	local startWhoChecks = self.customerWhoStatusStartUntil and self:Now() <= self.customerWhoStatusStartUntil
 	if self.customerWhoStatusStartUntil and not startWhoChecks then
 		self.customerWhoStatusStartUntil = nil
 		self.customerWhoStatusBatchSeen = nil
 	end
-	if statusOverride then
+	if tutorialActive then
+		self:SetCustomerStatusText(self:Text("TUTORIAL_CUSTOMER_STATUS"))
+	elseif statusOverride then
 		self:SetCustomerStatusText(statusOverride)
 	elseif itemID then
 		self:SetCustomerStatusItem(itemID, itemName)
@@ -1207,7 +1255,7 @@ function AF:RefreshCustomerResults(statusOverride)
 	end
 	frame.content:SetHeight(math.max(1, contentHeight))
 	UpdateCustomerScrollBar(frame.modernScrollBar)
-	if itemID and self.QueueCustomerWhoStatusChecks then
+	if itemID and not tutorialActive and self.QueueCustomerWhoStatusChecks then
 		if startWhoChecks then
 			self:QueueCustomerWhoStatusChecks(rows, true, self.customerWhoStatusBatchSeen, self.customerWhoStatusKickPending)
 		end
@@ -1237,6 +1285,10 @@ end
 
 function AF:OpenCrafterProfession(entry)
 	if not entry then
+		return
+	end
+	if entry.tutorialFake then
+		self:SetProfessionButtonTooltip(self:Text("TUTORIAL_FAKE_ACTION_TOOLTIP"), 4)
 		return
 	end
 
@@ -1357,6 +1409,9 @@ function AF:TrySelectPendingProfessionRecipe()
 end
 
 function AF:FillPersonalOrder(entry)
+	if entry and entry.tutorialFake then
+		return
+	end
 	if not entry or not ProfessionsCustomerOrdersFrame or not ProfessionsCustomerOrdersFrame.Form then
 		self:Print(self:Text("PERSONAL_ORDER_NO_FORM"))
 		return

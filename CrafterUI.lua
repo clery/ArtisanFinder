@@ -389,6 +389,9 @@ function AF:AttachCrafterUI()
 	defaults.title = defaults.TitleContainer.TitleText
 	defaults.title:SetText("ArtisanFinder")
 	defaults.collapseButton:Hide()
+	if self.SetupCrafterTutorialButton then
+		self:SetupCrafterTutorialButton(defaults)
+	end
 
 	local collapseButton = CreateFrame("Frame", "ArtisanFinderCrafterDefaultsCollapseButton", ProfessionsFrame, "MaximizeMinimizeButtonFrameTemplate")
 	collapseButton:SetSize(24, 24)
@@ -503,6 +506,7 @@ function AF:AttachCrafterUI()
 	self.crafterFastScanButton = fastScanButton
 	self.crafterForceRescanButton = forceRescanButton
 	defaults.collapsibleRegions = {
+		defaults.tutorialButton,
 		defaults.defaultsHeader,
 		defaults.priceLabel,
 		defaults.noteLabel,
@@ -683,6 +687,9 @@ function AF:RefreshCrafterUI()
 	if professionID then
 		defaults:Show()
 		self:ApplyCrafterDefaultsCollapsed(self.crafterDefaultsCollapsed)
+		if self.MaybeShowCrafterTutorial then
+			self:MaybeShowCrafterTutorial()
+		end
 		defaults.advertiseCheck:SetChecked(self:IsProfessionAdvertised(self.playerName, professionID))
 		local default = self:GetProfessionPriceEntry(self.db.artisanProfile, professionID)
 		if default then

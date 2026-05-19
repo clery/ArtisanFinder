@@ -274,13 +274,14 @@ function AF:GetCachedArtisans(itemID, filterText, sortMode, queryToken)
 			MarkSeen(self, seenNames, favoriteEntry)
 		end
 	end
-	if self.GetGuildProfessionRows then
+	local showUncertifiedPeople = self.db.showUncertifiedPeople ~= false
+	if showUncertifiedPeople and self.GetGuildProfessionRows then
 		for _, entry in ipairs(self:GetGuildProfessionRows(itemID, self.currentCustomerProfessionID, filterText, seenNames, self.currentCustomerRecipeID)) do
 			table.insert(rows, entry)
 			MarkSeen(self, seenNames, entry)
 		end
 	end
-	if self.GetTradeLeadRows then
+	if showUncertifiedPeople and self.GetTradeLeadRows then
 		for _, entry in ipairs(self:GetTradeLeadRows(itemID, self.currentCustomerProfessionID, filterText, seenNames, self.currentCustomerRecipeID)) do
 			table.insert(rows, entry)
 			MarkSeen(self, seenNames, entry)
@@ -314,7 +315,7 @@ function AF:GetCachedArtisans(itemID, filterText, sortMode, queryToken)
 				table.insert(candidates, offlineEntry)
 			end
 		end
-		if self.GetCachedTradeLeadFallbackRows then
+		if showUncertifiedPeople and self.GetCachedTradeLeadFallbackRows then
 			for _, entry in ipairs(self:GetCachedTradeLeadFallbackRows(itemID, self.currentCustomerProfessionID, filterText, seenNames, self.currentCustomerRecipeID)) do
 				table.insert(candidates, entry)
 			end

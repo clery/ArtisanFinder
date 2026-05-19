@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.1 - 2026-05-20
+
+### Added
+
+- Added an account-wide first-run tutorial.
+- Added `/af tutorial reset` to restart the tutorial from the beginning.
+
 ## 1.2.0 - 2026-05-19
 
 ### Added

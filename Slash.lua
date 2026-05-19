@@ -36,15 +36,26 @@ function AF:SetDebugSelfResults(enabled)
 	self:RefreshCustomerQuery(true)
 end
 
+function AF:SetShowUncertifiedPeople(enabled)
+	self.db.showUncertifiedPeople = enabled == true
+	self:Print(self:Text("SHOW_UNCERTIFIED_CHANGED", self.db.showUncertifiedPeople and self:Text("ENABLED") or self:Text("DISABLED")))
+	self:RefreshCustomerResults()
+end
+
 function AF:PrintSlashHelp()
 	self:Print(self:Text("SCAN_HELP_FORCE"))
 	self:Print(self:Text("AUTO_AVAILABILITY_HELP_ON"))
 	self:Print(self:Text("AUTO_AVAILABILITY_HELP_OFF"))
 	self:Print(self:Text("AUTO_AVAILABILITY_HELP_TOGGLE"))
 	self:Print(self:Text("AUTO_AVAILABILITY_HELP_STATE"))
+	self:Print(self:Text("SHOW_UNCERTIFIED_HELP_ON"))
+	self:Print(self:Text("SHOW_UNCERTIFIED_HELP_OFF"))
+	self:Print(self:Text("SHOW_UNCERTIFIED_HELP_TOGGLE"))
+	self:Print(self:Text("SHOW_UNCERTIFIED_HELP_STATE"))
 	if self.db and self.db.debugSelfResults then
 		self:Print(self:Text("LOCALE_HELP"))
 	end
+	self:Print(self:Text("TUTORIAL_HELP_RESET"))
 	self:Print(self:Text("CLEAR_HELP"))
 	self:Print(self:Text("DEBUG_HELP_ON"))
 	self:Print(self:Text("DEBUG_HELP_OFF"))
@@ -130,6 +141,7 @@ function AF:ClearOptionsData()
 	self.db.tradeLeadMinutes = 15
 	self.db.offlineFallbackResults = 10
 	self.db.offlineFallbackMax = 20
+	self.db.showUncertifiedPeople = true
 	self.db.minimap = { angle = 225, hide = false }
 	self.db.debugSelfResults = false
 	self.db.advertising = {}
@@ -204,11 +216,30 @@ function AF:HandleSlash(message)
 			self:Print(self:Text("AUTO_AVAILABILITY_UNKNOWN", rest))
 			self:PrintSlashHelp()
 		end
+	elseif command == "uncertified" then
+		if rest == "on" then
+			self:SetShowUncertifiedPeople(true)
+		elseif rest == "off" then
+			self:SetShowUncertifiedPeople(false)
+		elseif rest == "toggle" then
+			self:SetShowUncertifiedPeople(not self.db.showUncertifiedPeople)
+		elseif rest == "" then
+			self:Print(self:Text("SHOW_UNCERTIFIED_STATE", self.db.showUncertifiedPeople and self:Text("ENABLED") or self:Text("DISABLED")))
+		else
+			self:Print(self:Text("SHOW_UNCERTIFIED_UNKNOWN", rest))
+			self:PrintSlashHelp()
+		end
 	elseif command == "locale" then
 		if self.db and self.db.debugSelfResults then
 			self:SetLocaleOverride(rest)
 		else
 			self:PrintSlashHelp()
+		end
+	elseif command == "tutorial" then
+		if rest == "reset" then
+			self:ResetTutorial()
+		else
+			self:Print(self:Text("TUTORIAL_HELP_RESET"))
 		end
 	elseif command == "clear" then
 		if rest == "all" then

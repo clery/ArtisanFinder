@@ -59,6 +59,7 @@ function AF:OnPlayerLogin()
 	self:InitializeTradeChat()
 	self:InitializeOptions()
 	self:CleanupCustomerCache()
+	self:InitializeTutorial()
 
 	self:Print(self:Text("ADDON_LOADED"))
 	self:QueueAutoAvailabilityRefresh()
@@ -278,6 +279,17 @@ AF.frame:SetScript("OnEvent", function(_, event, ...)
 	elseif event == "TRADE_SKILL_SHOW" or event == "TRADE_SKILL_DATA_SOURCE_CHANGED" then
 		if AF:IsInCombatLocked() then
 			return
+		end
+		local closeProfessionBook = event == "TRADE_SKILL_SHOW" and AF.IsIntroTutorialActive and AF:IsIntroTutorialActive()
+		if event == "TRADE_SKILL_SHOW" and AF.CloseIntroTutorial then
+			AF:CloseIntroTutorial()
+		end
+		if closeProfessionBook and ProfessionsBookFrame and ProfessionsBookFrame:IsShown() then
+			if HideUIPanel then
+				HideUIPanel(ProfessionsBookFrame)
+			else
+				ProfessionsBookFrame:Hide()
+			end
 		end
 		C_Timer.After(0, function()
 			if AF:IsInCombatLocked() then
