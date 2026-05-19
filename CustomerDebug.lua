@@ -61,6 +61,14 @@ local function GetDebugQuality(index, offset)
 	offset = offset or 0
 	return math.max(1, math.min(5, 3 + ((index + offset) % 3)))
 end
+
+local function GetDebugConcentrationQuality(bestQuality, enabled)
+	bestQuality = tonumber(bestQuality) or 0
+	if enabled and bestQuality > 0 and bestQuality < 5 then
+		return bestQuality + 1
+	end
+	return nil
+end
 function AF:ClearDebugSelfResults(itemID)
 	local cache = self.db.customerCache[tostring(itemID or "")]
 	if not cache then
@@ -86,7 +94,7 @@ function AF:InjectDebugSelfResult(itemID, professionID)
 	if not item then
 		return
 	end
-	if professionID and professionID ~= 0 and tonumber(item.professionID) ~= tonumber(professionID) then
+	if professionID and professionID ~= 0 and self:GetBaseProfessionID(item.professionID) ~= self:GetBaseProfessionID(professionID) then
 		return
 	end
 	if not self:IsProfessionAdvertised(self:GetPlayerFullName(), item.professionID) then
@@ -105,7 +113,7 @@ function AF:InjectDebugSelfResult(itemID, professionID)
 		orderTarget = actualName,
 		itemID = itemID,
 		professionID = item.professionID,
-		professionName = item.professionName or self:GetProfessionName(item.professionID),
+		professionName = self:GetProfessionName(item.professionID),
 		priceCopper = actualPriceCopper,
 		freeCommission = actualFreeCommission,
 		note = actualNote,
@@ -142,6 +150,7 @@ function AF:InjectDebugSelfResult(itemID, professionID)
 		local priceCopper = i == 1 and 0 or (i * 12500000)
 		local baseQuality = math.min(5, 2 + i)
 		local bestQuality = math.min(5, baseQuality + 1)
+		local concentrationQuality = GetDebugConcentrationQuality(bestQuality, i ~= 2)
 		self:SetFavoriteArtisan(altName, i == 1)
 		self.db.customerCache[itemKey]["__debug_alt_" .. i] = {
 			name = altName,
@@ -149,7 +158,7 @@ function AF:InjectDebugSelfResult(itemID, professionID)
 			orderTarget = altName,
 			itemID = itemID,
 			professionID = item.professionID,
-			professionName = item.professionName or self:GetProfessionName(item.professionID),
+			professionName = self:GetProfessionName(item.professionID),
 			priceCopper = priceCopper,
 			freeCommission = priceCopper == 0,
 			note = i == 1 and "Alt crafter, whisper main" or "",
@@ -164,9 +173,10 @@ function AF:InjectDebugSelfResult(itemID, professionID)
 			bestQuality = bestQuality,
 			rawBestQuality = bestQuality,
 			bestQualityAtlas = "Professions-Icon-Quality-Tier" .. bestQuality .. "-Small",
-			bestConcentrationQuality = nil,
+			bestConcentrationQuality = concentrationQuality,
+			bestConcentrationQualityAtlas = concentrationQuality and ("Professions-Icon-Quality-Tier" .. concentrationQuality .. "-Small") or nil,
 			bestTotalSkill = item.bestTotalSkill,
-			bestConcentrationCost = nil,
+			bestConcentrationCost = concentrationQuality and (60 + i * 15) or nil,
 			bestReagentSummary = item.bestReagentSummary,
 			bestReagentSummaryUpdatedAt = item.bestReagentSummaryUpdatedAt or now,
 			bestReagentTruncated = item.bestReagentTruncated,
@@ -185,6 +195,7 @@ function AF:InjectDebugSelfResult(itemID, professionID)
 		local priceCopper, isFree = GetDebugCommissionCopper(i)
 		local baseQuality = GetDebugQuality(i)
 		local bestQuality = math.min(5, baseQuality + (i % 3 == 0 and 0 or 1))
+		local concentrationQuality = GetDebugConcentrationQuality(bestQuality, i % 2 == 0)
 		local note = GetDebugValue(DEBUG_NOTES, i)
 		local debugName = GetDebugValue(DEBUG_CRAFTER_NAMES, i) .. "-" .. (GetRealmName() or "")
 		if i <= 6 then
@@ -198,7 +209,7 @@ function AF:InjectDebugSelfResult(itemID, professionID)
 			orderTarget = debugName,
 			itemID = itemID,
 			professionID = item.professionID,
-			professionName = item.professionName or self:GetProfessionName(item.professionID),
+			professionName = self:GetProfessionName(item.professionID),
 			priceCopper = isFree and 0 or priceCopper,
 			freeCommission = isFree,
 			note = note,
@@ -213,9 +224,10 @@ function AF:InjectDebugSelfResult(itemID, professionID)
 			bestQuality = bestQuality,
 			rawBestQuality = bestQuality,
 			bestQualityAtlas = "Professions-Icon-Quality-Tier" .. bestQuality .. "-Small",
-			bestConcentrationQuality = nil,
+			bestConcentrationQuality = concentrationQuality,
+			bestConcentrationQualityAtlas = concentrationQuality and ("Professions-Icon-Quality-Tier" .. concentrationQuality .. "-Small") or nil,
 			bestTotalSkill = item.bestTotalSkill,
-			bestConcentrationCost = nil,
+			bestConcentrationCost = concentrationQuality and (80 + i * 10) or nil,
 			bestReagentSummary = item.bestReagentSummary,
 			bestReagentSummaryUpdatedAt = item.bestReagentSummaryUpdatedAt or now,
 			bestReagentTruncated = item.bestReagentTruncated,

@@ -113,6 +113,12 @@ function AF:QueueBroadcastQuery(itemID, professionID)
 		AF.pendingCustomerQueryProfessionID = nil
 		if pendingItemID and tonumber(AF.currentCustomerItemID) == tonumber(pendingItemID) then
 			AF:BroadcastQuery(pendingItemID, pendingProfessionID)
+			if AF.InjectDebugSelfResult then
+				AF:InjectDebugSelfResult(pendingItemID, pendingProfessionID)
+			end
+			if AF.InjectDebugTradeLeads then
+				AF:InjectDebugTradeLeads()
+			end
 			if AF.RefreshCustomerResults then
 				AF:RefreshCustomerResults()
 			end
@@ -155,7 +161,12 @@ local function ItemMatchesQuery(item, itemID, professionID)
 	if item.itemID and tonumber(item.itemID) ~= tonumber(itemID) then
 		return false
 	end
-	return professionID == 0 or tonumber(item.professionID) == tonumber(professionID)
+	if professionID == 0 then
+		return true
+	end
+	local itemProfessionID = AF.GetBaseProfessionID and AF:GetBaseProfessionID(item.professionID) or tonumber(item.professionID)
+	local queryProfessionID = AF.GetBaseProfessionID and AF:GetBaseProfessionID(professionID) or tonumber(professionID)
+	return itemProfessionID == queryProfessionID
 end
 
 function AF:GetAdvertisedItemMatches(itemID, professionID)
@@ -222,11 +233,12 @@ function AF:HandleQuery(parts, sender)
 			local priceCopper, freeCommission, note = self:GetItemPriceForProfile(match.profile, itemID, item.professionID)
 			local encodedNote = self:EncodeNote(note)
 			local encodedLink = self:EncodeField(item.professionLink)
+			local responseProfessionID = self:GetBaseProfessionID(item.professionID)
 			local payloadParts = {
 				"R",
 				self.PROTOCOL_VERSION,
 				itemID,
-				tonumber(item.professionID) or 0,
+				tonumber(responseProfessionID) or tonumber(item.professionID) or 0,
 				tonumber(priceCopper) or 0,
 				freeCommission and 1 or 0,
 				encodedNote,
@@ -401,7 +413,7 @@ function AF:HandleResponse(parts, sender)
 	self.db.customerCache[itemKey] = self.db.customerCache[itemKey] or {}
 	local previous = self.db.customerCache[itemKey][cacheKey]
 	local previousRecipeID = tonumber(previous and previous.recipeID) or 0
-	local professionName = professionLink ~= "" and professionLink:match("%[(.-)%]") or self:GetProfessionName(professionID)
+	local professionName = self:GetProfessionName(professionID)
 	if professionLink ~= "" then
 		self:RememberProfessionLink(crafterName, professionID, professionLink)
 	elseif previous and previous.professionLink then

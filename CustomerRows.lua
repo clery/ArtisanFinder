@@ -1,14 +1,99 @@
 local _, AF = ...
 
+local DETAIL_ELLIPSIS = "..."
+
+local function GetUTF8EndForCharCount(text, count)
+	text = tostring(text or "")
+	count = tonumber(count) or 0
+	if count <= 0 then
+		return 0
+	end
+	local pos = 1
+	local chars = 0
+	while pos <= #text and chars < count do
+		local byte = text:byte(pos) or 0
+		local step = 1
+		if byte >= 240 then
+			step = 4
+		elseif byte >= 224 then
+			step = 3
+		elseif byte >= 194 then
+			step = 2
+		end
+		chars = chars + 1
+		pos = pos + step
+	end
+	return math.min(#text, pos - 1)
+end
+
+local function GetUTF8CharCount(text)
+	text = tostring(text or "")
+	local count = 0
+	local pos = 1
+	while pos <= #text do
+		local byte = text:byte(pos) or 0
+		local step = 1
+		if byte >= 240 then
+			step = 4
+		elseif byte >= 224 then
+			step = 3
+		elseif byte >= 194 then
+			step = 2
+		end
+		count = count + 1
+		pos = pos + step
+	end
+	return count
+end
+
+local function SetFittedDetailText(row, commissionText, note)
+	commissionText = tostring(commissionText or "")
+	note = tostring(note or "")
+	if note == "" then
+		row.detail:SetText(commissionText)
+		return false
+	end
+
+	local maxWidth = math.max(row.detail:GetWidth() or 0, (row:GetWidth() or 0) - 67, 280)
+	local prefix = commissionText .. " - "
+	row.detail:SetText(prefix .. note)
+	if row.detail:GetStringWidth() <= maxWidth then
+		return false
+	end
+
+	row.detail:SetText(prefix .. DETAIL_ELLIPSIS)
+	if row.detail:GetStringWidth() > maxWidth then
+		row.detail:SetText(commissionText)
+		return true
+	end
+
+	local low = 0
+	local high = GetUTF8CharCount(note)
+	while low < high do
+		local mid = math.ceil((low + high) / 2)
+		row.detail:SetText(prefix .. note:sub(1, GetUTF8EndForCharCount(note, mid)) .. DETAIL_ELLIPSIS)
+		if row.detail:GetStringWidth() <= maxWidth then
+			low = mid
+		else
+			high = mid - 1
+		end
+	end
+	row.detail:SetText(prefix .. note:sub(1, GetUTF8EndForCharCount(note, low)) .. DETAIL_ELLIPSIS)
+	return true
+end
+
 function AF:BuildCustomerRowViewModel(entry)
 	local displayName = self:GetDisplayPlayerName(entry.name or "?")
-	if entry.unavailableFavorite then
+	if not entry.ownAlt and self:HasProfessionOpenFailed(entry) then
+		displayName = displayName .. " |cff888888(" .. self:Text("OFFLINE") .. ")|r"
+	elseif entry.unavailableFavorite then
 		displayName = displayName .. " |cff888888(" .. self:Text("UNAVAILABLE") .. ")|r"
 	elseif entry.offlineCached then
 		displayName = displayName .. " |cff888888(" .. self:Text("UNAVAILABLE") .. ")|r"
 	end
 
 	local detail
+	local detailNote
 	local capability
 	local onlineAs
 	local crafterName = self:NormalizeName(entry.orderTarget or entry.name)
@@ -18,10 +103,10 @@ function AF:BuildCustomerRowViewModel(entry)
 	end
 	if entry.tradeLead then
 		detail = entry.note or self:Text("MISSING_ADDON_DATA")
-		capability = entry.professionName or ""
+		capability = (entry.professionID and self:GetProfessionName(entry.professionID)) or entry.professionName or ""
 	else
-		local note = entry.note and entry.note ~= "" and (" - " .. entry.note) or ""
-		detail = self:FormatMoney(entry.priceCopper, entry.freeCommission) .. note
+		detailNote = entry.note and entry.note ~= "" and entry.note or ""
+		detail = self:FormatMoney(entry.priceCopper, entry.freeCommission)
 		capability = self:FormatCapability(entry)
 		if entry.ownAlt then
 			capability = "|cff33ff99" .. self:Text("YOUR_ALT") .. "|r" .. (capability ~= "" and ("\n" .. capability) or "")
@@ -34,6 +119,7 @@ function AF:BuildCustomerRowViewModel(entry)
 	return {
 		displayName = displayName,
 		detail = detail,
+		detailNote = detailNote,
 		capability = capability,
 		updatedAt = self:FormatCustomerRowUpdatedAt(entry),
 		certified = not entry.tradeLead,
@@ -46,7 +132,9 @@ function AF:ApplyCustomerRowViewModel(row, viewModel, minimumHeight, bottomPaddi
 	row.favorite:SetShown(viewModel.favorite)
 	row.name:SetText(viewModel.displayName or "")
 	row.updatedAt:SetText(viewModel.updatedAt or "")
-	row.detail:SetText(viewModel.detail or "")
+	row.updatedAt:SetWidth(math.max(1, math.ceil((row.updatedAt:GetStringWidth() or 0) + 2)))
+	local noteTruncated = SetFittedDetailText(row, viewModel.detail, viewModel.detailNote)
+	row.noteTooltipText = noteTruncated and viewModel.detailNote or nil
 	row.capability:SetText(viewModel.capability or "")
 
 	return math.max(

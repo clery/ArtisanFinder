@@ -95,10 +95,17 @@ function AF:GetOwnAltRows(itemID, professionID, filterText, seenNames, recipeID)
 		if not item then
 			return
 		end
-		if professionID ~= 0 and tonumber(item.professionID) ~= professionID then
+		if professionID ~= 0 and self:GetBaseProfessionID(item.professionID) ~= self:GetBaseProfessionID(professionID) then
 			return
 		end
-		if recipeID ~= 0 and item.recipeID and tonumber(item.recipeID) ~= recipeID then
+		if not self:IsProfessionAdvertised(characterName, item.professionID) then
+			return
+		end
+		if recipeID ~= 0
+			and item.recipeID
+			and tonumber(item.recipeID) ~= recipeID
+			and self:GetBaseProfessionID(item.professionID) ~= self:GetBaseProfessionID(professionID)
+		then
 			return
 		end
 		local priceCopper, freeCommission, note = self:GetItemPriceForProfile(profile, itemID, item.professionID)
@@ -110,7 +117,7 @@ function AF:GetOwnAltRows(itemID, professionID, filterText, seenNames, recipeID)
 			orderTarget = characterName,
 			itemID = itemID,
 			professionID = item.professionID,
-			professionName = item.professionName or self:GetProfessionName(item.professionID, profile),
+			professionName = self:GetProfessionName(item.professionID, profile),
 			priceCopper = priceCopper,
 			freeCommission = freeCommission,
 			note = note,
@@ -121,11 +128,13 @@ function AF:GetOwnAltRows(itemID, professionID, filterText, seenNames, recipeID)
 			rawQuality = item.rawQuality,
 			qualityAtlas = item.qualityAtlas,
 			concentrationQuality = item.concentrationQuality,
+			concentrationQualityAtlas = item.concentrationQualityAtlas,
 			concentrationCost = item.concentrationCost,
 			bestQuality = item.bestQuality,
 			rawBestQuality = item.rawBestQuality,
 			bestQualityAtlas = item.bestQualityAtlas,
 			bestConcentrationQuality = item.bestConcentrationQuality,
+			bestConcentrationQualityAtlas = item.bestConcentrationQualityAtlas,
 			bestTotalSkill = item.bestTotalSkill,
 			bestConcentrationCost = item.bestConcentrationCost,
 			bestReagentSummary = item.bestReagentSummary,

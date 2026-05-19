@@ -285,6 +285,10 @@ function AF:PrepareProfessionForScan(profession)
 	local professionEntry = profile.professions[professionKey]
 	professionEntry.id = profession.id
 	professionEntry.name = profession.name
+	professionEntry.parentProfessionID = profession.parentProfessionID
+	professionEntry.skillLineID = profession.skillLineID
+	professionEntry.childProfessionID = profession.childProfessionID
+	professionEntry.icon = professionEntry.icon or profession.icon
 	professionEntry.updatedAt = self:Now()
 	professionEntry.professionLink = self:CaptureCurrentProfessionLink(profession) or professionEntry.professionLink
 	professionEntry.recipes = professionEntry.recipes or {}

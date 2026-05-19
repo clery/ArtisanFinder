@@ -23,7 +23,9 @@ function AF:PrintSlashHelp()
 	self:Print(self:Text("AUTO_AVAILABILITY_HELP_OFF"))
 	self:Print(self:Text("AUTO_AVAILABILITY_HELP_TOGGLE"))
 	self:Print(self:Text("AUTO_AVAILABILITY_HELP_STATE"))
-	self:Print(self:Text("LOCALE_HELP"))
+	if self.db and self.db.debugSelfResults then
+		self:Print(self:Text("LOCALE_HELP"))
+	end
 	self:Print(self:Text("CLEAR_HELP"))
 	self:Print(self:Text("DEBUG_HELP_ON"))
 	self:Print(self:Text("DEBUG_HELP_OFF"))
@@ -170,6 +172,7 @@ function AF:ClearOptionsData()
 	self.db.minimap = { angle = 225, hide = false }
 	self.db.debugSelfResults = false
 	self.db.advertising = {}
+	self.db.advertisingKnown = {}
 	if self.ClearDebugTradeLeads then
 		self:ClearDebugTradeLeads()
 	end
@@ -238,7 +241,11 @@ function AF:HandleSlash(message)
 			self:PrintSlashHelp()
 		end
 	elseif command == "locale" then
-		self:SetLocaleOverride(rest)
+		if self.db and self.db.debugSelfResults then
+			self:SetLocaleOverride(rest)
+		else
+			self:PrintSlashHelp()
+		end
 	elseif command == "clear" then
 		if rest == "all" then
 			self:ClearAllData()

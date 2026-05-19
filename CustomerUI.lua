@@ -9,7 +9,7 @@ local SORT_MODES = {
 local ROW_HEIGHT = 58
 local ROW_BOTTOM_PADDING = 7
 local ROW_TOP_PADDING = 4
-local CUSTOMER_PANEL_WIDTH = 452
+local CUSTOMER_PANEL_WIDTH = 482
 local CUSTOMER_PANEL_COLLAPSED_WIDTH = 28
 local CUSTOMER_PANEL_ATTACH_OFFSET_X = -5
 local CUSTOMER_COLLAPSE_BUTTON_LEVEL_OFFSET = 1000
@@ -320,6 +320,51 @@ local function SplitAroundPlaceholder(text)
 	return text:sub(1, placeholderStart - 1), text:sub(placeholderEnd + 1)
 end
 
+local function IsCursorOverRegion(region)
+	if not region or not region.GetLeft then
+		return false
+	end
+	local left, right, top, bottom = region:GetLeft(), region:GetRight(), region:GetTop(), region:GetBottom()
+	if not left or not right or not top or not bottom then
+		return false
+	end
+	local scale = UIParent:GetEffectiveScale()
+	local x, y = GetCursorPosition()
+	x = x / scale
+	y = y / scale
+	return x >= left and x <= right and y >= bottom and y <= top
+end
+
+local function GetCustomerNoteTooltip()
+	if not AF.customerNoteTooltip then
+		AF.customerNoteTooltip = CreateFrame("GameTooltip", "ArtisanFinderCustomerNoteTooltip", UIParent, "GameTooltipTemplate")
+	end
+	return AF.customerNoteTooltip
+end
+
+local function HideCustomerNoteTooltip()
+	local tooltip = AF.customerNoteTooltip
+	if tooltip then
+		tooltip:Hide()
+		tooltip.ownerRow = nil
+	end
+end
+
+local function UpdateCustomerNoteTooltip(row)
+	if not row or not row.noteTooltipText or not IsCursorOverRegion(row.detail) then
+		HideCustomerNoteTooltip()
+		return
+	end
+	local tooltip = GetCustomerNoteTooltip()
+	if tooltip.ownerRow == row and tooltip:IsShown() then
+		return
+	end
+	tooltip.ownerRow = row
+	tooltip:SetOwner(row, "ANCHOR_CURSOR")
+	tooltip:SetText(row.noteTooltipText, 1, 1, 1, 1, true)
+	tooltip:Show()
+end
+
 local function CreateCustomerRow(parent)
 	local row = CreateFrame("Button", nil, parent, "ArtisanFinderCustomerRowTemplate")
 	AF:StyleListRow(row)
@@ -337,12 +382,24 @@ local function CreateCustomerRow(parent)
 
 	row.name:ClearAllPoints()
 	row.name:SetPoint("TOPLEFT", row.certified, "TOPRIGHT", 4, 0)
-	row.name:SetPoint("RIGHT", -40, 0)
+	row.name:SetPoint("RIGHT", row.updatedAt, "LEFT", -4, 0)
+	if row.name.SetWordWrap then
+		row.name:SetWordWrap(false)
+	end
+	if row.name.SetMaxLines then
+		row.name:SetMaxLines(1)
+	end
 	row.updatedAt:ClearAllPoints()
 	row.updatedAt:SetPoint("TOPRIGHT", -40, -6)
 	row.detail:ClearAllPoints()
 	row.detail:SetPoint("TOPLEFT", row.name, "BOTTOMLEFT", 0, -3)
 	row.detail:SetPoint("RIGHT", -40, 0)
+	if row.detail.SetWordWrap then
+		row.detail:SetWordWrap(false)
+	end
+	if row.detail.SetMaxLines then
+		row.detail:SetMaxLines(1)
+	end
 	row.capability:ClearAllPoints()
 	row.capability:SetPoint("TOPLEFT", row.detail, "BOTTOMLEFT", 0, -3)
 	row.capability:SetPoint("RIGHT", -40, 0)
@@ -365,8 +422,9 @@ local function CreateCustomerRow(parent)
 		if buttonFrame.entry then
 			GameTooltip:SetOwner(buttonFrame, "ANCHOR_RIGHT")
 			GameTooltip:SetText(AF:GetDisplayPlayerName(buttonFrame.entry.name or "?"), 1, 0.82, 0)
-			if buttonFrame.entry.professionName then
-				GameTooltip:AddLine(buttonFrame.entry.professionName, 1, 1, 1)
+			local professionName = buttonFrame.entry.professionID and AF:GetProfessionName(buttonFrame.entry.professionID) or buttonFrame.entry.professionName
+			if professionName then
+				GameTooltip:AddLine(professionName, 1, 1, 1)
 			end
 			GameTooltip:AddLine(buttonFrame.entry.tradeLead and AF:Text("MISSING_ADDON_DATA") or AF:Text("CERTIFIED_ADDON_DATA"), buttonFrame.entry.tradeLead and 0.75 or 0.35, buttonFrame.entry.tradeLead and 0.75 or 1, buttonFrame.entry.tradeLead and 0.75 or 0.35, true)
 			if not buttonFrame.entry.tradeLead then
@@ -375,9 +433,12 @@ local function CreateCustomerRow(parent)
 			end
 			AF:StyleCustomerTooltip(GameTooltip)
 			GameTooltip:Show()
+			buttonFrame:SetScript("OnUpdate", UpdateCustomerNoteTooltip)
 		end
 	end)
-	row:SetScript("OnLeave", function()
+	row:SetScript("OnLeave", function(buttonFrame)
+		buttonFrame:SetScript("OnUpdate", nil)
+		HideCustomerNoteTooltip()
 		GameTooltip:Hide()
 	end)
 
@@ -476,10 +537,18 @@ function AF:SetCustomerStatusText(text)
 	if not frame then
 		return
 	end
+	frame.statusText:SetText(text or "")
+	frame.statusText:SetHeight(math.max(16, frame.statusText:GetStringHeight()))
+	if frame.divider then
+		frame.divider:ClearAllPoints()
+		frame.divider:SetPoint("TOPLEFT", frame.statusText, "BOTTOMLEFT", 0, -8)
+		frame.divider:SetPoint("RIGHT", frame, "RIGHT", -12, 0)
+	end
 	frame.statusPrefix:SetText(text or "")
 	frame.statusPrefix:ClearAllPoints()
 	frame.statusPrefix:SetPoint("TOPLEFT", frame, "TOPLEFT", 14, -32)
 	frame.statusPrefix:SetPoint("RIGHT", frame, "RIGHT", -14, 0)
+	frame.statusPrefix:Hide()
 	frame.itemLink:Hide()
 	frame.itemLink.itemLinkText = nil
 	frame.statusSuffix:SetText("")
@@ -498,6 +567,7 @@ function AF:SetCustomerStatusItem(itemID, itemName, templateKey)
 	frame.statusPrefix:SetPoint("TOPLEFT", frame, "TOPLEFT", 14, -32)
 	frame.statusPrefix:SetText(prefix)
 	frame.statusPrefix:SetWidth(math.max(1, frame.statusPrefix:GetStringWidth() + 2))
+	frame.statusPrefix:Hide()
 
 	local itemLink = "item:" .. tostring(itemID)
 	local displayText = "[" .. tostring(itemName) .. "]"
@@ -513,9 +583,16 @@ function AF:SetCustomerStatusItem(itemID, itemName, templateKey)
 
 	frame.itemLink.itemLinkText = itemLink
 	frame.itemLink.text:SetText(displayText)
-	frame.itemLink:SetWidth(math.max(1, frame.itemLink.text:GetStringWidth() + 4))
+	frame.itemLink:SetWidth(1)
 	frame.itemLink:Show()
 	frame.statusSuffix:SetText(suffix)
+	frame.statusText:SetText(prefix .. displayText .. suffix)
+	frame.statusText:SetHeight(math.max(16, frame.statusText:GetStringHeight()))
+	if frame.divider then
+		frame.divider:ClearAllPoints()
+		frame.divider:SetPoint("TOPLEFT", frame.statusText, "BOTTOMLEFT", 0, -8)
+		frame.divider:SetPoint("RIGHT", frame, "RIGHT", -12, 0)
+	end
 end
 
 function AF:SetCustomerPanelCollapsed(collapsed, skipRefresh)
@@ -619,16 +696,17 @@ function AF:AttachCustomerUI()
 	self:ApplyProfessionPanel(frame.collapsedRail)
 	frame.collapsedRail:Hide()
 
-	frame.status = frame.statusPrefix
+	frame.status = frame.statusText
 	frame.status:ClearAllPoints()
 	frame.status:SetPoint("TOPLEFT", frame, "TOPLEFT", 14, -32)
 	frame.status:SetPoint("RIGHT", -14, 0)
 	frame.status:SetJustifyH("LEFT")
 	frame.status:SetText(self:Text("SELECT_ORDER_ITEM"))
-	frame.statusPrefix = frame.status
+	frame.status:SetHeight(math.max(16, frame.status:GetStringHeight()))
+	frame.statusPrefix:Hide()
 	frame.itemLink:SetHeight(16)
 	frame.itemLink:ClearAllPoints()
-	frame.itemLink:SetPoint("LEFT", frame.statusPrefix, "RIGHT", 0, 0)
+	frame.itemLink:SetPoint("TOPLEFT", frame.status, "TOPLEFT", 0, 0)
 	frame.itemLink.text:SetJustifyH("LEFT")
 	frame.itemLink:Hide()
 	frame.itemLink:SetScript("OnEnter", function(button)
@@ -645,6 +723,7 @@ function AF:AttachCustomerUI()
 	frame.statusSuffix:SetPoint("LEFT", frame.itemLink, "RIGHT", 0, 0)
 	frame.statusSuffix:SetPoint("RIGHT", -14, 0)
 	frame.statusSuffix:SetJustifyH("LEFT")
+	frame.statusSuffix:Hide()
 	frame.divider = self:AddDivider(frame, frame.status, -8)
 
 	frame.search:SetSize(172, 22)
@@ -875,6 +954,52 @@ function AF:ClearProfessionButtonTooltip()
 	end
 end
 
+function AF:GetProfessionOpenFailureKey(entry)
+	if not entry then
+		return nil
+	end
+	local target = self:NormalizeName(entry.orderTarget or entry.name or entry.target)
+	local professionID = tonumber(entry.professionID) or 0
+	local professionLink = entry.professionLink or self:GetRememberedProfessionLink(entry.orderTarget or entry.name, entry.professionID) or ""
+	if not target and professionID == 0 and professionLink == "" then
+		return nil
+	end
+	return tostring(target or "?") .. ":" .. tostring(professionID) .. ":" .. tostring(professionLink)
+end
+
+function AF:HasProfessionOpenFailed(entry)
+	local key = self:GetProfessionOpenFailureKey(entry)
+	return key and self.professionOpenFailures and self.professionOpenFailures[key] == true
+end
+
+function AF:MarkProfessionOpenFailed(entry)
+	local key = self:GetProfessionOpenFailureKey(entry)
+	if key then
+		self.professionOpenFailures = self.professionOpenFailures or {}
+		self.professionOpenFailures[key] = true
+	end
+
+	local menu = self.customerFrame and self.customerFrame.menu
+	if menu and menu:IsShown() and menu.entry == entry then
+		menu.link:Disable()
+		self:SetProfessionButtonTooltip(self:Text("PROFESSION_LINK_UNAVAILABLE_TOOLTIP"))
+	end
+	if self.RefreshCustomerResults then
+		self:RefreshCustomerResults()
+	end
+end
+
+function AF:ClearPendingProfessionOpen()
+	self.pendingProfessionRecipeID = nil
+	self.pendingProfessionID = nil
+	self.pendingProfessionRecipeTries = nil
+	self.pendingProfessionLink = nil
+	self.pendingProfessionLinkPayload = nil
+	self.pendingProfessionTarget = nil
+	self.pendingProfessionEntry = nil
+	self.pendingProfessionOpenToken = (self.pendingProfessionOpenToken or 0) + 1
+end
+
 function AF:ShowCustomerMenu(entry, owner)
 	local menu = self.customerFrame and self.customerFrame.menu
 	if not menu then
@@ -934,7 +1059,8 @@ function AF:GetCustomerOrderItemContext()
 		end
 		if C_TradeSkillUI.GetProfessionInfoByRecipeID then
 			local professionInfo = C_TradeSkillUI.GetProfessionInfoByRecipeID(recipeID)
-			professionID = professionInfo and (professionInfo.profession or professionInfo.professionID or professionInfo.skillLineID)
+			professionID = professionInfo and (professionInfo.parentProfession or professionInfo.parentProfessionID or professionInfo.profession or professionInfo.professionID or professionInfo.skillLineID)
+			professionID = self:GetBaseProfessionID(professionID)
 		end
 	end
 
@@ -1011,6 +1137,9 @@ function AF:CanReliablyOpenProfession(entry)
 	if entry.offline then
 		return false
 	end
+	if self:HasProfessionOpenFailed(entry) then
+		return false
+	end
 	if entry.tradeLead then
 		return entry.professionLink ~= nil
 	end
@@ -1051,7 +1180,7 @@ function AF:RefreshCustomerResults(statusOverride)
 			row:SetWidth(math.max(280, frame.scroll:GetWidth() - 4))
 			row.name:ClearAllPoints()
 			row.name:SetPoint("TOPLEFT", row.certified, "TOPRIGHT", 4, 0)
-			row.name:SetPoint("RIGHT", -40, 0)
+			row.name:SetPoint("RIGHT", row.updatedAt, "LEFT", -4, 0)
 			local rowHeight = self:ApplyCustomerRowViewModel(row, self:BuildCustomerRowViewModel(entry), ROW_HEIGHT, ROW_BOTTOM_PADDING)
 			row:SetHeight(rowHeight)
 			contentHeight = contentHeight + rowHeight
@@ -1093,25 +1222,38 @@ function AF:OpenCrafterProfession(entry)
 
 	local professionLink = entry.professionLink or self:GetRememberedProfessionLink(entry.orderTarget or entry.name, entry.professionID)
 	if not professionLink then
+		self:MarkProfessionOpenFailed(entry)
 		return
 	end
 
 	local professionLinkPayload = professionLink:match("|H([^|]+)|h") or professionLink
 	self.pendingProfessionRecipeID = tonumber(entry.recipeID)
+	self.pendingProfessionID = tonumber(entry.professionID)
 	self.pendingProfessionRecipeTries = 12
 	self.pendingProfessionLink = professionLink
 	self.pendingProfessionLinkPayload = professionLinkPayload
 	self.pendingProfessionTarget = entry.orderTarget or entry.name
+	self.pendingProfessionEntry = entry
+	self.pendingProfessionOpenToken = (self.pendingProfessionOpenToken or 0) + 1
+	local openToken = self.pendingProfessionOpenToken
 	local ok = pcall(SetItemRef, professionLinkPayload, professionLink, "LeftButton", DEFAULT_CHAT_FRAME)
 	if not ok then
-		self:SetProfessionButtonTooltip(self:Text("PROFESSION_LINK_UNAVAILABLE_TOOLTIP"), 8)
-		self.pendingProfessionRecipeID = nil
-		self.pendingProfessionRecipeTries = nil
-		self.pendingProfessionLink = nil
-		self.pendingProfessionLinkPayload = nil
-		self.pendingProfessionTarget = nil
+		self:MarkProfessionOpenFailed(entry)
+		self:ClearPendingProfessionOpen()
 		return
 	end
+	C_Timer.After(1, function()
+		if AF.pendingProfessionOpenToken ~= openToken then
+			return
+		end
+		local menu = AF.customerFrame and AF.customerFrame.menu
+		local sameEntry = menu and menu:IsShown() and menu.entry == entry
+		local page = ProfessionsFrame and ProfessionsFrame.CraftingPage
+		if sameEntry and (not page or not page:IsVisible()) then
+			AF:MarkProfessionOpenFailed(entry)
+			AF:ClearPendingProfessionOpen()
+		end
+	end)
 	self:QueuePendingProfessionRecipeSelection()
 end
 
@@ -1142,12 +1284,13 @@ function AF:TrySelectPendingProfessionRecipe()
 			self:QueuePendingProfessionRecipeSelection()
 			return
 		end
-		self:SetProfessionButtonTooltip(self:Text("PROFESSION_LINK_UNAVAILABLE_TOOLTIP"), 8)
-		self.pendingProfessionRecipeID = nil
-		self.pendingProfessionRecipeTries = nil
-		self.pendingProfessionLink = nil
-		self.pendingProfessionLinkPayload = nil
-		self.pendingProfessionTarget = nil
+		self:MarkProfessionOpenFailed(self.pendingProfessionEntry or {
+			orderTarget = self.pendingProfessionTarget,
+			name = self.pendingProfessionTarget,
+			professionID = self.pendingProfessionID,
+			professionLink = self.pendingProfessionLink,
+		})
+		self:ClearPendingProfessionOpen()
 		return
 	end
 
@@ -1160,11 +1303,7 @@ function AF:TrySelectPendingProfessionRecipe()
 
 	local selectedRecipeInfo = form.GetRecipeInfo and form:GetRecipeInfo()
 	if selectedRecipeInfo and tonumber(selectedRecipeInfo.recipeID) == recipeID then
-		self.pendingProfessionRecipeID = nil
-		self.pendingProfessionRecipeTries = nil
-		self.pendingProfessionLink = nil
-		self.pendingProfessionLinkPayload = nil
-		self.pendingProfessionTarget = nil
+		self:ClearPendingProfessionOpen()
 		return
 	end
 
@@ -1172,10 +1311,7 @@ function AF:TrySelectPendingProfessionRecipe()
 	if self.pendingProfessionRecipeTries > 0 then
 		self:QueuePendingProfessionRecipeSelection()
 	else
-		self.pendingProfessionRecipeID = nil
-		self.pendingProfessionLink = nil
-		self.pendingProfessionLinkPayload = nil
-		self.pendingProfessionTarget = nil
+		self:ClearPendingProfessionOpen()
 	end
 end
 

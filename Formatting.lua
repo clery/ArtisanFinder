@@ -1,13 +1,37 @@
 local _, AF = ...
 
+local function TruncateUTF8(text, maxChars, maxBytes)
+	text = tostring(text or "")
+	maxChars = tonumber(maxChars) or #text
+	maxBytes = tonumber(maxBytes) or #text
+	local pos = 1
+	local chars = 0
+	local lastEnd = 0
+	while pos <= #text and chars < maxChars do
+		local byte = text:byte(pos) or 0
+		local step = 1
+		if byte >= 240 then
+			step = 4
+		elseif byte >= 224 then
+			step = 3
+		elseif byte >= 194 then
+			step = 2
+		end
+		if pos + step - 1 > maxBytes then
+			break
+		end
+		chars = chars + 1
+		lastEnd = pos + step - 1
+		pos = pos + step
+	end
+	return text:sub(1, lastEnd)
+end
+
 function AF:EncodeNote(note)
 	note = tostring(note or "")
 	note = note:gsub("[\r\n]", " ")
 	note = note:gsub("|", "/")
-	if #note > self.MAX_NOTE_BYTES then
-		note = note:sub(1, self.MAX_NOTE_BYTES)
-	end
-	return note
+	return TruncateUTF8(note, self.MAX_NOTE_CHARS or 256, self.MAX_NOTE_BYTES or 1024)
 end
 
 function AF:DecodeNote(note)
@@ -46,6 +70,9 @@ function AF:ParseCopperFromGoldText(text)
 		return 0, true, "free"
 	end
 	if value < 0 then
+		return nil
+	end
+	if value > (self.MAX_COMMISSION_GOLD or 99999999) then
 		return nil
 	end
 	return math.floor(value * 10000 + 0.5), false, "paid"
@@ -87,6 +114,83 @@ function AF:GetQualityIconMarkup(quality, atlas, size)
 		end
 	end
 	return "Q" .. quality
+end
+
+local PROFESSION_ICON_FALLBACKS = {
+	[5] = "Interface\\Icons\\INV_Misc_Food_15",
+	[6] = "Interface\\Icons\\Trade_Mining",
+	[10] = "Interface\\Icons\\Trade_Fishing",
+	[12] = "Interface\\Icons\\INV_Misc_Gem_01",
+	[164] = "Interface\\Icons\\Trade_BlackSmithing",
+	[165] = "Interface\\Icons\\INV_Misc_ArmorKit_17",
+	[171] = "Interface\\Icons\\Trade_Alchemy",
+	[182] = "Interface\\Icons\\Trade_Herbalism",
+	[185] = "Interface\\Icons\\INV_Misc_Food_15",
+	[186] = "Interface\\Icons\\Trade_Mining",
+	[197] = "Interface\\Icons\\Trade_Tailoring",
+	[202] = "Interface\\Icons\\Trade_Engineering",
+	[333] = "Interface\\Icons\\Trade_Engraving",
+	[356] = "Interface\\Icons\\Trade_Fishing",
+	[393] = "Interface\\Icons\\INV_Misc_Pelt_Wolf_01",
+	[755] = "Interface\\Icons\\INV_Misc_Gem_01",
+	[773] = "Interface\\Icons\\INV_Inscription_Tradeskill01",
+}
+local PROFESSION_ICON_SPELLS = {
+	[5] = 2550,
+	[6] = 2575,
+	[10] = 7620,
+	[12] = 25229,
+	[164] = 2018,
+	[165] = 2108,
+	[171] = 2259,
+	[182] = 2366,
+	[185] = 2550,
+	[186] = 2575,
+	[197] = 3908,
+	[202] = 4036,
+	[333] = 7411,
+	[356] = 7620,
+	[393] = 8613,
+	[755] = 25229,
+	[773] = 45357,
+}
+
+local function GetTextureMarkup(texture, size)
+	texture = texture and tostring(texture) or ""
+	if texture == "" then
+		return nil
+	end
+	size = tonumber(size) or 14
+	return "|T" .. texture .. ":" .. size .. ":" .. size .. ":0:0|t"
+end
+
+function AF:GetProfessionIconMarkup(professionID, profileOrRow, size)
+	professionID = tonumber(type(profileOrRow) == "table" and (profileOrRow.baseProfessionID or profileOrRow.parentProfessionID) or nil) or tonumber(professionID)
+	local icon = type(profileOrRow) == "table" and (profileOrRow.professionIcon or profileOrRow.icon or profileOrRow.iconTexture) or nil
+	if not icon and professionID and type(profileOrRow) == "table" and profileOrRow.professions then
+		local profession = profileOrRow.professions[tostring(professionID)]
+		icon = profession and (profession.icon or profession.professionIcon or profession.iconTexture)
+	end
+	if not icon and professionID and C_Spell and C_Spell.GetSpellTexture and PROFESSION_ICON_SPELLS[professionID] then
+		local ok, spellIcon = pcall(C_Spell.GetSpellTexture, PROFESSION_ICON_SPELLS[professionID])
+		if ok then
+			icon = spellIcon
+		end
+	end
+	if not icon and professionID and GetSpellTexture and PROFESSION_ICON_SPELLS[professionID] then
+		local ok, spellIcon = pcall(GetSpellTexture, PROFESSION_ICON_SPELLS[professionID])
+		if ok then
+			icon = spellIcon
+		end
+	end
+	if not icon and professionID and C_TradeSkillUI and C_TradeSkillUI.GetProfessionInfoBySkillLineID then
+		local ok, info = pcall(C_TradeSkillUI.GetProfessionInfoBySkillLineID, professionID)
+		if ok and type(info) == "table" then
+			icon = info.icon or info.iconTexture or info.professionIcon
+		end
+	end
+	icon = icon or PROFESSION_ICON_FALLBACKS[professionID]
+	return GetTextureMarkup(icon, size)
 end
 
 local function HasCommissionValue(entry)
@@ -138,7 +242,7 @@ function AF:SetCommissionFields(entry, priceCopper, freeCommission, state)
 		entry.freeCommission = true
 		entry.commissionSpecified = true
 	elseif state == "paid" then
-		entry.priceCopper = tonumber(priceCopper) or 0
+		entry.priceCopper = math.min(tonumber(priceCopper) or 0, self.MAX_COMMISSION_COPPER or 100000000000)
 		entry.freeCommission = false
 		entry.commissionSpecified = true
 	else
@@ -186,6 +290,7 @@ function AF:FormatMoney(copper, free)
 	if copper <= 0 then
 		return self:Text("NO_PRICE_SET")
 	end
+	copper = math.min(copper, self.MAX_COMMISSION_COPPER or 100000000000)
 	if GetMoneyString then
 		return GetMoneyString(copper, true)
 	end
@@ -227,6 +332,14 @@ function AF:FormatCapability(entry)
 	local parts = {}
 	local normalQuality = tonumber(entry.quality)
 	local bestQuality = tonumber(entry.bestQuality)
+	local bestConcentrationQuality = tonumber(entry.bestConcentrationQuality)
+	local baseConcentrationQuality = tonumber(entry.concentrationQuality)
+	local concentrationQuality = bestConcentrationQuality
+	local concentrationAtlas = entry.bestConcentrationQualityAtlas
+	if baseConcentrationQuality and baseConcentrationQuality > (concentrationQuality or 0) then
+		concentrationQuality = baseConcentrationQuality
+		concentrationAtlas = entry.concentrationQualityAtlas
+	end
 	local baseText
 	if normalQuality and normalQuality > 0 then
 		baseText = self:Text("BASE_QUALITY", self:GetQualityIconMarkup(normalQuality, entry.qualityAtlas, 16) or ("Q" .. normalQuality))
@@ -239,7 +352,16 @@ function AF:FormatCapability(entry)
 		table.insert(parts, self:Text("RECOMMENDED_REAGENTS_QUALITY", self:GetQualityIconMarkup(bestQuality, entry.bestQualityAtlas, 16) or ("Q" .. bestQuality)))
 	end
 
-	return table.concat(parts, " - ")
+	local line = table.concat(parts, " - ")
+	if concentrationQuality and concentrationQuality > (bestQuality or normalQuality or 0) then
+		local concentrationText = self:Text("CONCENTRATION_QUALITY", self:GetQualityIconMarkup(concentrationQuality, concentrationAtlas, 16) or ("Q" .. concentrationQuality))
+		if line == "" then
+			return concentrationText
+		end
+		return line .. " - " .. concentrationText
+	end
+
+	return line
 end
 
 function AF:AddCapabilityTooltipLines(tooltip, entry)

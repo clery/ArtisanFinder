@@ -276,18 +276,22 @@ function AF:GetCurrentProfessionInfo()
 	if not info then
 		return nil
 	end
-	local professionID = info.profession or info.professionID or info.skillLineID
-	if not professionID and C_TradeSkillUI.GetProfessionChildSkillLineID then
-		professionID = C_TradeSkillUI.GetProfessionChildSkillLineID()
+	local childProfessionID = info.profession or info.professionID or info.skillLineID
+	if not childProfessionID and C_TradeSkillUI.GetProfessionChildSkillLineID then
+		childProfessionID = C_TradeSkillUI.GetProfessionChildSkillLineID()
 	end
+	local parentProfessionID = info.parentProfession or info.parentProfessionID
+	local professionID = parentProfessionID or childProfessionID
 	if not professionID then
 		return nil
 	end
 	return {
 		id = professionID,
-		name = info.professionName or info.parentProfessionName or self:Text("PROFESSION_FALLBACK", tostring(professionID)),
-		parentProfessionID = info.parentProfession or info.parentProfessionID,
-		skillLineID = info.skillLineID,
+		name = info.parentProfessionName or info.professionName or self:Text("PROFESSION_FALLBACK", tostring(professionID)),
+		parentProfessionID = parentProfessionID,
+		skillLineID = info.skillLineID or childProfessionID,
+		childProfessionID = childProfessionID,
+		icon = info.icon or info.iconTexture or info.professionIcon,
 	}
 end
 
@@ -492,6 +496,7 @@ function AF:GetRecipeCapability(recipeID)
 		capability.bestQualityAtlas = best.bestQualityAtlas
 		capability.rawBestQuality = best.rawBestQuality
 		capability.bestConcentrationQuality = best.bestConcentrationQuality
+		capability.bestConcentrationQualityAtlas = best.bestConcentrationQualityAtlas
 		capability.bestTotalSkill = best.bestTotalSkill
 		capability.bestConcentrationCost = best.bestConcentrationCost
 		capability.bestReagentSummary = best.bestReagentSummary
@@ -1016,6 +1021,7 @@ function AF:GetBestReagentCapability(recipeID)
 		bestQuality = GetRecipeDisplayQuality(recipeID, best.normalInfo, best.reagentInfo),
 		bestQualityAtlas = select(2, GetRecipeDisplayQualityInfo(recipeID, best.normalInfo, best.reagentInfo)),
 		bestConcentrationQuality = GetRecipeDisplayQuality(recipeID, best.concentrationInfo, best.reagentInfo),
+		bestConcentrationQualityAtlas = select(2, GetRecipeDisplayQualityInfo(recipeID, best.concentrationInfo, best.reagentInfo)),
 		bestTotalSkill = GetOperationTotalSkill(best.normalInfo) or GetOperationTotalSkill(best.concentrationInfo),
 		bestConcentrationCost = best.concentrationInfo and best.concentrationInfo.concentrationCost or nil,
 		bestReagentSummary = summary,
@@ -1046,6 +1052,7 @@ function AF:ApplyRecipeCapability(item, recipeID)
 	item.bestQualityAtlas = capability.bestQualityAtlas
 	item.rawBestQuality = capability.rawBestQuality
 	item.bestConcentrationQuality = capability.bestConcentrationQuality
+	item.bestConcentrationQualityAtlas = capability.bestConcentrationQualityAtlas
 	item.bestTotalSkill = capability.bestTotalSkill
 	item.bestConcentrationCost = capability.bestConcentrationCost
 	item.bestReagentSummary = capability.bestReagentSummary

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.3 - 2026-05-19
+
+### Changed
+
+- Invalidated existing local profession scan data so characters rescan with base profession IDs and updated advertising defaults after upgrading.
+- Debug customer rows now include sample concentration quality upgrades.
+
 ## 1.1.1 - 2026-05-18
 
 ### Added

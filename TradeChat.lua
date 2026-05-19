@@ -36,6 +36,12 @@ local KNOWN_PROFESSION_SKILL_LINES = {
 	[755] = true, -- Jewelcrafting
 	[773] = true, -- Inscription
 }
+local PROFESSION_SKILL_LINE_ALIASES = {
+	[5] = 185, -- Midnight Cooking
+	[6] = 186, -- Midnight Mining
+	[10] = 356, -- Midnight Fishing
+	[12] = 755, -- Midnight Jewelcrafting
+}
 
 local function ExtractTradeLinks(message)
 	local links = {}
@@ -86,6 +92,9 @@ local function AddCandidate(candidates, value)
 	value = tonumber(value)
 	if value and value ~= 0 then
 		candidates[value] = true
+		if PROFESSION_SKILL_LINE_ALIASES[value] then
+			candidates[PROFESSION_SKILL_LINE_ALIASES[value]] = true
+		end
 	end
 end
 
@@ -147,7 +156,7 @@ function AF:InjectDebugTradeLeads()
 			table.insert(professions, {
 				id = professionID,
 				link = profession.professionLink,
-				name = profession.name or self:GetProfessionName(professionID),
+				name = self:GetProfessionName(professionID, profile),
 			})
 		end
 	end
@@ -273,7 +282,7 @@ function AF:GetCachedTradeLeadFallbackRows(itemID, professionID, filterText, see
 				target = lead.target,
 				itemID = itemID,
 				professionID = normalizedProfessionID,
-				professionName = lead.professionName,
+				professionName = normalizedProfessionID ~= 0 and self:GetProfessionName(normalizedProfessionID) or lead.professionName,
 				professionLink = lead.professionLink,
 				updatedAt = lead.updatedAt,
 				tradeLead = true,
@@ -327,7 +336,7 @@ function AF:GetTradeLeadRows(itemID, professionID, filterText, seenNames, recipe
 				target = lead.target,
 				itemID = itemID,
 				professionID = normalizedProfessionID,
-				professionName = lead.professionName,
+				professionName = normalizedProfessionID ~= 0 and self:GetProfessionName(normalizedProfessionID) or lead.professionName,
 				professionLink = lead.professionLink,
 				updatedAt = lead.updatedAt,
 				tradeLead = true,

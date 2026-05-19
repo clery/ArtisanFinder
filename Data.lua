@@ -1,6 +1,75 @@
 local _, AF = ...
 
 local MIGRATIONS = {}
+local DEFAULT_OFF_ADVERTISING_PROFESSIONS = {
+	[182] = true, -- Herbalism
+	[185] = true, -- Cooking
+	[186] = true, -- Mining
+	[356] = true, -- Fishing
+	[393] = true, -- Skinning
+}
+local PROFESSION_ID_ALIASES = {
+	[5] = 185, -- Midnight Cooking
+	[6] = 186, -- Midnight Mining
+	[10] = 356, -- Midnight Fishing
+	[12] = 755, -- Midnight Jewelcrafting
+}
+local DEFAULT_OFF_ADVERTISING_NAMES = {
+	["cooking"] = true,
+	["fishing"] = true,
+	["herbalism"] = true,
+	["mining"] = true,
+	["skinning"] = true,
+}
+local BASE_PROFESSION_SPELLS = {
+	[164] = 2018, -- Blacksmithing
+	[165] = 2108, -- Leatherworking
+	[171] = 2259, -- Alchemy
+	[182] = 2366, -- Herbalism
+	[185] = 2550, -- Cooking
+	[186] = 2575, -- Mining
+	[197] = 3908, -- Tailoring
+	[202] = 4036, -- Engineering
+	[333] = 7411, -- Enchanting
+	[356] = 7620, -- Fishing
+	[393] = 8613, -- Skinning
+	[755] = 25229, -- Jewelcrafting
+	[773] = 45357, -- Inscription
+}
+local BASE_PROFESSION_NAMES = {
+	[164] = "Blacksmithing",
+	[165] = "Leatherworking",
+	[171] = "Alchemy",
+	[182] = "Herbalism",
+	[185] = "Cooking",
+	[186] = "Mining",
+	[197] = "Tailoring",
+	[202] = "Engineering",
+	[333] = "Enchanting",
+	[356] = "Fishing",
+	[393] = "Skinning",
+	[755] = "Jewelcrafting",
+	[773] = "Inscription",
+}
+
+local function GetBaseProfessionID(professionID)
+	professionID = tonumber(professionID)
+	return PROFESSION_ID_ALIASES[professionID] or professionID
+end
+
+function AF:GetBaseProfessionID(professionID)
+	return GetBaseProfessionID(professionID)
+end
+
+local function GetBaseProfessionIDFromName(professionName)
+	professionName = tostring(professionName or ""):lower()
+	for professionID, professionNamePattern in pairs(BASE_PROFESSION_NAMES) do
+		if professionName:find(professionNamePattern:lower(), 1, true) then
+			return professionID
+		end
+	end
+	return nil
+end
 
 local function EnsureProfileContainers(profile)
 	profile = profile or {}
@@ -10,10 +79,119 @@ local function EnsureProfileContainers(profile)
 	return profile
 end
 
+local function InvalidateScannedProfileData(profile)
+	if type(profile) ~= "table" then
+		return
+	end
+	profile.professions = {}
+	profile.items = {}
+end
+
+local function InvalidateScannedData(db)
+	InvalidateScannedProfileData(db.artisanProfile)
+	for _, profile in pairs(db.artisanCharacters or {}) do
+		InvalidateScannedProfileData(profile)
+	end
+	db.professionLinks = {}
+end
+
+local function GetMigrationProfessionID(professionKey, profession)
+	return GetBaseProfessionID(profession and (profession.parentProfessionID or profession.baseProfessionID))
+		or GetBaseProfessionIDFromName(profession and profession.name)
+		or GetBaseProfessionID(profession and profession.id)
+		or GetBaseProfessionID(professionKey)
+end
+
+local function PreserveEffectiveAdvertising(db)
+	db.advertising = db.advertising or {}
+	db.advertisingKnown = db.advertisingKnown or {}
+	local function preserveProfile(characterName, profile)
+		if type(profile) ~= "table" then
+			return
+		end
+		characterName = tostring(characterName or profile.characterName or "")
+		if characterName == "" then
+			return
+		end
+		local characterSettings = db.advertising[characterName]
+		local knownSettings = db.advertisingKnown[characterName]
+		for professionKey, profession in pairs(profile.professions or {}) do
+			local baseProfessionID = GetMigrationProfessionID(professionKey, profession)
+			if baseProfessionID then
+				local baseProfessionKey = tostring(baseProfessionID)
+				characterSettings = characterSettings or {}
+				knownSettings = knownSettings or {}
+				local oldValue = characterSettings[tostring(professionKey)]
+				if oldValue == nil then
+					oldValue = characterSettings[baseProfessionKey]
+				end
+				characterSettings[baseProfessionKey] = oldValue ~= false
+				knownSettings[baseProfessionKey] = true
+				if tostring(professionKey) ~= baseProfessionKey then
+					characterSettings[tostring(professionKey)] = nil
+					knownSettings[tostring(professionKey)] = nil
+				end
+			end
+		end
+		if characterSettings and next(characterSettings) ~= nil then
+			db.advertising[characterName] = characterSettings
+		end
+		if knownSettings and next(knownSettings) ~= nil then
+			db.advertisingKnown[characterName] = knownSettings
+		end
+	end
+	for characterName, profile in pairs(db.artisanCharacters or {}) do
+		preserveProfile(characterName, profile)
+	end
+	if type(db.artisanProfile) == "table" then
+		preserveProfile(db.artisanProfile.characterName, db.artisanProfile)
+	end
+end
+
+local function NormalizeProfessionKeyedSettings(db)
+	for _, characterSettings in pairs(db.advertising or {}) do
+		if type(characterSettings) == "table" then
+			for professionKey, value in pairs(characterSettings) do
+				local baseProfessionID = GetBaseProfessionID(professionKey)
+				local baseProfessionKey = baseProfessionID and tostring(baseProfessionID) or nil
+				if baseProfessionKey and baseProfessionKey ~= professionKey then
+					if characterSettings[baseProfessionKey] == nil then
+						characterSettings[baseProfessionKey] = value
+					end
+					characterSettings[professionKey] = nil
+				end
+			end
+		end
+	end
+
+	local function normalizeProfilePrices(profile)
+		local professionPrices = type(profile) == "table" and profile.professionPrices or nil
+		if type(professionPrices) ~= "table" then
+			return
+		end
+		for professionKey, value in pairs(professionPrices) do
+			local baseProfessionID = GetBaseProfessionID(professionKey)
+			local baseProfessionKey = baseProfessionID and tostring(baseProfessionID) or nil
+			if baseProfessionKey and baseProfessionKey ~= professionKey then
+				if professionPrices[baseProfessionKey] == nil then
+					professionPrices[baseProfessionKey] = value
+				end
+				professionPrices[professionKey] = nil
+			end
+		end
+	end
+
+	normalizeProfilePrices(db.artisanProfile)
+	for _, profile in pairs(db.artisanCharacters or {}) do
+		normalizeProfilePrices(profile)
+	end
+end
+
 local function ApplyDBDefaults(db)
 	db.artisanProfile = EnsureProfileContainers(db.artisanProfile)
 	db.artisanCharacters = db.artisanCharacters or {}
 	db.advertising = db.advertising or {}
+	db.advertisingKnown = db.advertisingKnown or {}
 	db.customerCache = db.customerCache or {}
 	db.favoriteArtisans = db.favoriteArtisans or {}
 	db.responseThrottle = db.responseThrottle or {}
@@ -85,6 +263,7 @@ end
 MIGRATIONS[6] = function(db)
 	db.artisanCharacters = db.artisanCharacters or {}
 	db.advertising = db.advertising or {}
+	db.advertisingKnown = db.advertisingKnown or {}
 end
 
 MIGRATIONS[7] = function(db)
@@ -95,6 +274,13 @@ end
 
 MIGRATIONS[8] = function(db)
 	db.professionLinks = db.professionLinks or {}
+end
+
+MIGRATIONS[9] = function(db)
+	ApplyDBDefaults(db)
+	PreserveEffectiveAdvertising(db)
+	NormalizeProfessionKeyedSettings(db)
+	InvalidateScannedData(db)
 end
 
 function AF:MigrateDB(db)
@@ -237,6 +423,46 @@ function AF:ForEachArtisanProfile(callback)
 	end
 end
 
+function AF:IsProfessionAdvertisedByDefault(professionID)
+	professionID = GetBaseProfessionID(professionID)
+	if not professionID then
+		return false
+	end
+	return DEFAULT_OFF_ADVERTISING_PROFESSIONS[professionID] ~= true
+end
+
+function AF:GetProfessionDefaultAdvertisingID(professionID, profileOrRow)
+	professionID = GetBaseProfessionID(professionID)
+	if type(profileOrRow) == "table" then
+		local parentProfessionID = GetBaseProfessionID(profileOrRow.parentProfessionID or profileOrRow.baseProfessionID)
+		if parentProfessionID then
+			return parentProfessionID
+		end
+		local namedProfessionID = GetBaseProfessionIDFromName(profileOrRow.name or profileOrRow.professionName)
+		if namedProfessionID then
+			return namedProfessionID
+		end
+		if profileOrRow.professions and professionID then
+			local profession = profileOrRow.professions[tostring(professionID)]
+			parentProfessionID = GetBaseProfessionID(profession and profession.parentProfessionID)
+			if parentProfessionID then
+				return parentProfessionID
+			end
+		end
+	end
+	return professionID
+end
+
+function AF:IsProfessionDefaultOffByName(professionName)
+	professionName = tostring(professionName or ""):lower()
+	for name in pairs(DEFAULT_OFF_ADVERTISING_NAMES) do
+		if professionName:find(name, 1, true) then
+			return true
+		end
+	end
+	return false
+end
+
 function AF:IsProfessionAdvertised(characterName, professionID)
 	characterName = self:NormalizeName(characterName)
 	professionID = tostring(professionID or "")
@@ -244,21 +470,39 @@ function AF:IsProfessionAdvertised(characterName, professionID)
 		return false
 	end
 	local characterSettings = self.db and self.db.advertising and self.db.advertising[characterName]
-	return not (characterSettings and characterSettings[professionID] == false)
+	local setting = characterSettings and characterSettings[professionID]
+	if setting ~= nil then
+		return setting == true
+	end
+	local profile = self.db and self.db.artisanCharacters and self.db.artisanCharacters[characterName]
+	local profession = profile and profile.professions and profile.professions[professionID]
+	local defaultID = self:GetProfessionDefaultAdvertisingID(professionID, profession)
+	if self:IsProfessionDefaultOffByName(profession and profession.name) then
+		return false
+	end
+	return self:IsProfessionAdvertisedByDefault(defaultID)
 end
 
 function AF:SetProfessionAdvertised(characterName, professionID, enabled)
 	characterName = self:NormalizeName(characterName)
-	professionID = tostring(professionID or "")
-	if not characterName or professionID == "" or not self.db then
+	local professionKey = tostring(professionID or "")
+	if not characterName or professionKey == "" or not self.db then
 		return
 	end
 	self.db.advertising = self.db.advertising or {}
+	self.db.advertisingKnown = self.db.advertisingKnown or {}
+	self.db.advertisingKnown[characterName] = self.db.advertisingKnown[characterName] or {}
+	self.db.advertisingKnown[characterName][professionKey] = true
 	self.db.advertising[characterName] = self.db.advertising[characterName] or {}
-	if enabled == false then
-		self.db.advertising[characterName][professionID] = false
+	local profile = self.db and self.db.artisanCharacters and self.db.artisanCharacters[characterName]
+	local profession = profile and profile.professions and profile.professions[professionKey]
+	local defaultAdvertised = (not self:IsProfessionDefaultOffByName(profession and profession.name))
+		and self:IsProfessionAdvertisedByDefault(self:GetProfessionDefaultAdvertisingID(professionKey, profession))
+	enabled = enabled == true
+	if enabled == defaultAdvertised then
+		self.db.advertising[characterName][professionKey] = nil
 	else
-		self.db.advertising[characterName][professionID] = nil
+		self.db.advertising[characterName][professionKey] = enabled
 	end
 	if next(self.db.advertising[characterName]) == nil then
 		self.db.advertising[characterName] = nil
@@ -333,10 +577,17 @@ function AF:StoreProfessionLink(characterName, professionID, professionLink, pro
 	profession.id = professionID
 	profession.name = professionName or profession.name
 	profession.professionLink = professionLink
+	if not profession.icon and self.GetCurrentProfessionInfo then
+		local currentProfession = self:GetCurrentProfessionInfo()
+		if currentProfession and tonumber(currentProfession.id) == professionID then
+			profession.icon = currentProfession.icon
+		end
+	end
 
 	for _, item in pairs(profile.items or {}) do
 		if tonumber(item.professionID) == professionID then
 			item.professionLink = professionLink
+			item.professionIcon = item.professionIcon or profession.icon
 		end
 	end
 
@@ -413,9 +664,10 @@ function AF:GetProfessionScannedCount(profile, professionID)
 	if not profile or not professionID then
 		return 0
 	end
+	local baseProfessionID = self:GetBaseProfessionID(professionID)
 	local count = 0
 	for _, item in pairs(profile.items or {}) do
-		if tonumber(item.professionID) == tonumber(professionID) then
+		if self:GetBaseProfessionID(item.professionID) == baseProfessionID then
 			count = count + 1
 		end
 	end
@@ -440,11 +692,15 @@ function AF:GetScannedProfessionRows()
 			local professionID = tonumber(profession.id) or tonumber(professionKey)
 			local count = self:GetProfessionScannedCount(profile, professionID)
 			if professionID and count > 0 then
+				local displayProfessionID = self:GetProfessionDefaultAdvertisingID(professionID, profession)
 				added[professionID] = true
 				table.insert(rows, {
 					characterName = characterName,
 					professionID = professionID,
-					professionName = profession.name or self:GetProfessionName(professionID, profile),
+					baseProfessionID = displayProfessionID,
+					parentProfessionID = profession.parentProfessionID,
+					professionName = self:GetProfessionName(displayProfessionID, profile),
+					professionIcon = profession.icon or profession.professionIcon or profession.iconTexture,
 					count = count,
 					advertised = self:IsProfessionAdvertised(characterName, professionID),
 				})
@@ -453,11 +709,15 @@ function AF:GetScannedProfessionRows()
 		for _, item in pairs(profile.items or {}) do
 			local professionID = tonumber(item.professionID)
 			if professionID and not added[professionID] then
+				local displayProfessionID = self:GetProfessionDefaultAdvertisingID(professionID, item)
 				added[professionID] = true
 				table.insert(rows, {
 					characterName = characterName,
 					professionID = professionID,
-					professionName = item.professionName or self:GetProfessionName(professionID, profile),
+					baseProfessionID = displayProfessionID,
+					parentProfessionID = item.parentProfessionID,
+					professionName = self:GetProfessionName(displayProfessionID, profile),
+					professionIcon = item.professionIcon or item.icon or item.iconTexture,
 					count = self:GetProfessionScannedCount(profile, professionID),
 					advertised = self:IsProfessionAdvertised(characterName, professionID),
 				})
@@ -475,23 +735,113 @@ function AF:GetScannedProfessionRows()
 	return rows
 end
 
+function AF:GetAdvertisingProfessionRows()
+	local rows = self:GetScannedProfessionRows()
+	local added = {}
+	for _, row in ipairs(rows) do
+		local key = tostring(row.characterName or "") .. ":" .. tostring(row.professionID or "")
+		added[key] = true
+		row.hasScanned = true
+	end
+
+	for characterName, characterSettings in pairs(self.db and self.db.advertising or {}) do
+		if type(characterSettings) == "table" then
+			for professionKey in pairs(characterSettings) do
+				local professionID = tonumber(professionKey)
+				local key = tostring(characterName or "") .. ":" .. tostring(professionID or "")
+				if professionID and not added[key] then
+					local baseProfessionID = self:GetProfessionDefaultAdvertisingID(professionID)
+					table.insert(rows, {
+						characterName = characterName,
+						professionID = professionID,
+						baseProfessionID = baseProfessionID,
+						professionName = self:GetProfessionName(baseProfessionID),
+						count = 0,
+						advertised = self:IsProfessionAdvertised(characterName, professionID),
+						preservedSetting = true,
+					})
+					added[key] = true
+				end
+			end
+		end
+	end
+
+	for characterName, characterSettings in pairs(self.db and self.db.advertisingKnown or {}) do
+		if type(characterSettings) == "table" then
+			for professionKey in pairs(characterSettings) do
+				local professionID = tonumber(professionKey)
+				local key = tostring(characterName or "") .. ":" .. tostring(professionID or "")
+				if professionID and not added[key] then
+					local baseProfessionID = self:GetProfessionDefaultAdvertisingID(professionID)
+					table.insert(rows, {
+						characterName = characterName,
+						professionID = professionID,
+						baseProfessionID = baseProfessionID,
+						professionName = self:GetProfessionName(baseProfessionID),
+						count = 0,
+						advertised = self:IsProfessionAdvertised(characterName, professionID),
+						preservedSetting = true,
+					})
+					added[key] = true
+				end
+			end
+		end
+	end
+
+	table.sort(rows, function(a, b)
+		local aCharacter = tostring(a.characterName or "")
+		local bCharacter = tostring(b.characterName or "")
+		if aCharacter ~= bCharacter then
+			return aCharacter < bCharacter
+		end
+		return tostring(a.professionName or "") < tostring(b.professionName or "")
+	end)
+	return rows
+end
+
 function AF:GetProfessionName(professionID, profile)
 	profile = profile or (self.db and self.db.artisanProfile)
 	local info = profile and profile.professions and profile.professions[tostring(professionID or "")]
-	return info and info.name or self:Text("PROFESSION_FALLBACK", tostring(professionID or "?"))
+	local namedProfessionID = GetBaseProfessionIDFromName(info and info.name)
+	if namedProfessionID and namedProfessionID ~= tonumber(professionID) then
+		return self:GetProfessionName(namedProfessionID)
+	end
+	if info and info.name then
+		return info.name
+	end
+	professionID = GetBaseProfessionID(professionID)
+	local spellID = BASE_PROFESSION_SPELLS[professionID]
+	if spellID and C_Spell and C_Spell.GetSpellName then
+		local ok, name = pcall(C_Spell.GetSpellName, spellID)
+		if ok and name and name ~= "" then
+			return name
+		end
+	end
+	if spellID and GetSpellInfo then
+		local ok, name = pcall(GetSpellInfo, spellID)
+		if ok and name and name ~= "" then
+			return name
+		end
+	end
+	return BASE_PROFESSION_NAMES[professionID] or self:Text("PROFESSION_FALLBACK", tostring(professionID or "?"))
 end
 
 function AF:GetItemPriceForProfile(profile, itemID, professionID)
 	profile = self:NormalizeArtisanProfile(profile)
 	local item = profile.items[tostring(itemID or "")]
 	local professionPrice = profile.professionPrices[tostring(professionID or "")]
+	local baseProfessionID = self:GetProfessionDefaultAdvertisingID(professionID, item)
+	local baseProfessionPrice = baseProfessionID and profile.professionPrices[tostring(baseProfessionID)] or nil
 	local priceCopper, freeCommission = self:GetEntryCommission(item)
 	local note = self:GetEntryNote(item)
 	if not priceCopper then
 		priceCopper, freeCommission = self:GetEntryCommission(professionPrice)
+		if not priceCopper then
+			priceCopper, freeCommission = self:GetEntryCommission(baseProfessionPrice)
+		end
 	end
 	if not note then
-		note = self:GetEntryNote(professionPrice)
+		note = self:GetEntryNote(professionPrice) or self:GetEntryNote(baseProfessionPrice)
 	end
 	return tonumber(priceCopper) or 0, freeCommission == true, note or ""
 end

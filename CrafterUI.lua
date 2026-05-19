@@ -3,6 +3,8 @@ local _, AF = ...
 local DEFAULT_COMMISSION_PANEL_WIDTH = 356
 local DEFAULT_COMMISSION_PANEL_HEIGHT = 276
 local CRAFTER_COLLAPSE_BUTTON_LEVEL_OFFSET = 1000
+local COMMISSION_PRICE_FIELD_WIDTH = 104
+local COMMISSION_PRICE_MAX_LETTERS = 9
 
 local function UpdatePlaceholder(box)
 	box.Placeholder:SetShown((box:GetText() or "") == "" and not box:HasFocus())
@@ -23,6 +25,14 @@ local function WatchEditBox(box, callback)
 			callback()
 		end
 	end)
+end
+
+local function ClampCommissionEditBox(box)
+	local value = tonumber(box:GetText())
+	if not value or value <= (AF.MAX_COMMISSION_GOLD or 99999999) then
+		return
+	end
+	SetEditBoxText(box, tostring(AF.MAX_COMMISSION_GOLD or 99999999))
 end
 
 local function PrepareInsetEditBox(field, width, placeholderKey, hasGoldIcon)
@@ -290,8 +300,7 @@ function AF:GetCurrentCraftingRecipeContext()
 		end
 	end
 
-	local professionID = professionInfo and (professionInfo.profession or professionInfo.professionID or professionInfo.skillLineID)
-	professionID = professionID or currentProfession.id
+	local professionID = currentProfession.id
 
 	return itemID and {
 		itemID = itemID,
@@ -301,7 +310,8 @@ function AF:GetCurrentCraftingRecipeContext()
 		learned = recipeInfo.learned ~= false,
 		isRecraft = isRecraft,
 		professionID = professionID,
-		professionName = (professionInfo and professionInfo.professionName) or currentProfession.name,
+		professionName = currentProfession.name,
+		professionIcon = currentProfession.icon,
 	} or nil
 end
 
@@ -322,6 +332,7 @@ function AF:EnsureCurrentRecipeEntry(context)
 	item.itemName = context.itemName or item.itemName
 	item.professionID = context.professionID or item.professionID
 	item.professionName = context.professionName or item.professionName
+	item.professionIcon = context.professionIcon or item.professionIcon
 	self:ApplyRecipeCapability(item, context.recipeID)
 	item.updatedAt = self:Now()
 
@@ -334,6 +345,7 @@ function AF:EnsureCurrentRecipeEntry(context)
 		}
 		self.db.artisanProfile.professions[professionKey] = profession
 		profession.name = context.professionName or profession.name
+		profession.icon = context.professionIcon or profession.icon
 		profession.updatedAt = self:Now()
 		profession.professionLink = item.professionLink or profession.professionLink
 		profession.recipes = profession.recipes or {}
@@ -354,15 +366,16 @@ function AF:AttachCrafterUI()
 	frame.priceLabel:SetJustifyH("LEFT")
 	frame.priceLabel:SetText(self:Text("COMMISSION"))
 
-	frame.price = PrepareInsetEditBox(frame.priceField, 78, "COMMISSION_PLACEHOLDER", true)
+	frame.price = PrepareInsetEditBox(frame.priceField, COMMISSION_PRICE_FIELD_WIDTH, "COMMISSION_PLACEHOLDER", true)
 	SetFieldPoint(frame.price, "LEFT", frame.priceLabel, "RIGHT", 4, 0)
+	frame.price:SetMaxLetters(COMMISSION_PRICE_MAX_LETTERS)
 
 	frame.noteLabel:SetJustifyH("LEFT")
 	frame.noteLabel:SetText(self:Text("NOTE"))
 
 	frame.note = PrepareInsetEditBox(frame.noteField, 170, "NOTE_PLACEHOLDER")
 	SetFieldPoint(frame.note, "LEFT", frame.noteLabel, "RIGHT", 4, 0)
-	frame.note:SetMaxLetters(AF.MAX_NOTE_BYTES)
+	frame.note:SetMaxLetters(AF.MAX_NOTE_CHARS or 256)
 
 	frame.save:SetPoint("LEFT", frame.note, "RIGHT", 8, 0)
 	FitNoteAndSave(frame, frame.noteLabel, frame.note, frame.save, 326, 120)
@@ -411,15 +424,16 @@ function AF:AttachCrafterUI()
 	defaults.priceLabel:SetJustifyH("LEFT")
 	defaults.priceLabel:SetText(self:Text("COMMISSION"))
 
-	defaults.price = PrepareInsetEditBox(defaults.priceField, 78, "COMMISSION_PLACEHOLDER", true)
+	defaults.price = PrepareInsetEditBox(defaults.priceField, COMMISSION_PRICE_FIELD_WIDTH, "COMMISSION_PLACEHOLDER", true)
 	SetFieldPoint(defaults.price, "LEFT", defaults.priceLabel, "RIGHT", 4, 0)
+	defaults.price:SetMaxLetters(COMMISSION_PRICE_MAX_LETTERS)
 
 	defaults.noteLabel:SetJustifyH("LEFT")
 	defaults.noteLabel:SetText(self:Text("NOTE"))
 
 	defaults.note = PrepareInsetEditBox(defaults.noteField, 128, "NOTE_PLACEHOLDER")
 	SetFieldPoint(defaults.note, "LEFT", defaults.noteLabel, "RIGHT", 4, 0)
-	defaults.note:SetMaxLetters(AF.MAX_NOTE_BYTES)
+	defaults.note:SetMaxLetters(AF.MAX_NOTE_CHARS or 256)
 
 	FitStackedDefaultNoteAndSave(defaults, defaults.noteLabel, defaults.note, defaults.save)
 	defaults.save:Disable()
@@ -451,6 +465,7 @@ function AF:AttachCrafterUI()
 	fastScanButton:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 		GameTooltip:SetText(AF:Text("FAST_SCAN_BUTTON"), 1, 0.82, 0)
+		GameTooltip:AddLine(AF:Text("FAST_SCAN_STATE", AF.db and AF.db.fastScan and AF:Text("ENABLED") or AF:Text("DISABLED")), 0.85, 0.85, 0.85, true)
 		GameTooltip:AddLine(AF:Text("FAST_SCAN_TOOLTIP"), 1, 1, 1, true)
 		GameTooltip:Show()
 	end)
@@ -483,9 +498,11 @@ function AF:AttachCrafterUI()
 	end)
 
 	local markItemDirty = function()
+		ClampCommissionEditBox(frame.price)
 		AF:UpdateCrafterDirtyState()
 	end
 	local markDefaultDirty = function()
+		ClampCommissionEditBox(defaults.price)
 		AF:UpdateCrafterDirtyState()
 	end
 	WatchEditBox(frame.price, markItemDirty)
@@ -577,9 +594,12 @@ function AF:UpdateFastScanButton()
 	end
 	local active = self.activeScan
 	local currentProfession = self:GetCurrentProfessionInfo()
-	local isCurrentScan = active and currentProfession and tonumber(active.professionID) == tonumber(currentProfession.id)
-	SizeButtonForText(button, self:Text("FAST_SCAN_BUTTON"), 96, 120)
-	if isCurrentScan then
+	local fastScanText = self:Text("FAST_SCAN_BUTTON")
+	if self.db and self.db.fastScan == true then
+		fastScanText = "|TInterface\\Buttons\\UI-CheckBox-Check:14:14:0:0|t " .. fastScanText
+	end
+	SizeButtonForText(button, fastScanText, 108, 140)
+	if currentProfession then
 		button:Enable()
 	else
 		button:Disable()

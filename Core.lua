@@ -146,7 +146,8 @@ function AF:SetAutoAvailability(enabled)
 	self:Print(self:Text("AUTO_AVAILABILITY_CHANGED", self.db.autoAvailability and self:Text("ENABLED") or self:Text("DISABLED")))
 	if self.db.autoAvailability then
 		self:QueueAutoAvailabilityRefresh()
-	elseif self.RefreshMinimap then
+	end
+	if self.RefreshMinimap then
 		self:RefreshMinimap()
 	end
 	if self.RefreshOptionsPanel then

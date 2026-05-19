@@ -19,6 +19,60 @@ local function OpenProfessionPanel()
 	end)
 end
 
+function AF:PopulateMinimapTooltip(tooltip)
+	if not tooltip or not tooltip.AddLine then
+		return
+	end
+	tooltip:AddLine("ArtisanFinder", 1, 0.82, 0)
+	tooltip:AddLine(AF.available and AF:Text("MINIMAP_AVAILABLE") or AF:Text("MINIMAP_UNAVAILABLE"), AF.available and 0.1 or 1, AF.available and 1 or 0.25, 0.1)
+	tooltip:AddLine(AF:Text("MINIMAP_AUTO_AVAILABILITY", AF.db.autoAvailability and AF:Text("ENABLED") or AF:Text("DISABLED")), 1, 1, 1)
+	if AF.db.autoAvailability then
+		tooltip:AddLine(AF:Text("MINIMAP_AUTO_HINT"), 0.65, 0.65, 0.65, true)
+	end
+	local professionRows = AF:GetAdvertisingProfessionRows()
+	if #professionRows > 0 then
+		local currentCharacter
+		for _, row in ipairs(professionRows) do
+			if row.characterName ~= currentCharacter then
+				currentCharacter = row.characterName
+				tooltip:AddLine(AF:GetDisplayPlayerName(currentCharacter), 1, 0.82, 0)
+			end
+			local icon = AF:GetProfessionIconMarkup(row.professionID, row, 14) or ""
+			local text = AF:Text("MINIMAP_PROFESSION_SCANNED", row.professionName, row.count)
+			if icon ~= "" then
+				text = icon .. " " .. text
+			end
+			if row.advertised then
+				tooltip:AddLine("  " .. text, 1, 1, 1)
+			else
+				tooltip:AddLine("  " .. text .. " |cff888888(" .. AF:Text("MINIMAP_NOT_ADVERTISED") .. ")|r", 0.65, 0.65, 0.65)
+			end
+		end
+	else
+		tooltip:AddLine(AF:Text("MINIMAP_SCANNED", 0), 1, 1, 1)
+	end
+	tooltip:AddLine(" ")
+	tooltip:AddLine(AF:Text("MINIMAP_LEFT_CLICK"), 0.65, 0.65, 0.65)
+	tooltip:AddLine(AF:Text("MINIMAP_MIDDLE_CLICK"), 0.65, 0.65, 0.65)
+	tooltip:AddLine(AF:Text("MINIMAP_RIGHT_CLICK"), 0.65, 0.65, 0.65)
+	tooltip:AddLine(AF:Text("MINIMAP_SHIFT_CLICK"), 0.65, 0.65, 0.65)
+end
+
+function AF:RefreshOpenMinimapTooltip()
+	local tooltip = _G.LibDBIconTooltip
+	if not self.minimapTooltipShown or not tooltip or not tooltip:IsShown() or not tooltip.ClearLines then
+		return
+	end
+	local owner = tooltip.GetOwner and tooltip:GetOwner()
+	local ownerName = owner and owner.GetName and owner:GetName()
+	if ownerName and ownerName ~= "LibDBIcon10_ArtisanFinder" then
+		return
+	end
+	tooltip:ClearLines()
+	self:PopulateMinimapTooltip(tooltip)
+	tooltip:Show()
+end
+
 function AF:InitializeMinimap()
 	if self.minimapInitialized then
 		return
@@ -56,38 +110,11 @@ function AF:InitializeMinimap()
 			end
 		end,
 		OnTooltipShow = function(tooltip)
-			if not tooltip or not tooltip.AddLine then
-				return
-			end
-			tooltip:AddLine("ArtisanFinder", 1, 0.82, 0)
-			tooltip:AddLine(AF.available and AF:Text("MINIMAP_AVAILABLE") or AF:Text("MINIMAP_UNAVAILABLE"), AF.available and 0.1 or 1, AF.available and 1 or 0.25, 0.1)
-			tooltip:AddLine(AF:Text("MINIMAP_AUTO_AVAILABILITY", AF.db.autoAvailability and AF:Text("ENABLED") or AF:Text("DISABLED")), 1, 1, 1)
-			if AF.db.autoAvailability then
-				tooltip:AddLine(AF:Text("MINIMAP_AUTO_HINT"), 0.65, 0.65, 0.65, true)
-			end
-			local professionRows = AF:GetScannedProfessionRows()
-			if #professionRows > 0 then
-				local currentCharacter
-				for _, row in ipairs(professionRows) do
-					if row.characterName ~= currentCharacter then
-						currentCharacter = row.characterName
-						tooltip:AddLine(AF:GetDisplayPlayerName(currentCharacter), 1, 0.82, 0)
-					end
-					local text = AF:Text("MINIMAP_PROFESSION_SCANNED", row.professionName, row.count)
-					if row.advertised then
-						tooltip:AddLine("  " .. text, 1, 1, 1)
-					else
-						tooltip:AddLine("  " .. text .. " |cff888888(" .. AF:Text("MINIMAP_NOT_ADVERTISED") .. ")|r", 0.65, 0.65, 0.65)
-					end
-				end
-			else
-				tooltip:AddLine(AF:Text("MINIMAP_SCANNED", 0), 1, 1, 1)
-			end
-			tooltip:AddLine(" ")
-			tooltip:AddLine(AF:Text("MINIMAP_LEFT_CLICK"), 0.65, 0.65, 0.65)
-			tooltip:AddLine(AF:Text("MINIMAP_MIDDLE_CLICK"), 0.65, 0.65, 0.65)
-			tooltip:AddLine(AF:Text("MINIMAP_RIGHT_CLICK"), 0.65, 0.65, 0.65)
-			tooltip:AddLine(AF:Text("MINIMAP_SHIFT_CLICK"), 0.65, 0.65, 0.65)
+			AF.minimapTooltipShown = true
+			AF:PopulateMinimapTooltip(tooltip)
+		end,
+		OnLeave = function()
+			AF.minimapTooltipShown = false
 		end,
 	})
 
@@ -139,4 +166,5 @@ function AF:RefreshMinimap()
 			self.minimapIcon:Show("ArtisanFinder")
 		end
 	end
+	self:RefreshOpenMinimapTooltip()
 end
