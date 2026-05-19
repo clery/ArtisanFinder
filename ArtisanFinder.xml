@@ -227,7 +227,7 @@
 	</Frame>
 
 	<Frame name="ArtisanFinderProfessionDefaultsTemplate" virtual="true" inherits="DefaultPanelTemplate">
-		<Size x="356" y="276"/>
+		<Size x="392" y="276"/>
 		<Layers>
 			<Layer level="OVERLAY">
 				<FontString parentKey="defaultsHeader" inherits="GameFontNormalSmall" justifyH="LEFT">
@@ -258,6 +258,9 @@
 					<Anchors>
 						<Anchor point="TOPLEFT" x="14" y="-170"/>
 					</Anchors>
+				</FontString>
+				<FontString parentKey="scanProgressText" inherits="GameFontHighlightSmall" justifyH="LEFT" hidden="true">
+					<Size x="46" y="20"/>
 				</FontString>
 				<Texture parentKey="scanDivider" atlas="Options_HorizontalDivider">
 					<Size y="2"/>

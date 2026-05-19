@@ -84,6 +84,9 @@ end
 function AF:RefreshLocalizedUI()
 	self:RefreshCustomerLocale()
 	self:RefreshCrafterLocale()
+	if self.RefreshTutorialLocale then
+		self:RefreshTutorialLocale()
+	end
 	self:RefreshMainUI()
 end
 

@@ -6,6 +6,7 @@
 
 - Added an account-wide first-run tutorial.
 - Added `/af tutorial reset` to restart the tutorial from the beginning.
+- Added scan progress percentage in the ArtisanFinder profession panel.
 
 ## 1.2.0 - 2026-05-19
 

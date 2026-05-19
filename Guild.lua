@@ -51,7 +51,7 @@ local function GetGuildRosterRequester()
 	if C_GuildInfo and C_GuildInfo.GuildRoster then
 		return C_GuildInfo.GuildRoster
 	end
-	return GuildRoster
+	return nil
 end
 
 local function RequestGuildRoster()

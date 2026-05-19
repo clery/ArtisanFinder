@@ -449,6 +449,28 @@ function AF:GetActiveScanProgress()
 	return active, professionEntry, progress
 end
 
+function AF:GetCurrentProfessionScanPercent(profession)
+	local active, _, progress = self:GetActiveScanProgress()
+	if not active or not progress or not profession or tonumber(active.professionID) ~= tonumber(profession.id) then
+		return nil
+	end
+
+	local total = tonumber(progress.total) or 0
+	if total <= 0 then
+		return 0
+	end
+
+	local completed = self:TableCount(progress.completed)
+	local percent = math.floor((completed / total) * 100)
+	if percent < 0 then
+		return 0
+	end
+	if percent > 100 then
+		return 100
+	end
+	return percent
+end
+
 function AF:RefreshScanProgressUI(force)
 	self.scanRefreshCounter = (self.scanRefreshCounter or 0) + 1
 	if force or self.scanRefreshCounter >= 8 then

@@ -7,12 +7,8 @@ local HELP_PLATE_TILE_BUTTON_SIZE = 46
 local HELP_PLATE_HIGHLIGHT_PADDING = 7
 
 local function EnsureHelpPlate()
-	if C_AddOns and C_AddOns.LoadAddOn then
-		C_AddOns.LoadAddOn("Blizzard_HelpPlate")
-	elseif LoadAddOn then
-		LoadAddOn("Blizzard_HelpPlate")
-	end
-	return HelpPlate ~= nil
+	C_AddOns.LoadAddOn("Blizzard_HelpPlate")
+	return true
 end
 
 local function StopActiveTutorial()
@@ -240,9 +236,31 @@ local function CreateTutorialButton(parent, point, relativeTo, relativePoint, x,
 	button:SetFrameStrata(parent:GetFrameStrata())
 	button:SetFrameLevel((parent:GetFrameLevel() or 0) + 500)
 	button:SetToplevel(true)
-	button.mainHelpPlateButtonTooltipText = AF:Text("TUTORIAL_HELP_BUTTON_TOOLTIP")
+	button:SetScript("OnEnter", function(self)
+		local tooltipText = AF:Text("TUTORIAL_HELP_BUTTON_TOOLTIP")
+		self.mainHelpPlateButtonTooltipText = tooltipText
+		self.tooltipText = tooltipText
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		GameTooltip:SetText(tooltipText, 1, 0.82, 0)
+		GameTooltip:Show()
+	end)
+	button:SetScript("OnLeave", function()
+		GameTooltip:Hide()
+	end)
 	button:SetPoint(point, relativeTo or parent, relativePoint or point, x or 0, y or 0)
 	return button
+end
+
+function AF:RefreshTutorialLocale()
+	local tooltipText = self:Text("TUTORIAL_HELP_BUTTON_TOOLTIP")
+	if self.crafterTutorialButton then
+		self.crafterTutorialButton.mainHelpPlateButtonTooltipText = tooltipText
+		self.crafterTutorialButton.tooltipText = tooltipText
+	end
+	if self.customerTutorialButton then
+		self.customerTutorialButton.mainHelpPlateButtonTooltipText = tooltipText
+		self.customerTutorialButton.tooltipText = tooltipText
+	end
 end
 
 function AF:InitializeTutorial()

@@ -1,6 +1,6 @@
 local _, AF = ...
 
-local DEFAULT_COMMISSION_PANEL_WIDTH = 356
+local DEFAULT_COMMISSION_PANEL_WIDTH = 392
 local DEFAULT_COMMISSION_PANEL_HEIGHT = 276
 local CRAFTER_COLLAPSE_BUTTON_LEVEL_OFFSET = 1000
 local COMMISSION_PRICE_FIELD_WIDTH = 104
@@ -505,6 +505,7 @@ function AF:AttachCrafterUI()
 	self.crafterDefaultsCollapseButton = collapseButton
 	self.crafterFastScanButton = fastScanButton
 	self.crafterForceRescanButton = forceRescanButton
+	self.crafterScanProgressText = defaults.scanProgressText
 	defaults.collapsibleRegions = {
 		defaults.tutorialButton,
 		defaults.defaultsHeader,
@@ -520,6 +521,7 @@ function AF:AttachCrafterUI()
 		defaults.save,
 		defaults.fastScanButton,
 		defaults.forceRescanButton,
+		defaults.scanProgressText,
 		defaults.advertiseCheck,
 	}
 
@@ -579,6 +581,7 @@ end
 function AF:UpdateFastScanButton()
 	local button = self.crafterFastScanButton
 	local forceRescanButton = self.crafterForceRescanButton
+	local scanProgressText = self.crafterScanProgressText
 	local defaults = self.crafterDefaultsFrame
 	if not button or not defaults then
 		return
@@ -606,6 +609,22 @@ function AF:UpdateFastScanButton()
 			forceRescanButton:Disable()
 		end
 		forceRescanButton:SetShown(defaults:IsShown() and not self.crafterDefaultsCollapsed)
+	end
+	if scanProgressText then
+		scanProgressText:ClearAllPoints()
+		if forceRescanButton then
+			scanProgressText:SetPoint("LEFT", forceRescanButton, "RIGHT", 8, 0)
+		else
+			scanProgressText:SetPoint("LEFT", button, "RIGHT", 8, 0)
+		end
+		local percent = self:GetCurrentProfessionScanPercent(currentProfession)
+		if percent then
+			scanProgressText:SetText(string.format("%d%%", percent))
+			scanProgressText:SetShown(defaults:IsShown() and not self.crafterDefaultsCollapsed)
+		else
+			scanProgressText:SetText("")
+			scanProgressText:Hide()
+		end
 	end
 end
 
