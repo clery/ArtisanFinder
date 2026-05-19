@@ -732,6 +732,9 @@ function AF:AttachCustomerUI()
 	frame.search:SetAutoFocus(false)
 	frame.search:SetScript("OnTextChanged", function()
 		SearchBoxTemplate_OnTextChanged(frame.search)
+		if AF.StartCustomerWhoStatusChecks then
+			AF:StartCustomerWhoStatusChecks()
+		end
 		AF:RefreshCustomerResults()
 	end)
 
@@ -747,6 +750,9 @@ function AF:AttachCustomerUI()
 		end
 		AF.db.defaultSort = GetSortMode(AF.customerSortIndex).key
 		frame.sort:SetText(AF:Text("SORT_BUTTON", GetSortLabel(AF.customerSortIndex)))
+		if AF.StartCustomerWhoStatusChecks then
+			AF:StartCustomerWhoStatusChecks()
+		end
 		AF:RefreshCustomerResults()
 		if AF.RefreshOptionsPanel then
 			AF:RefreshOptionsPanel()
@@ -758,6 +764,9 @@ function AF:AttachCustomerUI()
 	frame.refresh:SetPoint("LEFT", frame.sort, "RIGHT", 6, 0)
 	frame.refresh:SetText(self:Text("REFRESH"))
 	frame.refresh:SetScript("OnClick", function()
+		if AF.StartCustomerWhoStatusChecks then
+			AF:StartCustomerWhoStatusChecks()
+		end
 		AF:RefreshCustomerQuery(true)
 	end)
 
@@ -856,6 +865,9 @@ function AF:AttachCustomerUI()
 		AF:SetCustomerPanelCollapsed(frame.collapsed, true)
 		AF:QueueCustomerSidePanelLayout()
 		if not frame.collapsed then
+			if AF.StartCustomerWhoStatusChecks then
+				AF:StartCustomerWhoStatusChecks()
+			end
 			AF:RefreshCustomerQuery()
 		end
 	end)
@@ -878,6 +890,9 @@ function AF:AttachCustomerUI()
 		AF.customerFrame:Show()
 		AF:QueueCustomerSidePanelLayout()
 		if not AF.customerFrame.collapsed then
+			if AF.StartCustomerWhoStatusChecks then
+				AF:StartCustomerWhoStatusChecks()
+			end
 			AF:RefreshCustomerQuery()
 		end
 	end)
@@ -1108,6 +1123,9 @@ function AF:RefreshCustomerQuery(force)
 		self.currentCustomerQueryProfessionID = nil
 		self:QueueBroadcastQuery(context.itemID, context.professionID)
 	end
+	if changed and self.StartCustomerWhoStatusChecks then
+		self:StartCustomerWhoStatusChecks()
+	end
 	self:InjectDebugSelfResult(context.itemID, context.professionID)
 	if self.InjectDebugTradeLeads then
 		self:InjectDebugTradeLeads()
@@ -1137,7 +1155,7 @@ function AF:CanReliablyOpenProfession(entry)
 	if entry.offline then
 		return false
 	end
-	if self:HasProfessionOpenFailed(entry) then
+	if self:IsCustomerEntryOffline(entry) then
 		return false
 	end
 	if entry.tradeLead then
@@ -1158,6 +1176,11 @@ function AF:RefreshCustomerResults(statusOverride)
 	local filterText = frame.search:GetText() or ""
 	local queryToken = self.currentCustomerQueryToken
 	local rows = itemID and self:GetCachedArtisans(itemID, filterText, sortMode, queryToken) or {}
+	local startWhoChecks = self.customerWhoStatusStartUntil and self:Now() <= self.customerWhoStatusStartUntil
+	if self.customerWhoStatusStartUntil and not startWhoChecks then
+		self.customerWhoStatusStartUntil = nil
+		self.customerWhoStatusBatchSeen = nil
+	end
 	if statusOverride then
 		self:SetCustomerStatusText(statusOverride)
 	elseif itemID then
@@ -1192,6 +1215,15 @@ function AF:RefreshCustomerResults(statusOverride)
 	end
 	frame.content:SetHeight(math.max(1, contentHeight))
 	UpdateCustomerScrollBar(frame.modernScrollBar)
+	if itemID and self.QueueCustomerWhoStatusChecks then
+		if startWhoChecks then
+			self:QueueCustomerWhoStatusChecks(rows, true, self.customerWhoStatusBatchSeen)
+		end
+		if #rows > 0 then
+			self.customerWhoStatusStartUntil = nil
+			self.customerWhoStatusBatchSeen = nil
+		end
+	end
 
 	if #rows == 0 and itemID then
 		local hasAvailableUnfiltered = false

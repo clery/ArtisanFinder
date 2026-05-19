@@ -84,7 +84,7 @@ end
 
 function AF:BuildCustomerRowViewModel(entry)
 	local displayName = self:GetDisplayPlayerName(entry.name or "?")
-	if not entry.ownAlt and self:HasProfessionOpenFailed(entry) then
+	if self:IsCustomerEntryOffline(entry) then
 		displayName = displayName .. " |cff888888(" .. self:Text("OFFLINE") .. ")|r"
 	elseif entry.unavailableFavorite then
 		displayName = displayName .. " |cff888888(" .. self:Text("UNAVAILABLE") .. ")|r"

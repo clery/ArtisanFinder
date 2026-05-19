@@ -2,18 +2,38 @@
 
 ## 1.1.3 - 2026-05-19
 
+### Added
+
+- Added in-game presence checks for stale trade-chat and cached artisan leads so confirmed offline artisans can be shown as Offline in customer results.
+
 ### Changed
 
+- The customer Profession button is now disabled for confirmed offline leads to avoid opening stale profession links during order preparation.
 - Invalidated existing local profession scan data so characters rescan with base profession IDs and updated advertising defaults after upgrading.
 - Debug customer rows now include sample concentration quality upgrades.
+
+### Fixed
+
+- Fixed own alt-character rows being treated as external offline leads.
+
+## 1.1.2 - 2026-05-19
+
+### Added
+
+- Added collapse/expand controls for the crafter and customer ArtisanFinder panels.
+- Added local own-alt customer rows that appear above other artisans for matching scanned crafts.
+- Added granular clear commands for options, scanned craft data, cached external artisans, and favorite artisan marks.
+
+### Changed
+
+- Customer-side Profession actions now show an unavailable tooltip when a known profession link cannot be opened.
+- Profession scans now avoid capturing data from linked profession windows opened from customer results.
 
 ## 1.1.1 - 2026-05-18
 
 ### Added
 
 - Added a crafter-side scanning section with an in-panel Fast scan toggle, a Rescan button, and per-profession availability advertising controls.
-- Added a collapse/expand control for the crafter-side ArtisanFinder panel.
-- Added local own-alt customer rows that appear above other artisans for matching scanned crafts.
 
 ### Changed
 

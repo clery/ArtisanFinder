@@ -24,6 +24,7 @@
 ## X-Credits: clery
 ## X-Category: Professions
 ## X-License: All Rights Reserved: You are free to fork and modify on GitHub, please ask us about anything else.
+## X-Third-Party-Notices: THIRD_PARTY_NOTICES.md
 ## X-Website: https://github.com/clery/ArtisanFinder
 ## X-Curse-Project-ID: 1545540
 
@@ -42,6 +43,7 @@ Util.lua
 Formatting.lua
 Data.lua
 CustomerCache.lua
+WhoStatus.lua
 Options.lua
 Core.lua
 Comms.lua

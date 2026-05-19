@@ -16,6 +16,7 @@ The addon is built around a simple idea: customers should be able to find the ri
 *   Search and sorting for busy artisan lists.
 *   Personal order field helper for recipient and commission review.
 *   Profession-link opening from customer results.
+*   Collapsible customer and crafter panels that stay out of the way when you need more room.
 *   Reagent recommendations with reagent icons in tooltips.
 *   Trade-chat profession leads for crafters who do not use the addon, with configurable duration and offline fallback.
 *   Background recipe scanning that resumes if the profession window closes.
@@ -119,3 +120,7 @@ ArtisanFinder includes localization support for English, French, German, Spanish
 ## Inspiration
 
 ArtisanFinder was inspired by the convenience of Easycraft.io and the in-game Dofus Artisan list, adapted for World of Warcraft's Crafting Orders and Professions UI.
+
+## Third-Party Libraries
+
+ArtisanFinder embeds several addon libraries under `Libs/`. Their license and notice information is listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

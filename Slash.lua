@@ -273,6 +273,16 @@ function AF:HandleSlash(message)
 			self:Print(self:Text("DEBUG_UNKNOWN", rest))
 			self:PrintSlashHelp()
 		end
+	elseif command == "who" then
+		if rest == "debug on" then
+			self:SetWhoStatusDebug(true)
+		elseif rest == "debug off" then
+			self:SetWhoStatusDebug(false)
+		elseif rest == "debug" then
+			self:SetWhoStatusDebug(not self.whoStatusDebug)
+		else
+			self:CheckWhoStatusNow(rest)
+		end
 	else
 		self:PrintSlashHelp()
 	end

@@ -47,6 +47,7 @@ function AF:OnPlayerLogin()
 	self.available = false
 
 	self:InitializeComms()
+	self:InitializeWhoStatus()
 	self:InitializeMinimap()
 	self:InitializeCustomerUI()
 	self:InitializeCrafterUI()

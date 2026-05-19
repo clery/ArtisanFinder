@@ -1,0 +1,21 @@
+# Third-Party Notices
+
+ArtisanFinder includes a small number of embedded World of Warcraft addon libraries under `Libs/`.
+These libraries are not covered by ArtisanFinder's "All Rights Reserved" project license; each remains
+available under its own upstream license or notice terms.
+
+## Embedded Libraries
+
+| Library | License / notice | Source |
+| --- | --- | --- |
+| LibStub | Public Domain | Bundled header notice in `Libs/LibStub/LibStub.lua` |
+| CallbackHandler-1.0 | BSD-2-Clause, per upstream project metadata | https://www.curseforge.com/wow/addons/callbackhandler |
+| LibDataBroker-1.1 | All Rights Reserved, per upstream project metadata | https://www.wowace.com/projects/libdatabroker-1-1 |
+| LibDBIcon-1.0 | Ace3 Style BSD, per upstream project metadata | https://www.wowace.com/projects/libdbicon-1-0 |
+| ChatThrottleLib | Public Domain | Bundled header notice in `Libs/ChatThrottleLib/ChatThrottleLib.lua` |
+| LibWho-2.0 | MIT License | Bundled license in `Libs/LibWho-2.0/LICENSE`; upstream: https://github.com/sylvanaar/who-lib |
+
+## Notes
+
+When distributing ArtisanFinder, keep this file and any bundled third-party license files with the
+addon package, especially `Libs/LibWho-2.0/LICENSE`.
