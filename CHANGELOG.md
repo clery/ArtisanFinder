@@ -5,7 +5,8 @@
 ### Added
 
 - Added a crafter-side scanning section with an in-panel Fast scan toggle, a Rescan button, and per-profession availability advertising controls.
-- Added an Options setting for fast foreground scanning.
+- Added a collapse/expand control for the crafter-side ArtisanFinder panel.
+- Added local own-alt customer rows that appear above other artisans for matching scanned crafts.
 
 ### Changed
 

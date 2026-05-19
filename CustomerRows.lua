@@ -23,6 +23,9 @@ function AF:BuildCustomerRowViewModel(entry)
 		local note = entry.note and entry.note ~= "" and (" - " .. entry.note) or ""
 		detail = self:FormatMoney(entry.priceCopper, entry.freeCommission) .. note
 		capability = self:FormatCapability(entry)
+		if entry.ownAlt then
+			capability = "|cff33ff99" .. self:Text("YOUR_ALT") .. "|r" .. (capability ~= "" and ("\n" .. capability) or "")
+		end
 		if onlineAs then
 			capability = "|cff33ff99" .. onlineAs .. "|r" .. (capability ~= "" and ("\n" .. capability) or "")
 		end

@@ -79,12 +79,88 @@ local function CopyCustomerEntry(entry)
 	return copy
 end
 
+function AF:GetOwnAltRows(itemID, professionID, filterText, seenNames, recipeID)
+	local rows = {}
+	local currentName = self:NormalizeName(self.playerName or self:GetPlayerFullName())
+	local itemKey = tostring(itemID or "")
+	professionID = tonumber(professionID) or 0
+	recipeID = tonumber(recipeID) or 0
+
+	self:ForEachArtisanProfile(function(characterName, profile)
+		characterName = self:NormalizeName(characterName)
+		if not characterName or characterName == currentName then
+			return
+		end
+		local item = profile.items and profile.items[itemKey]
+		if not item then
+			return
+		end
+		if professionID ~= 0 and tonumber(item.professionID) ~= professionID then
+			return
+		end
+		if recipeID ~= 0 and item.recipeID and tonumber(item.recipeID) ~= recipeID then
+			return
+		end
+		local priceCopper, freeCommission, note = self:GetItemPriceForProfile(profile, itemID, item.professionID)
+		local profession = profile.professions and profile.professions[tostring(item.professionID or "")]
+		local professionLink = item.professionLink or (profession and profession.professionLink) or self:GetRememberedProfessionLink(characterName, item.professionID)
+		local entry = {
+			name = characterName,
+			target = characterName,
+			orderTarget = characterName,
+			itemID = itemID,
+			professionID = item.professionID,
+			professionName = item.professionName or self:GetProfessionName(item.professionID, profile),
+			priceCopper = priceCopper,
+			freeCommission = freeCommission,
+			note = note,
+			recipeID = item.recipeID,
+			recipeDifficulty = item.recipeDifficulty,
+			totalSkill = item.totalSkill,
+			quality = item.quality,
+			rawQuality = item.rawQuality,
+			qualityAtlas = item.qualityAtlas,
+			concentrationQuality = item.concentrationQuality,
+			concentrationCost = item.concentrationCost,
+			bestQuality = item.bestQuality,
+			rawBestQuality = item.rawBestQuality,
+			bestQualityAtlas = item.bestQualityAtlas,
+			bestConcentrationQuality = item.bestConcentrationQuality,
+			bestTotalSkill = item.bestTotalSkill,
+			bestConcentrationCost = item.bestConcentrationCost,
+			bestReagentSummary = item.bestReagentSummary,
+			bestReagentSummaryUpdatedAt = item.bestReagentSummaryUpdatedAt,
+			bestReagentTruncated = item.bestReagentTruncated,
+			bestReagentPendingNames = item.bestReagentPendingNames,
+			professionLink = professionLink,
+			updatedAt = item.updatedAt or profile.updatedAt or self:Now(),
+			verifiedAt = self:Now(),
+			certified = true,
+			tradeLead = false,
+			ownAlt = true,
+		}
+		if EntryMatchesCustomerFilter(self, entry, filterText) then
+			local seenKey = GetSeenKey(self, entry)
+			if seenKey and not seenNames[seenKey] then
+				table.insert(rows, entry)
+				MarkSeen(self, seenNames, entry)
+			end
+		end
+	end)
+
+	return rows
+end
+
 function AF:GetCachedArtisans(itemID, filterText, sortMode, queryToken)
 	local itemCache = self.db.customerCache[tostring(itemID or "")]
 	local rows = {}
 	local now = self:Now()
 	filterText = tostring(filterText or ""):lower()
 	local seenNames = {}
+	for _, entry in ipairs(self:GetOwnAltRows(itemID, self.currentCustomerProfessionID, filterText, seenNames, self.currentCustomerRecipeID)) do
+		table.insert(rows, entry)
+	end
+
 	for _, entry in pairs(itemCache or {}) do
 		local verifiedForQuery = queryToken and tonumber(entry.lastQueryToken) == tonumber(queryToken) and entry.verifiedAt
 		if verifiedForQuery and entry.updatedAt and now - entry.updatedAt <= self.CACHE_MAX_AGE then
@@ -93,6 +169,7 @@ function AF:GetCachedArtisans(itemID, filterText, sortMode, queryToken)
 				rowEntry.certified = true
 				rowEntry.tradeLead = false
 				rowEntry.unavailableFavorite = nil
+				rowEntry.professionLink = rowEntry.professionLink or self:GetRememberedProfessionLink(rowEntry.orderTarget or rowEntry.name, rowEntry.professionID)
 				table.insert(rows, rowEntry)
 				MarkSeen(self, seenNames, rowEntry)
 			end
@@ -107,6 +184,7 @@ function AF:GetCachedArtisans(itemID, filterText, sortMode, queryToken)
 			favoriteEntry.tradeLead = false
 			favoriteEntry.unavailableFavorite = true
 			favoriteEntry.target = favoriteEntry.orderTarget or favoriteEntry.name
+			favoriteEntry.professionLink = favoriteEntry.professionLink or self:GetRememberedProfessionLink(favoriteEntry.orderTarget or favoriteEntry.name, favoriteEntry.professionID)
 			table.insert(rows, favoriteEntry)
 			MarkSeen(self, seenNames, favoriteEntry)
 		end
@@ -140,6 +218,7 @@ function AF:GetCachedArtisans(itemID, filterText, sortMode, queryToken)
 				offlineEntry.tradeLead = false
 				offlineEntry.offlineCached = true
 				offlineEntry.target = offlineEntry.orderTarget or offlineEntry.name
+				offlineEntry.professionLink = offlineEntry.professionLink or self:GetRememberedProfessionLink(offlineEntry.orderTarget or offlineEntry.name, offlineEntry.professionID)
 				table.insert(candidates, offlineEntry)
 			end
 		end
@@ -172,6 +251,11 @@ function AF:GetCachedArtisans(itemID, filterText, sortMode, queryToken)
 
 	sortMode = sortMode or "best"
 	table.sort(rows, function(a, b)
+		local aOwnAlt = a.ownAlt and 0 or 1
+		local bOwnAlt = b.ownAlt and 0 or 1
+		if aOwnAlt ~= bOwnAlt then
+			return aOwnAlt < bOwnAlt
+		end
 		local aFavorite = self:IsFavoriteArtisan(a) and 0 or 1
 		local bFavorite = self:IsFavoriteArtisan(b) and 0 or 1
 		if aFavorite ~= bFavorite then

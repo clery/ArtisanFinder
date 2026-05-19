@@ -30,6 +30,12 @@ local DEBUG_ALT_NAMES = {
 	"Bellwyn",
 	"Craftelle",
 }
+
+local DEBUG_ALT_CONTACT_NAMES = {
+	"Mainora",
+	"Brokerwyn",
+	"Guildelle",
+}
 local function GetDebugValue(values, index)
 	return values[((index - 1) % #values) + 1]
 end
@@ -132,13 +138,14 @@ function AF:InjectDebugSelfResult(itemID, professionID)
 
 	for i, altBaseName in ipairs(DEBUG_ALT_NAMES) do
 		local altName = altBaseName .. "-" .. (GetRealmName() or "")
+		local contactName = GetDebugValue(DEBUG_ALT_CONTACT_NAMES, i) .. "-" .. (GetRealmName() or "")
 		local priceCopper = i == 1 and 0 or (i * 12500000)
 		local baseQuality = math.min(5, 2 + i)
 		local bestQuality = math.min(5, baseQuality + 1)
 		self:SetFavoriteArtisan(altName, i == 1)
 		self.db.customerCache[itemKey]["__debug_alt_" .. i] = {
 			name = altName,
-			target = actualName,
+			target = contactName,
 			orderTarget = altName,
 			itemID = itemID,
 			professionID = item.professionID,

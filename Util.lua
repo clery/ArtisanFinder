@@ -13,7 +13,7 @@ AF.REAGENT_DETAIL_CACHE_MAX_AGE = 60 * 60
 AF.LIVE_QUERY_TIMEOUT = 6
 AF.MAX_NOTE_BYTES = 80
 AF.MAX_LINK_BYTES = 96
-AF.SCHEMA_VERSION = 7
+AF.SCHEMA_VERSION = 8
 
 function AF:Print(message)
 	print("|cff33ff99ArtisanFinder:|r " .. tostring(message))

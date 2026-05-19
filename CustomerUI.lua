@@ -12,6 +12,7 @@ local ROW_TOP_PADDING = 4
 local CUSTOMER_PANEL_WIDTH = 452
 local CUSTOMER_PANEL_COLLAPSED_WIDTH = 28
 local CUSTOMER_PANEL_ATTACH_OFFSET_X = -5
+local CUSTOMER_COLLAPSE_BUTTON_LEVEL_OFFSET = 1000
 
 local function GetSortMode(index)
 	return SORT_MODES[index or 1] or SORT_MODES[1]
@@ -28,6 +29,22 @@ local function GetSortIndexByKey(key)
 		end
 	end
 	return 1
+end
+
+local function RaiseCustomerCollapseButton(button)
+	if not button then
+		return
+	end
+
+	local anchor = ProfessionsCustomerOrdersFrame or ProfessionsFrame or UIParent
+	local level = (anchor.GetFrameLevel and anchor:GetFrameLevel() or 0) + CUSTOMER_COLLAPSE_BUTTON_LEVEL_OFFSET
+	if anchor.GetFrameStrata then
+		button:SetFrameStrata(anchor:GetFrameStrata())
+	end
+	button:SetFrameLevel(level)
+	for _, child in ipairs({ button:GetChildren() }) do
+		child:SetFrameLevel(level + 1)
+	end
 end
 
 function AF:GetCustomerSortOptions()
@@ -501,7 +518,7 @@ function AF:SetCustomerStatusItem(itemID, itemName, templateKey)
 	frame.statusSuffix:SetText(suffix)
 end
 
-function AF:SetCustomerPanelCollapsed(collapsed)
+function AF:SetCustomerPanelCollapsed(collapsed, skipRefresh)
 	local frame = self.customerFrame
 	if not frame then
 		return
@@ -518,18 +535,26 @@ function AF:SetCustomerPanelCollapsed(collapsed)
 	frame.Bg:SetShown(not frame.collapsed)
 	frame.TopTileStreaks:SetShown(not frame.collapsed)
 	frame.collapsedRail:SetShown(frame.collapsed)
-	frame.collapseButton:ClearAllPoints()
-	if frame.collapsed then
-		frame.collapseButton:SetPoint("TOP", frame.collapsedRail, "TOP", 0, 0)
-		frame.collapseButton:SetMaximizedLook()
-	else
-		frame.collapseButton:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 1, 0)
-		frame.collapseButton:SetMinimizedLook()
+	if frame.collapseButton then
+		frame.collapseButton:Hide()
+	end
+	local collapseButton = self.customerCollapseButton
+	if collapseButton then
+		collapseButton:ClearAllPoints()
+		if frame.collapsed then
+			collapseButton:SetPoint("TOP", frame.collapsedRail, "TOP", 0, 0)
+			collapseButton:SetMaximizedLook()
+		else
+			collapseButton:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 1, 0)
+			collapseButton:SetMinimizedLook()
+		end
+		RaiseCustomerCollapseButton(collapseButton)
+		collapseButton:SetShown(frame:IsShown())
 	end
 
 	if frame.collapsed then
 		self:HideCustomerMenu()
-	else
+	elseif not skipRefresh then
 		self:RefreshCustomerQuery(true)
 	end
 	self:QueueCustomerSidePanelLayout()
@@ -577,14 +602,19 @@ function AF:AttachCustomerUI()
 	frame.title = frame.TitleContainer.TitleText
 	frame.title:SetText("ArtisanFinder")
 
-	frame.collapseButton:SetFrameLevel(frame:GetFrameLevel() + 5)
-	frame.collapseButton:SetOnMinimizedCallback(function()
+	frame.collapseButton:Hide()
+	local collapseButton = CreateFrame("Frame", "ArtisanFinderCustomerCollapseButton", ordersFrame, "MaximizeMinimizeButtonFrameTemplate")
+	collapseButton:SetSize(24, 24)
+	RaiseCustomerCollapseButton(collapseButton)
+	collapseButton:SetOnMinimizedCallback(function()
 		AF:SetCustomerPanelCollapsed(true)
 	end)
-	frame.collapseButton:SetOnMaximizedCallback(function()
+	collapseButton:SetOnMaximizedCallback(function()
 		AF:SetCustomerPanelCollapsed(false)
 	end)
-	frame.collapseButton:SetMinimizedLook()
+	collapseButton:SetMinimizedLook()
+	collapseButton:Hide()
+	self.customerCollapseButton = collapseButton
 	frame.collapsedRail:SetFrameLevel(frame:GetFrameLevel())
 	self:ApplyProfessionPanel(frame.collapsedRail)
 	frame.collapsedRail:Hide()
@@ -699,7 +729,7 @@ function AF:AttachCustomerUI()
 
 	frame.menu.whisper:SetText(self:Text("WHISPER"))
 	frame.menu.whisper:SetScript("OnClick", function()
-		if frame.menu.entry then
+		if frame.menu.entry and not frame.menu.entry.ownAlt then
 			AF:OpenWhisper(frame.menu.entry.target or frame.menu.entry.name)
 		end
 		AF:HideCustomerMenu()
@@ -714,11 +744,20 @@ function AF:AttachCustomerUI()
 	end)
 
 	frame.menu.link:SetText(self:Text("PROFESSION"))
+	if frame.menu.link.SetMotionScriptsWhileDisabled then
+		frame.menu.link:SetMotionScriptsWhileDisabled(true)
+	end
 	frame.menu.link:SetScript("OnClick", function()
 		if frame.menu.entry then
+			AF:ClearProfessionButtonTooltip()
 			AF:OpenCrafterProfession(frame.menu.entry)
 		end
-		AF:HideCustomerMenu()
+	end)
+	frame.menu.link:SetScript("OnEnter", function(button)
+		AF:ShowProfessionButtonTooltip(button)
+	end)
+	frame.menu.link:SetScript("OnLeave", function()
+		GameTooltip:Hide()
 	end)
 
 	frame.collapsibleRegions = {
@@ -735,6 +774,7 @@ function AF:AttachCustomerUI()
 	self.customerFrame = frame
 	frame:SetScript("OnShow", function()
 		frame.elapsed = 0
+		AF:SetCustomerPanelCollapsed(frame.collapsed, true)
 		AF:QueueCustomerSidePanelLayout()
 		if not frame.collapsed then
 			AF:RefreshCustomerQuery()
@@ -750,6 +790,11 @@ function AF:AttachCustomerUI()
 			AF:RefreshCustomerQuery()
 		end
 	end)
+	frame:SetScript("OnHide", function()
+		if AF.customerCollapseButton then
+			AF.customerCollapseButton:Hide()
+		end
+	end)
 	parent:HookScript("OnShow", function()
 		AF.customerFrame:Show()
 		AF:QueueCustomerSidePanelLayout()
@@ -759,6 +804,9 @@ function AF:AttachCustomerUI()
 	end)
 	parent:HookScript("OnHide", function()
 		AF.customerFrame:Hide()
+		if AF.customerCollapseButton then
+			AF.customerCollapseButton:Hide()
+		end
 		AF:HideCustomerMenu()
 		AF:RestoreCurrentListingsAnchor()
 	end)
@@ -778,8 +826,53 @@ function AF:HideCustomerMenu()
 	if not frame then
 		return
 	end
+	self:ClearProfessionButtonTooltip()
 	frame.menu:Hide()
 	frame.menuBlocker:Hide()
+end
+
+function AF:ShowProfessionButtonTooltip(button)
+	button = button or (self.customerFrame and self.customerFrame.menu and self.customerFrame.menu.link)
+	local text = button and button.artisanFinderTooltipText
+	if not text then
+		return
+	end
+	GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
+	GameTooltip:SetText(text, 1, 0.82, 0, 1, true)
+	GameTooltip:Show()
+end
+
+function AF:SetProfessionButtonTooltip(text, duration)
+	local button = self.customerFrame and self.customerFrame.menu and self.customerFrame.menu.link
+	if not button then
+		return
+	end
+	button.artisanFinderTooltipText = text
+	button.artisanFinderTooltipToken = (button.artisanFinderTooltipToken or 0) + 1
+	local token = button.artisanFinderTooltipToken
+	if button:IsMouseOver() then
+		self:ShowProfessionButtonTooltip(button)
+	end
+	if duration then
+		C_Timer.After(duration, function()
+			local currentButton = AF.customerFrame and AF.customerFrame.menu and AF.customerFrame.menu.link
+			if currentButton and currentButton.artisanFinderTooltipToken == token then
+				AF:ClearProfessionButtonTooltip()
+			end
+		end)
+	end
+end
+
+function AF:ClearProfessionButtonTooltip()
+	local button = self.customerFrame and self.customerFrame.menu and self.customerFrame.menu.link
+	if not button then
+		return
+	end
+	button.artisanFinderTooltipText = nil
+	button.artisanFinderTooltipToken = (button.artisanFinderTooltipToken or 0) + 1
+	if button:IsMouseOver() then
+		GameTooltip:Hide()
+	end
 end
 
 function AF:ShowCustomerMenu(entry, owner)
@@ -789,10 +882,17 @@ function AF:ShowCustomerMenu(entry, owner)
 	end
 	menu.entry = entry
 	menu.favorite:SetText(self:Text(self:IsFavoriteArtisan(entry) and "UNFAVORITE" or "FAVORITE"))
-	if entry.professionLink then
+	if entry.ownAlt then
+		menu.whisper:Disable()
+	else
+		menu.whisper:Enable()
+	end
+	if self:CanReliablyOpenProfession(entry) then
 		menu.link:Enable()
+		self:ClearProfessionButtonTooltip()
 	else
 		menu.link:Disable()
+		self:SetProfessionButtonTooltip(self:Text("PROFESSION_LINK_UNAVAILABLE_TOOLTIP"))
 	end
 	menu:ClearAllPoints()
 	menu:SetPoint("TOPLEFT", owner, "TOPRIGHT", 2, 0)
@@ -901,6 +1001,22 @@ function AF:EnsureCustomerRows(count)
 	end
 end
 
+function AF:CanReliablyOpenProfession(entry)
+	if not entry then
+		return false
+	end
+	if entry.ownAlt then
+		return false
+	end
+	if entry.offline then
+		return false
+	end
+	if entry.tradeLead then
+		return entry.professionLink ~= nil
+	end
+	return entry.professionLink ~= nil
+end
+
 function AF:RefreshCustomerResults(statusOverride)
 	local frame = self.customerFrame
 	if not frame then
@@ -966,13 +1082,36 @@ function AF:RefreshCustomerResults(statusOverride)
 end
 
 function AF:OpenCrafterProfession(entry)
-	if not entry or not entry.professionLink then
+	if not entry then
 		return
 	end
 
+	if not self:CanReliablyOpenProfession(entry) then
+		self:SetProfessionButtonTooltip(self:Text("PROFESSION_LINK_UNAVAILABLE_TOOLTIP"), 6)
+		return
+	end
+
+	local professionLink = entry.professionLink or self:GetRememberedProfessionLink(entry.orderTarget or entry.name, entry.professionID)
+	if not professionLink then
+		return
+	end
+
+	local professionLinkPayload = professionLink:match("|H([^|]+)|h") or professionLink
 	self.pendingProfessionRecipeID = tonumber(entry.recipeID)
 	self.pendingProfessionRecipeTries = 12
-	SetItemRef(entry.professionLink, entry.professionLink, "LeftButton", DEFAULT_CHAT_FRAME)
+	self.pendingProfessionLink = professionLink
+	self.pendingProfessionLinkPayload = professionLinkPayload
+	self.pendingProfessionTarget = entry.orderTarget or entry.name
+	local ok = pcall(SetItemRef, professionLinkPayload, professionLink, "LeftButton", DEFAULT_CHAT_FRAME)
+	if not ok then
+		self:SetProfessionButtonTooltip(self:Text("PROFESSION_LINK_UNAVAILABLE_TOOLTIP"), 8)
+		self.pendingProfessionRecipeID = nil
+		self.pendingProfessionRecipeTries = nil
+		self.pendingProfessionLink = nil
+		self.pendingProfessionLinkPayload = nil
+		self.pendingProfessionTarget = nil
+		return
+	end
 	self:QueuePendingProfessionRecipeSelection()
 end
 
@@ -1001,9 +1140,18 @@ function AF:TrySelectPendingProfessionRecipe()
 		self.pendingProfessionRecipeTries = (self.pendingProfessionRecipeTries or 0) - 1
 		if self.pendingProfessionRecipeTries > 0 then
 			self:QueuePendingProfessionRecipeSelection()
+			return
 		end
+		self:SetProfessionButtonTooltip(self:Text("PROFESSION_LINK_UNAVAILABLE_TOOLTIP"), 8)
+		self.pendingProfessionRecipeID = nil
+		self.pendingProfessionRecipeTries = nil
+		self.pendingProfessionLink = nil
+		self.pendingProfessionLinkPayload = nil
+		self.pendingProfessionTarget = nil
 		return
 	end
+
+	self:HideCustomerMenu()
 
 	local recipeInfo = C_TradeSkillUI and C_TradeSkillUI.GetRecipeInfo and C_TradeSkillUI.GetRecipeInfo(recipeID)
 	if recipeInfo then
@@ -1014,6 +1162,9 @@ function AF:TrySelectPendingProfessionRecipe()
 	if selectedRecipeInfo and tonumber(selectedRecipeInfo.recipeID) == recipeID then
 		self.pendingProfessionRecipeID = nil
 		self.pendingProfessionRecipeTries = nil
+		self.pendingProfessionLink = nil
+		self.pendingProfessionLinkPayload = nil
+		self.pendingProfessionTarget = nil
 		return
 	end
 
@@ -1022,6 +1173,9 @@ function AF:TrySelectPendingProfessionRecipe()
 		self:QueuePendingProfessionRecipeSelection()
 	else
 		self.pendingProfessionRecipeID = nil
+		self.pendingProfessionLink = nil
+		self.pendingProfessionLinkPayload = nil
+		self.pendingProfessionTarget = nil
 	end
 end
 

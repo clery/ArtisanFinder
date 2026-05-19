@@ -103,8 +103,18 @@ ArtisanFinder includes localization support for English, French, German, Spanish
 
 ## Useful Commands
 
+*   `/af`: shows help for ArtisanFinder commands.
 *   `/af scan`: force a fresh scan of the currently open profession.
-*   `/af clear confirm`: clear ArtisanFinder's saved data.
+*   `/af auto`: show current automatic availability state.
+*   `/af auto on`: enable automatic availability in trade-chat areas.
+*   `/af auto off`: disables automatic availability.
+*   `/af auto toggle`: toggles the auto availability mode.
+*   `/af clear`: show clear data commands.
+*   `/af clear all`: clear ArtisanFinder's saved data.
+*   `/af clear options`: reset ArtisanFinder options.
+*   `/af clear scans`: clear this character's scanned craft data.
+*   `/af clear artisans`: clear cached external artisan data.
+*   `/af clear artisans favorite`: clear favorite artisan marks.
 
 ## Inspiration
 

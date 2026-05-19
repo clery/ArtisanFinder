@@ -2,6 +2,7 @@ local _, AF = ...
 
 local DEFAULT_COMMISSION_PANEL_WIDTH = 356
 local DEFAULT_COMMISSION_PANEL_HEIGHT = 276
+local CRAFTER_COLLAPSE_BUTTON_LEVEL_OFFSET = 1000
 
 local function UpdatePlaceholder(box)
 	box.Placeholder:SetShown((box:GetText() or "") == "" and not box:HasFocus())
@@ -121,6 +122,19 @@ local function ConfigureInfoButton(button, tooltipTitle, tooltipText)
 	return button
 end
 
+local function RaiseCrafterCollapseButton(button)
+	if not button or not ProfessionsFrame then
+		return
+	end
+
+	local level = (ProfessionsFrame:GetFrameLevel() or 0) + CRAFTER_COLLAPSE_BUTTON_LEVEL_OFFSET
+	button:SetFrameStrata(ProfessionsFrame:GetFrameStrata())
+	button:SetFrameLevel(level)
+	for _, child in ipairs({ button:GetChildren() }) do
+		child:SetFrameLevel(level + 1)
+	end
+end
+
 local function ParseCommissionOrWarn(box)
 	local copper, free, state = AF:NormalizeCommissionInput(box:GetText())
 	if not copper then
@@ -163,6 +177,50 @@ function AF:RefreshCrafterLocale()
 	end
 end
 
+function AF:ApplyCrafterDefaultsCollapsed(collapsed)
+	local defaults = self.crafterDefaultsFrame
+	if not defaults then
+		return
+	end
+
+	self.crafterDefaultsCollapsed = collapsed and true or false
+	defaults:SetWidth(self.crafterDefaultsCollapsed and 28 or DEFAULT_COMMISSION_PANEL_WIDTH)
+	for _, region in ipairs(defaults.collapsibleRegions or {}) do
+		region:SetShown(not self.crafterDefaultsCollapsed)
+	end
+	defaults.title:SetShown(not self.crafterDefaultsCollapsed)
+	defaults.TitleContainer:SetShown(not self.crafterDefaultsCollapsed)
+	defaults.NineSlice:SetShown(not self.crafterDefaultsCollapsed)
+	defaults.Bg:SetShown(not self.crafterDefaultsCollapsed)
+	defaults.TopTileStreaks:SetShown(not self.crafterDefaultsCollapsed)
+	defaults.collapsedRail:SetShown(self.crafterDefaultsCollapsed)
+	defaults.collapsedRail:ClearAllPoints()
+	defaults.collapsedRail:SetPoint("TOPLEFT", defaults, "TOPLEFT", 0, 0)
+	defaults.collapsedRail:SetPoint("BOTTOMRIGHT", defaults, "BOTTOMRIGHT", 0, 0)
+	if defaults.collapseButton then
+		defaults.collapseButton:Hide()
+	end
+
+	local collapseButton = self.crafterDefaultsCollapseButton
+	if collapseButton then
+		collapseButton:ClearAllPoints()
+		if self.crafterDefaultsCollapsed then
+			collapseButton:SetPoint("TOP", defaults.collapsedRail, "TOP", 0, -2)
+			collapseButton:SetMaximizedLook()
+		else
+			collapseButton:SetPoint("TOPRIGHT", defaults, "TOPRIGHT", 1, 0)
+			collapseButton:SetMinimizedLook()
+		end
+		RaiseCrafterCollapseButton(collapseButton)
+		collapseButton:Show()
+	end
+end
+
+function AF:SetCrafterDefaultsCollapsed(collapsed)
+	self:ApplyCrafterDefaultsCollapsed(collapsed)
+	self:RefreshCrafterUI()
+end
+
 function AF:GetCraftingSchematicForm()
 	if not ProfessionsFrame or not ProfessionsFrame.CraftingPage then
 		return nil
@@ -174,7 +232,21 @@ function AF:IsLinkedProfessionOpen()
 	return C_TradeSkillUI and C_TradeSkillUI.IsTradeSkillLinked and C_TradeSkillUI.IsTradeSkillLinked() == true or false
 end
 
+function AF:IsOwnProfessionWindowOpen()
+	local form = self:GetCraftingSchematicForm()
+	return ProfessionsFrame
+		and ProfessionsFrame:IsShown()
+		and form
+		and form:IsVisible()
+		and not self:IsLinkedProfessionOpen()
+		or false
+end
+
 function AF:GetCurrentCraftingRecipeContext()
+	if self.IsOwnProfessionWindowOpen and not self:IsOwnProfessionWindowOpen() then
+		return nil
+	end
+
 	local form = self:GetCraftingSchematicForm()
 	if not form or not form.GetRecipeInfo then
 		return nil
@@ -186,6 +258,25 @@ function AF:GetCurrentCraftingRecipeContext()
 	end
 
 	local recipeID = recipeInfo.recipeID
+	local currentProfession = self:GetCurrentProfessionInfo()
+	if not currentProfession then
+		return nil
+	end
+
+	local professionInfo
+	if C_TradeSkillUI and C_TradeSkillUI.GetProfessionInfoByRecipeID then
+		local ok, info = pcall(C_TradeSkillUI.GetProfessionInfoByRecipeID, recipeID)
+		if ok then
+			professionInfo = info
+		end
+	end
+	if professionInfo and not self:ProfessionInfoMatchesProfession(currentProfession, professionInfo) then
+		return nil
+	end
+	if not professionInfo and self.RecipeBelongsToProfession and not self:RecipeBelongsToProfession(currentProfession, recipeInfo, self:GetCurrentProfessionCategoryIDs(), recipeID) then
+		return nil
+	end
+
 	local isRecraft = recipeInfo.isRecraft == true or form.isRecraft == true
 	if not isRecraft and form.transaction and form.transaction.IsRecraft then
 		isRecraft = form.transaction:IsRecraft() == true
@@ -199,14 +290,8 @@ function AF:GetCurrentCraftingRecipeContext()
 		end
 	end
 
-	local professionInfo
-	if C_TradeSkillUI and C_TradeSkillUI.GetProfessionInfoByRecipeID then
-		professionInfo = C_TradeSkillUI.GetProfessionInfoByRecipeID(recipeID)
-	end
-
-	local fallbackProfession = self:GetCurrentProfessionInfo()
 	local professionID = professionInfo and (professionInfo.profession or professionInfo.professionID or professionInfo.skillLineID)
-	professionID = professionID or (fallbackProfession and fallbackProfession.id)
+	professionID = professionID or currentProfession.id
 
 	return itemID and {
 		itemID = itemID,
@@ -216,12 +301,15 @@ function AF:GetCurrentCraftingRecipeContext()
 		learned = recipeInfo.learned ~= false,
 		isRecraft = isRecraft,
 		professionID = professionID,
-		professionName = (professionInfo and professionInfo.professionName) or (fallbackProfession and fallbackProfession.name),
+		professionName = (professionInfo and professionInfo.professionName) or currentProfession.name,
 	} or nil
 end
 
 function AF:EnsureCurrentRecipeEntry(context)
 	if not context or not context.itemID then
+		return nil
+	end
+	if self.IsOwnProfessionWindowOpen and not self:IsOwnProfessionWindowOpen() then
 		return nil
 	end
 
@@ -300,6 +388,22 @@ function AF:AttachCrafterUI()
 	self:ApplyCustomerSidePanel(defaults)
 	defaults.title = defaults.TitleContainer.TitleText
 	defaults.title:SetText("ArtisanFinder")
+	defaults.collapseButton:Hide()
+
+	local collapseButton = CreateFrame("Frame", "ArtisanFinderCrafterDefaultsCollapseButton", ProfessionsFrame, "MaximizeMinimizeButtonFrameTemplate")
+	collapseButton:SetSize(24, 24)
+	RaiseCrafterCollapseButton(collapseButton)
+	collapseButton:SetOnMinimizedCallback(function()
+		AF:SetCrafterDefaultsCollapsed(true)
+	end)
+	collapseButton:SetOnMaximizedCallback(function()
+		AF:SetCrafterDefaultsCollapsed(false)
+	end)
+	collapseButton:SetMinimizedLook()
+	collapseButton:Hide()
+	defaults.collapsedRail:SetFrameLevel(defaults:GetFrameLevel() + 5)
+	self:ApplyProfessionPanel(defaults.collapsedRail)
+	defaults.collapsedRail:Hide()
 	defaults.defaultsHeader:SetText(self:Text("DEFAULT_COMMISSION"))
 	defaults.scanHeader:SetText(self:Text("CRAFTER_PANEL_SCAN_SECTION"))
 	defaults.advertisingHeader:SetText(self:Text("CRAFTER_PANEL_ADVERTISING_SECTION"))
@@ -391,8 +495,25 @@ function AF:AttachCrafterUI()
 
 	self.crafterFrame = frame
 	self.crafterDefaultsFrame = defaults
+	self.crafterDefaultsCollapseButton = collapseButton
 	self.crafterFastScanButton = fastScanButton
 	self.crafterForceRescanButton = forceRescanButton
+	defaults.collapsibleRegions = {
+		defaults.defaultsHeader,
+		defaults.priceLabel,
+		defaults.noteLabel,
+		defaults.defaultsDivider,
+		defaults.scanHeader,
+		defaults.scanDivider,
+		defaults.advertisingHeader,
+		defaults.info,
+		defaults.priceField,
+		defaults.noteField,
+		defaults.save,
+		defaults.fastScanButton,
+		defaults.forceRescanButton,
+		defaults.advertiseCheck,
+	}
 
 	if form.RegisterCallback and ProfessionsRecipeSchematicFormMixin then
 		local refresh = function()
@@ -463,7 +584,7 @@ function AF:UpdateFastScanButton()
 	else
 		button:Disable()
 	end
-	button:SetShown(defaults:IsShown())
+	button:SetShown(defaults:IsShown() and not self.crafterDefaultsCollapsed)
 	if forceRescanButton then
 		SizeButtonForText(forceRescanButton, self:Text("FORCE_RESCAN_BUTTON"), 76, 120)
 		forceRescanButton:ClearAllPoints()
@@ -473,7 +594,7 @@ function AF:UpdateFastScanButton()
 		else
 			forceRescanButton:Disable()
 		end
-		forceRescanButton:SetShown(defaults:IsShown())
+		forceRescanButton:SetShown(defaults:IsShown() and not self.crafterDefaultsCollapsed)
 	end
 end
 
@@ -521,10 +642,12 @@ function AF:RefreshCrafterUI()
 		return
 	end
 
-	local form = self:GetCraftingSchematicForm()
-	if not ProfessionsFrame:IsShown() or not form or not form:IsVisible() or self:IsLinkedProfessionOpen() then
+	if not self:IsOwnProfessionWindowOpen() then
 		frame:Hide()
 		defaults:Hide()
+		if self.crafterDefaultsCollapseButton then
+			self.crafterDefaultsCollapseButton:Hide()
+		end
 		return
 	end
 
@@ -534,17 +657,25 @@ function AF:RefreshCrafterUI()
 	local context = self:GetCurrentCraftingRecipeContext()
 	local profession = self:GetCurrentProfessionInfo()
 	local professionID = context and context.professionID or (profession and profession.id)
+	if professionID and self.CaptureCurrentProfessionLink then
+		self:CaptureCurrentProfessionLink(profession or { id = professionID, name = context and context.professionName }, "crafter-ui-refresh")
+	end
 	if not context or context.learned == false or context.isRecraft then
 		frame:Hide()
 	else
 		local item = self:EnsureCurrentRecipeEntry(context)
-		frame:Show()
-		SetEditBoxText(frame.price, self:FormatCommissionInput(item))
-		SetEditBoxText(frame.note, item.note or "")
+		if item then
+			frame:Show()
+			SetEditBoxText(frame.price, self:FormatCommissionInput(item))
+			SetEditBoxText(frame.note, item.note or "")
+		else
+			frame:Hide()
+		end
 	end
 
 	if professionID then
 		defaults:Show()
+		self:ApplyCrafterDefaultsCollapsed(self.crafterDefaultsCollapsed)
 		defaults.advertiseCheck:SetChecked(self:IsProfessionAdvertised(self.playerName, professionID))
 		local default = self.db.artisanProfile.professionPrices[tostring(professionID)]
 		if default then
@@ -556,6 +687,9 @@ function AF:RefreshCrafterUI()
 		end
 	else
 		defaults:Hide()
+		if self.crafterDefaultsCollapseButton then
+			self.crafterDefaultsCollapseButton:Hide()
+		end
 	end
 
 	self:UpdateFastScanButton()

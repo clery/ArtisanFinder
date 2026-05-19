@@ -268,6 +268,18 @@
 			</Layer>
 		</Layers>
 		<Frames>
+			<Frame parentKey="collapsedRail" inherits="BackdropTemplate" hidden="true">
+				<Size x="28" y="24"/>
+				<Anchors>
+					<Anchor point="TOP" x="0" y="0"/>
+				</Anchors>
+			</Frame>
+			<Frame parentKey="collapseButton" inherits="MaximizeMinimizeButtonFrameTemplate">
+				<Size x="24" y="24"/>
+				<Anchors>
+					<Anchor point="TOPRIGHT" x="1" y="0"/>
+				</Anchors>
+			</Frame>
 			<Button parentKey="info" inherits="UIPanelInfoButton">
 				<Anchors>
 					<Anchor point="TOPRIGHT" x="-12" y="-49"/>

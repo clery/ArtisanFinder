@@ -259,17 +259,21 @@ AF.frame:SetScript("OnEvent", function(_, event, ...)
 				return
 			end
 			AF:TryAttachProfessionUIs()
-			if event == "TRADE_SKILL_DATA_SOURCE_CHANGED" and AF.QueueProfessionDataSourceProbe then
-				AF:QueueProfessionDataSourceProbe()
-			end
-			if event == "TRADE_SKILL_SHOW" and AF.StartProfessionEquipmentWatch then
-				AF:StartProfessionEquipmentWatch()
-			end
-			if event == "TRADE_SKILL_SHOW" and AF.ResumeCurrentProfessionScanIfNeeded then
-				AF:ResumeCurrentProfessionScanIfNeeded()
-			end
 			if AF.RefreshCrafterUI then
 				AF:RefreshCrafterUI()
+			end
+			local ownProfessionWindowOpen = AF.IsOwnProfessionWindowOpen and AF:IsOwnProfessionWindowOpen()
+			if event == "TRADE_SKILL_DATA_SOURCE_CHANGED" and ownProfessionWindowOpen and AF.QueueProfessionDataSourceProbe then
+				AF:QueueProfessionDataSourceProbe()
+			end
+			if event == "TRADE_SKILL_SHOW" and ownProfessionWindowOpen and AF.StartProfessionEquipmentWatch then
+				AF:StartProfessionEquipmentWatch()
+			end
+			if event == "TRADE_SKILL_SHOW" and ownProfessionWindowOpen and AF.ResumeCurrentProfessionScanIfNeeded then
+				AF:ResumeCurrentProfessionScanIfNeeded()
+			end
+			if ownProfessionWindowOpen and AF.CaptureCurrentProfessionLink then
+				AF:CaptureCurrentProfessionLink(nil, event)
 			end
 			if AF.TrySelectPendingProfessionRecipe then
 				AF:TrySelectPendingProfessionRecipe()
@@ -292,12 +296,16 @@ AF.frame:SetScript("OnEvent", function(_, event, ...)
 			end
 			return
 		end
-		if event == "PROFESSION_EQUIPMENT_CHANGED" then
+		local ownProfessionWindowOpen = AF.IsOwnProfessionWindowOpen and AF:IsOwnProfessionWindowOpen()
+		if event == "PROFESSION_EQUIPMENT_CHANGED" and ownProfessionWindowOpen then
 			AF.pendingProfessionEquipmentSkillLineID = ...
 			AF.pendingProfessionEquipmentScan = true
 		end
-		if AF.QueueAutoScanForChange then
+		if ownProfessionWindowOpen and AF.QueueAutoScanForChange then
 			AF:QueueAutoScanForChange(event == "PLAYER_EQUIPMENT_CHANGED" and "PROFESSION_EQUIPMENT_CHANGED" or event)
+		end
+		if ownProfessionWindowOpen and AF.CaptureCurrentProfessionLink then
+			AF:CaptureCurrentProfessionLink(nil, event)
 		end
 		if AF.TrySelectPendingProfessionRecipe then
 			AF:TrySelectPendingProfessionRecipe()

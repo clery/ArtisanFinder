@@ -17,6 +17,7 @@ local function ApplyDBDefaults(db)
 	db.customerCache = db.customerCache or {}
 	db.favoriteArtisans = db.favoriteArtisans or {}
 	db.responseThrottle = db.responseThrottle or {}
+	db.professionLinks = db.professionLinks or {}
 	db.tradeLeads = db.tradeLeads or {}
 	db.tradeLeadCache = db.tradeLeadCache or {}
 	db.minimap = db.minimap or { angle = 225, hide = false }
@@ -90,6 +91,10 @@ MIGRATIONS[7] = function(db)
 	if db.fastScan == nil then
 		db.fastScan = false
 	end
+end
+
+MIGRATIONS[8] = function(db)
+	db.professionLinks = db.professionLinks or {}
 end
 
 function AF:MigrateDB(db)
@@ -269,6 +274,80 @@ function AF:SetProfessionAdvertised(characterName, professionID, enabled)
 	end
 end
 
+function AF:GetProfessionLinkKey(characterName, professionID)
+	characterName = self:NormalizeName(characterName)
+	professionID = tonumber(professionID)
+	if not characterName or not professionID then
+		return nil
+	end
+	return characterName .. ":" .. tostring(professionID)
+end
+
+function AF:RememberProfessionLink(characterName, professionID, professionLink)
+	local key = self:GetProfessionLinkKey(characterName, professionID)
+	if not key or type(professionLink) ~= "string" or professionLink == "" or not self.db then
+		return
+	end
+	self.db.professionLinks = self.db.professionLinks or {}
+	self.db.professionLinks[key] = professionLink
+end
+
+function AF:StoreProfessionLink(characterName, professionID, professionLink, professionName)
+	if type(professionLink) ~= "string" or professionLink == "" or not self.db then
+		return nil
+	end
+
+	characterName = self:NormalizeName(characterName or self.activeArtisanCharacter or self.playerName or self:GetPlayerFullName())
+	professionID = tonumber(professionID)
+	if not characterName or not professionID then
+		return nil
+	end
+	local activeCharacter = self:NormalizeName(self.activeArtisanCharacter or self.playerName or self:GetPlayerFullName())
+	if characterName == activeCharacter and self.IsOwnProfessionWindowOpen and not self:IsOwnProfessionWindowOpen() then
+		return nil
+	end
+
+	self:RememberProfessionLink(characterName, professionID, professionLink)
+	self.db.artisanCharacters = self.db.artisanCharacters or {}
+	local profile = self.db.artisanCharacters[characterName]
+	if not profile and characterName == activeCharacter then
+		profile = self:GetActiveArtisanProfile()
+	end
+	if not profile then
+		return professionLink
+	end
+
+	profile = self:NormalizeArtisanProfile(profile, characterName)
+	self.db.artisanCharacters[characterName] = profile
+	if characterName == activeCharacter then
+		self.db.artisanProfile = profile
+	end
+
+	local professionKey = tostring(professionID)
+	local profession = profile.professions[professionKey] or {
+		id = professionID,
+		name = professionName or self:GetProfessionName(professionID, profile),
+		recipes = {},
+	}
+	profile.professions[professionKey] = profession
+	profession.id = professionID
+	profession.name = professionName or profession.name
+	profession.professionLink = professionLink
+
+	for _, item in pairs(profile.items or {}) do
+		if tonumber(item.professionID) == professionID then
+			item.professionLink = professionLink
+		end
+	end
+
+	return professionLink
+end
+
+function AF:GetRememberedProfessionLink(characterName, professionID)
+	local key = self:GetProfessionLinkKey(characterName, professionID)
+	return key and self.db and self.db.professionLinks and self.db.professionLinks[key] or nil
+end
+
 function AF:NormalizeName(name)
 	if not name or name == "" then
 		return nil
@@ -333,11 +412,6 @@ end
 function AF:GetProfessionScannedCount(profile, professionID)
 	if not profile or not professionID then
 		return 0
-	end
-	local profession = profile.professions and profile.professions[tostring(professionID)]
-	local recipeCount = profession and self:TableCount(profession.recipes)
-	if recipeCount and recipeCount > 0 then
-		return recipeCount
 	end
 	local count = 0
 	for _, item in pairs(profile.items or {}) do

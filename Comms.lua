@@ -402,6 +402,13 @@ function AF:HandleResponse(parts, sender)
 	local previous = self.db.customerCache[itemKey][cacheKey]
 	local previousRecipeID = tonumber(previous and previous.recipeID) or 0
 	local professionName = professionLink ~= "" and professionLink:match("%[(.-)%]") or self:GetProfessionName(professionID)
+	if professionLink ~= "" then
+		self:RememberProfessionLink(crafterName, professionID, professionLink)
+	elseif previous and previous.professionLink then
+		professionLink = previous.professionLink
+	else
+		professionLink = self:GetRememberedProfessionLink(crafterName, professionID) or ""
+	end
 	self.db.customerCache[itemKey][cacheKey] = {
 		name = crafterName,
 		target = sender,
