@@ -25,41 +25,7 @@ local function GetRecommendationSnapshot(item)
 	}, "|")
 end
 
-function AF:IsSkillProbeScanReason(reason)
-	return reason == "SKILL_LINES_CHANGED"
-		or reason == "SPELLS_CHANGED"
-		or reason == "PROFESSION_EQUIPMENT_CHANGED"
-		or reason == "TRAIT_CONFIG_UPDATED"
-		or reason == "TRAIT_PENDING_APPLIED"
-end
-
-function AF:GetCurrentProfessionEquipmentSignature(profession)
-	if not profession then
-		return nil
-	end
-	local candidateIDs = {
-		profession.id,
-		profession.parentProfessionID,
-		profession.skillLineID,
-	}
-	for _, professionID in ipairs(candidateIDs) do
-		professionID = tonumber(professionID)
-		if professionID then
-			local ok, slots = pcall(C_TradeSkillUI.GetProfessionSlots, professionID)
-			if ok and type(slots) == "table" and next(slots) then
-				local parts = {}
-				for _, slotID in ipairs(slots) do
-					local link = GetInventoryItemLink and GetInventoryItemLink("player", slotID)
-					table.insert(parts, tostring(slotID) .. "=" .. tostring(link or "empty"))
-				end
-				return professionID .. ":" .. table.concat(parts, "|")
-			end
-		end
-	end
-	return nil
-end
-
-function AF:GetCurrentProfessionEquipmentState(profession)
+local function GetProfessionEquipmentState(profession)
 	if not profession then
 		return nil
 	end
@@ -88,9 +54,31 @@ function AF:GetCurrentProfessionEquipmentState(profession)
 	return nil
 end
 
+local function GetProfessionEntry(AF, professionOrID)
+	local professionID = type(professionOrID) == "table" and professionOrID.id or professionOrID
+	local profile = AF.db and AF.db.artisanProfile
+	return profile and profile.professions and profile.professions[tostring(professionID)]
+end
+
+function AF:IsSkillProbeScanReason(reason)
+	return reason == "SKILL_LINES_CHANGED"
+		or reason == "SPELLS_CHANGED"
+		or reason == "PROFESSION_EQUIPMENT_CHANGED"
+		or reason == "TRAIT_CONFIG_UPDATED"
+		or reason == "TRAIT_PENDING_APPLIED"
+end
+
+function AF:GetCurrentProfessionEquipmentSignature(profession)
+	local state = GetProfessionEquipmentState(profession)
+	return state and state.signature or nil
+end
+
+function AF:GetCurrentProfessionEquipmentState(profession)
+	return GetProfessionEquipmentState(profession)
+end
+
 function AF:StoreBestProfessionEquipmentState(profession, state)
-	local profile = self.db and self.db.artisanProfile
-	local professionEntry = profile and profession and profile.professions and profile.professions[tostring(profession.id)]
+	local professionEntry = profession and GetProfessionEntry(self, profession)
 	if not professionEntry or type(state) ~= "table" then
 		return
 	end
@@ -99,12 +87,11 @@ end
 
 function AF:GetProfessionEquipmentSignatureChanged(profession)
 	local state = self:GetCurrentProfessionEquipmentState(profession)
-	local signature = state and state.signature or self:GetCurrentProfessionEquipmentSignature(profession)
+	local signature = state and state.signature
 	if not signature then
 		return false
 	end
-	local profile = self.db and self.db.artisanProfile
-	local professionEntry = profile and profile.professions and profile.professions[tostring(profession.id)]
+	local professionEntry = GetProfessionEntry(self, profession)
 	if not professionEntry then
 		return false
 	end
@@ -114,8 +101,7 @@ function AF:GetProfessionEquipmentSignatureChanged(profession)
 end
 
 function AF:ShouldQueueProfessionEquipmentScan(profession)
-	local profile = self.db and self.db.artisanProfile
-	local professionEntry = profile and profession and profile.professions and profile.professions[tostring(profession.id)]
+	local professionEntry = profession and GetProfessionEntry(self, profession)
 	if not professionEntry then
 		return false
 	end
@@ -156,8 +142,7 @@ function AF:RestartActiveScanForEquipmentUpgrade(profession)
 	if not self:ShouldQueueProfessionEquipmentScan(profession) then
 		return false
 	end
-	local profile = self.db and self.db.artisanProfile
-	local professionEntry = profile and profile.professions and profile.professions[tostring(profession.id)]
+	local professionEntry = GetProfessionEntry(self, profession)
 	if professionEntry then
 		professionEntry.scanProgress = nil
 		professionEntry.scanSignature = nil
@@ -242,14 +227,12 @@ function AF:GetCurrentProfessionSkillSnapshots(profession)
 end
 
 function AF:GetSavedProfessionSkillTotals(profession)
-	local profile = self.db and self.db.artisanProfile
-	local professionEntry = profile and profession and profile.professions and profile.professions[tostring(profession.id)]
+	local professionEntry = profession and GetProfessionEntry(self, profession)
 	return professionEntry and professionEntry.bestProfessionSkillTotals or nil
 end
 
 function AF:StoreBestProfessionSkillSnapshots(profession, snapshots)
-	local profile = self.db and self.db.artisanProfile
-	local professionEntry = profile and profession and profile.professions and profile.professions[tostring(profession.id)]
+	local professionEntry = profession and GetProfessionEntry(self, profession)
 	if not professionEntry or type(snapshots) ~= "table" then
 		return
 	end
@@ -456,8 +439,7 @@ function AF:GetActiveScanProgress()
 		return nil
 	end
 
-	local profile = self.db and self.db.artisanProfile
-	local professionEntry = profile and profile.professions and profile.professions[tostring(active.professionID)]
+	local professionEntry = GetProfessionEntry(self, active.professionID)
 	local progress = professionEntry and professionEntry.scanProgress
 	if not progress or progress.signature ~= active.signature then
 		self.activeScan = nil
@@ -471,12 +453,8 @@ function AF:RefreshScanProgressUI(force)
 	self.scanRefreshCounter = (self.scanRefreshCounter or 0) + 1
 	if force or self.scanRefreshCounter >= 8 then
 		self.scanRefreshCounter = 0
-		if self.RefreshCrafterUI then
-			self:RefreshCrafterUI()
-		end
-		if self.RefreshMinimap then
-			self:RefreshMinimap()
-		end
+		self:RefreshCrafterUI()
+		self:RefreshMinimap()
 	end
 end
 
@@ -515,9 +493,7 @@ function AF:CompleteActiveScan(active, professionEntry, progress)
 		completedAt = self:Now(),
 	}
 	self:RefreshScanProgressUI(true)
-	if self.RefreshOptionsPanel then
-		self:RefreshOptionsPanel()
-	end
+	self:RefreshOptionsPanel()
 	local currentProfession = self:GetCurrentProfessionInfo()
 	if not currentProfession or tonumber(currentProfession.id) ~= tonumber(active.professionID) then
 		currentProfession = { id = active.professionID }
@@ -720,10 +696,7 @@ function AF:ProfessionHasPendingReagentNameWork(professionID)
 end
 
 function AF:ShouldStartAutoScanForReason(reason, profession, currentSignature)
-	local professionEntry = self.db
-		and self.db.artisanProfile
-		and self.db.artisanProfile.professions
-		and self.db.artisanProfile.professions[tostring(profession.id)]
+	local professionEntry = GetProfessionEntry(self, profession)
 	if not professionEntry then
 		return true, false
 	end
@@ -916,7 +889,7 @@ function AF:ResumeCurrentProfessionScanIfNeeded()
 	if not profession then
 		return 0
 	end
-	local professionEntry = self.db and self.db.artisanProfile and self.db.artisanProfile.professions[tostring(profession.id)]
+	local professionEntry = GetProfessionEntry(self, profession)
 	local currentSignature = self:GetCurrentProfessionScanSignature(profession)
 	if not currentSignature then
 		return 0

@@ -57,6 +57,11 @@ local function GetBaseProfessionID(professionID)
 	return PROFESSION_ID_ALIASES[professionID] or professionID
 end
 
+local function GetProfessionKey(professionID)
+	professionID = GetBaseProfessionID(professionID)
+	return professionID and tostring(professionID) or nil
+end
+
 function AF:GetBaseProfessionID(professionID)
 	return GetBaseProfessionID(professionID)
 end
@@ -148,37 +153,28 @@ local function PreserveEffectiveAdvertising(db)
 	end
 end
 
+local function NormalizeProfessionKeyedTable(tbl)
+	if type(tbl) ~= "table" then
+		return
+	end
+	for professionKey, value in pairs(tbl) do
+		local baseProfessionKey = GetProfessionKey(professionKey)
+		if baseProfessionKey and baseProfessionKey ~= professionKey then
+			if tbl[baseProfessionKey] == nil then
+				tbl[baseProfessionKey] = value
+			end
+			tbl[professionKey] = nil
+		end
+	end
+end
+
 local function NormalizeProfessionKeyedSettings(db)
 	for _, characterSettings in pairs(db.advertising or {}) do
-		if type(characterSettings) == "table" then
-			for professionKey, value in pairs(characterSettings) do
-				local baseProfessionID = GetBaseProfessionID(professionKey)
-				local baseProfessionKey = baseProfessionID and tostring(baseProfessionID) or nil
-				if baseProfessionKey and baseProfessionKey ~= professionKey then
-					if characterSettings[baseProfessionKey] == nil then
-						characterSettings[baseProfessionKey] = value
-					end
-					characterSettings[professionKey] = nil
-				end
-			end
-		end
+		NormalizeProfessionKeyedTable(characterSettings)
 	end
 
 	local function normalizeProfilePrices(profile)
-		local professionPrices = type(profile) == "table" and profile.professionPrices or nil
-		if type(professionPrices) ~= "table" then
-			return
-		end
-		for professionKey, value in pairs(professionPrices) do
-			local baseProfessionID = GetBaseProfessionID(professionKey)
-			local baseProfessionKey = baseProfessionID and tostring(baseProfessionID) or nil
-			if baseProfessionKey and baseProfessionKey ~= professionKey then
-				if professionPrices[baseProfessionKey] == nil then
-					professionPrices[baseProfessionKey] = value
-				end
-				professionPrices[professionKey] = nil
-			end
-		end
+		NormalizeProfessionKeyedTable(type(profile) == "table" and profile.professionPrices or nil)
 	end
 
 	normalizeProfilePrices(db.artisanProfile)
@@ -465,18 +461,21 @@ end
 
 function AF:IsProfessionAdvertised(characterName, professionID)
 	characterName = self:NormalizeName(characterName)
-	professionID = tostring(professionID or "")
-	if not characterName or professionID == "" then
+	local professionKey = GetProfessionKey(professionID)
+	if not characterName or not professionKey then
 		return false
 	end
 	local characterSettings = self.db and self.db.advertising and self.db.advertising[characterName]
-	local setting = characterSettings and characterSettings[professionID]
+	local setting = characterSettings and characterSettings[professionKey]
+	if setting == nil and characterSettings then
+		setting = characterSettings[tostring(professionID)]
+	end
 	if setting ~= nil then
 		return setting == true
 	end
 	local profile = self.db and self.db.artisanCharacters and self.db.artisanCharacters[characterName]
-	local profession = profile and profile.professions and profile.professions[professionID]
-	local defaultID = self:GetProfessionDefaultAdvertisingID(professionID, profession)
+	local profession = profile and profile.professions and profile.professions[professionKey]
+	local defaultID = self:GetProfessionDefaultAdvertisingID(professionKey, profession)
 	if self:IsProfessionDefaultOffByName(profession and profession.name) then
 		return false
 	end
@@ -485,8 +484,8 @@ end
 
 function AF:SetProfessionAdvertised(characterName, professionID, enabled)
 	characterName = self:NormalizeName(characterName)
-	local professionKey = tostring(professionID or "")
-	if not characterName or professionKey == "" or not self.db then
+	local professionKey = GetProfessionKey(professionID)
+	if not characterName or not professionKey or not self.db then
 		return
 	end
 	self.db.advertising = self.db.advertising or {}
@@ -504,22 +503,29 @@ function AF:SetProfessionAdvertised(characterName, professionID, enabled)
 	else
 		self.db.advertising[characterName][professionKey] = enabled
 	end
+	local legacyProfessionKey = tostring(professionID)
+	if legacyProfessionKey ~= professionKey then
+		self.db.advertising[characterName][legacyProfessionKey] = nil
+	end
 	if next(self.db.advertising[characterName]) == nil then
 		self.db.advertising[characterName] = nil
 	end
-	if self.RefreshMinimap then
-		self:RefreshMinimap()
-	end
-	if self.RefreshCrafterUI then
-		self:RefreshCrafterUI()
-	end
-	if self.RefreshOptionsPanel then
-		self:RefreshOptionsPanel()
-	end
+	self:RefreshMinimap()
+	self:RefreshCrafterUI()
+	self:RefreshOptionsPanel()
 end
 
 function AF:GetProfessionLinkKey(characterName, professionID)
 	characterName = self:NormalizeName(characterName)
+	local professionKey = GetProfessionKey(professionID)
+	if not characterName or not professionKey then
+		return nil
+	end
+	return characterName .. ":" .. professionKey
+end
+
+local function GetLegacyProfessionLinkKey(AF, characterName, professionID)
+	characterName = AF:NormalizeName(characterName)
 	professionID = tonumber(professionID)
 	if not characterName or not professionID then
 		return nil
@@ -577,7 +583,7 @@ function AF:StoreProfessionLink(characterName, professionID, professionLink, pro
 	profession.id = professionID
 	profession.name = professionName or profession.name
 	profession.professionLink = professionLink
-	if not profession.icon and self.GetCurrentProfessionInfo then
+	if not profession.icon then
 		local currentProfession = self:GetCurrentProfessionInfo()
 		if currentProfession and tonumber(currentProfession.id) == professionID then
 			profession.icon = currentProfession.icon
@@ -596,7 +602,12 @@ end
 
 function AF:GetRememberedProfessionLink(characterName, professionID)
 	local key = self:GetProfessionLinkKey(characterName, professionID)
-	return key and self.db and self.db.professionLinks and self.db.professionLinks[key] or nil
+	local links = self.db and self.db.professionLinks
+	if key and links and links[key] then
+		return links[key]
+	end
+	local legacyKey = GetLegacyProfessionLinkKey(self, characterName, professionID)
+	return legacyKey and links and links[legacyKey] or nil
 end
 
 function AF:NormalizeName(name)
@@ -823,7 +834,12 @@ end
 function AF:GetItemPriceForProfile(profile, itemID, professionID)
 	profile = self:NormalizeArtisanProfile(profile)
 	local item = profile.items[tostring(itemID or "")]
-	local professionPrice = profile.professionPrices[tostring(professionID or "")]
+	local professionKey = GetProfessionKey(professionID)
+	local legacyProfessionKey = professionID and tostring(professionID) or nil
+	local professionPrice = professionKey and profile.professionPrices[professionKey] or nil
+	if not professionPrice and legacyProfessionKey then
+		professionPrice = profile.professionPrices[legacyProfessionKey]
+	end
 	local baseProfessionID = self:GetProfessionDefaultAdvertisingID(professionID, item)
 	local baseProfessionPrice = baseProfessionID and profile.professionPrices[tostring(baseProfessionID)] or nil
 	local priceCopper, freeCommission = self:GetEntryCommission(item)
@@ -844,6 +860,18 @@ function AF:GetItemPrice(itemID, professionID)
 	return self:GetItemPriceForProfile(self:GetActiveArtisanProfile(), itemID, professionID)
 end
 
+function AF:GetProfessionPriceEntry(profile, professionID)
+	profile = profile or (self.db and self.db.artisanProfile)
+	local professionKey = GetProfessionKey(professionID)
+	local professionPrices = profile and profile.professionPrices
+	local entry = professionKey and professionPrices and professionPrices[professionKey] or nil
+	if entry then
+		return entry
+	end
+	local legacyProfessionKey = professionID and tostring(professionID) or nil
+	return legacyProfessionKey and professionPrices and professionPrices[legacyProfessionKey] or nil
+end
+
 function AF:SetItemPrice(itemID, priceCopper, freeCommission, note, commissionState)
 	local item = self.db.artisanProfile.items[tostring(itemID or "")]
 	if not item then
@@ -855,8 +883,12 @@ function AF:SetItemPrice(itemID, priceCopper, freeCommission, note, commissionSt
 end
 
 function AF:SetProfessionPrice(professionID, priceCopper, freeCommission, note, commissionState)
-	local entry = self.db.artisanProfile.professionPrices[tostring(professionID or "")] or {}
-	self.db.artisanProfile.professionPrices[tostring(professionID or "")] = entry
+	local professionKey = GetProfessionKey(professionID)
+	if not professionKey then
+		return
+	end
+	local entry = self.db.artisanProfile.professionPrices[professionKey] or {}
+	self.db.artisanProfile.professionPrices[professionKey] = entry
 	self:SetCommissionFields(entry, priceCopper, freeCommission, commissionState)
 	entry.note = note or ""
 	entry.updatedAt = self:Now()

@@ -132,19 +132,6 @@ local function ConfigureInfoButton(button, tooltipTitle, tooltipText)
 	return button
 end
 
-local function RaiseCrafterCollapseButton(button)
-	if not button or not ProfessionsFrame then
-		return
-	end
-
-	local level = (ProfessionsFrame:GetFrameLevel() or 0) + CRAFTER_COLLAPSE_BUTTON_LEVEL_OFFSET
-	button:SetFrameStrata(ProfessionsFrame:GetFrameStrata())
-	button:SetFrameLevel(level)
-	for _, child in ipairs({ button:GetChildren() }) do
-		child:SetFrameLevel(level + 1)
-	end
-end
-
 local function ParseCommissionOrWarn(box)
 	local copper, free, state = AF:NormalizeCommissionInput(box:GetText())
 	if not copper then
@@ -221,7 +208,7 @@ function AF:ApplyCrafterDefaultsCollapsed(collapsed)
 			collapseButton:SetPoint("TOPRIGHT", defaults, "TOPRIGHT", 1, 0)
 			collapseButton:SetMinimizedLook()
 		end
-		RaiseCrafterCollapseButton(collapseButton)
+			self:RaiseButtonAboveAnchor(collapseButton, ProfessionsFrame, CRAFTER_COLLAPSE_BUTTON_LEVEL_OFFSET)
 		collapseButton:Show()
 	end
 end
@@ -403,7 +390,7 @@ function AF:AttachCrafterUI()
 
 	local collapseButton = CreateFrame("Frame", "ArtisanFinderCrafterDefaultsCollapseButton", ProfessionsFrame, "MaximizeMinimizeButtonFrameTemplate")
 	collapseButton:SetSize(24, 24)
-	RaiseCrafterCollapseButton(collapseButton)
+	self:RaiseButtonAboveAnchor(collapseButton, ProfessionsFrame, CRAFTER_COLLAPSE_BUTTON_LEVEL_OFFSET)
 	collapseButton:SetOnMinimizedCallback(function()
 		AF:SetCrafterDefaultsCollapsed(true)
 	end)
@@ -641,7 +628,7 @@ function AF:UpdateCrafterDirtyState()
 		local profession = self:GetCurrentProfessionInfo()
 		professionID = profession and profession.id
 	end
-	local default = professionID and self.db.artisanProfile.professionPrices[tostring(professionID)]
+	local default = professionID and self:GetProfessionPriceEntry(self.db.artisanProfile, professionID)
 	local defaultNote = default and default.note or ""
 	local defaultDirty = self:IsCommissionInputDirty(defaults.price:GetText(), default)
 		or (defaults.note:GetText() or "") ~= defaultNote
@@ -675,7 +662,7 @@ function AF:RefreshCrafterUI()
 	local context = self:GetCurrentCraftingRecipeContext()
 	local profession = self:GetCurrentProfessionInfo()
 	local professionID = context and context.professionID or (profession and profession.id)
-	if professionID and self.CaptureCurrentProfessionLink then
+	if professionID then
 		self:CaptureCurrentProfessionLink(profession or { id = professionID, name = context and context.professionName }, "crafter-ui-refresh")
 	end
 	if not context or context.learned == false or context.isRecraft then
@@ -695,7 +682,7 @@ function AF:RefreshCrafterUI()
 		defaults:Show()
 		self:ApplyCrafterDefaultsCollapsed(self.crafterDefaultsCollapsed)
 		defaults.advertiseCheck:SetChecked(self:IsProfessionAdvertised(self.playerName, professionID))
-		local default = self.db.artisanProfile.professionPrices[tostring(professionID)]
+		local default = self:GetProfessionPriceEntry(self.db.artisanProfile, professionID)
 		if default then
 			SetEditBoxText(defaults.price, self:FormatCommissionInput(default))
 			SetEditBoxText(defaults.note, default.note or "")

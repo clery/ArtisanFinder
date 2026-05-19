@@ -31,22 +31,6 @@ local function GetSortIndexByKey(key)
 	return 1
 end
 
-local function RaiseCustomerCollapseButton(button)
-	if not button then
-		return
-	end
-
-	local anchor = ProfessionsCustomerOrdersFrame or ProfessionsFrame or UIParent
-	local level = (anchor.GetFrameLevel and anchor:GetFrameLevel() or 0) + CUSTOMER_COLLAPSE_BUTTON_LEVEL_OFFSET
-	if anchor.GetFrameStrata then
-		button:SetFrameStrata(anchor:GetFrameStrata())
-	end
-	button:SetFrameLevel(level)
-	for _, child in ipairs({ button:GetChildren() }) do
-		child:SetFrameLevel(level + 1)
-	end
-end
-
 function AF:GetCustomerSortOptions()
 	local options = {}
 	for _, mode in ipairs(SORT_MODES) do
@@ -617,7 +601,7 @@ function AF:SetCustomerPanelCollapsed(collapsed, skipRefresh)
 			collapseButton:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 1, 0)
 			collapseButton:SetMinimizedLook()
 		end
-		RaiseCustomerCollapseButton(collapseButton)
+			AF:RaiseButtonAboveAnchor(collapseButton, ProfessionsCustomerOrdersFrame or ProfessionsFrame or UIParent, CUSTOMER_COLLAPSE_BUTTON_LEVEL_OFFSET)
 		collapseButton:SetShown(frame:IsShown())
 	end
 
@@ -674,7 +658,7 @@ function AF:AttachCustomerUI()
 	frame.collapseButton:Hide()
 	local collapseButton = CreateFrame("Frame", "ArtisanFinderCustomerCollapseButton", ordersFrame, "MaximizeMinimizeButtonFrameTemplate")
 	collapseButton:SetSize(24, 24)
-	RaiseCustomerCollapseButton(collapseButton)
+	self:RaiseButtonAboveAnchor(collapseButton, ProfessionsCustomerOrdersFrame or ProfessionsFrame or UIParent, CUSTOMER_COLLAPSE_BUTTON_LEVEL_OFFSET)
 	collapseButton:SetOnMinimizedCallback(function()
 		AF:SetCustomerPanelCollapsed(true)
 	end)

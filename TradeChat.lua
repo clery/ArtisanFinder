@@ -64,14 +64,6 @@ local function ExtractTradeLinks(message)
 	return links
 end
 
-local function SafeExtractTradeLinks(message)
-	local ok, links = pcall(ExtractTradeLinks, message)
-	if ok and type(links) == "table" then
-		return links
-	end
-	return {}
-end
-
 local function GetTradeLinkProfessionCandidates(link)
 	local body = tostring(link or ""):match("|Htrade:([^|]+)|h")
 	local candidates = {}
@@ -118,6 +110,28 @@ local function HasIntersection(left, right)
 		end
 	end
 	return false
+end
+
+local function TradeLeadMatchesFilter(row, filterText)
+	local haystack = table.concat({
+		row.name or "",
+		row.professionName or "",
+		row.note or "",
+	}, " "):lower()
+	return filterText == "" or haystack:find(filterText, 1, true)
+end
+
+local function MarkTradeLeadSeen(seenNames, key, row)
+	if not seenNames then
+		return
+	end
+	seenNames[key] = true
+	if row.name then
+		seenNames[row.name] = true
+	end
+	if row.target then
+		seenNames[row.target] = true
+	end
 end
 
 function AF:InitializeTradeChat()
@@ -203,7 +217,7 @@ function AF:OnTradeChatMessage(message, sender, _, channelName, _, _, _, _, chan
 		return
 	end
 
-	local links = SafeExtractTradeLinks(message)
+	local links = ExtractTradeLinks(message)
 	if #links == 0 or not sender then
 		return
 	end
@@ -239,9 +253,7 @@ function AF:OnTradeChatMessage(message, sender, _, channelName, _, _, _, _, chan
 		self.db.tradeLeadCache[leadKey] = lead
 	end
 
-	if self.RefreshCustomerResults then
-		self:RefreshCustomerResults()
-	end
+	self:RefreshCustomerResults()
 end
 
 function AF:PruneTradeLeads()
@@ -291,12 +303,7 @@ function AF:GetCachedTradeLeadFallbackRows(itemID, professionID, filterText, see
 				offlineCached = true,
 				note = self:Text("MISSING_ADDON_DATA"),
 			}
-			local haystack = table.concat({
-				row.name or "",
-				row.professionName or "",
-				row.note or "",
-			}, " "):lower()
-			if filterText == "" or haystack:find(filterText, 1, true) then
+			if TradeLeadMatchesFilter(row, filterText) then
 				table.insert(rows, row)
 			end
 		end
@@ -344,22 +351,9 @@ function AF:GetTradeLeadRows(itemID, professionID, filterText, seenNames, recipe
 				tradeProfessionMatch = exactProfessionMatch == true,
 				note = self:Text("MISSING_ADDON_DATA"),
 			}
-			local haystack = table.concat({
-				row.name or "",
-				row.professionName or "",
-				row.note or "",
-			}, " "):lower()
-			if filterText == "" or haystack:find(filterText, 1, true) then
+			if TradeLeadMatchesFilter(row, filterText) then
 				table.insert(rows, row)
-				if seenNames then
-					seenNames[name] = true
-					if row.name then
-						seenNames[row.name] = true
-					end
-					if row.target then
-						seenNames[row.target] = true
-					end
-				end
+				MarkTradeLeadSeen(seenNames, name, row)
 			end
 		end
 	end

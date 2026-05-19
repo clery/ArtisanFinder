@@ -147,6 +147,20 @@ function AF:StyleListRow(row)
 	row.divider:SetAlpha(0.35)
 end
 
+function AF:RaiseButtonAboveAnchor(button, anchor, levelOffset)
+	if not button or not anchor then
+		return
+	end
+	local level = (anchor.GetFrameLevel and anchor:GetFrameLevel() or 0) + (levelOffset or 1)
+	if anchor.GetFrameStrata then
+		button:SetFrameStrata(anchor:GetFrameStrata())
+	end
+	button:SetFrameLevel(level)
+	for _, child in ipairs({ button:GetChildren() }) do
+		child:SetFrameLevel(level + 1)
+	end
+end
+
 function AF:AddDivider(parent, anchor, offsetY)
 	local divider = parent:CreateTexture(nil, "ARTWORK")
 	divider:SetAtlas("Options_HorizontalDivider", true)

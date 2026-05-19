@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
-set -euo pipefail
+# set -euo pipefail
 
-repo_root="$(git rev-parse --show-toplevel)"
-cd "$repo_root"
+# repo_root="$(git rev-parse --show-toplevel)"
+# cd "$repo_root"
 
-# Keep folders traversable, but normalize addon files to non-executable.
-find . -path ./.git -prune -o -type d -exec chmod 755 {} +
+# # Keep folders traversable, but normalize addon files to non-executable.
+# find . -path ./.git -prune -o -type d -exec chmod 755 {} +
 
-while IFS= read -r -d '' path; do
-	if [[ "$path" == ".githooks/pre-commit" ]]; then
-		chmod 755 "$path"
-		git update-index --chmod=+x -- "$path"
-	elif [[ -e "$path" ]]; then
-		chmod 644 "$path"
-		git update-index --chmod=-x -- "$path"
-	fi
-done < <(git ls-files -z)
+# while IFS= read -r -d '' path; do
+# 	if [[ "$path" == ".githooks/pre-commit" ]]; then
+# 		chmod 755 "$path"
+# 		git update-index --chmod=+x -- "$path"
+# 	elif [[ -e "$path" ]]; then
+# 		chmod 644 "$path"
+# 		git update-index --chmod=-x -- "$path"
+# 	fi
+# done < <(git ls-files -z)

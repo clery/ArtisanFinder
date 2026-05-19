@@ -124,15 +124,9 @@ function AF:QueueBroadcastQuery(itemID, professionID)
 		AF.pendingCustomerQueryProfessionID = nil
 		if pendingItemID and tonumber(AF.currentCustomerItemID) == tonumber(pendingItemID) then
 			AF:BroadcastQuery(pendingItemID, pendingProfessionID)
-			if AF.InjectDebugSelfResult then
-				AF:InjectDebugSelfResult(pendingItemID, pendingProfessionID)
-			end
-			if AF.InjectDebugTradeLeads then
-				AF:InjectDebugTradeLeads()
-			end
-			if AF.RefreshCustomerResults then
-				AF:RefreshCustomerResults()
-			end
+			AF:InjectDebugSelfResult(pendingItemID, pendingProfessionID)
+			AF:InjectDebugTradeLeads()
+			AF:RefreshCustomerResults()
 		end
 	end)
 	return true
@@ -175,9 +169,7 @@ local function ItemMatchesQuery(item, itemID, professionID)
 	if professionID == 0 then
 		return true
 	end
-	local itemProfessionID = AF.GetBaseProfessionID and AF:GetBaseProfessionID(item.professionID) or tonumber(item.professionID)
-	local queryProfessionID = AF.GetBaseProfessionID and AF:GetBaseProfessionID(professionID) or tonumber(professionID)
-	return itemProfessionID == queryProfessionID
+	return AF:GetBaseProfessionID(item.professionID) == AF:GetBaseProfessionID(professionID)
 end
 
 function AF:GetAdvertisedItemMatches(itemID, professionID)
@@ -466,9 +458,7 @@ function AF:HandleResponse(parts, sender)
 	}
 	self:ApplyPendingReagentDetail(sender, itemID, recipeID, queryToken, crafterName)
 
-	if self.RefreshCustomerResults then
-		self:RefreshCustomerResults()
-	end
+	self:RefreshCustomerResults()
 end
 
 function AF:GetReagentDetailKey(sender, itemID, recipeID, queryToken, crafterName)
@@ -585,8 +575,6 @@ function AF:HandleReagentDetail(parts, sender)
 		local combined = table.concat(pending.chunks, "")
 		pending.summary = self:DecodeField(combined)
 		self:ApplyPendingReagentDetail(sender, itemID, recipeID, queryToken, crafterName)
-		if self.RefreshCustomerResults then
-			self:RefreshCustomerResults()
-		end
+		self:RefreshCustomerResults()
 	end
 end

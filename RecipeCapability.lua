@@ -2,7 +2,6 @@ local _, AF = ...
 
 local MAX_REAGENT_COMBINATIONS = 72
 local MAX_REAGENT_SUMMARY_BYTES = 900
-local MAX_OPTIONAL_REAGENTS_PER_SLOT = 8
 local SCAN_SIGNATURE_VERSION = 22
 local SKILL_PROBE_SIGNATURE_VERSION = 1
 local FULL_SCAN_SIGNATURE_VERSION = 1
@@ -80,11 +79,6 @@ local function GetReagentQualityInfoFromItemID(itemID)
 		return tonumber(reagentQualityInfo.quality), reagentQualityInfo.iconSmall or reagentQualityInfo.icon
 	end
 	return nil, nil
-end
-
-local function GetReagentQualityFromItemID(itemID)
-	local quality = GetReagentQualityInfoFromItemID(itemID)
-	return quality
 end
 
 local function IsLowerQualityReagent(left, right)
@@ -172,6 +166,19 @@ local function FormatOperationDebug(operationInfo)
 		"lower=" .. tostring(operationInfo.lowerSkillThreshold or "-"),
 		"upper=" .. tostring(operationInfo.upperSkillTreshold or operationInfo.upperSkillThreshold or "-"),
 	}, ", ")
+end
+
+local function ApplyOperationInfo(target, recipeID, operationInfo)
+	target.recipeDifficulty = operationInfo.baseDifficulty
+	target.baseSkill = operationInfo.baseSkill
+	target.bonusSkill = operationInfo.bonusSkill
+	target.bonusDifficulty = operationInfo.bonusDifficulty
+	target.lowerSkillThreshold = operationInfo.lowerSkillThreshold
+	target.upperSkillThreshold = GetOperationUpperThreshold(operationInfo)
+	target.totalSkill = GetOperationTotalSkill(operationInfo)
+	target.rawQuality = GetOperationQuality(operationInfo)
+	target.debugBaseOperation = FormatOperationDebug(operationInfo)
+	target.quality, target.qualityAtlas = GetRecipeDisplayQualityInfo(recipeID, operationInfo, {})
 end
 
 local function ScoreOperationPair(normalInfo, concentrationInfo)
@@ -406,19 +413,7 @@ function AF:GetRecipeCapability(recipeID)
 	local capability = {}
 	local ok, operationInfo = pcall(C_TradeSkillUI.GetCraftingOperationInfo, recipeID, {}, nil, false)
 	if ok and type(operationInfo) == "table" then
-		capability.recipeDifficulty = operationInfo.baseDifficulty
-		capability.baseSkill = operationInfo.baseSkill
-		capability.bonusSkill = operationInfo.bonusSkill
-		capability.bonusDifficulty = operationInfo.bonusDifficulty
-		capability.lowerSkillThreshold = operationInfo.lowerSkillThreshold
-		capability.upperSkillThreshold = GetOperationUpperThreshold(operationInfo)
-		local totalSkill = (tonumber(operationInfo.baseSkill) or 0) + (tonumber(operationInfo.bonusSkill) or 0)
-		if totalSkill > 0 then
-			capability.totalSkill = totalSkill
-		end
-		capability.debugBaseOperation = FormatOperationDebug(operationInfo)
-		capability.rawQuality = GetOperationQuality(operationInfo)
-		capability.quality, capability.qualityAtlas = GetRecipeDisplayQualityInfo(recipeID, operationInfo, {})
+		ApplyOperationInfo(capability, recipeID, operationInfo)
 	end
 
 	local okConcentration, concentrationInfo = pcall(C_TradeSkillUI.GetCraftingOperationInfo, recipeID, {}, nil, true)
@@ -455,10 +450,6 @@ function AF:GetRecipeCapability(recipeID)
 			"atlas " .. tostring(hasAtlasUpgrade),
 			"score " .. tostring(best.reagentQualityScore or "-"),
 		}, "; ")
-	else
-		capability.debugBestCandidateReason = "no best candidate"
-	end
-	if best then
 		capability.bestQuality = best.bestQuality
 		capability.bestQualityAtlas = best.bestQualityAtlas
 		capability.rawBestQuality = best.rawBestQuality
@@ -469,6 +460,8 @@ function AF:GetRecipeCapability(recipeID)
 		capability.bestReagentSummary = best.bestReagentSummary
 		capability.bestReagentTruncated = best.bestReagentTruncated
 		capability.bestReagentPendingNames = best.debugReason == "waiting for reagent item names"
+	else
+		capability.debugBestCandidateReason = "no best candidate"
 	end
 
 	capability.professionLink = self:CaptureCurrentProfessionLink()
@@ -482,18 +475,8 @@ function AF:GetRecipeSkillProbe(recipeID)
 		return nil
 	end
 
-	local probe = {
-		recipeDifficulty = operationInfo.baseDifficulty,
-		baseSkill = operationInfo.baseSkill,
-		bonusSkill = operationInfo.bonusSkill,
-		bonusDifficulty = operationInfo.bonusDifficulty,
-		lowerSkillThreshold = operationInfo.lowerSkillThreshold,
-		upperSkillThreshold = GetOperationUpperThreshold(operationInfo),
-		totalSkill = GetOperationTotalSkill(operationInfo),
-		rawQuality = GetOperationQuality(operationInfo),
-		debugBaseOperation = FormatOperationDebug(operationInfo),
-	}
-	probe.quality, probe.qualityAtlas = GetRecipeDisplayQualityInfo(recipeID, operationInfo, {})
+	local probe = {}
+	ApplyOperationInfo(probe, recipeID, operationInfo)
 	probe.skillProbeSignature = self:BuildSkillProbeSignature(recipeID, probe)
 	return probe
 end
@@ -791,7 +774,6 @@ function AF:GetBestReagentCapability(recipeID)
 
 	local candidateSlots = {}
 	local fixedReagents = {}
-	local skippedOptional = false
 	local ignoredOptional = 0
 	local visibleSlots = 0
 	for _, reagentSlotSchematic in ipairs(schematic.reagentSlotSchematics) do
@@ -895,31 +877,22 @@ function AF:GetBestReagentCapability(recipeID)
 	end
 
 	if useGreedy then
-		local selected = {}
-		for slotIndex, candidate in ipairs(candidateSlots) do
-			local slot = candidate.slot
-			local bestReagent = candidate.optional and nil or slot.reagents[1]
-			for _, reagent in ipairs(slot.reagents) do
-				if IsLowerQualityReagent(reagent, bestReagent) then
-					bestReagent = reagent
+		local function SelectReagents(isBetter)
+			local selected = {}
+			for slotIndex, candidate in ipairs(candidateSlots) do
+				local slot = candidate.slot
+				local bestReagent = candidate.optional and nil or slot.reagents[1]
+				for _, reagent in ipairs(slot.reagents) do
+					if isBetter(reagent, bestReagent) then
+						bestReagent = reagent
+					end
 				end
+				selected[slotIndex] = bestReagent
 			end
-			selected[slotIndex] = bestReagent
+			return selected
 		end
-		Evaluate(selected, true)
-
-		selected = {}
-		for slotIndex, candidate in ipairs(candidateSlots) do
-			local slot = candidate.slot
-			local bestReagent = candidate.optional and nil or slot.reagents[1]
-			for _, reagent in ipairs(slot.reagents) do
-				if IsHigherQualityReagent(reagent, bestReagent) then
-					bestReagent = reagent
-				end
-			end
-			selected[slotIndex] = bestReagent
-		end
-		Evaluate(selected, true)
+		Evaluate(SelectReagents(IsLowerQualityReagent), true)
+		Evaluate(SelectReagents(IsHigherQualityReagent), true)
 	else
 		local selected = {}
 		local function Visit(slotIndex)
@@ -974,11 +947,6 @@ function AF:ApplyRecipeCapability(item, recipeID)
 		return
 	end
 	local capability = self:GetRecipeCapability(recipeID)
-	item.recipeDifficulty = capability.recipeDifficulty
-	item.totalSkill = capability.totalSkill
-	item.quality = capability.quality
-	item.qualityAtlas = capability.qualityAtlas
-	item.rawQuality = capability.rawQuality
 	item.concentrationQuality = capability.concentrationQuality
 	item.concentrationQualityAtlas = capability.concentrationQualityAtlas
 	item.rawConcentrationQuality = capability.rawConcentrationQuality
@@ -1000,7 +968,6 @@ function AF:ApplyRecipeCapability(item, recipeID)
 	item.debugBestCandidateSummary = capability.debugBestCandidateSummary
 	item.debugBestCandidateAccepted = capability.debugBestCandidateAccepted == true
 	item.debugBestCandidateOperation = capability.debugBestCandidateOperation
-	item.debugBaseOperation = capability.debugBaseOperation
 	item.debugBestCandidateReason = capability.debugBestCandidateReason
 	item.professionLink = capability.professionLink or item.professionLink
 	self:ApplyRecipeSkillProbe(item, recipeID, capability)

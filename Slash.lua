@@ -6,15 +6,34 @@ local function NormalizeCommand(message)
 	return command or "", rest or ""
 end
 
+local function ClearCustomerQueryState(AF)
+	AF.pendingReagentDetails = nil
+	AF.currentCustomerItemID = nil
+	AF.currentCustomerItemName = nil
+	AF.currentCustomerProfessionID = nil
+	AF.currentCustomerRecipeID = nil
+	AF.currentCustomerQueryToken = nil
+	AF.currentCustomerQueryItemID = nil
+	AF.currentCustomerQueryProfessionID = nil
+	AF.lastQueryItemID = nil
+	AF.lastQueryProfessionID = nil
+	AF.lastQueryAt = nil
+end
+
+function AF:RefreshMainUI(statusText)
+	self:RefreshCustomerResults(statusText)
+	self:RefreshCrafterUI()
+	self:RefreshMinimap()
+	self:RefreshOptionsPanel()
+end
+
 function AF:SetDebugSelfResults(enabled)
 	self.db.debugSelfResults = enabled == true
-	if not self.db.debugSelfResults and self.ClearDebugTradeLeads then
+	if not self.db.debugSelfResults then
 		self:ClearDebugTradeLeads()
 	end
 	self:Print(self:Text("DEBUG_SELF_CHANGED", self.db.debugSelfResults and self:Text("ENABLED") or self:Text("DISABLED")))
-	if self.RefreshCustomerQuery then
-		self:RefreshCustomerQuery(true)
-	end
+	self:RefreshCustomerQuery(true)
 end
 
 function AF:PrintSlashHelp()
@@ -51,24 +70,9 @@ function AF:GetAvailableLocaleText()
 end
 
 function AF:RefreshLocalizedUI()
-	if self.RefreshCustomerLocale then
-		self:RefreshCustomerLocale()
-	end
-	if self.RefreshCrafterLocale then
-		self:RefreshCrafterLocale()
-	end
-	if self.RefreshCustomerResults then
-		self:RefreshCustomerResults()
-	end
-	if self.RefreshCrafterUI then
-		self:RefreshCrafterUI()
-	end
-	if self.RefreshMinimap then
-		self:RefreshMinimap()
-	end
-	if self.RefreshOptionsPanel then
-		self:RefreshOptionsPanel()
-	end
+	self:RefreshCustomerLocale()
+	self:RefreshCrafterLocale()
+	self:RefreshMainUI()
 end
 
 function AF:SetLocaleOverride(locale)
@@ -79,7 +83,7 @@ function AF:SetLocaleOverride(locale)
 		self:RefreshLocalizedUI()
 		return
 	end
-	if not self.Locales or not self.Locales[locale] then
+	if not self.Locales[locale] then
 		self:Print(self:Text("LOCALE_UNKNOWN", locale, self:GetAvailableLocaleText()))
 		return
 	end
@@ -100,65 +104,21 @@ function AF:ClearAllData()
 	self.autoScanQueued = false
 	self.scanProcessing = false
 	self.tradeLeads = {}
-	self.pendingReagentDetails = nil
-	self.currentCustomerItemID = nil
-	self.currentCustomerItemName = nil
-	self.currentCustomerProfessionID = nil
-	self.currentCustomerRecipeID = nil
-	self.currentCustomerQueryToken = nil
-	self.currentCustomerQueryItemID = nil
-	self.currentCustomerQueryProfessionID = nil
-	self.lastQueryItemID = nil
-	self.lastQueryProfessionID = nil
-	self.lastQueryAt = nil
+	ClearCustomerQueryState(self)
 	self:EnsureDB()
 	self:SelectActiveArtisanProfile(self.playerName or self:GetPlayerFullName())
 	self.tradeLeads = self.db.tradeLeads
-	if self.RefreshCustomerResults then
-		self:RefreshCustomerResults(self:Text("SELECT_ORDER_ITEM"))
-	end
-	if self.RefreshCrafterUI then
-		self:RefreshCrafterUI()
-	end
-	if self.RefreshMinimap then
-		self:RefreshMinimap()
-	end
-	if self.RefreshOptionsPanel then
-		self:RefreshOptionsPanel()
-	end
+	self:RefreshAfterClear()
 	self:Print(self:Text("CLEAR_DONE"))
 end
 
 function AF:ResetCustomerQueryState(statusText)
-	self.pendingReagentDetails = nil
-	self.currentCustomerItemID = nil
-	self.currentCustomerItemName = nil
-	self.currentCustomerProfessionID = nil
-	self.currentCustomerRecipeID = nil
-	self.currentCustomerQueryToken = nil
-	self.currentCustomerQueryItemID = nil
-	self.currentCustomerQueryProfessionID = nil
-	self.lastQueryItemID = nil
-	self.lastQueryProfessionID = nil
-	self.lastQueryAt = nil
-	if self.RefreshCustomerResults then
-		self:RefreshCustomerResults(statusText or self:Text("SELECT_ORDER_ITEM"))
-	end
+	ClearCustomerQueryState(self)
+	self:RefreshCustomerResults(statusText or self:Text("SELECT_ORDER_ITEM"))
 end
 
 function AF:RefreshAfterClear(statusText)
-	if self.RefreshCustomerResults then
-		self:RefreshCustomerResults(statusText or self:Text("SELECT_ORDER_ITEM"))
-	end
-	if self.RefreshCrafterUI then
-		self:RefreshCrafterUI()
-	end
-	if self.RefreshMinimap then
-		self:RefreshMinimap()
-	end
-	if self.RefreshOptionsPanel then
-		self:RefreshOptionsPanel()
-	end
+	self:RefreshMainUI(statusText or self:Text("SELECT_ORDER_ITEM"))
 end
 
 function AF:ClearOptionsData()
@@ -173,9 +133,7 @@ function AF:ClearOptionsData()
 	self.db.debugSelfResults = false
 	self.db.advertising = {}
 	self.db.advertisingKnown = {}
-	if self.ClearDebugTradeLeads then
-		self:ClearDebugTradeLeads()
-	end
+	self:ClearDebugTradeLeads()
 	if self.customerSortIndex then
 		self.customerSortIndex = nil
 	end
@@ -210,7 +168,7 @@ function AF:ClearExternalArtisans()
 	self.db.tradeLeadCache = {}
 	self.db.responseThrottle = {}
 	self.tradeLeads = self.db.tradeLeads
-	self:ResetCustomerQueryState()
+	ClearCustomerQueryState(self)
 	self:RefreshAfterClear()
 	self:Print(self:Text("CLEAR_ARTISANS_DONE"))
 end
@@ -224,9 +182,7 @@ end
 function AF:HandleSlash(message)
 	local command, rest = NormalizeCommand(message)
 	if command == "scan" then
-		if self.StartOrResumeCurrentProfessionScan then
-			self:StartOrResumeCurrentProfessionScan(true, false)
-		end
+		self:StartOrResumeCurrentProfessionScan(true, false)
 	elseif command == "auto" then
 		if rest == "on" then
 			self:SetAutoAvailability(true)

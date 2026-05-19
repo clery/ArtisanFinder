@@ -43,7 +43,7 @@ function AF:EncodeField(value, maxBytes)
 	value = value:gsub("[\r\n]", " ")
 	value = value:gsub("|", "{p}")
 	if maxBytes and #value > maxBytes then
-		value = value:sub(1, maxBytes)
+		value = TruncateUTF8(value, #value, maxBytes)
 	end
 	return value
 end
