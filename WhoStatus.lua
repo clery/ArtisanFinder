@@ -109,18 +109,16 @@ local function KickWhoQueue(label)
 	end
 	DebugPrint("who start", label or "")
 	pcall(lib.AskWhoNext, lib)
-	if C_Timer then
-		C_Timer.After(0.1, function()
-			local currentLib = GetLibWho()
-			if currentLib and currentLib.AskWhoNext then
-				if currentLib.WhoInProgress or not currentLib.readyForNext or (currentLib.frame and currentLib.frame:IsShown()) then
-					return
-				end
-				DebugPrint("who start delayed", label or "")
-				pcall(currentLib.AskWhoNext, currentLib)
+	C_Timer.After(0.1, function()
+		local currentLib = GetLibWho()
+		if currentLib and currentLib.AskWhoNext then
+			if currentLib.WhoInProgress or not currentLib.readyForNext or (currentLib.frame and currentLib.frame:IsShown()) then
+				return
 			end
-		end)
-	end
+			DebugPrint("who start delayed", label or "")
+			pcall(currentLib.AskWhoNext, currentLib)
+		end
+	end)
 end
 
 function AF:InitializeWhoStatus()

@@ -34,7 +34,7 @@ function AF:IsSkillProbeScanReason(reason)
 end
 
 function AF:GetCurrentProfessionEquipmentSignature(profession)
-	if not profession or not C_TradeSkillUI or not C_TradeSkillUI.GetProfessionSlots then
+	if not profession then
 		return nil
 	end
 	local candidateIDs = {
@@ -60,7 +60,7 @@ function AF:GetCurrentProfessionEquipmentSignature(profession)
 end
 
 function AF:GetCurrentProfessionEquipmentState(profession)
-	if not profession or not C_TradeSkillUI or not C_TradeSkillUI.GetProfessionSlots then
+	if not profession then
 		return nil
 	end
 	local candidateIDs = {
@@ -189,7 +189,7 @@ function AF:AddProfessionSkillSnapshot(snapshots, info)
 	if type(info) ~= "table" then
 		return
 	end
-	local professionID = tonumber(info.skillLineID or info.professionID or info.profession)
+	local professionID = tonumber(info.professionID)
 	if not professionID then
 		return
 	end
@@ -208,8 +208,8 @@ function AF:ProfessionSkillInfoMatchesCurrentProfession(profession, info)
 	if not profession or type(info) ~= "table" then
 		return false
 	end
-	local professionID = tonumber(info.profession or info.professionID or info.skillLineID)
-	local parentProfessionID = tonumber(info.parentProfession or info.parentProfessionID)
+	local professionID = tonumber(info.professionID)
+	local parentProfessionID = tonumber(info.parentProfessionID)
 	local currentParentID = tonumber(profession.parentProfessionID)
 	return professionID == tonumber(profession.id)
 		or professionID == tonumber(profession.skillLineID)
@@ -218,31 +218,25 @@ function AF:ProfessionSkillInfoMatchesCurrentProfession(profession, info)
 end
 
 function AF:GetCurrentProfessionSkillSnapshots(profession)
-	if not profession or not C_TradeSkillUI then
+	if not profession then
 		return nil
 	end
 	local snapshots = {}
-	if C_TradeSkillUI.GetChildProfessionInfos then
-		local ok, childInfos = pcall(C_TradeSkillUI.GetChildProfessionInfos)
-		if ok and type(childInfos) == "table" then
-			for _, info in ipairs(childInfos) do
-				if self:ProfessionSkillInfoMatchesCurrentProfession(profession, info) then
-					self:AddProfessionSkillSnapshot(snapshots, info)
-				end
+	local okChildren, childInfos = pcall(C_TradeSkillUI.GetChildProfessionInfos)
+	if okChildren and type(childInfos) == "table" then
+		for _, info in ipairs(childInfos) do
+			if self:ProfessionSkillInfoMatchesCurrentProfession(profession, info) then
+				self:AddProfessionSkillSnapshot(snapshots, info)
 			end
 		end
 	end
-	if C_TradeSkillUI.GetChildProfessionInfo then
-		local ok, info = pcall(C_TradeSkillUI.GetChildProfessionInfo)
-		if ok then
-			self:AddProfessionSkillSnapshot(snapshots, info)
-		end
+	local okChild, info = pcall(C_TradeSkillUI.GetChildProfessionInfo)
+	if okChild then
+		self:AddProfessionSkillSnapshot(snapshots, info)
 	end
-	if C_TradeSkillUI.GetProfessionInfoBySkillLineID then
-		local ok, info = pcall(C_TradeSkillUI.GetProfessionInfoBySkillLineID, profession.id)
-		if ok then
-			self:AddProfessionSkillSnapshot(snapshots, info)
-		end
+	local okProfession, skillInfo = pcall(C_TradeSkillUI.GetProfessionInfoBySkillLineID, profession.id)
+	if okProfession then
+		self:AddProfessionSkillSnapshot(snapshots, skillInfo)
 	end
 	return next(snapshots) and snapshots or nil
 end
@@ -298,7 +292,7 @@ function AF:PrepareProfessionForScan(profession)
 end
 
 function AF:BuildScanProgress(profession, professionEntry, signature, force, mode, reason)
-	local recipeIDs = self:GetCurrentProfessionRecipeIDs(profession, "progress")
+	local recipeIDs = self:GetCurrentProfessionRecipeIDs(profession)
 	if type(recipeIDs) ~= "table" then
 		return nil, self:Text("SCAN_NO_RECIPES")
 	end
@@ -314,7 +308,7 @@ function AF:BuildScanProgress(profession, professionEntry, signature, force, mod
 	local profile = self.db.artisanProfile
 	local pending = {}
 	for _, recipeID in ipairs(recipeIDs) do
-		local recipeInfo = C_TradeSkillUI.GetRecipeInfo and C_TradeSkillUI.GetRecipeInfo(recipeID)
+		local recipeInfo = C_TradeSkillUI.GetRecipeInfo(recipeID)
 		local learned = not recipeInfo or recipeInfo.learned ~= false
 		if learned then
 			local outputs = self:GetRecipeOutputItemIDs(recipeID)
@@ -376,7 +370,7 @@ function AF:ScanJob(profession, professionEntry, job)
 		self:PauseActiveProfessionScan(true)
 		return false
 	end
-	local recipeInfo = C_TradeSkillUI.GetRecipeInfo and C_TradeSkillUI.GetRecipeInfo(job.recipeID)
+	local recipeInfo = C_TradeSkillUI.GetRecipeInfo(job.recipeID)
 	if not self:RecipeBelongsToProfession(profession, recipeInfo, self:GetCurrentProfessionCategoryIDs(), job.recipeID) then
 		return "skipped"
 	end
@@ -442,7 +436,7 @@ function AF:ScanJob(profession, professionEntry, job)
 end
 
 function AF:IsCurrentProfessionScanAvailable(professionID)
-	if not C_TradeSkillUI or not C_TradeSkillUI.IsTradeSkillReady or not C_TradeSkillUI.IsTradeSkillReady() then
+	if not C_TradeSkillUI.IsTradeSkillReady() then
 		return false
 	end
 	if self.IsOwnProfessionWindowOpen and not self:IsOwnProfessionWindowOpen() then
@@ -636,7 +630,7 @@ function AF:StartOrResumeCurrentProfessionScan(force, silent, mode, forceProbe, 
 		return 0
 	end
 
-	if not C_TradeSkillUI or not C_TradeSkillUI.IsTradeSkillReady or not C_TradeSkillUI.IsTradeSkillReady() then
+	if not C_TradeSkillUI.IsTradeSkillReady() then
 		if not silent then
 			self:Print(self:Text("SCAN_OPEN_PROFESSION"))
 		end
@@ -749,7 +743,7 @@ function AF:ShouldStartAutoScanForReason(reason, profession, currentSignature)
 end
 
 function AF:IsKnowledgeApplyPending(professionID)
-	if not professionID or not C_ProfSpecs or not C_Traits or not C_ProfSpecs.GetConfigIDForSkillLine or not C_Traits.ConfigHasStagedChanges then
+	if not professionID then
 		return false
 	end
 	local configID = C_ProfSpecs.GetConfigIDForSkillLine(professionID)
@@ -801,7 +795,7 @@ function AF:StartProfessionEquipmentWatch()
 			C_Timer.After(1.0, Tick)
 			return
 		end
-		if (AF.IsOwnProfessionWindowOpen and not AF:IsOwnProfessionWindowOpen()) or not C_TradeSkillUI or not C_TradeSkillUI.IsTradeSkillReady or not C_TradeSkillUI.IsTradeSkillReady() then
+		if (AF.IsOwnProfessionWindowOpen and not AF:IsOwnProfessionWindowOpen()) or not C_TradeSkillUI.IsTradeSkillReady() then
 			return
 		end
 		local profession = AF:GetCurrentProfessionInfo()

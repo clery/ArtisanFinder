@@ -118,7 +118,7 @@ local function TrySetTextureAtlas(texture, atlas, useAtlasSize)
 	if not texture or not atlas then
 		return false
 	end
-	if C_Texture and C_Texture.GetAtlasInfo and not C_Texture.GetAtlasInfo(atlas) then
+	if not C_Texture.GetAtlasInfo(atlas) then
 		return false
 	end
 	if texture.SetAtlas then
@@ -525,11 +525,9 @@ end
 
 function AF:QueueCustomerSidePanelLayout()
 	self:PositionCustomerSidePanels()
-	if C_Timer then
-		C_Timer.After(0, function()
-			AF:PositionCustomerSidePanels()
-		end)
-	end
+	C_Timer.After(0, function()
+		AF:PositionCustomerSidePanels()
+	end)
 end
 
 function AF:SetCustomerStatusText(text)
@@ -571,15 +569,9 @@ function AF:SetCustomerStatusItem(itemID, itemName, templateKey)
 
 	local itemLink = "item:" .. tostring(itemID)
 	local displayText = "[" .. tostring(itemName) .. "]"
-	if C_Item and C_Item.GetItemInfo then
-		local _, link = C_Item.GetItemInfo(itemID)
-		itemLink = link or itemLink
-		displayText = link or displayText
-	elseif GetItemInfo then
-		local _, link = GetItemInfo(itemID)
-		itemLink = link or itemLink
-		displayText = link or displayText
-	end
+	local _, link = C_Item.GetItemInfo(itemID)
+	itemLink = link or itemLink
+	displayText = link or displayText
 
 	frame.itemLink.itemLinkText = itemLink
 	frame.itemLink.text:SetText(displayText)
@@ -1072,11 +1064,9 @@ function AF:GetCustomerOrderItemContext()
 				itemID = outputItemID
 			end
 		end
-		if C_TradeSkillUI.GetProfessionInfoByRecipeID then
-			local professionInfo = C_TradeSkillUI.GetProfessionInfoByRecipeID(recipeID)
-			professionID = professionInfo and (professionInfo.parentProfession or professionInfo.parentProfessionID or professionInfo.profession or professionInfo.professionID or professionInfo.skillLineID)
-			professionID = self:GetBaseProfessionID(professionID)
-		end
+		local professionInfo = C_TradeSkillUI.GetProfessionInfoByRecipeID(recipeID)
+		professionID = professionInfo and (professionInfo.parentProfessionID or professionInfo.professionID)
+		professionID = self:GetBaseProfessionID(professionID)
 	end
 
 	return itemID and {
@@ -1328,7 +1318,7 @@ function AF:TrySelectPendingProfessionRecipe()
 
 	self:HideCustomerMenu()
 
-	local recipeInfo = C_TradeSkillUI and C_TradeSkillUI.GetRecipeInfo and C_TradeSkillUI.GetRecipeInfo(recipeID)
+	local recipeInfo = C_TradeSkillUI.GetRecipeInfo(recipeID)
 	if recipeInfo then
 		recipeList:SelectRecipe(recipeInfo, true)
 	end

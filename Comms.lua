@@ -286,10 +286,10 @@ function AF:HandleQuery(parts, sender)
 				payloadParts[18] = ""
 				payloadParts[19] = ""
 				payloadParts[20] = ""
-				payloadParts[21] = ""
+				payloadParts[21] = 0
 				payloadParts[22] = ""
 				payloadParts[23] = ""
-				payloadParts[24] = ""
+				payloadParts[24] = 0
 				payload = table.concat(payloadParts, "|")
 			end
 

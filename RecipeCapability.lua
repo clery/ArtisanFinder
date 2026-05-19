@@ -39,7 +39,7 @@ local function GetQuantityRequired(reagentSlotSchematic, reagent)
 end
 
 local function GetReagentQuality(reagent)
-	if not reagent or not reagent.itemID or not C_TradeSkillUI or not C_TradeSkillUI.GetItemReagentQualityInfo then
+	if not reagent or not reagent.itemID then
 		return 0
 	end
 	local ok, qualityInfo = pcall(C_TradeSkillUI.GetItemReagentQualityInfo, reagent.itemID)
@@ -50,7 +50,7 @@ local function GetReagentQuality(reagent)
 end
 
 local function GetReagentQualityMarkup(reagent)
-	if not reagent or not reagent.itemID or not C_TradeSkillUI or not C_TradeSkillUI.GetItemReagentQualityInfo then
+	if not reagent or not reagent.itemID then
 		return nil
 	end
 	local ok, qualityInfo = pcall(C_TradeSkillUI.GetItemReagentQualityInfo, reagent.itemID)
@@ -72,7 +72,7 @@ local function GetQualityTierFromAtlas(atlas)
 end
 
 local function GetReagentQualityInfoFromItemID(itemID)
-	if not itemID or not C_TradeSkillUI or not C_TradeSkillUI.GetItemReagentQualityInfo then
+	if not itemID then
 		return nil, nil
 	end
 	local ok, reagentQualityInfo = pcall(C_TradeSkillUI.GetItemReagentQualityInfo, itemID)
@@ -122,15 +122,10 @@ local function GetReagentName(reagent)
 		return nil
 	end
 	if reagent.itemID then
-		local itemName
-		if C_Item and C_Item.GetItemInfo then
-			itemName = C_Item.GetItemInfo(reagent.itemID)
-		elseif GetItemInfo then
-			itemName = GetItemInfo(reagent.itemID)
-		end
-		if not itemName and C_Item and C_Item.RequestLoadItemDataByID then
+		local itemName = C_Item.GetItemInfo(reagent.itemID)
+		if not itemName then
 			pcall(C_Item.RequestLoadItemDataByID, reagent.itemID)
-			if C_Timer and not AF.reagentNameRetryQueued then
+			if not AF.reagentNameRetryQueued then
 				AF.reagentNameRetryQueued = true
 				C_Timer.After(2, function()
 					AF.reagentNameRetryQueued = false
@@ -142,7 +137,7 @@ local function GetReagentName(reagent)
 		end
 		return itemName
 	end
-	if reagent.currencyID and C_CurrencyInfo and C_CurrencyInfo.GetCurrencyInfo then
+	if reagent.currencyID then
 		local info = C_CurrencyInfo.GetCurrencyInfo(reagent.currencyID)
 		return info and info.name or nil
 	end
@@ -269,18 +264,12 @@ local function TrimSummaryByLine(summary, maxBytes)
 end
 
 function AF:GetCurrentProfessionInfo()
-	if not C_TradeSkillUI or not C_TradeSkillUI.GetChildProfessionInfo then
-		return nil
-	end
 	local info = C_TradeSkillUI.GetChildProfessionInfo()
 	if not info then
 		return nil
 	end
-	local childProfessionID = info.profession or info.professionID or info.skillLineID
-	if not childProfessionID and C_TradeSkillUI.GetProfessionChildSkillLineID then
-		childProfessionID = C_TradeSkillUI.GetProfessionChildSkillLineID()
-	end
-	local parentProfessionID = info.parentProfession or info.parentProfessionID
+	local childProfessionID = C_TradeSkillUI.GetProfessionChildSkillLineID() or info.professionID
+	local parentProfessionID = info.parentProfessionID
 	local professionID = parentProfessionID or childProfessionID
 	if not professionID then
 		return nil
@@ -289,38 +278,31 @@ function AF:GetCurrentProfessionInfo()
 		id = professionID,
 		name = info.parentProfessionName or info.professionName or self:Text("PROFESSION_FALLBACK", tostring(professionID)),
 		parentProfessionID = parentProfessionID,
-		skillLineID = info.skillLineID or childProfessionID,
+		skillLineID = childProfessionID,
 		childProfessionID = childProfessionID,
-		icon = info.icon or info.iconTexture or info.professionIcon,
 	}
 end
 
 function AF:GetRecipeOutputItemIDs(recipeID)
 	local outputs = {}
 
-	if C_TradeSkillUI.GetRecipeQualityItemIDs then
-		local ok, qualityItemIDs = pcall(C_TradeSkillUI.GetRecipeQualityItemIDs, recipeID)
-		if ok and type(qualityItemIDs) == "table" then
-			for _, itemID in pairs(qualityItemIDs) do
-				AddOutput(outputs, itemID)
-			end
+	local okQualityItems, qualityItemIDs = pcall(C_TradeSkillUI.GetRecipeQualityItemIDs, recipeID)
+	if okQualityItems and type(qualityItemIDs) == "table" then
+		for _, itemID in pairs(qualityItemIDs) do
+			AddOutput(outputs, itemID)
 		end
 	end
 
-	if C_TradeSkillUI.GetRecipeItemLink then
-		local ok, link = pcall(C_TradeSkillUI.GetRecipeItemLink, recipeID)
-		if ok then
-			AddOutput(outputs, self:GetItemIDFromLink(link))
-		end
+	local okLink, link = pcall(C_TradeSkillUI.GetRecipeItemLink, recipeID)
+	if okLink then
+		AddOutput(outputs, self:GetItemIDFromLink(link))
 	end
 
-	if C_TradeSkillUI.GetRecipeOutputItemData then
-		for quality = 1, 5 do
-			local ok, outputInfo = pcall(C_TradeSkillUI.GetRecipeOutputItemData, recipeID, {}, nil, quality)
-			if ok and type(outputInfo) == "table" then
-				AddOutput(outputs, outputInfo.itemID)
-				AddOutput(outputs, self:GetItemIDFromLink(outputInfo.hyperlink))
-			end
+	for quality = 1, 5 do
+		local ok, outputInfo = pcall(C_TradeSkillUI.GetRecipeOutputItemData, recipeID, {}, nil, quality)
+		if ok and type(outputInfo) == "table" then
+			AddOutput(outputs, outputInfo.itemID)
+			AddOutput(outputs, self:GetItemIDFromLink(outputInfo.hyperlink))
 		end
 	end
 
@@ -340,30 +322,26 @@ GetRecipeDisplayQualityInfo = function(recipeID, operationInfo, reagentInfo)
 		return nil, nil
 	end
 
-	local recipeInfo = C_TradeSkillUI and C_TradeSkillUI.GetRecipeInfo and C_TradeSkillUI.GetRecipeInfo(recipeID)
+	local recipeInfo = C_TradeSkillUI.GetRecipeInfo(recipeID)
 	local qualityItemID = recipeInfo and recipeInfo.qualityItemIDs and recipeInfo.qualityItemIDs[quality]
 	local reagentQuality, reagentQualityAtlas = GetReagentQualityInfoFromItemID(qualityItemID)
 	if reagentQuality then
 		return reagentQuality, reagentQualityAtlas
 	end
 
-	if C_TradeSkillUI and C_TradeSkillUI.GetRecipeQualityItemIDs then
-		local okQualityItems, qualityItemIDs = pcall(C_TradeSkillUI.GetRecipeQualityItemIDs, recipeID)
-		qualityItemID = okQualityItems and type(qualityItemIDs) == "table" and qualityItemIDs[quality] or nil
-		reagentQuality, reagentQualityAtlas = GetReagentQualityInfoFromItemID(qualityItemID)
-		if reagentQuality then
-			return reagentQuality, reagentQualityAtlas
-		end
+	local okQualityItems, qualityItemIDs = pcall(C_TradeSkillUI.GetRecipeQualityItemIDs, recipeID)
+	qualityItemID = okQualityItems and type(qualityItemIDs) == "table" and qualityItemIDs[quality] or nil
+	reagentQuality, reagentQualityAtlas = GetReagentQualityInfoFromItemID(qualityItemID)
+	if reagentQuality then
+		return reagentQuality, reagentQualityAtlas
 	end
 
-	if C_TradeSkillUI and C_TradeSkillUI.GetRecipeOutputItemData and C_TradeSkillUI.GetItemReagentQualityInfo then
-		local overrideQualityID = recipeInfo and recipeInfo.qualityIDs and recipeInfo.qualityIDs[quality] or quality
-		local okOutput, outputInfo = pcall(C_TradeSkillUI.GetRecipeOutputItemData, recipeID, reagentInfo or {}, nil, overrideQualityID)
-		if okOutput and type(outputInfo) == "table" and outputInfo.itemID then
-			reagentQuality, reagentQualityAtlas = GetReagentQualityInfoFromItemID(outputInfo.itemID)
-			if reagentQuality then
-				return reagentQuality, reagentQualityAtlas
-			end
+	local overrideQualityID = recipeInfo and recipeInfo.qualityIDs and recipeInfo.qualityIDs[quality] or quality
+	local okOutput, outputInfo = pcall(C_TradeSkillUI.GetRecipeOutputItemData, recipeID, reagentInfo or {}, nil, overrideQualityID)
+	if okOutput and type(outputInfo) == "table" and outputInfo.itemID then
+		reagentQuality, reagentQualityAtlas = GetReagentQualityInfoFromItemID(outputInfo.itemID)
+		if reagentQuality then
+			return reagentQuality, reagentQualityAtlas
 		end
 	end
 
@@ -373,15 +351,13 @@ GetRecipeDisplayQualityInfo = function(recipeID, operationInfo, reagentInfo)
 		return quality + (maxQuality - qualityCount), nil
 	end
 
-	if C_TradeSkillUI and C_TradeSkillUI.GetRecipeItemQualityInfo then
-		local ok, qualityInfo = pcall(C_TradeSkillUI.GetRecipeItemQualityInfo, recipeID, quality)
-		if ok and qualityInfo then
-			return GetQualityTierFromAtlas(qualityInfo.iconSmall)
-				or GetQualityTierFromAtlas(qualityInfo.icon)
-				or tonumber(qualityInfo.quality)
-				or quality,
-				qualityInfo.iconSmall or qualityInfo.icon
-		end
+	local ok, qualityInfo = pcall(C_TradeSkillUI.GetRecipeItemQualityInfo, recipeID, quality)
+	if ok and qualityInfo then
+		return GetQualityTierFromAtlas(qualityInfo.iconSmall)
+			or GetQualityTierFromAtlas(qualityInfo.icon)
+			or tonumber(qualityInfo.quality)
+			or quality,
+			qualityInfo.iconSmall or qualityInfo.icon
 	end
 	return quality, nil
 end
@@ -392,17 +368,12 @@ GetRecipeDisplayQuality = function(recipeID, operationInfo, reagentInfo)
 end
 
 function AF:GetProfessionLink()
-	if not C_TradeSkillUI or not C_TradeSkillUI.GetTradeSkillListLink then
-		return nil, "missing GetTradeSkillListLink API"
+	local okCanLink, canLink = pcall(C_TradeSkillUI.CanTradeSkillListLink)
+	if not okCanLink then
+		return nil, "CanTradeSkillListLink error: " .. tostring(canLink)
 	end
-	if C_TradeSkillUI.CanTradeSkillListLink then
-		local okCanLink, canLink = pcall(C_TradeSkillUI.CanTradeSkillListLink)
-		if not okCanLink then
-			return nil, "CanTradeSkillListLink error: " .. tostring(canLink)
-		end
-		if okCanLink and canLink == false then
-			return nil, "CanTradeSkillListLink returned false"
-		end
+	if okCanLink and canLink == false then
+		return nil, "CanTradeSkillListLink returned false"
 	end
 	local ok, link = pcall(C_TradeSkillUI.GetTradeSkillListLink)
 	if ok and type(link) == "string" and link ~= "" then
@@ -432,10 +403,6 @@ function AF:CaptureCurrentProfessionLink(profession, reason)
 end
 
 function AF:GetRecipeCapability(recipeID)
-	if not C_TradeSkillUI or not C_TradeSkillUI.GetCraftingOperationInfo then
-		return {}
-	end
-
 	local capability = {}
 	local ok, operationInfo = pcall(C_TradeSkillUI.GetCraftingOperationInfo, recipeID, {}, nil, false)
 	if ok and type(operationInfo) == "table" then
@@ -510,9 +477,6 @@ function AF:GetRecipeCapability(recipeID)
 end
 
 function AF:GetRecipeSkillProbe(recipeID)
-	if not C_TradeSkillUI or not C_TradeSkillUI.GetCraftingOperationInfo then
-		return nil
-	end
 	local ok, operationInfo = pcall(C_TradeSkillUI.GetCraftingOperationInfo, recipeID, {}, nil, false)
 	if not ok or type(operationInfo) ~= "table" then
 		return nil
@@ -615,14 +579,14 @@ end
 
 function AF:GetProfessionRecipeSignature()
 	local profession = self:GetCurrentProfessionInfo()
-	local recipeIDs = self:GetCurrentProfessionRecipeIDs(profession, "signature")
+	local recipeIDs = self:GetCurrentProfessionRecipeIDs(profession)
 	if type(recipeIDs) ~= "table" then
 		return nil
 	end
 
 	local learnedRecipeIDs = {}
 	for _, recipeID in ipairs(recipeIDs) do
-		local recipeInfo = C_TradeSkillUI.GetRecipeInfo and C_TradeSkillUI.GetRecipeInfo(recipeID)
+		local recipeInfo = C_TradeSkillUI.GetRecipeInfo(recipeID)
 		if not recipeInfo or recipeInfo.learned ~= false then
 			table.insert(learnedRecipeIDs, tonumber(recipeID) or 0)
 		end
@@ -632,13 +596,9 @@ function AF:GetProfessionRecipeSignature()
 end
 
 local function AddCategoryID(categoryIDs, category)
-	if type(category) == "number" then
-		categoryIDs[category] = true
-	elseif type(category) == "table" then
-		local categoryID = tonumber(category.categoryID or category.id or category.ID)
-		if categoryID then
-			categoryIDs[categoryID] = true
-		end
+	local categoryID = tonumber(category)
+	if categoryID then
+		categoryIDs[categoryID] = true
 	end
 end
 
@@ -647,8 +607,8 @@ function AF:ProfessionInfoMatchesProfession(profession, info)
 		return false
 	end
 
-	local professionID = tonumber(info.profession or info.professionID or info.skillLineID)
-	local parentProfessionID = tonumber(info.parentProfession or info.parentProfessionID)
+	local professionID = tonumber(info.professionID)
+	local parentProfessionID = tonumber(info.parentProfessionID)
 	local candidates = {
 		tonumber(profession.id),
 		tonumber(profession.skillLineID),
@@ -665,19 +625,9 @@ function AF:ProfessionInfoMatchesProfession(profession, info)
 end
 
 function AF:GetCurrentProfessionCategoryIDs()
-	if not C_TradeSkillUI or not C_TradeSkillUI.GetCategories then
+	local ok, categories = pcall(C_TradeSkillUI.GetCategories)
+	if not ok or type(categories) ~= "table" then
 		return nil
-	end
-
-	local results = { pcall(C_TradeSkillUI.GetCategories) }
-	local ok = table.remove(results, 1)
-	if not ok or #results == 0 then
-		return nil
-	end
-
-	local categories = results
-	if #results == 1 and type(results[1]) == "table" and not (results[1].categoryID or results[1].id or results[1].ID) then
-		categories = results[1]
 	end
 
 	local categoryIDs = {}
@@ -695,10 +645,6 @@ function AF:CategoryBelongsToCurrentProfession(categoryID, categoryIDs)
 	if categoryIDs[categoryID] then
 		return true
 	end
-	if not C_TradeSkillUI or not C_TradeSkillUI.GetCategoryInfo then
-		return false
-	end
-
 	local seen = {}
 	for _ = 1, 8 do
 		if not categoryID or seen[categoryID] then
@@ -713,7 +659,7 @@ function AF:CategoryBelongsToCurrentProfession(categoryID, categoryIDs)
 		if type(result) == "table" then
 			info = result
 		end
-		local parentCategoryID = tonumber(info.parentCategoryID or info.parentCategory or info.parentID)
+		local parentCategoryID = tonumber(info.parentCategoryID)
 		if parentCategoryID and categoryIDs[parentCategoryID] then
 			return true
 		end
@@ -728,7 +674,7 @@ function AF:RecipeBelongsToProfession(profession, recipeInfo, categoryIDs, recip
 	end
 	recipeID = tonumber(recipeID or recipeInfo.recipeID)
 
-	if recipeID and C_TradeSkillUI and C_TradeSkillUI.GetProfessionInfoByRecipeID then
+	if recipeID then
 		local ok, professionInfo = pcall(C_TradeSkillUI.GetProfessionInfoByRecipeID, recipeID)
 		if ok and type(professionInfo) == "table" then
 			return self:ProfessionInfoMatchesProfession(profession, professionInfo)
@@ -741,7 +687,7 @@ function AF:RecipeBelongsToProfession(profession, recipeInfo, categoryIDs, recip
 		tonumber(profession.parentProfessionID),
 	}
 	local sawProfessionField = false
-	for _, field in ipairs({ "professionID", "profession", "skillLineID", "parentProfessionID" }) do
+	for _, field in ipairs({ "professionID", "parentProfessionID" }) do
 		local value = tonumber(recipeInfo[field])
 		if value then
 			sawProfessionField = true
@@ -765,10 +711,6 @@ function AF:RecipeBelongsToProfession(profession, recipeInfo, categoryIDs, recip
 end
 
 function AF:GetCurrentProfessionRecipeIDs(profession)
-	if not C_TradeSkillUI or not C_TradeSkillUI.GetAllRecipeIDs then
-		return nil
-	end
-
 	local recipeIDs = C_TradeSkillUI.GetAllRecipeIDs()
 	if type(recipeIDs) ~= "table" then
 		return nil
@@ -777,7 +719,7 @@ function AF:GetCurrentProfessionRecipeIDs(profession)
 	local categoryIDs = self:GetCurrentProfessionCategoryIDs()
 	local filtered = {}
 	for _, recipeID in ipairs(recipeIDs) do
-		local recipeInfo = C_TradeSkillUI.GetRecipeInfo and C_TradeSkillUI.GetRecipeInfo(recipeID)
+		local recipeInfo = C_TradeSkillUI.GetRecipeInfo(recipeID)
 		if self:RecipeBelongsToProfession(profession, recipeInfo, categoryIDs, recipeID) then
 			table.insert(filtered, recipeID)
 		end
@@ -787,14 +729,11 @@ function AF:GetCurrentProfessionRecipeIDs(profession)
 end
 
 function AF:GetProfessionSpecSignature(professionID)
-	if not professionID or not C_ProfSpecs or not C_Traits then
+	if not professionID then
 		return "nospec"
 	end
-	if C_ProfSpecs.SkillLineHasSpecialization and not C_ProfSpecs.SkillLineHasSpecialization(professionID) then
+	if not C_ProfSpecs.SkillLineHasSpecialization(professionID) then
 		return "nospec"
-	end
-	if not C_ProfSpecs.GetConfigIDForSkillLine or not C_ProfSpecs.GetSpecTabIDsForSkillLine or not C_Traits.GetTreeNodes or not C_Traits.GetNodeInfo then
-		return "unknown"
 	end
 
 	local configID = C_ProfSpecs.GetConfigIDForSkillLine(professionID)
@@ -843,11 +782,7 @@ function AF:GetCurrentProfessionScanSignature(profession)
 end
 
 function AF:GetBestReagentCapability(recipeID)
-	if not C_TradeSkillUI or not C_TradeSkillUI.GetRecipeSchematic or not C_TradeSkillUI.GetCraftingOperationInfo then
-		return { debugReason = "missing profession simulation APIs" }
-	end
-
-	local recipeInfo = C_TradeSkillUI.GetRecipeInfo and C_TradeSkillUI.GetRecipeInfo(recipeID)
+	local recipeInfo = C_TradeSkillUI.GetRecipeInfo(recipeID)
 	local recipeLevel = recipeInfo and recipeInfo.unlockedRecipeLevel
 	local okSchematic, schematic = pcall(C_TradeSkillUI.GetRecipeSchematic, recipeID, false, recipeLevel)
 	if not okSchematic or type(schematic) ~= "table" or type(schematic.reagentSlotSchematics) ~= "table" then

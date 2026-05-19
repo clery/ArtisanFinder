@@ -4,9 +4,7 @@ local ICON = 7548932 -- inv-12-profession-blacksmithing-repairhammer-purple
 local ICON_COORDS = { 0, 1, 0, 1 }
 
 local function OpenProfessionPanel()
-	if C_AddOns and C_AddOns.LoadAddOn then
-		pcall(C_AddOns.LoadAddOn, "Blizzard_Professions")
-	end
+	pcall(C_AddOns.LoadAddOn, "Blizzard_Professions")
 	if ProfessionsFrame and ProfessionsFrame:IsShown() then
 		AF:FocusCrafterUI()
 	elseif ToggleProfessionsBook then

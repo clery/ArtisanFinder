@@ -79,12 +79,6 @@ function AF:ToggleAvailable()
 end
 
 function AF:HasTradeChatAccess()
-	if GetChannelName then
-		local globalTrade = tostring(_G.TRADE or "Trade")
-		if globalTrade ~= "" and GetChannelName(globalTrade) and GetChannelName(globalTrade) ~= 0 then
-			return true
-		end
-	end
 	if GetChannelList then
 		local channels = { GetChannelList() }
 		for _, value in ipairs(channels) do

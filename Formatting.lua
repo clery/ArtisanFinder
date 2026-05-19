@@ -171,22 +171,10 @@ function AF:GetProfessionIconMarkup(professionID, profileOrRow, size)
 		local profession = profileOrRow.professions[tostring(professionID)]
 		icon = profession and (profession.icon or profession.professionIcon or profession.iconTexture)
 	end
-	if not icon and professionID and C_Spell and C_Spell.GetSpellTexture and PROFESSION_ICON_SPELLS[professionID] then
+	if not icon and professionID and PROFESSION_ICON_SPELLS[professionID] then
 		local ok, spellIcon = pcall(C_Spell.GetSpellTexture, PROFESSION_ICON_SPELLS[professionID])
 		if ok then
 			icon = spellIcon
-		end
-	end
-	if not icon and professionID and GetSpellTexture and PROFESSION_ICON_SPELLS[professionID] then
-		local ok, spellIcon = pcall(GetSpellTexture, PROFESSION_ICON_SPELLS[professionID])
-		if ok then
-			icon = spellIcon
-		end
-	end
-	if not icon and professionID and C_TradeSkillUI and C_TradeSkillUI.GetProfessionInfoBySkillLineID then
-		local ok, info = pcall(C_TradeSkillUI.GetProfessionInfoBySkillLineID, professionID)
-		if ok and type(info) == "table" then
-			icon = info.icon or info.iconTexture or info.professionIcon
 		end
 	end
 	icon = icon or PROFESSION_ICON_FALLBACKS[professionID]
@@ -422,12 +410,7 @@ function AF:GetItemIconMarkup(itemID, size)
 	if not itemID then
 		return nil
 	end
-	local texture
-	if C_Item and C_Item.GetItemIconByID then
-		texture = C_Item.GetItemIconByID(itemID)
-	elseif GetItemIcon then
-		texture = GetItemIcon(itemID)
-	end
+	local texture = C_Item.GetItemIconByID(itemID)
 	if texture and CreateTextureMarkup then
 		return CreateTextureMarkup(texture, size, size, size, size, 0, 1, 0, 1)
 	end
@@ -446,13 +429,8 @@ function AF:GetItemName(itemID)
 	if not itemID then
 		return nil
 	end
-	local itemName
-	if C_Item and C_Item.GetItemInfo then
-		itemName = C_Item.GetItemInfo(itemID)
-	elseif GetItemInfo then
-		itemName = GetItemInfo(itemID)
-	end
-	if not itemName and C_Item and C_Item.RequestLoadItemDataByID then
+	local itemName = C_Item.GetItemInfo(itemID)
+	if not itemName then
 		pcall(C_Item.RequestLoadItemDataByID, itemID)
 	end
 	return itemName

@@ -811,14 +811,8 @@ function AF:GetProfessionName(professionID, profile)
 	end
 	professionID = GetBaseProfessionID(professionID)
 	local spellID = BASE_PROFESSION_SPELLS[professionID]
-	if spellID and C_Spell and C_Spell.GetSpellName then
+	if spellID then
 		local ok, name = pcall(C_Spell.GetSpellName, spellID)
-		if ok and name and name ~= "" then
-			return name
-		end
-	end
-	if spellID and GetSpellInfo then
-		local ok, name = pcall(GetSpellInfo, spellID)
 		if ok and name and name ~= "" then
 			return name
 		end

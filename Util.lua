@@ -38,10 +38,6 @@ function AF:IsTradeChannelName(name)
 	if name == "" then
 		return false
 	end
-	local globalTrade = tostring(_G.TRADE or _G.CHAT_MSG_TRADE or "")
-	if globalTrade ~= "" and name:find(globalTrade:lower(), 1, true) then
-		return true
-	end
 	for _, pattern in ipairs(TRADE_CHANNEL_PATTERNS) do
 		if name:find(pattern, 1, true) then
 			return true
@@ -51,7 +47,7 @@ function AF:IsTradeChannelName(name)
 end
 
 function AF:IsInUnavailableActivity()
-	if C_PartyInfo and C_PartyInfo.IsDelveInProgress and C_PartyInfo.IsDelveInProgress() then
+	if C_PartyInfo.IsDelveInProgress() then
 		return true
 	end
 	if not IsInInstance then

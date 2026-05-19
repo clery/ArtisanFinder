@@ -239,7 +239,7 @@ function AF:GetCraftingSchematicForm()
 end
 
 function AF:IsLinkedProfessionOpen()
-	return C_TradeSkillUI and C_TradeSkillUI.IsTradeSkillLinked and C_TradeSkillUI.IsTradeSkillLinked() == true or false
+	return C_TradeSkillUI.IsTradeSkillLinked() == true
 end
 
 function AF:IsOwnProfessionWindowOpen()
@@ -274,11 +274,9 @@ function AF:GetCurrentCraftingRecipeContext()
 	end
 
 	local professionInfo
-	if C_TradeSkillUI and C_TradeSkillUI.GetProfessionInfoByRecipeID then
-		local ok, info = pcall(C_TradeSkillUI.GetProfessionInfoByRecipeID, recipeID)
-		if ok then
-			professionInfo = info
-		end
+	local ok, info = pcall(C_TradeSkillUI.GetProfessionInfoByRecipeID, recipeID)
+	if ok then
+		professionInfo = info
 	end
 	if professionInfo and not self:ProfessionInfoMatchesProfession(currentProfession, professionInfo) then
 		return nil
@@ -383,7 +381,7 @@ function AF:AttachCrafterUI()
 	frame.save:SetScript("OnClick", function()
 		local context = AF:GetCurrentCraftingRecipeContext()
 		local item = AF:EnsureCurrentRecipeEntry(context)
-		if not item or context.learned == false then
+		if not item or not context or context.learned == false then
 			AF:Print(AF:Text("SELECT_LEARNED_CRAFT"))
 			return
 		end
@@ -558,7 +556,7 @@ function AF:PositionCrafterUI()
 	end
 
 	frame:ClearAllPoints()
-	local auctionatorFrame = _G.AuctionatorCraftingInfoProfessionsFrame
+	local auctionatorFrame = _G["AuctionatorCraftingInfoProfessionsFrame"]
 	if auctionatorFrame and auctionatorFrame:GetParent() == form and auctionatorFrame:IsShown() then
 		frame:SetPoint("TOPLEFT", auctionatorFrame, "BOTTOMLEFT", 0, -8)
 	else

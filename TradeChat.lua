@@ -309,7 +309,7 @@ function AF:GetCustomerRecipeProfessionCandidates(recipeID, professionID)
 	local candidates = {}
 	AddCandidate(candidates, professionID)
 
-	if recipeID and C_TradeSkillUI and C_TradeSkillUI.GetProfessionInfoByRecipeID then
+	if recipeID then
 		local professionInfo = C_TradeSkillUI.GetProfessionInfoByRecipeID(recipeID)
 		AddProfessionInfoCandidates(candidates, professionInfo)
 	end
