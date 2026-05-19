@@ -27,6 +27,7 @@
 ## X-Third-Party-Notices: THIRD_PARTY_NOTICES.md
 ## X-Website: https://github.com/clery/ArtisanFinder
 ## X-Curse-Project-ID: 1545540
+## X-Wago-ID: 5NR8p1K3
 
 ## SavedVariables: ArtisanFinderDB
 
