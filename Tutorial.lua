@@ -15,8 +15,11 @@ local function StopActiveTutorial()
 	if HelpTip and HelpTip.HideAllSystem then
 		HelpTip:HideAllSystem(TUTORIAL_SYSTEM)
 	end
-	if HelpPlate and HelpPlate.Hide and AF.activeTutorialHelpPlateInfo and HelpPlate.IsShowingHelpInfo(AF.activeTutorialHelpPlateInfo) then
+	if HelpPlate and HelpPlate.Hide and AF.activeTutorialHelpPlateInfo then
 		HelpPlate.Hide(false)
+	end
+	if HelpPlateTooltip then
+		HelpPlateTooltip:Hide()
 	end
 	if AF.RestoreHelpPlateTiles then
 		AF:RestoreHelpPlateTiles()
@@ -443,14 +446,17 @@ function AF:BuildCustomerHelpPlateInfo()
 end
 
 function AF:EndCustomerTutorial()
-	if not self.customerTutorialActive then
+	local wasActive = self.customerTutorialActive
+	local shouldStopHelpPlate = IsActiveHelpPlateShowing("customer")
+		or (self.activeTutorialKind == "customer" and self.activeTutorialHelpPlateInfo ~= nil)
+	if not wasActive and not shouldStopHelpPlate then
 		return
 	end
 	self.customerTutorialActive = nil
 	self.customerTutorialFavorite = nil
 	self:HideCustomerMenu()
 	self.db.tutorial.customerSeen = true
-	if IsActiveHelpPlateShowing("customer") then
+	if shouldStopHelpPlate then
 		StopActiveTutorial()
 	end
 	self:RefreshCustomerResults()

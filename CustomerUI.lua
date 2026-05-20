@@ -617,6 +617,9 @@ function AF:SetCustomerPanelCollapsed(collapsed, skipRefresh)
 	end
 
 	if frame.collapsed then
+		if self.EndCustomerTutorial then
+			self:EndCustomerTutorial()
+		end
 		self:HideCustomerMenu()
 	elseif not skipRefresh then
 		self:RefreshCustomerQuery(true)
@@ -883,6 +886,9 @@ function AF:AttachCustomerUI()
 		end
 	end)
 	frame:SetScript("OnHide", function()
+		if AF.EndCustomerTutorial then
+			AF:EndCustomerTutorial()
+		end
 		if AF.customerCollapseButton then
 			AF.customerCollapseButton:Hide()
 		end
@@ -901,6 +907,9 @@ function AF:AttachCustomerUI()
 		end
 	end)
 	parent:HookScript("OnHide", function()
+		if AF.EndCustomerTutorial then
+			AF:EndCustomerTutorial()
+		end
 		AF.customerFrame:Hide()
 		if AF.customerCollapseButton then
 			AF.customerCollapseButton:Hide()
