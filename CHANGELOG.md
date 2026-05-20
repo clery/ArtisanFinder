@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.2.2 - 2026-05-20
+
+### Added
+
+- Added per-row customer refresh buttons for checking whether stale or offline-fallback artisans are online.
+- Added a loading indicators to artisan rows to indicate this data is stale, and may be inaccurate.
+- Added in-form Personal Order and Guild Order warnings so review reminders appear in the Crafting Order form instead of chat.
+
+### Changed
+
+- Offline fallback rows now show `/who` refresh controls when their online status still needs to be checked.
+
+### Fixed
+
+- Crafter commission and note fields now keep in-progress edits while profession scans refresh the panel.
+- Fixed offline fallback limits so increasing the option shows more fallback rows instead of fewer.
+- Fixed the customer tutorial row quality examples and row highlight sizing.
+
 ## 1.2.1 - 2026-05-20
 
 ### Added

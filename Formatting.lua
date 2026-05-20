@@ -84,7 +84,7 @@ function AF:GetCommissionInputText(priceCopper, freeCommission)
 	end
 	priceCopper = tonumber(priceCopper) or 0
 	if priceCopper <= 0 then
-		return "0"
+		return ""
 	end
 	return tostring(priceCopper / 10000)
 end

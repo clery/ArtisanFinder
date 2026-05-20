@@ -309,6 +309,7 @@ function AF:GetCachedArtisans(itemID, filterText, sortMode, queryToken)
 				offlineEntry.certified = true
 				offlineEntry.tradeLead = false
 				offlineEntry.offlineCached = true
+				offlineEntry.offlineFallback = true
 				offlineEntry.target = offlineEntry.orderTarget or offlineEntry.name
 				offlineEntry.professionLink = offlineEntry.professionLink or self:GetRememberedProfessionLink(offlineEntry.orderTarget or offlineEntry.name, offlineEntry.professionID)
 				MarkGuildAffiliation(self, offlineEntry)
@@ -330,7 +331,7 @@ function AF:GetCachedArtisans(itemID, filterText, sortMode, queryToken)
 		end)
 		local offlineAdded = 0
 		for _, entry in ipairs(candidates) do
-			if #rows >= offlineTrigger or offlineAdded >= offlineMax then
+			if offlineAdded >= offlineMax then
 				break
 			end
 			local seenKey = GetSeenKey(self, entry)

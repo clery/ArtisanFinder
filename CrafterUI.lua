@@ -1,21 +1,51 @@
 local _, AF = ...
 
 local DEFAULT_COMMISSION_PANEL_WIDTH = 392
-local DEFAULT_COMMISSION_PANEL_HEIGHT = 276
+local DEFAULT_COMMISSION_PANEL_HEIGHT = 316
 local CRAFTER_COLLAPSE_BUTTON_LEVEL_OFFSET = 1000
-local COMMISSION_PRICE_FIELD_WIDTH = 104
+local COMMISSION_PRICE_FIELD_WIDTH = 150
+local COMMISSION_FIELD_HEIGHT = 36
 local COMMISSION_PRICE_MAX_LETTERS = 9
 
 local function UpdatePlaceholder(box)
-	box.Placeholder:SetShown((box:GetText() or "") == "" and not box:HasFocus())
+	box.Placeholder:SetShown((box:GetText() or "") == "")
 end
 
-local function SetEditBoxText(box, text)
+local function SetEditBoxText(box, text, updateLastSettingText)
+	text = tostring(text or "")
 	box.artisanFinderSettingText = true
-	box:SetText(text or "")
+	box:SetText(text)
 	box:SetCursorPosition(0)
 	box.artisanFinderSettingText = false
+	if updateLastSettingText ~= false then
+		box.artisanFinderLastSettingText = text
+	end
 	UpdatePlaceholder(box)
+end
+
+local function SetEditBoxTextIfUnedited(box, text)
+	text = tostring(text or "")
+	local currentText = box:GetText() or ""
+	if currentText == text then
+		box.artisanFinderLastSettingText = text
+		UpdatePlaceholder(box)
+		return
+	end
+	if box:HasFocus() or (box.artisanFinderLastSettingText ~= nil and currentText ~= box.artisanFinderLastSettingText) then
+		UpdatePlaceholder(box)
+		return
+	end
+	SetEditBoxText(box, text)
+end
+
+local function SetEditBoxTextForSource(box, text, sourceKey)
+	sourceKey = tostring(sourceKey or "")
+	if box.artisanFinderSettingSource ~= sourceKey then
+		box.artisanFinderSettingSource = sourceKey
+		SetEditBoxText(box, text)
+		return
+	end
+	SetEditBoxTextIfUnedited(box, text)
 end
 
 local function WatchEditBox(box, callback)
@@ -32,11 +62,11 @@ local function ClampCommissionEditBox(box)
 	if not value or value <= (AF.MAX_COMMISSION_GOLD or 99999999) then
 		return
 	end
-	SetEditBoxText(box, tostring(AF.MAX_COMMISSION_GOLD or 99999999))
+	SetEditBoxText(box, tostring(AF.MAX_COMMISSION_GOLD or 99999999), false)
 end
 
 local function PrepareInsetEditBox(field, width, placeholderKey, hasGoldIcon)
-	field:SetSize(width, 24)
+	field:SetSize(width, COMMISSION_FIELD_HEIGHT)
 	field.NineSlice:SetAllPoints()
 	field.NineSlice.layoutType = "InsetFrameTemplate"
 	if NineSliceUtil and NineSliceUtil.ApplyLayoutByName then
@@ -55,9 +85,11 @@ local function PrepareInsetEditBox(field, width, placeholderKey, hasGoldIcon)
 
 	box.Placeholder = field.Placeholder
 	box.Placeholder:ClearAllPoints()
-	box.Placeholder:SetPoint("LEFT", box, "LEFT", 0, 0)
-	box.Placeholder:SetPoint("RIGHT", box, "RIGHT", 0, 0)
+	box.Placeholder:SetPoint("TOPLEFT", field, "TOPLEFT", 8, -4)
+	box.Placeholder:SetPoint("BOTTOMRIGHT", field, "BOTTOMRIGHT", hasGoldIcon and -25 or -8, 4)
 	box.Placeholder:SetJustifyH("LEFT")
+	box.Placeholder:SetJustifyV("MIDDLE")
+	box.Placeholder:SetWordWrap(true)
 	box.Placeholder:SetText(AF:Text(placeholderKey))
 
 	box.GoldIcon = field.GoldIcon
@@ -81,6 +113,12 @@ end
 
 local function SetFieldWidth(box, width)
 	box.Field:SetWidth(width)
+end
+
+local function MatchFieldWidth(box, sourceBox)
+	if box and sourceBox and sourceBox.Field then
+		SetFieldWidth(box, sourceBox.Field:GetWidth())
+	end
 end
 
 local function SizeButtonForText(button, text, minWidth, maxWidth)
@@ -132,12 +170,35 @@ local function ConfigureInfoButton(button, tooltipTitle, tooltipText)
 	return button
 end
 
-local function ParseCommissionOrWarn(box)
-	local copper, free, state = AF:NormalizeCommissionInput(box:GetText())
-	if not copper then
-		AF:Print(AF:Text("COMMISSION_INVALID"))
+local function SetPanelError(panel, message)
+	if panel and panel.errorText then
+		panel.errorText:SetText(message or "")
+		panel.errorText:SetShown(message ~= nil and message ~= "")
+	end
+end
+
+local function ClearPanelError(panel)
+	SetPanelError(panel, nil)
+end
+
+local function HasPanelError(panel)
+	return panel and panel.errorText and panel.errorText:IsShown()
+end
+
+local function ValidateCommissionInput(box, panel)
+	if AF:NormalizeCommissionInput(box:GetText()) then
+		ClearPanelError(panel)
+		return true
+	end
+	SetPanelError(panel, AF:Text("COMMISSION_INVALID"))
+	return false
+end
+
+local function ParseCommissionOrWarn(box, panel)
+	if not ValidateCommissionInput(box, panel) then
 		return nil
 	end
+	local copper, free, state = AF:NormalizeCommissionInput(box:GetText())
 	return copper, free, state
 end
 
@@ -156,6 +217,10 @@ function AF:RefreshCrafterLocale()
 		UpdatePlaceholder(frame.price)
 		UpdatePlaceholder(frame.note)
 		FitNoteAndSave(frame, frame.noteLabel, frame.note, frame.save, 326, 120)
+		MatchFieldWidth(frame.price, frame.note)
+		if frame.errorText and frame.errorText:IsShown() then
+			frame.errorText:SetText(self:Text("COMMISSION_INVALID"))
+		end
 	end
 	if defaults then
 		defaults.title:SetText("ArtisanFinder")
@@ -170,6 +235,13 @@ function AF:RefreshCrafterLocale()
 		UpdatePlaceholder(defaults.price)
 		UpdatePlaceholder(defaults.note)
 		FitStackedDefaultNoteAndSave(defaults, defaults.noteLabel, defaults.note, defaults.save)
+		if frame then
+			MatchFieldWidth(defaults.note, frame.note)
+		end
+		MatchFieldWidth(defaults.price, defaults.note)
+		if defaults.errorText and defaults.errorText:IsShown() then
+			defaults.errorText:SetText(self:Text("COMMISSION_INVALID"))
+		end
 		self:UpdateFastScanButton()
 	end
 end
@@ -239,6 +311,10 @@ function AF:IsOwnProfessionWindowOpen()
 		and form:IsVisible()
 		and not self:IsLinkedProfessionOpen()
 		or false
+end
+
+function AF:IsProfessionPanelMinimized()
+	return ProfessionsUtil and ProfessionsUtil.IsCraftingMinimized and ProfessionsUtil.IsCraftingMinimized() == true
 end
 
 function AF:GetCurrentCraftingRecipeContext()
@@ -366,6 +442,11 @@ function AF:AttachCrafterUI()
 
 	frame.save:SetPoint("LEFT", frame.note, "RIGHT", 8, 0)
 	FitNoteAndSave(frame, frame.noteLabel, frame.note, frame.save, 326, 120)
+	MatchFieldWidth(frame.price, frame.note)
+	frame.errorText:ClearAllPoints()
+	frame.errorText:SetPoint("TOPLEFT", frame.note.Field, "BOTTOMLEFT", 0, -3)
+	frame.errorText:SetPoint("RIGHT", frame, "RIGHT", -2, 0)
+	frame.errorText:SetHeight(28)
 	frame.save:Disable()
 	frame.save:SetScript("OnClick", function()
 		local context = AF:GetCurrentCraftingRecipeContext()
@@ -375,12 +456,14 @@ function AF:AttachCrafterUI()
 			return
 		end
 
-		local copper, free, state = ParseCommissionOrWarn(frame.price)
+		local copper, free, state = ParseCommissionOrWarn(frame.price, frame)
 		if not copper then
 			return
 		end
 
 		AF:SetItemPrice(item.itemID, copper, free, frame.note:GetText(), state)
+		SetEditBoxText(frame.price, AF:FormatCommissionInput(item))
+		SetEditBoxText(frame.note, item.note or "")
 		AF:RefreshCrafterUI()
 	end)
 
@@ -426,6 +509,12 @@ function AF:AttachCrafterUI()
 	defaults.note:SetMaxLetters(AF.MAX_NOTE_CHARS or 256)
 
 	FitStackedDefaultNoteAndSave(defaults, defaults.noteLabel, defaults.note, defaults.save)
+	MatchFieldWidth(defaults.note, frame.note)
+	MatchFieldWidth(defaults.price, defaults.note)
+	defaults.errorText:ClearAllPoints()
+	defaults.errorText:SetPoint("LEFT", defaults.save, "RIGHT", 8, 0)
+	defaults.errorText:SetPoint("RIGHT", defaults, "RIGHT", -14, 0)
+	defaults.errorText:SetHeight(28)
 	defaults.save:Disable()
 	defaults.save:SetScript("OnClick", function()
 		local context = AF:GetCurrentCraftingRecipeContext()
@@ -439,12 +528,15 @@ function AF:AttachCrafterUI()
 			return
 		end
 
-		local copper, free, state = ParseCommissionOrWarn(defaults.price)
+		local copper, free, state = ParseCommissionOrWarn(defaults.price, defaults)
 		if not copper then
 			return
 		end
 
 		AF:SetProfessionPrice(professionID, copper, free, defaults.note:GetText(), state)
+		local savedDefault = AF:GetProfessionPriceEntry(AF.db.artisanProfile, professionID)
+		SetEditBoxText(defaults.price, AF:FormatCommissionInput(savedDefault))
+		SetEditBoxText(defaults.note, savedDefault and savedDefault.note or "")
 		AF:RefreshCrafterUI()
 	end)
 
@@ -489,10 +581,12 @@ function AF:AttachCrafterUI()
 
 	local markItemDirty = function()
 		ClampCommissionEditBox(frame.price)
+		ValidateCommissionInput(frame.price, frame)
 		AF:UpdateCrafterDirtyState()
 	end
 	local markDefaultDirty = function()
 		ClampCommissionEditBox(defaults.price)
+		ValidateCommissionInput(defaults.price, defaults)
 		AF:UpdateCrafterDirtyState()
 	end
 	WatchEditBox(frame.price, markItemDirty)
@@ -522,6 +616,7 @@ function AF:AttachCrafterUI()
 		defaults.fastScanButton,
 		defaults.forceRescanButton,
 		defaults.scanProgressText,
+		defaults.errorText,
 		defaults.advertiseCheck,
 	}
 
@@ -535,6 +630,15 @@ function AF:AttachCrafterUI()
 
 	if form.Init then
 		hooksecurefunc(form, "Init", function()
+			AF:RefreshCrafterUI()
+		end)
+	end
+	if ProfessionsFrame and not self.crafterProfessionMinimizeHooked then
+		self.crafterProfessionMinimizeHooked = true
+		hooksecurefunc(ProfessionsFrame, "SetMinimized", function()
+			AF:RefreshCrafterUI()
+		end)
+		hooksecurefunc(ProfessionsFrame, "SetMaximized", function()
 			AF:RefreshCrafterUI()
 		end)
 	end
@@ -642,7 +746,7 @@ function AF:UpdateCrafterDirtyState()
 		itemDirty = self:IsCommissionInputDirty(frame.price:GetText(), item)
 			or (frame.note:GetText() or "") ~= (item.note or "")
 	end
-	if itemDirty then
+	if itemDirty and not HasPanelError(frame) then
 		frame.save:Enable()
 	else
 		frame.save:Disable()
@@ -657,7 +761,7 @@ function AF:UpdateCrafterDirtyState()
 	local defaultNote = default and default.note or ""
 	local defaultDirty = self:IsCommissionInputDirty(defaults.price:GetText(), default)
 		or (defaults.note:GetText() or "") ~= defaultNote
-	if defaultDirty then
+	if defaultDirty and not HasPanelError(defaults) then
 		defaults.save:Enable()
 	else
 		defaults.save:Disable()
@@ -672,7 +776,7 @@ function AF:RefreshCrafterUI()
 		return
 	end
 
-	if not self:IsOwnProfessionWindowOpen() then
+	if not self:IsOwnProfessionWindowOpen() or self:IsProfessionPanelMinimized() then
 		frame:Hide()
 		defaults:Hide()
 		if self.crafterDefaultsCollapseButton then
@@ -696,9 +800,15 @@ function AF:RefreshCrafterUI()
 		local item = self:EnsureCurrentRecipeEntry(context)
 		if item then
 			frame:Show()
-			SetEditBoxText(frame.price, self:FormatCommissionInput(item))
-			SetEditBoxText(frame.note, item.note or "")
+			local sourceKey = table.concat({ "item", tostring(context.itemID or ""), tostring(context.recipeID or ""), tostring(context.professionID or "") }, ":")
+			if frame.artisanFinderErrorSource ~= sourceKey then
+				frame.artisanFinderErrorSource = sourceKey
+				ClearPanelError(frame)
+			end
+			SetEditBoxTextForSource(frame.price, self:FormatCommissionInput(item), sourceKey)
+			SetEditBoxTextForSource(frame.note, item.note or "", sourceKey)
 		else
+			ClearPanelError(frame)
 			frame:Hide()
 		end
 	end
@@ -711,14 +821,20 @@ function AF:RefreshCrafterUI()
 		end
 		defaults.advertiseCheck:SetChecked(self:IsProfessionAdvertised(self.playerName, professionID))
 		local default = self:GetProfessionPriceEntry(self.db.artisanProfile, professionID)
+		local sourceKey = "profession:" .. tostring(professionID or "")
+		if defaults.artisanFinderErrorSource ~= sourceKey then
+			defaults.artisanFinderErrorSource = sourceKey
+			ClearPanelError(defaults)
+		end
 		if default then
-			SetEditBoxText(defaults.price, self:FormatCommissionInput(default))
-			SetEditBoxText(defaults.note, default.note or "")
+			SetEditBoxTextForSource(defaults.price, self:FormatCommissionInput(default), sourceKey)
+			SetEditBoxTextForSource(defaults.note, default.note or "", sourceKey)
 		else
-			SetEditBoxText(defaults.price, "0")
-			SetEditBoxText(defaults.note, "")
+			SetEditBoxTextForSource(defaults.price, "", sourceKey)
+			SetEditBoxTextForSource(defaults.note, "", sourceKey)
 		end
 	else
+		ClearPanelError(defaults)
 		defaults:Hide()
 		if self.crafterDefaultsCollapseButton then
 			self.crafterDefaultsCollapseButton:Hide()

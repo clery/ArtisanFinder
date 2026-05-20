@@ -185,21 +185,22 @@
 	</Frame>
 
 	<Frame name="ArtisanFinderCrafterItemTemplate" virtual="true">
-		<Size x="326" y="58"/>
+		<Size x="326" y="82"/>
 		<Layers>
 			<Layer level="OVERLAY">
 				<FontString parentKey="priceLabel" inherits="GameFontHighlightSmall" justifyH="LEFT">
 					<Size x="74" y="20"/>
 					<Anchors>
-						<Anchor point="TOPLEFT" x="0" y="-2"/>
+						<Anchor point="TOPLEFT" x="0" y="-8"/>
 					</Anchors>
 				</FontString>
 				<FontString parentKey="noteLabel" inherits="GameFontHighlightSmall" justifyH="LEFT">
 					<Size x="74" y="20"/>
 					<Anchors>
-						<Anchor point="TOPLEFT" x="0" y="-31"/>
+						<Anchor point="TOPLEFT" x="0" y="-50"/>
 					</Anchors>
 				</FontString>
+				<FontString parentKey="errorText" inherits="GameFontRedSmall" justifyH="LEFT" wordWrap="true" hidden="true"/>
 			</Layer>
 		</Layers>
 		<Frames>
@@ -209,15 +210,15 @@
 				</Anchors>
 			</Button>
 			<Frame parentKey="priceField" inherits="ArtisanFinderInsetEditBoxTemplate">
-				<Size x="104" y="24"/>
+				<Size x="150" y="36"/>
 				<Anchors>
 					<Anchor point="TOPLEFT" x="78" y="0"/>
 				</Anchors>
 			</Frame>
 			<Frame parentKey="noteField" inherits="ArtisanFinderInsetEditBoxTemplate">
-				<Size x="170" y="24"/>
+				<Size x="170" y="36"/>
 				<Anchors>
-					<Anchor point="TOPLEFT" x="78" y="-29"/>
+					<Anchor point="TOPLEFT" x="78" y="-42"/>
 				</Anchors>
 			</Frame>
 			<Button parentKey="save" inherits="UIPanelButtonTemplate">
@@ -227,7 +228,7 @@
 	</Frame>
 
 	<Frame name="ArtisanFinderProfessionDefaultsTemplate" virtual="true" inherits="DefaultPanelTemplate">
-		<Size x="392" y="276"/>
+		<Size x="392" y="316"/>
 		<Layers>
 			<Layer level="OVERLAY">
 				<FontString parentKey="defaultsHeader" inherits="GameFontNormalSmall" justifyH="LEFT">
@@ -238,25 +239,26 @@
 				<FontString parentKey="priceLabel" inherits="GameFontHighlightSmall" justifyH="LEFT">
 					<Size x="74" y="20"/>
 					<Anchors>
-						<Anchor point="TOPLEFT" x="14" y="-55"/>
+						<Anchor point="TOPLEFT" x="14" y="-61"/>
 					</Anchors>
 				</FontString>
 				<FontString parentKey="noteLabel" inherits="GameFontHighlightSmall" justifyH="LEFT">
 					<Size x="74" y="20"/>
 					<Anchors>
-						<Anchor point="TOPLEFT" x="14" y="-84"/>
+						<Anchor point="TOPLEFT" x="14" y="-102"/>
 					</Anchors>
 				</FontString>
+				<FontString parentKey="errorText" inherits="GameFontRedSmall" justifyH="LEFT" wordWrap="true" hidden="true"/>
 				<Texture parentKey="defaultsDivider" atlas="Options_HorizontalDivider">
 					<Size y="2"/>
 					<Anchors>
-						<Anchor point="TOPLEFT" x="12" y="-145"/>
-						<Anchor point="TOPRIGHT" x="-12" y="-145"/>
+						<Anchor point="TOPLEFT" x="12" y="-170"/>
+						<Anchor point="TOPRIGHT" x="-12" y="-170"/>
 					</Anchors>
 				</Texture>
 				<FontString parentKey="scanHeader" inherits="GameFontNormalSmall" justifyH="LEFT">
 					<Anchors>
-						<Anchor point="TOPLEFT" x="14" y="-170"/>
+						<Anchor point="TOPLEFT" x="14" y="-195"/>
 					</Anchors>
 				</FontString>
 				<FontString parentKey="scanProgressText" inherits="GameFontHighlightSmall" justifyH="LEFT" hidden="true">
@@ -265,13 +267,13 @@
 				<Texture parentKey="scanDivider" atlas="Options_HorizontalDivider">
 					<Size y="2"/>
 					<Anchors>
-						<Anchor point="TOPLEFT" x="12" y="-197"/>
-						<Anchor point="TOPRIGHT" x="-12" y="-197"/>
+						<Anchor point="TOPLEFT" x="12" y="-222"/>
+						<Anchor point="TOPRIGHT" x="-12" y="-222"/>
 					</Anchors>
 				</Texture>
 				<FontString parentKey="advertisingHeader" inherits="GameFontNormalSmall" justifyH="LEFT">
 					<Anchors>
-						<Anchor point="TOPLEFT" x="14" y="-210"/>
+						<Anchor point="TOPLEFT" x="14" y="-235"/>
 					</Anchors>
 				</FontString>
 			</Layer>
@@ -295,15 +297,15 @@
 				</Anchors>
 			</Button>
 			<Frame parentKey="priceField" inherits="ArtisanFinderInsetEditBoxTemplate">
-				<Size x="104" y="24"/>
+				<Size x="150" y="36"/>
 				<Anchors>
 					<Anchor point="TOPLEFT" x="92" y="-53"/>
 				</Anchors>
 			</Frame>
 			<Frame parentKey="noteField" inherits="ArtisanFinderInsetEditBoxTemplate">
-				<Size x="128" y="24"/>
+				<Size x="128" y="36"/>
 				<Anchors>
-					<Anchor point="TOPLEFT" x="92" y="-82"/>
+					<Anchor point="TOPLEFT" x="92" y="-94"/>
 				</Anchors>
 			</Frame>
 			<Button parentKey="save" inherits="UIPanelButtonTemplate">
@@ -312,19 +314,19 @@
 			<Button parentKey="fastScanButton" inherits="UIPanelButtonTemplate">
 				<Size x="96" y="22"/>
 				<Anchors>
-					<Anchor point="TOPLEFT" x="92" y="-165"/>
+					<Anchor point="TOPLEFT" x="92" y="-190"/>
 				</Anchors>
 			</Button>
 			<Button parentKey="forceRescanButton" inherits="UIPanelButtonTemplate">
 				<Size x="76" y="22"/>
 				<Anchors>
-					<Anchor point="TOPLEFT" x="194" y="-165"/>
+					<Anchor point="TOPLEFT" x="194" y="-190"/>
 				</Anchors>
 			</Button>
 			<CheckButton parentKey="advertiseCheck" inherits="UICheckButtonTemplate">
 				<Size x="24" y="24"/>
 				<Anchors>
-					<Anchor point="TOPLEFT" x="10" y="-227"/>
+					<Anchor point="TOPLEFT" x="10" y="-252"/>
 				</Anchors>
 			</CheckButton>
 		</Frames>

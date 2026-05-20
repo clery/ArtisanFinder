@@ -13,6 +13,7 @@ local CUSTOMER_PANEL_WIDTH = 482
 local CUSTOMER_PANEL_COLLAPSED_WIDTH = 28
 local CUSTOMER_PANEL_ATTACH_OFFSET_X = -5
 local CUSTOMER_COLLAPSE_BUTTON_LEVEL_OFFSET = 1000
+local CUSTOMER_REFRESH_WHO_COOLDOWN = 5
 
 local function GetSortMode(index)
 	return SORT_MODES[index or 1] or SORT_MODES[1]
@@ -374,10 +375,10 @@ local function CreateCustomerRow(parent)
 		row.name:SetMaxLines(1)
 	end
 	row.updatedAt:ClearAllPoints()
-	row.updatedAt:SetPoint("TOPRIGHT", -40, -6)
+	row.updatedAt:SetPoint("TOPRIGHT", -65, -6)
 	row.detail:ClearAllPoints()
 	row.detail:SetPoint("TOPLEFT", row.name, "BOTTOMLEFT", 0, -3)
-	row.detail:SetPoint("RIGHT", -40, 0)
+	row.detail:SetPoint("RIGHT", -65, 0)
 	if row.detail.SetWordWrap then
 		row.detail:SetWordWrap(false)
 	end
@@ -386,21 +387,50 @@ local function CreateCustomerRow(parent)
 	end
 	row.capability:ClearAllPoints()
 	row.capability:SetPoint("TOPLEFT", row.detail, "BOTTOMLEFT", 0, -3)
-	row.capability:SetPoint("RIGHT", -40, 0)
+	row.capability:SetPoint("RIGHT", -65, 0)
 
 	row.action:SetNormalTexture("Interface\\Buttons\\UI-OptionsButton")
 	row.action:SetPushedTexture("Interface\\Buttons\\UI-OptionsButton")
-	row.action:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+	row.action:SetHighlightTexture("Interface\\Buttons\\UI-OptionsButton", "ADD")
 	row.action:GetNormalTexture():ClearAllPoints()
 	row.action:GetNormalTexture():SetSize(21, 21)
 	row.action:GetNormalTexture():SetPoint("CENTER")
 	row.action:GetPushedTexture():ClearAllPoints()
 	row.action:GetPushedTexture():SetSize(21, 21)
 	row.action:GetPushedTexture():SetPoint("CENTER", 1, -1)
+	row.action:GetHighlightTexture():ClearAllPoints()
+	row.action:GetHighlightTexture():SetSize(21, 21)
+	row.action:GetHighlightTexture():SetPoint("CENTER")
+	row.action:GetHighlightTexture():SetVertexColor(1, 0.82, 0)
 	row.action:SetScript("OnClick", function(buttonFrame)
 		if row.entry then
 			AF:ShowCustomerMenu(row.entry, buttonFrame)
 		end
+	end)
+
+	row.whoRefresh = CreateFrame("Button", nil, row)
+	row.whoRefresh:SetSize(18, 18)
+	row.whoRefresh:SetPoint("RIGHT", row.action, "LEFT", -1, 0)
+	SetButtonAtlas(row.whoRefresh, "UI-RefreshButton", "UI-RefreshButton", "UI-RefreshButton", "UI-RefreshButton")
+	if row.whoRefresh:GetDisabledTexture() then
+		row.whoRefresh:GetDisabledTexture():SetDesaturated(true)
+		row.whoRefresh:GetDisabledTexture():SetVertexColor(0.55, 0.55, 0.55)
+	end
+	row.whoRefresh:SetScript("OnClick", function()
+		AF:RefreshCustomerEntryWhoStatus(row.entry)
+		AF:UpdateCustomerWhoRefreshButtons()
+	end)
+	row.whoRefresh:SetScript("OnEnter", function(button)
+		if button:IsEnabled() then
+			return
+		end
+		local remaining = AF:GetCustomerWhoStatusReadyRemaining()
+		GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
+		GameTooltip:SetText(remaining > 0 and AF:Text("ROW_REFRESH_DISABLED_TOOLTIP", remaining) or AF:Text("REFRESH_DISABLED_TOOLTIP"), 1, 0.82, 0)
+		GameTooltip:Show()
+	end)
+	row.whoRefresh:SetScript("OnLeave", function()
+		GameTooltip:Hide()
 	end)
 	row:SetScript("OnEnter", function(buttonFrame)
 		if buttonFrame.entry then
@@ -641,6 +671,7 @@ function AF:RefreshCustomerLocale()
 	self.customerSortIndex = SORT_MODES[self.customerSortIndex or 1] and self.customerSortIndex or 1
 	frame.sort:SetText(self:Text("SORT_BUTTON", GetSortLabel(self.customerSortIndex)))
 	frame.refresh:SetText(self:Text("REFRESH"))
+	self:UpdateCustomerRefreshButton()
 	frame.menu.favorite:SetText(self:Text(frame.menu.entry and self:IsFavoriteArtisan(frame.menu.entry) and "UNFAVORITE" or "FAVORITE"))
 	frame.menu.whisper:SetText(self:Text("WHISPER"))
 	frame.menu.personal:SetText(self:Text(self:IsGuildOrderEntry(frame.menu.entry) and "GUILD_ORDER" or "PERSONAL_ORDER"))
@@ -725,9 +756,10 @@ function AF:AttachCustomerUI()
 	frame.search:SetAutoFocus(false)
 	frame.search:SetScript("OnTextChanged", function()
 		SearchBoxTemplate_OnTextChanged(frame.search)
-		if AF.StartCustomerWhoStatusChecks then
-			AF:StartCustomerWhoStatusChecks()
-		end
+		AF:RefreshCustomerResults()
+	end)
+	frame.search:SetScript("OnEnterPressed", function(editBox)
+		editBox:ClearFocus()
 		AF:RefreshCustomerResults()
 	end)
 
@@ -743,9 +775,6 @@ function AF:AttachCustomerUI()
 		end
 		AF.db.defaultSort = GetSortMode(AF.customerSortIndex).key
 		frame.sort:SetText(AF:Text("SORT_BUTTON", GetSortLabel(AF.customerSortIndex)))
-		if AF.StartCustomerWhoStatusChecks then
-			AF:StartCustomerWhoStatusChecks()
-		end
 		AF:RefreshCustomerResults()
 		if AF.RefreshOptionsPanel then
 			AF:RefreshOptionsPanel()
@@ -756,9 +785,35 @@ function AF:AttachCustomerUI()
 	frame.refresh:ClearAllPoints()
 	frame.refresh:SetPoint("LEFT", frame.sort, "RIGHT", 6, 0)
 	frame.refresh:SetText(self:Text("REFRESH"))
+	if frame.refresh.SetMotionScriptsWhileDisabled then
+		frame.refresh:SetMotionScriptsWhileDisabled(true)
+	end
+	frame.refresh:SetScript("OnEnter", function(button)
+		if AF:IsCustomerRefreshAvailable() then
+			return
+		end
+		GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
+		GameTooltip:SetText(AF:Text("REFRESH_DISABLED_TOOLTIP"), 1, 0.82, 0)
+		GameTooltip:Show()
+	end)
+	frame.refresh:SetScript("OnLeave", function()
+		GameTooltip:Hide()
+	end)
 	frame.refresh:SetScript("OnClick", function()
+		if not AF:IsCustomerRefreshAvailable() then
+			AF:UpdateCustomerRefreshButton()
+			return
+		end
+		AF.customerRefreshCooldownUntil = AF:Now() + CUSTOMER_REFRESH_WHO_COOLDOWN
+		AF:UpdateCustomerRefreshButton()
+		C_Timer.After(CUSTOMER_REFRESH_WHO_COOLDOWN, function()
+			AF:UpdateCustomerRefreshButton()
+		end)
 		if AF.StartCustomerWhoStatusChecks then
 			AF:StartCustomerWhoStatusChecks()
+		end
+		if AF.QueueCustomerWhoStatusChecks then
+			AF:QueueCustomerWhoStatusChecks(AF:GetVisibleCustomerEntries(), true, nil, true)
 		end
 		AF:RefreshCustomerQuery(true)
 	end)
@@ -866,9 +921,6 @@ function AF:AttachCustomerUI()
 		AF:SetCustomerPanelCollapsed(frame.collapsed, true)
 		AF:QueueCustomerSidePanelLayout()
 		if not frame.collapsed then
-			if AF.StartCustomerWhoStatusChecks then
-				AF:StartCustomerWhoStatusChecks()
-			end
 			AF:RefreshCustomerQuery()
 			if AF.MaybeShowCustomerTutorial then
 				AF:MaybeShowCustomerTutorial()
@@ -897,9 +949,6 @@ function AF:AttachCustomerUI()
 		AF.customerFrame:Show()
 		AF:QueueCustomerSidePanelLayout()
 		if not AF.customerFrame.collapsed then
-			if AF.StartCustomerWhoStatusChecks then
-				AF:StartCustomerWhoStatusChecks()
-			end
 			AF:RefreshCustomerQuery()
 			if AF.MaybeShowCustomerTutorial then
 				AF:MaybeShowCustomerTutorial()
@@ -1113,6 +1162,77 @@ function AF:GetCustomerOrderItemContext()
 	} or nil
 end
 
+function AF:GetCustomerAutoWhoKey(context)
+	if not context or not context.itemID then
+		return nil
+	end
+	return table.concat({
+		tostring(context.itemID),
+		tostring(context.recipeID or 0),
+		tostring(context.professionID or 0),
+	}, ":")
+end
+
+function AF:StartInitialCustomerWhoStatusChecks(context)
+	if not self.StartCustomerWhoStatusChecks then
+		return
+	end
+
+	local key = self:GetCustomerAutoWhoKey(context)
+	if not key then
+		return
+	end
+
+	self.customerAutoWhoSeenCrafts = self.customerAutoWhoSeenCrafts or {}
+	if self.customerAutoWhoSeenCrafts[key] then
+		return
+	end
+
+	self.customerAutoWhoSeenCrafts[key] = true
+	self:StartCustomerWhoStatusChecks()
+end
+
+function AF:IsCustomerLiveSearchPending()
+	local itemID = tonumber(self.currentCustomerItemID)
+	if not itemID then
+		return false
+	end
+	if tonumber(self.pendingCustomerQueryItemID) == itemID then
+		return true
+	end
+	return tonumber(self.currentCustomerQueryItemID) == itemID
+		and self.lastQueryAt
+		and self:Now() - self.lastQueryAt < self.LIVE_QUERY_TIMEOUT
+end
+
+function AF:IsCustomerRefreshAvailable()
+	if self.customerTutorialActive then
+		return false
+	end
+	if not self.currentCustomerItemID then
+		return false
+	end
+	local cooldownUntil = tonumber(self.customerRefreshCooldownUntil)
+	if cooldownUntil and self:Now() < cooldownUntil then
+		return false
+	end
+	return not self:IsCustomerLiveSearchPending()
+end
+
+function AF:UpdateCustomerRefreshButton()
+	local frame = self.customerFrame
+	if not frame or not frame.refresh then
+		return
+	end
+	if self:IsCustomerRefreshAvailable() then
+		frame.refresh:Enable()
+		if GameTooltip:GetOwner() == frame.refresh then
+			GameTooltip:Hide()
+		end
+	else
+		frame.refresh:Disable()
+	end
+end
 
 function AF:RefreshCustomerQuery(force)
 	self:AttachCustomerUI()
@@ -1136,6 +1256,7 @@ function AF:RefreshCustomerQuery(force)
 		self.currentCustomerQueryItemID = nil
 		self.currentCustomerQueryProfessionID = nil
 		self:RefreshCustomerResults(self:Text("SELECT_ORDER_ITEM"))
+		self:UpdateCustomerRefreshButton()
 		return
 	end
 
@@ -1163,7 +1284,7 @@ function AF:RefreshCustomerQuery(force)
 		end
 	end
 	if changed and self.StartCustomerWhoStatusChecks then
-		self:StartCustomerWhoStatusChecks()
+		self:StartInitialCustomerWhoStatusChecks(context)
 	end
 	self.customerWhoStatusKickPending = force == true
 	self:InjectDebugSelfResult(context.itemID, context.professionID)
@@ -1183,6 +1304,16 @@ function AF:EnsureCustomerRows(count)
 		local row = CreateCustomerRow(frame.content)
 		self.customerRows[i] = row
 	end
+end
+
+function AF:GetVisibleCustomerEntries()
+	local entries = {}
+	for _, row in ipairs(self.customerRows or {}) do
+		if row:IsShown() and row.entry then
+			table.insert(entries, row.entry)
+		end
+	end
+	return entries
 end
 
 function AF:CanReliablyOpenProfession(entry)
@@ -1223,6 +1354,13 @@ function AF:RefreshCustomerResults(statusOverride)
 	local queryToken = self.currentCustomerQueryToken
 	local tutorialActive = self.customerTutorialActive == true
 	local rows = tutorialActive and { self:GetCustomerTutorialRow() } or (itemID and self:GetCachedArtisans(itemID, filterText, sortMode, queryToken) or {})
+	local hasOfflineFallbackRows = false
+	for _, entry in ipairs(rows) do
+		if entry.offlineFallback then
+			hasOfflineFallbackRows = true
+			break
+		end
+	end
 	local startWhoChecks = self.customerWhoStatusStartUntil and self:Now() <= self.customerWhoStatusStartUntil
 	if self.customerWhoStatusStartUntil and not startWhoChecks then
 		self.customerWhoStatusStartUntil = nil
@@ -1259,13 +1397,21 @@ function AF:RefreshCustomerResults(statusOverride)
 			row:Show()
 		else
 			row.entry = nil
+			row.artisanFinderWhoName = nil
+			if row.whoSpinner then
+				row.whoSpinner:Hide()
+				row.artisanFinderWhoSpinnerName = nil
+			end
+			if row.whoRefresh then
+				row.whoRefresh:Hide()
+			end
 			row:Hide()
 		end
 	end
 	frame.content:SetHeight(math.max(1, contentHeight))
 	UpdateCustomerScrollBar(frame.modernScrollBar)
 	if itemID and not tutorialActive and self.QueueCustomerWhoStatusChecks then
-		if startWhoChecks then
+		if startWhoChecks or hasOfflineFallbackRows then
 			self:QueueCustomerWhoStatusChecks(rows, true, self.customerWhoStatusBatchSeen, self.customerWhoStatusKickPending)
 		end
 		self.customerWhoStatusKickPending = nil
@@ -1290,6 +1436,7 @@ function AF:RefreshCustomerResults(statusOverride)
 			self:SetCustomerStatusItem(itemID, itemName, "NO_ARTISANS_FOUND")
 		end
 	end
+	self:UpdateCustomerRefreshButton()
 end
 
 function AF:OpenCrafterProfession(entry)
@@ -1417,6 +1564,39 @@ function AF:TrySelectPendingProfessionRecipe()
 	end
 end
 
+function AF:SetCustomerOrderFormMessage(message)
+	local form = ProfessionsCustomerOrdersFrame and ProfessionsCustomerOrdersFrame.Form
+	local paymentContainer = form and form.PaymentContainer
+	local button = paymentContainer and paymentContainer.ListOrderButton
+	if not paymentContainer or not button then
+		return false
+	end
+
+	if not self.customerOrderFormMessage then
+		local text = paymentContainer:CreateFontString(nil, "OVERLAY", "GameFontRedSmall")
+		text:SetJustifyH("CENTER")
+		text:SetJustifyV("BOTTOM")
+		text:SetWordWrap(true)
+		self.customerOrderFormMessage = text
+	end
+
+	local text = self.customerOrderFormMessage
+	text:ClearAllPoints()
+	text:SetPoint("BOTTOM", button, "TOP", 0, 4)
+	text:SetWidth(math.max(220, button:GetWidth() or 220))
+	text:SetText(message or "")
+	text:SetShown(message and message ~= "")
+
+	self.customerOrderFormMessageToken = (self.customerOrderFormMessageToken or 0) + 1
+	local token = self.customerOrderFormMessageToken
+	C_Timer.After(6, function()
+		if AF.customerOrderFormMessageToken == token and AF.customerOrderFormMessage then
+			AF.customerOrderFormMessage:Hide()
+		end
+	end)
+	return true
+end
+
 function AF:FillPersonalOrder(entry)
 	if entry and entry.tutorialFake then
 		return
@@ -1456,5 +1636,8 @@ function AF:FillPersonalOrder(entry)
 	end
 
 	form:UpdateListOrderButton()
-	self:Print(self:Text(isGuildOrder and "GUILD_ORDER_FILLED" or "PERSONAL_ORDER_FILLED"))
+	local message = self:Text(isGuildOrder and "GUILD_ORDER_FILLED" or "PERSONAL_ORDER_FILLED")
+	if not self:SetCustomerOrderFormMessage(message) then
+		self:Print(message)
+	end
 end

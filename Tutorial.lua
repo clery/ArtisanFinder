@@ -410,6 +410,9 @@ function AF:SetupCustomerTutorialButton(frame)
 end
 
 function AF:GetCustomerTutorialRow()
+	local baseQuality = self:Text("BASE_QUALITY", self:GetQualityIconMarkup(3, nil, 16) or "Q3")
+	local bestQuality = self:Text("RECOMMENDED_REAGENTS_QUALITY", self:GetQualityIconMarkup(4, nil, 16) or "Q4")
+	local concentrationQuality = self:Text("CONCENTRATION_QUALITY", self:GetQualityIconMarkup(5, nil, 16) or "Q5")
 	return {
 		tutorialFake = true,
 		name = self:Text("TUTORIAL_FAKE_ARTISAN_NAME"),
@@ -418,7 +421,10 @@ function AF:GetCustomerTutorialRow()
 		professionID = self.currentCustomerProfessionID or 164,
 		professionName = self.currentCustomerProfessionID and self:GetProfessionName(self.currentCustomerProfessionID) or self:Text("PROFESSION_FALLBACK", "Tutorial"),
 		note = self:Text("TUTORIAL_FAKE_ARTISAN_NOTE"),
-		capabilityText = self:Text("TUTORIAL_FAKE_ARTISAN_CAPABILITY"),
+		capabilityText = table.concat({ baseQuality, bestQuality, concentrationQuality }, " - "),
+		quality = 3,
+		bestQuality = 4,
+		bestConcentrationQuality = 5,
 		priceCopper = 5000000,
 		freeCommission = false,
 		commissionSpecified = true,
@@ -441,7 +447,7 @@ function AF:BuildCustomerHelpPlateInfo()
 	leftX = math.max(0, leftX - HELP_PLATE_HIGHLIGHT_PADDING)
 	AddHelpPlateTile(info, frame, self:Text("TUTORIAL_CUSTOMER_STATUS"), { leftX = leftX }, frame.status)
 	AddHelpPlateTile(info, frame, self:Text("TUTORIAL_CUSTOMER_SEARCH"), { leftX = leftX }, frame.search, frame.sort, frame.refresh)
-	AddHelpPlateTile(info, frame, self:Text("TUTORIAL_CUSTOMER_ROW") .. "\n\n" .. self:Text("TUTORIAL_CUSTOMER_ACTION"), { leftX = leftX }, row.name, row.detail, row.capability)
+	AddHelpPlateTile(info, frame, self:Text("TUTORIAL_CUSTOMER_ROW") .. "\n\n" .. self:Text("TUTORIAL_CUSTOMER_ACTION"), { leftX = leftX }, row.name, row.detail, row.capability, row.whoRefresh, row.action)
 	return #info > 0 and info or nil
 end
 

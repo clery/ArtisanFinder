@@ -194,6 +194,7 @@ local function ApplyDBDefaults(db)
 	db.professionLinks = db.professionLinks or {}
 	db.tradeLeads = db.tradeLeads or {}
 	db.tradeLeadCache = db.tradeLeadCache or {}
+	db.whoOnlineCache = db.whoOnlineCache or {}
 	db.guildCache = db.guildCache or {}
 	db.guildCache.rosterByName = db.guildCache.rosterByName or {}
 	db.guildCache.recipeMembers = db.guildCache.recipeMembers or {}

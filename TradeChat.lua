@@ -301,6 +301,7 @@ function AF:GetCachedTradeLeadFallbackRows(itemID, professionID, filterText, see
 				certified = false,
 				tradeProfessionMatch = true,
 				offlineCached = true,
+				offlineFallback = true,
 				note = self:Text("MISSING_ADDON_DATA"),
 			}
 			if TradeLeadMatchesFilter(row, filterText) then

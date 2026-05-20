@@ -1,6 +1,8 @@
 local _, AF = ...
 
 local DETAIL_ELLIPSIS = "..."
+local WHO_SPINNER_SIZE = 16
+local WHO_SPINNER_PADDING = 5
 
 local function GetUTF8EndForCharCount(text, count)
 	text = tostring(text or "")
@@ -82,6 +84,80 @@ local function SetFittedDetailText(row, commissionText, note)
 	return true
 end
 
+local function EnsureWhoSpinner(row)
+	if not row.whoSpinner then
+		local spinner = CreateFrame("Frame", nil, row, "SpinnerTemplate")
+		spinner:SetSize(WHO_SPINNER_SIZE, WHO_SPINNER_SIZE)
+		spinner:EnableMouse(true)
+		spinner:SetScript("OnEnter", function(owner)
+			local refreshIcon = CreateAtlasMarkup and CreateAtlasMarkup("UI-RefreshButton", 14, 14) or ""
+			GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+			GameTooltip:SetText(AF:Text("WHO_REFRESH_HINT", refreshIcon), 1, 0.82, 0, 1, true)
+			GameTooltip:Show()
+		end)
+		spinner:SetScript("OnLeave", function()
+			GameTooltip:Hide()
+		end)
+		spinner:Hide()
+		row.whoSpinner = spinner
+	end
+	return row.whoSpinner
+end
+
+local function PositionWhoSpinner(row, shown)
+	local spinner = EnsureWhoSpinner(row)
+	if not shown then
+		if spinner:IsShown() then
+			spinner:Hide()
+		end
+		row.artisanFinderWhoSpinnerName = nil
+		return
+	end
+
+	local nameWidth = row.name:GetStringWidth() or 0
+	local maxOffset = math.max(0, (row.name:GetWidth() or 0) - WHO_SPINNER_SIZE)
+	spinner:ClearAllPoints()
+	spinner:SetPoint("LEFT", row.name, "LEFT", math.min(nameWidth + WHO_SPINNER_PADDING, maxOffset), 0)
+	row.artisanFinderWhoSpinnerName = row.artisanFinderWhoName
+	if not spinner:IsShown() then
+		spinner:Show()
+	end
+end
+
+function AF:IsCustomerEntryWhoPending(entry)
+	if not entry or entry.tutorialFake then
+		return false
+	end
+	return self:IsWhoStatusPending(entry.orderTarget or entry.name or entry.target) == true
+end
+
+function AF:RefreshCustomerWhoLoadingIndicators()
+	for _, row in ipairs(self.customerRows or {}) do
+		if row:IsShown() and row.artisanFinderWhoName then
+			PositionWhoSpinner(row, self:IsWhoStatusPending(row.artisanFinderWhoName) == true)
+		elseif row.whoSpinner then
+			row.whoSpinner:Hide()
+			row.artisanFinderWhoSpinnerName = nil
+		end
+	end
+end
+
+function AF:UpdateCustomerRowWhoRefreshButton(row)
+	if not row or not row.whoRefresh then
+		return
+	end
+	local enabled = row:IsShown() and self:IsCustomerEntryWhoRefreshAvailable(row.entry)
+	row.whoRefresh:SetShown(row:IsShown() and row.entry and not row.entry.tutorialFake and not row.entry.ownAlt)
+	row.whoRefresh:SetEnabled(enabled)
+	row.whoRefresh:SetAlpha(1)
+end
+
+function AF:UpdateCustomerWhoRefreshButtons()
+	for _, row in ipairs(self.customerRows or {}) do
+		self:UpdateCustomerRowWhoRefreshButton(row)
+	end
+end
+
 function AF:BuildCustomerRowViewModel(entry)
 	if entry and entry.tutorialFake then
 		return {
@@ -143,18 +219,31 @@ function AF:BuildCustomerRowViewModel(entry)
 		updatedAt = self:FormatCustomerRowUpdatedAt(entry),
 		certified = not entry.tradeLead,
 		favorite = self:IsFavoriteArtisan(entry),
+		whoName = self:GetCustomerEntryWhoName(entry),
+		whoPending = self:IsCustomerEntryWhoPending(entry),
 	}
 end
 
 function AF:ApplyCustomerRowViewModel(row, viewModel, minimumHeight, bottomPadding)
+	local keepSpinner = row.whoSpinner
+		and row.whoSpinner:IsShown()
+		and row.artisanFinderWhoSpinnerName == viewModel.whoName
+		and viewModel.whoPending
+	if row.whoSpinner and not keepSpinner then
+		row.whoSpinner:Hide()
+		row.artisanFinderWhoSpinnerName = nil
+	end
 	row.certified:SetShown(viewModel.certified)
 	row.favorite:SetShown(viewModel.favorite)
+	row.artisanFinderWhoName = viewModel.whoName
 	row.name:SetText(viewModel.displayName or "")
 	row.updatedAt:SetText(viewModel.updatedAt or "")
 	row.updatedAt:SetWidth(math.max(1, math.ceil((row.updatedAt:GetStringWidth() or 0) + 2)))
 	local noteTruncated = SetFittedDetailText(row, viewModel.detail, viewModel.detailNote)
 	row.noteTooltipText = noteTruncated and viewModel.detailNote or nil
 	row.capability:SetText(viewModel.capability or "")
+	PositionWhoSpinner(row, viewModel.whoPending)
+	self:UpdateCustomerRowWhoRefreshButton(row)
 
 	return math.max(
 		minimumHeight,

@@ -38,7 +38,7 @@ The results help answer the questions that usually slow down personal orders:
 *   What quality can they make with regular or recommended reagents?
 *   Can I whisper them or prepare a personal order without copying their name by hand?
 
-Each certified result can include the crafter's profession, commission, note, base craft quality, and recommended reagents when that information is available. You can search and sort the list when many artisans are available, mark favorite artisans, and use the row action button to whisper the crafter, open their profession link, or fill personal order fields for review.
+Each certified result can include the crafter's profession, commission, note, base craft quality, and recommended reagents when that information is available. You can search and sort the list when many artisans are available, mark favorite artisans, refresh a row's online status, and use the row action button to whisper the crafter, open their profession link, or fill personal order fields for review.
 
 If a crafter is online on an alt, ArtisanFinder can still show the character who actually owns the matching profession. The row makes it clear which character is online for whispers, while personal order fields are filled for the character who can craft the item.
 
@@ -80,7 +80,7 @@ Recommendations prefer lower-quality reagents when higher-quality reagents do no
 
 Commission fields use a single gold input:
 
-*   `0`: unspecified commission.
+*   Empty or `0`: unspecified commission.
 *   `-1`: free commission.
 *   Any positive number: commission in gold.
 
