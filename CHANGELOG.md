@@ -17,6 +17,7 @@
 - Fixed the hidden discovery channel so it waits for Trade and a stable channel list before joining, and rejoins later if it joined too early.
 - Fixed suggested reagent names in customer tooltips so they render in the customer's game locale when detailed scan data is available.
 - Fixed row refresh indicators so they only appear on non-addon trade leads and survive customer row recycling.
+- Tutorial polish.
 
 ## 1.2.2 - 2026-05-20
 

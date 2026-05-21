@@ -160,13 +160,15 @@ local function MakeHelpPlateClickThrough(info)
 				end
 				if HelpPlateTooltip and HelpPlateTooltip.Init then
 					HelpPlateTooltip:Init(self, tileInfo.ToolTipText, tileInfo.ToolTipDir or "RIGHT")
+					HelpPlateTooltip.artisanFinderOwner = self
 				end
 			end)
-			button:SetScript("OnLeave", function()
+			button:SetScript("OnLeave", function(self)
 				if tile.Box and tile.Box.BG then
 					tile.Box.BG:Show()
 				end
-				if HelpPlateTooltip then
+				if HelpPlateTooltip and HelpPlateTooltip.artisanFinderOwner == self then
+					HelpPlateTooltip.artisanFinderOwner = nil
 					HelpPlateTooltip:Hide()
 				end
 			end)
@@ -177,6 +179,9 @@ end
 function AF:RestoreHelpPlateTiles()
 	if not HelpPlateCanvas or not HelpPlateCanvas.GetChildren then
 		return
+	end
+	if HelpPlateTooltip then
+		HelpPlateTooltip.artisanFinderOwner = nil
 	end
 	HelpPlateCanvas:EnableMouse(true)
 	for i = 1, select("#", HelpPlateCanvas:GetChildren()) do
