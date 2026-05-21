@@ -193,6 +193,7 @@ local function ApplyDBDefaults(db)
 	db.favoriteArtisans = db.favoriteArtisans or {}
 	db.responseThrottle = db.responseThrottle or {}
 	db.professionLinks = db.professionLinks or {}
+	db.artisanContacts = db.artisanContacts or {}
 	db.tradeLeads = db.tradeLeads or {}
 	db.tradeLeadCache = db.tradeLeadCache or {}
 	db.whoOnlineCache = db.whoOnlineCache or {}
@@ -296,6 +297,10 @@ end
 
 MIGRATIONS[11] = function(db)
 	db.connectedRealmCache = db.connectedRealmCache or {}
+end
+
+MIGRATIONS[12] = function(db)
+	db.artisanContacts = db.artisanContacts or {}
 end
 
 function AF:MigrateDB(db)
@@ -627,6 +632,25 @@ function AF:GetRememberedProfessionLink(characterName, professionID)
 	end
 	local legacyKey = GetLegacyProfessionLinkKey(self, characterName, professionID)
 	return legacyKey and links and links[legacyKey] or nil
+end
+
+function AF:RememberArtisanContact(crafterName, contactName)
+	crafterName = self:NormalizeName(crafterName)
+	contactName = self:NormalizeName(contactName)
+	if not crafterName or not contactName or not self.db then
+		return
+	end
+	self.db.artisanContacts = self.db.artisanContacts or {}
+	self.db.artisanContacts[crafterName] = {
+		target = contactName,
+		updatedAt = self:Now(),
+	}
+end
+
+function AF:GetRememberedArtisanContact(crafterName)
+	crafterName = self:NormalizeName(crafterName)
+	local entry = crafterName and self.db and self.db.artisanContacts and self.db.artisanContacts[crafterName]
+	return entry and self:NormalizeName(entry.target) or nil
 end
 
 function AF:NormalizeName(name)

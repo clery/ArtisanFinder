@@ -283,11 +283,34 @@ local function ItemMatchesQuery(item, itemID, professionID)
 	return AF:GetBaseProfessionID(item.professionID) == AF:GetBaseProfessionID(professionID)
 end
 
-function AF:GetAdvertisedItemMatches(itemID, professionID)
+local function CanRespondForCrafter(AF, crafterName, requesterName, channel)
+	crafterName = AF:NormalizeName(crafterName)
+	requesterName = AF:NormalizeName(requesterName)
+	if not crafterName then
+		return false
+	end
+	if requesterName and AF:IsNameOnConnectedRealm(requesterName) and AF:IsNameOnConnectedRealm(crafterName) then
+		return true
+	end
+	if not AF.GetCachedGuildRosterEntry then
+		return false
+	end
+	if channel == "GUILD" then
+		return AF:GetCachedGuildRosterEntry(crafterName) ~= nil
+	end
+	return requesterName
+		and AF:GetCachedGuildRosterEntry(requesterName) ~= nil
+		and AF:GetCachedGuildRosterEntry(crafterName) ~= nil
+end
+
+function AF:GetAdvertisedItemMatches(itemID, professionID, requesterName, channel)
 	local matches = {}
 	self:ForEachArtisanProfile(function(characterName, profile)
 		local item = profile.items and profile.items[tostring(itemID)]
-		if ItemMatchesQuery(item, itemID, professionID) and self:IsProfessionAdvertised(characterName, item.professionID) then
+		if CanRespondForCrafter(self, characterName, requesterName, channel)
+			and ItemMatchesQuery(item, itemID, professionID)
+			and self:IsProfessionAdvertised(characterName, item.professionID)
+		then
 			table.insert(matches, {
 				characterName = characterName,
 				profile = profile,
@@ -334,7 +357,7 @@ function AF:HandleQuery(parts, sender, channel)
 		return
 	end
 
-	local matches = self:GetAdvertisedItemMatches(itemID, professionID)
+	local matches = self:GetAdvertisedItemMatches(itemID, professionID, requesterName, channel)
 	if #matches == 0 then
 		return
 	end
@@ -558,6 +581,9 @@ function AF:HandleResponse(parts, sender)
 		professionLink = previous.professionLink
 	else
 		professionLink = self:GetRememberedProfessionLink(crafterName, professionID) or ""
+	end
+	if self.RememberArtisanContact then
+		self:RememberArtisanContact(crafterName, sender)
 	end
 	self.db.customerCache[itemKey][cacheKey] = {
 		name = crafterName,

@@ -225,16 +225,16 @@ end
 
 function AF:MarkCachedGuildMembersOffline()
 	for _, entry in pairs(self.guildRosterByName or {}) do
-		entry.online = false
+		entry.online = nil
 	end
 	for _, professionCache in pairs(self.guildProfessionMembers or {}) do
 		for _, member in pairs(professionCache.members or {}) do
-			member.online = false
+			member.online = nil
 		end
 	end
 	for _, recipeCache in pairs(self.guildRecipeMembers or {}) do
 		for name in pairs(recipeCache.online or {}) do
-			recipeCache.online[name] = false
+			recipeCache.online[name] = nil
 		end
 	end
 end
@@ -485,15 +485,16 @@ function AF:GetGuildCachedProfessionMemberRows(itemID, professionID, filterText,
 		if name and not IsCurrentPlayer(self, name) and not seenNames[name] then
 			local knowsRecipe = recipeID ~= 0 and member.recipeIDs and member.recipeIDs[tostring(recipeID)] == true
 			local rosterEntry = self:GetGuildRosterEntry(name)
-			local online = rosterEntry and rosterEntry.online == true
+			local online = rosterEntry and rosterEntry.online
 			if not rosterEntry then
 				online = member.online == true
 			end
-			local rowUpdatedAt = online and (member.lastAvailableAt or member.updatedAt)
+			local isOnline = online == true
+			local rowUpdatedAt = isOnline and (member.lastAvailableAt or member.updatedAt)
 				or member.lastAvailableAt
 				or (rosterEntry and rosterEntry.lastAvailableAt)
 				or member.updatedAt
-			if knowsRecipe and not IsGuildMemberTooStale(self, online, rowUpdatedAt) then
+			if knowsRecipe and not IsGuildMemberTooStale(self, isOnline, rowUpdatedAt) then
 				local entry = {
 					name = name,
 					target = name,
@@ -543,17 +544,18 @@ function AF:GetGuildRecipeMemberRows(itemID, professionID, filterText, seenNames
 		local name = self:ResolveGuildMemberName(memberName, true)
 		if name and not IsCurrentPlayer(self, name) and not seenNames[name] then
 			local rosterEntry = self:GetGuildRosterEntry(name)
-			local online = rosterEntry and rosterEntry.online == true
+			local online = rosterEntry and rosterEntry.online
 			if not rosterEntry then
 				online = recipeData.online and recipeData.online[name] == true
 			end
+			local isOnline = online == true
 			local professionCache = self.guildProfessionMembers and self.guildProfessionMembers[tostring(professionID)]
 			local cachedMember = professionCache and professionCache.members and professionCache.members[name]
 			local lastAvailableAt = (recipeData.lastAvailableAt and recipeData.lastAvailableAt[name])
 				or (cachedMember and cachedMember.lastAvailableAt)
 				or (rosterEntry and rosterEntry.lastAvailableAt)
 			local fallbackUpdatedAt = cachedMember and cachedMember.updatedAt
-			if not IsGuildMemberTooStale(self, online, lastAvailableAt or fallbackUpdatedAt) then
+			if not IsGuildMemberTooStale(self, isOnline, lastAvailableAt or fallbackUpdatedAt) then
 				local entry = {
 					name = name,
 					target = name,
@@ -561,7 +563,7 @@ function AF:GetGuildRecipeMemberRows(itemID, professionID, filterText, seenNames
 					itemID = itemID,
 					professionID = professionID,
 					professionName = self:GetProfessionName(professionID),
-					updatedAt = online and (lastAvailableAt or recipeData.updatedAt) or (lastAvailableAt or fallbackUpdatedAt),
+					updatedAt = isOnline and (lastAvailableAt or recipeData.updatedAt) or (lastAvailableAt or fallbackUpdatedAt),
 					verifiedAt = self:Now(),
 					certified = false,
 					tradeLead = true,
@@ -697,9 +699,17 @@ function AF:GetOnlineGuildQueryTargets(professionID, recipeID, limit)
 		end
 	end
 
+	local function addMemberTarget(name)
+		local contactName = self.GetRememberedArtisanContact and self:GetRememberedArtisanContact(name)
+		if contactName and contactName ~= self:NormalizeName(name) then
+			addTarget(contactName)
+		end
+		addTarget(name)
+	end
+
 	local recipeData = self.guildRecipeMembers and self.guildRecipeMembers[BuildRecipeKey(professionID, recipeID)]
 	for _, memberName in ipairs(recipeData and recipeData.members or {}) do
-		addTarget(memberName)
+		addMemberTarget(memberName)
 		if #targets >= limit then
 			return targets
 		end
@@ -708,7 +718,7 @@ function AF:GetOnlineGuildQueryTargets(professionID, recipeID, limit)
 	local professionCache = self.guildProfessionMembers and self.guildProfessionMembers[tostring(professionID)]
 	for name, member in pairs(professionCache and professionCache.members or {}) do
 		if member.recipeIDs and member.recipeIDs[tostring(recipeID)] == true then
-			addTarget(name)
+			addMemberTarget(name)
 			if #targets >= limit then
 				return targets
 			end
