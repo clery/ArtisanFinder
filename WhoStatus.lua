@@ -298,11 +298,21 @@ function AF:GetCustomerWhoStatusReadyRemaining()
 end
 
 function AF:IsCustomerEntryWhoRefreshAvailable(entry)
-	if not entry or entry.tutorialFake or entry.debug or entry.ownAlt or entry.guildMember then
+	if not self:IsCustomerEntryWhoRefreshable(entry) then
 		return false
 	end
 	local name = GetEntryWhoName(entry)
 	return name and self:IsCustomerWhoStatusReady()
+end
+
+function AF:IsCustomerEntryWhoRefreshable(entry)
+	return entry
+		and not entry.tutorialFake
+		and not entry.debug
+		and not entry.ownAlt
+		and not entry.guildMember
+		and entry.tradeLead == true
+		and GetEntryWhoName(entry) ~= nil
 end
 
 function AF:IsCustomerEntryOnline(entry)
@@ -319,7 +329,7 @@ function AF:IsCustomerEntryOnline(entry)
 end
 
 function AF:IsCustomerEntryWhoCheckFailed(entry)
-	if not entry or entry.ownAlt or entry.guildMember then
+	if not self:IsCustomerEntryWhoRefreshable(entry) then
 		return false
 	end
 	return self:IsWhoStatusFailed(GetEntryWhoName(entry))
@@ -334,6 +344,9 @@ function AF:IsCustomerEntryOffline(entry)
 	end
 	if entry.guildMember then
 		return entry.guildOnline == false
+	end
+	if not self:IsCustomerEntryWhoRefreshable(entry) then
+		return false
 	end
 	if self.HasProfessionOpenFailed and self:HasProfessionOpenFailed(entry) then
 		return true
@@ -358,6 +371,11 @@ function AF:MarkCustomerWhoOnline(name)
 		end
 	end
 	for _, lead in pairs(self.db and self.db.tradeLeadCache or {}) do
+		if EntryMatchesWhoName(lead, name) then
+			lead.updatedAt = now
+		end
+	end
+	for _, lead in pairs(self.db and self.db.tradeLeads or {}) do
 		if EntryMatchesWhoName(lead, name) then
 			lead.updatedAt = now
 		end
@@ -391,6 +409,12 @@ function AF:RefreshCustomerEntryWhoStatus(entry)
 	local status = self.whoStatus[name]
 	status.pending = true
 	status.requestedAt = self:Now()
+	if self:IsCustomerEntryOnline(entry) then
+		status.online = true
+		status.checkedAt = self:Now()
+		self:MarkCustomerWhoOnline(name)
+		self:RefreshCustomerResults()
+	end
 
 	if self.RefreshCustomerWhoLoadingIndicators then
 		self:RefreshCustomerWhoLoadingIndicators()

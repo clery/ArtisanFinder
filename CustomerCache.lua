@@ -213,6 +213,7 @@ function AF:GetOwnAltRows(itemID, professionID, filterText, seenNames, recipeID)
 			bestTotalSkill = item.bestTotalSkill,
 			bestConcentrationCost = item.bestConcentrationCost,
 			bestReagentSummary = item.bestReagentSummary,
+			bestReagentDetails = item.bestReagentDetails,
 			bestReagentSummaryUpdatedAt = item.bestReagentSummaryUpdatedAt,
 			bestReagentTruncated = item.bestReagentTruncated,
 			bestReagentPendingNames = item.bestReagentPendingNames,

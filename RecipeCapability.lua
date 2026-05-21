@@ -3,9 +3,9 @@ local _, AF = ...
 local MAX_REAGENT_COMBINATIONS = 72
 local MAX_OPTIONAL_REAGENT_TESTS_PER_SLOT = 8
 local MAX_REAGENT_SUMMARY_BYTES = 900
-local SCAN_SIGNATURE_VERSION = 23
+local SCAN_SIGNATURE_VERSION = 24
 local SKILL_PROBE_SIGNATURE_VERSION = 1
-local FULL_SCAN_SIGNATURE_VERSION = 2
+local FULL_SCAN_SIGNATURE_VERSION = 3
 local GetOperationQuality
 local GetRecipeDisplayQuality
 local GetRecipeDisplayQualityInfo
@@ -280,6 +280,17 @@ local function BuildSummaryEntry(reagentSlotSchematic, reagent)
 	local itemIcon = reagent.itemID and (AF:GetItemIconMarkup(reagent.itemID, 16) or "") or ""
 	local qualityText = GetReagentQuality(reagent) > 0 and (" " .. (GetReagentQualityMarkup(reagent) or "")) or ""
 	return string.format("%s%s x%d%s", itemIcon ~= "" and (itemIcon .. " ") or "", reagentName, quantity, qualityText)
+end
+
+local function BuildSummaryDetailEntry(reagentSlotSchematic, reagent)
+	local quantity = GetQuantityRequired(reagentSlotSchematic, reagent)
+	if reagent.itemID and reagent.itemID ~= 0 then
+		return string.format("i%d:%d", reagent.itemID, quantity)
+	end
+	if reagent.currencyID and reagent.currencyID ~= 0 then
+		return string.format("c%d:%d", reagent.currencyID, quantity)
+	end
+	return nil
 end
 
 local function GetOptionalSlotText(reagentSlotSchematic, reagent)
@@ -692,6 +703,10 @@ function AF:ProbeRequiresFullScan(item, recipeID, itemID, probe)
 	if tonumber(item.recipeDifficulty) ~= tonumber(probe.recipeDifficulty) then
 		return true
 	end
+	local fullScanSignature = self:BuildFullScanSignature(recipeID, itemID, probe.skillProbeSignature or self:BuildSkillProbeSignature(recipeID, probe))
+	if item.fullScanSignature ~= fullScanSignature then
+		return true
+	end
 	return false
 end
 
@@ -954,6 +969,7 @@ function AF:GetBestReagentCapability(recipeID)
 		local allReagentInfo = {}
 		local modifiedReagentInfo = {}
 		local summary = {}
+		local summaryDetails = {}
 		local reagentQualityScore = 0
 		local missingSummaryName = false
 		for _, fixed in ipairs(fixedReagents) do
@@ -966,6 +982,10 @@ function AF:GetBestReagentCapability(recipeID)
 				table.insert(summary, summaryEntry)
 			else
 				missingSummaryName = true
+			end
+			local detailEntry = BuildSummaryDetailEntry(fixed.slot, fixed.reagent)
+			if detailEntry then
+				table.insert(summaryDetails, detailEntry)
 			end
 			reagentQualityScore = reagentQualityScore + ((GetReagentQuality(fixed.reagent) or 0) * (GetQuantityRequired(fixed.slot, fixed.reagent) or 1))
 		end
@@ -982,6 +1002,10 @@ function AF:GetBestReagentCapability(recipeID)
 					table.insert(summary, summaryEntry)
 				else
 					missingSummaryName = true
+				end
+				local detailEntry = BuildSummaryDetailEntry(slot, reagent)
+				if detailEntry then
+					table.insert(summaryDetails, detailEntry)
 				end
 				reagentQualityScore = reagentQualityScore + ((GetReagentQuality(reagent) or 0) * (GetQuantityRequired(slot, reagent) or 1))
 			end
@@ -1005,6 +1029,7 @@ function AF:GetBestReagentCapability(recipeID)
 				reagentQualityScore = reagentQualityScore,
 				debugOperation = FormatOperationDebug(normalInfo) .. ", variant=" .. tostring(normalVariant) .. ", attempts=" .. tostring(normalDebug),
 				summary = table.concat(summary, "; "),
+				summaryDetails = table.concat(summaryDetails, ";"),
 				truncated = truncated or missingSummaryName,
 				missingSummaryName = missingSummaryName,
 			}
@@ -1070,6 +1095,7 @@ function AF:GetBestReagentCapability(recipeID)
 		bestTotalSkill = GetOperationTotalSkill(best.normalInfo) or GetOperationTotalSkill(best.concentrationInfo),
 		bestConcentrationCost = best.concentrationInfo and best.concentrationInfo.concentrationCost or nil,
 		bestReagentSummary = summary,
+		bestReagentDetails = best.summaryDetails,
 		bestReagentTruncated = summaryTruncated,
 		debugOperation = best.debugOperation,
 		debugReason = table.concat({
@@ -1096,7 +1122,8 @@ function AF:ApplyRecipeCapability(item, recipeID)
 	item.bestTotalSkill = capability.bestTotalSkill
 	item.bestConcentrationCost = capability.bestConcentrationCost
 	item.bestReagentSummary = capability.bestReagentSummary
-	item.bestReagentSummaryUpdatedAt = capability.bestReagentSummary and capability.bestReagentSummary ~= "" and self:Now() or nil
+	item.bestReagentDetails = capability.bestReagentDetails
+	item.bestReagentSummaryUpdatedAt = ((capability.bestReagentSummary and capability.bestReagentSummary ~= "") or (capability.bestReagentDetails and capability.bestReagentDetails ~= "")) and self:Now() or nil
 	item.bestReagentTruncated = capability.bestReagentTruncated == true
 	item.bestReagentPendingNames = capability.bestReagentPendingNames == true
 	item.optionalDifficultyDelta = capability.optionalDifficultyDelta

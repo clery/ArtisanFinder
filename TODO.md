@@ -5,5 +5,3 @@
 [] See if adding communities as broadcast channels is possible.
 
 [] When clicking the a row, prefill the Crafting order like the current "Personal Order" and "Guild Order" buttons do, and add information to the Crafting Order panel with suggested reagent and optional reagent for best results (with or without each optional reagent)
-
-[] Fix components names in tooltip showing in the crafter's locale instead of the game's locale.

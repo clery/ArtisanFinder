@@ -50,7 +50,32 @@ function AF:GetLastVisibleServerChannelID()
 	return lastID
 end
 
-function AF:DiscoveryChannelNeedsMove()
+function AF:GetVisibleServerChannelSignature()
+	if not GetChannelList then
+		return ""
+	end
+	local channels = { GetChannelList() }
+	local parts = {}
+	for index, value in ipairs(channels) do
+		if type(value) == "string" and value ~= self.CHANNEL_NAME then
+			table.insert(parts, tostring(channels[index - 1] or 0) .. ":" .. value)
+		end
+	end
+	return table.concat(parts, "|")
+end
+
+function AF:VisibleServerChannelsStable(requiredSeconds)
+	local signature = self:GetVisibleServerChannelSignature()
+	local now = self:Now()
+	if signature ~= self.discoveryVisibleChannelSignature then
+		self.discoveryVisibleChannelSignature = signature
+		self.discoveryVisibleChannelStableAt = now
+		return false
+	end
+	return now - (tonumber(self.discoveryVisibleChannelStableAt) or now) >= (requiredSeconds or 3)
+end
+
+function AF:DiscoveryChannelNeedsRejoin()
 	local discoveryID = GetChannelName(self.CHANNEL_NAME)
 	if discoveryID == 0 then
 		return false
@@ -59,23 +84,11 @@ function AF:DiscoveryChannelNeedsMove()
 	return lastVisibleID and discoveryID < lastVisibleID
 end
 
-function AF:MoveDiscoveryChannelAfterVisibleChannels()
-	local discoveryID = GetChannelName(self.CHANNEL_NAME)
-	local lastVisibleID = self:GetLastVisibleServerChannelID()
-	if discoveryID == 0 or not lastVisibleID or discoveryID >= lastVisibleID then
-		return
-	end
-	while discoveryID < lastVisibleID do
-		C_ChatInfo.SwapChatChannelsByChannelIndex(discoveryID, discoveryID + 1)
-		discoveryID = discoveryID + 1
-	end
-end
-
 function AF:QueueDiscoveryChannelJoin(delay)
 	if self.discoveryChannelJoinQueued then
 		return
 	end
-	if GetChannelName(self.CHANNEL_NAME) ~= 0 and not self:DiscoveryChannelNeedsMove() then
+	if GetChannelName(self.CHANNEL_NAME) ~= 0 and not self:DiscoveryChannelNeedsRejoin() then
 		self:HideDiscoveryChannelFromChat()
 		return
 	end
@@ -86,11 +99,16 @@ function AF:QueueDiscoveryChannelJoin(delay)
 			AF.deferredDiscoveryChannelJoin = true
 			return
 		end
-		if AF:DiscoveryChannelNeedsMove() then
-			AF:MoveDiscoveryChannelAfterVisibleChannels()
-			AF:HideDiscoveryChannelFromChat()
+		if AF:DiscoveryChannelNeedsRejoin() then
+			LeaveChannelByName(AF.CHANNEL_NAME)
+			AF:QueueDiscoveryChannelJoin(2)
+			return
 		end
 		if not AF:HasJoinedTradeChannel() then
+			AF:QueueDiscoveryChannelJoin(2)
+			return
+		end
+		if not AF:VisibleServerChannelsStable(3) then
 			AF:QueueDiscoveryChannelJoin(2)
 			return
 		end
@@ -102,7 +120,6 @@ function AF:JoinDiscoveryChannel()
 	if GetChannelName(self.CHANNEL_NAME) == 0 then
 		JoinTemporaryChannel(self.CHANNEL_NAME)
 	end
-	self:MoveDiscoveryChannelAfterVisibleChannels()
 	self:HideDiscoveryChannelFromChat()
 	self:HideDiscoveryChannelFromChat(0.5)
 	self:HideDiscoveryChannelFromChat(2)
@@ -395,7 +412,7 @@ function AF:HandleReagentDetailRequest(parts, sender)
 	end
 
 	local item = self:FindProfileItem(crafterName, itemID, recipeID)
-	if not item or not item.bestReagentSummary or item.bestReagentSummary == "" then
+	if not item or ((not item.bestReagentSummary or item.bestReagentSummary == "") and (not item.bestReagentDetails or item.bestReagentDetails == "")) then
 		return
 	end
 
@@ -412,11 +429,13 @@ end
 
 function AF:SendReagentDetail(item, target, queryToken, crafterName)
 	local summary = item and item.bestReagentSummary
-	if not summary or summary == "" then
+	local details = item and item.bestReagentDetails
+	if (not summary or summary == "") and (not details or details == "") then
 		return false
 	end
 
-	local encodedSummary = self:EncodeReagentSummary(summary, 1050)
+	local detailText = details and details ~= "" and ("R2:" .. details) or ("S1:" .. tostring(summary or ""))
+	local encodedSummary = self:EncodeReagentSummary(detailText, 1050)
 	local chunks = {}
 	local maxChunkBytes = 150
 	local offset = 1
@@ -541,6 +560,7 @@ function AF:HandleResponse(parts, sender)
 		bestConcentrationCost = bestConcentrationCost,
 		bestReagentTruncated = bestReagentTruncated,
 		bestReagentSummary = previousRecipeID == recipeID and previous and previous.bestReagentSummary or nil,
+		bestReagentDetails = previousRecipeID == recipeID and previous and previous.bestReagentDetails or nil,
 		bestReagentSummaryUpdatedAt = previousRecipeID == recipeID and previous and previous.bestReagentSummaryUpdatedAt or nil,
 		hasReagentSummary = hasReagentSummary,
 		optionalDifficultyDelta = optionalDifficultyDelta,
@@ -563,7 +583,7 @@ function AF:GetReagentDetailKey(sender, itemID, recipeID, queryToken, crafterNam
 end
 
 function AF:IsReagentDetailCacheFresh(entry)
-	if not entry or not entry.bestReagentSummary or entry.bestReagentSummary == "" then
+	if not entry or not entry.bestReagentDetails or entry.bestReagentDetails == "" then
 		return false
 	end
 	local updatedAt = tonumber(entry.bestReagentSummaryUpdatedAt)
@@ -574,7 +594,7 @@ function AF:RequestReagentDetail(entry)
 	if not entry or entry.tradeLead or self:IsReagentDetailCacheFresh(entry) then
 		return false
 	end
-	if not entry.hasReagentSummary and not entry.bestReagentSummary then
+	if not entry.hasReagentSummary and not entry.bestReagentSummary and not entry.bestReagentDetails then
 		return false
 	end
 	local itemID = tonumber(entry.itemID)
@@ -624,14 +644,15 @@ function AF:ApplyPendingReagentDetail(sender, itemID, recipeID, queryToken, craf
 	crafterName = self:NormalizeName(crafterName) or sender
 	local key = self:GetReagentDetailKey(sender, itemID, recipeID, queryToken, crafterName)
 	local pending = self.pendingReagentDetails[key]
-	if not pending or not pending.summary then
+	if not pending or (not pending.summary and not pending.details) then
 		return
 	end
 	local itemCache = self.db.customerCache[tostring(itemID)]
 	local entry = itemCache and itemCache[crafterName]
 	local entryRecipeID = tonumber(entry and entry.recipeID) or 0
 	if entry and tonumber(entry.lastQueryToken) == tonumber(queryToken) and entryRecipeID == (tonumber(recipeID) or 0) then
-		entry.bestReagentSummary = pending.summary
+		entry.bestReagentSummary = pending.summary or entry.bestReagentSummary
+		entry.bestReagentDetails = pending.details or entry.bestReagentDetails
 		entry.bestReagentSummaryUpdatedAt = self:Now()
 		entry.reagentDetailRequested = nil
 		self.pendingReagentDetails[key] = nil
@@ -670,7 +691,14 @@ function AF:HandleReagentDetail(parts, sender)
 
 	if pending.received == pending.total then
 		local combined = table.concat(pending.chunks, "")
-		pending.summary = self:DecodeField(combined)
+		local decoded = self:DecodeField(combined)
+		if decoded:sub(1, 3) == "R2:" then
+			pending.details = decoded:sub(4)
+		elseif decoded:sub(1, 3) == "S1:" then
+			pending.summary = decoded:sub(4)
+		else
+			pending.summary = decoded
+		end
 		self:ApplyPendingReagentDetail(sender, itemID, recipeID, queryToken, crafterName)
 		self:RefreshCustomerResults()
 	end

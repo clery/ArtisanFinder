@@ -11,12 +11,21 @@ local function GetScanJobKey(recipeID, itemID)
 	return tostring(recipeID or 0) .. ":" .. tostring(itemID or 0)
 end
 
+local function CopyScanItem(item)
+	local copy = {}
+	for key, value in pairs(item or {}) do
+		copy[key] = value
+	end
+	return copy
+end
+
 local function GetRecommendationSnapshot(item)
 	if not item then
 		return ""
 	end
 	return table.concat({
 		tostring(item.bestReagentSummary or ""),
+		tostring(item.bestReagentDetails or ""),
 		tostring(item.bestQuality or ""),
 		tostring(item.bestQualityAtlas or ""),
 		tostring(item.rawBestQuality or ""),
@@ -379,8 +388,11 @@ function AF:ScanJob(profession, professionEntry, job)
 	end
 	local profile = self.db.artisanProfile
 	local itemKey = tostring(job.itemID)
-	local existing = profile.items[itemKey] or {}
-	profile.items[itemKey] = existing
+	local savedItem = profile.items[itemKey]
+	local existing = CopyScanItem(savedItem)
+	if job.kind ~= "probe" then
+		profile.items[itemKey] = existing
+	end
 	existing.itemID = job.itemID
 	existing.recipeID = job.recipeID
 	existing.recipeName = job.recipeName or existing.recipeName or self:Text("RECIPE_FALLBACK", tostring(job.recipeID))
@@ -398,13 +410,17 @@ function AF:ScanJob(profession, professionEntry, job)
 			local equipmentSkillUpgrade = professionEntry.scanProgress
 				and professionEntry.scanProgress.reason == "PROFESSION_EQUIPMENT_CHANGED"
 				and tonumber(probe.totalSkill)
-				and tonumber(existing.totalSkill)
-				and tonumber(probe.totalSkill) > tonumber(existing.totalSkill)
+				and savedItem
+				and tonumber(savedItem.totalSkill)
+				and tonumber(probe.totalSkill) > tonumber(savedItem.totalSkill)
 			if equipmentSkillUpgrade then
 				professionEntry.scanProgress.skillUpgrades = (tonumber(professionEntry.scanProgress.skillUpgrades) or 0) + 1
 			end
-			local needsFull = equipmentSkillUpgrade or self:ProbeRequiresFullScan(existing, job.recipeID, job.itemID, probe)
-			self:ApplyRecipeSkillProbe(existing, job.recipeID, probe)
+			local needsFull = equipmentSkillUpgrade or self:ProbeRequiresFullScan(savedItem, job.recipeID, job.itemID, probe)
+			if not needsFull then
+				self:ApplyRecipeSkillProbe(existing, job.recipeID, probe)
+				profile.items[itemKey] = existing
+			end
 			if needsFull then
 				table.insert(professionEntry.scanProgress.pending, {
 					key = "full:" .. GetScanJobKey(job.recipeID, job.itemID),
@@ -414,6 +430,7 @@ function AF:ScanJob(profession, professionEntry, job)
 					recipeName = job.recipeName,
 				})
 				professionEntry.scanProgress.total = professionEntry.scanProgress.total + 1
+				return true
 			end
 		else
 			table.insert(professionEntry.scanProgress.pending, {
@@ -424,6 +441,7 @@ function AF:ScanJob(profession, professionEntry, job)
 				recipeName = job.recipeName,
 			})
 			professionEntry.scanProgress.total = professionEntry.scanProgress.total + 1
+			return true
 		end
 	else
 		local beforeRecommendation = GetRecommendationSnapshot(existing)

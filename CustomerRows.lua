@@ -147,8 +147,10 @@ function AF:UpdateCustomerRowWhoRefreshButton(row)
 		return
 	end
 	local enabled = row:IsShown() and self:IsCustomerEntryWhoRefreshAvailable(row.entry)
-	-- Guild rows use roster presence; debug rows are local samples, so neither should start /who.
-	row.whoRefresh:SetShown(row:IsShown() and row.entry and not row.entry.tutorialFake and not row.entry.debug and not row.entry.ownAlt and not row.entry.guildMember)
+	local entry = row.entry
+	local shown = row:IsShown()
+		and self:IsCustomerEntryWhoRefreshable(entry)
+	row.whoRefresh:SetShown(shown)
 	row.whoRefresh:SetEnabled(enabled)
 	row.whoRefresh:SetAlpha(1)
 end
@@ -186,7 +188,7 @@ function AF:BuildCustomerRowViewModel(entry)
 	elseif entry.unavailableFavorite and not isOnline then
 		displayName = displayName .. " |cff888888(" .. self:Text("UNAVAILABLE") .. ")|r"
 	elseif entry.offlineCached and not isOnline then
-		displayName = displayName .. " |cff888888(" .. self:Text("UNAVAILABLE") .. ")|r"
+		displayName = displayName .. " |cff888888(" .. self:Text(entry.tradeLead and "UNKNOWN" or "UNAVAILABLE") .. ")|r"
 	end
 
 	local detail

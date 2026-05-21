@@ -403,10 +403,14 @@ function AF:AddCapabilityTooltipLines(tooltip, entry)
 		end
 	end
 
-	if entry.bestReagentSummary and entry.bestReagentSummary ~= "" then
+	if (entry.bestReagentSummary and entry.bestReagentSummary ~= "") or (entry.bestReagentDetails and entry.bestReagentDetails ~= "") then
 		tooltip:AddLine(" ")
 		tooltip:AddLine(self:Text("SUGGESTED_REAGENTS"), 1, 0.82, 0)
-		self:AddReagentSummaryTooltipLines(tooltip, entry.bestReagentSummary, entry.bestReagentTruncated)
+		if entry.bestReagentDetails and entry.bestReagentDetails ~= "" then
+			self:AddReagentDetailTooltipLines(tooltip, entry.bestReagentDetails)
+		else
+			self:AddReagentSummaryTooltipLines(tooltip, entry.bestReagentSummary, entry.bestReagentTruncated)
+		end
 	elseif entry.bestReagentPendingNames or entry.reagentDetailRequested then
 		tooltip:AddLine(" ")
 		tooltip:AddLine(self:Text("SUGGESTED_REAGENTS"), 1, 0.82, 0)
@@ -416,6 +420,46 @@ function AF:AddCapabilityTooltipLines(tooltip, entry)
 		tooltip:AddLine(self:Text("NO_REAGENT_RECOMMENDATION"), 0.75, 0.75, 0.75, true)
 	end
 
+end
+
+local function GetLocalReagentQualityMarkup(itemID)
+	if not itemID or not C_TradeSkillUI or not C_TradeSkillUI.GetItemReagentQualityInfo then
+		return ""
+	end
+	local ok, qualityInfo = pcall(C_TradeSkillUI.GetItemReagentQualityInfo, itemID)
+	if not ok or not qualityInfo then
+		return ""
+	end
+	local atlas = qualityInfo.iconSmall or qualityInfo.icon
+	return (AF:GetQualityIconMarkup(qualityInfo.quality, atlas, 16) or "")
+end
+
+function AF:AddReagentDetailTooltipLines(tooltip, details)
+	local added = false
+	for entry in tostring(details or ""):gmatch("[^;]+") do
+		entry = entry:match("^%s*(.-)%s*$")
+		local kind, id, quantity = entry:match("^([ic])(%d+):(%d+)$")
+		id = tonumber(id)
+		quantity = tonumber(quantity) or 1
+		if kind == "i" and id then
+			local itemName = self:GetItemName(id) or self:Text("ITEM_FALLBACK")
+			local itemIcon = self:GetItemIconMarkup(id, 16) or ""
+			local qualityText = GetLocalReagentQualityMarkup(id)
+			tooltip:AddLine(string.format("%s%s x%d%s", itemIcon ~= "" and (itemIcon .. " ") or "", itemName, quantity, qualityText ~= "" and (" " .. qualityText) or ""), 1, 1, 1, true)
+			added = true
+		elseif kind == "c" and id and C_CurrencyInfo and C_CurrencyInfo.GetCurrencyInfo then
+			local currencyInfo = C_CurrencyInfo.GetCurrencyInfo(id)
+			local currencyName = currencyInfo and currencyInfo.name
+			if currencyName and currencyName ~= "" then
+				local icon = currencyInfo.iconFileID and CreateTextureMarkup and CreateTextureMarkup(currencyInfo.iconFileID, 16, 16, 16, 16, 0, 1, 0, 1) or ""
+				tooltip:AddLine(string.format("%s%s x%d", icon ~= "" and (icon .. " ") or "", currencyName, quantity), 1, 1, 1, true)
+				added = true
+			end
+		end
+	end
+	if not added then
+		tooltip:AddLine(self:Text("LOADING_REAGENT_NAMES"), 0.75, 0.75, 0.75, true)
+	end
 end
 
 function AF:AddReagentSummaryTooltipLines(tooltip, summary, truncated)
