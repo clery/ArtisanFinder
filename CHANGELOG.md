@@ -6,7 +6,8 @@
 
 ### Added
 
-* Customer searches now broadcast through guild addon messages as well as the hidden ArtisanFinder channel, so guild members can answer without relying only on the custom channel.
+* Customer searches now broadcast through guild addon messages as well as the hidden ArtisanFinder channel, with guild responses routed back through the guild channel for non-connected realm members.
+* Customer searches now also whisper-query online guild members who are already known to match the selected recipe, without contacting offline guild members.
 
 ### Fixed
 

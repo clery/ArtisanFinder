@@ -203,6 +203,13 @@ function AF:BroadcastQuery(itemID, professionID)
 	if IsInGuild and IsInGuild() then
 		sent = self:SendAddon(payload, "GUILD", nil, "NORMAL", queueName .. ":GUILD") or sent
 	end
+	if self.GetOnlineGuildQueryTargets then
+		local recipeID = tonumber(self.currentCustomerRecipeID) or 0
+		local whisperTargets = self:GetOnlineGuildQueryTargets(normalizedProfessionID, recipeID, 30)
+		for _, target in ipairs(whisperTargets) do
+			sent = self:SendAddon(payload, "WHISPER", target, "BULK", queueName .. ":GUILD_WHISPER:" .. tostring(target)) or sent
+		end
+	end
 	return sent
 end
 
@@ -251,7 +258,6 @@ function AF:OnAddonMessage(prefix, message, channel, sender)
 	if version ~= self.PROTOCOL_VERSION then
 		return
 	end
-	self:Print("DEBUG addon " .. tostring(kind or "?") .. " from " .. tostring(normalizedSender or sender or "?") .. " via " .. tostring(channel or "?"))
 
 	if kind == "Q" then
 		self:HandleQuery(parts, normalizedSender, channel)
@@ -317,7 +323,6 @@ end
 
 function AF:HandleQuery(parts, sender, channel)
 	if not self.available then
-		self:Print("DEBUG query ignored: availability off, sender=" .. tostring(sender or "?") .. ", via=" .. tostring(channel or "?"))
 		return
 	end
 
@@ -326,16 +331,13 @@ function AF:HandleQuery(parts, sender, channel)
 	local queryToken = tonumber(parts[5]) or self:Now()
 	local requesterName = self:NormalizeName(self:DecodeField(parts[6])) or sender
 	if not itemID then
-		self:Print("DEBUG query ignored: missing item, sender=" .. tostring(sender or "?") .. ", via=" .. tostring(channel or "?"))
 		return
 	end
 
 	local matches = self:GetAdvertisedItemMatches(itemID, professionID)
 	if #matches == 0 then
-		self:Print("DEBUG query no matches: item=" .. tostring(itemID) .. ", profession=" .. tostring(professionID) .. ", sender=" .. tostring(sender or "?") .. ", via=" .. tostring(channel or "?"))
 		return
 	end
-	self:Print("DEBUG query matched " .. tostring(#matches) .. ": item=" .. tostring(itemID) .. ", profession=" .. tostring(professionID) .. ", sender=" .. tostring(sender or "?") .. ", via=" .. tostring(channel or "?"))
 
 	for _, match in ipairs(matches) do
 		local item = match.item
@@ -408,9 +410,6 @@ function AF:HandleQuery(parts, sender, channel)
 			local responseTarget = responseChannel == "WHISPER" and sender or nil
 			if self:SendAddon(payload, responseChannel, responseTarget, "NORMAL", "R:" .. tostring(sender)) then
 				self.db.responseThrottle[throttleKey] = self:Now()
-				self:Print("DEBUG response sent: crafter=" .. tostring(crafterName or "?") .. ", to=" .. tostring(sender or "?") .. ", via=" .. tostring(responseChannel))
-			else
-				self:Print("DEBUG response failed: crafter=" .. tostring(crafterName or "?") .. ", to=" .. tostring(sender or "?") .. ", via=" .. tostring(responseChannel))
 			end
 		end
 	end
@@ -535,11 +534,9 @@ function AF:HandleResponse(parts, sender)
 	local cacheKey = crafterName
 
 	if not itemID then
-		self:Print("DEBUG response ignored: missing item, sender=" .. tostring(sender or "?"))
 		return
 	end
 	if responseTarget and responseTarget ~= self:NormalizeName(self.playerName or self:GetPlayerFullName()) then
-		self:Print("DEBUG response ignored: target=" .. tostring(responseTarget) .. ", sender=" .. tostring(sender or "?"))
 		return
 	end
 	local guildResponse = responseTarget ~= nil
@@ -602,7 +599,6 @@ function AF:HandleResponse(parts, sender)
 		guildOnline = guildResponse and true or nil,
 		guildMemberGUID = guildRosterEntry and guildRosterEntry.guid or nil,
 	}
-	self:Print("DEBUG response stored: crafter=" .. tostring(crafterName or "?") .. ", sender=" .. tostring(sender or "?") .. ", item=" .. tostring(itemID) .. ", verified=" .. tostring(verifiedForCurrentQuery == true) .. ", guild=" .. tostring(guildResponse == true))
 	self:ApplyPendingReagentDetail(sender, itemID, recipeID, queryToken, crafterName)
 
 	self:RefreshCustomerResults()

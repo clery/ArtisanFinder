@@ -674,6 +674,50 @@ function AF:HandleGuildRecipeKnownByMembers()
 	end
 end
 
+function AF:GetOnlineGuildQueryTargets(professionID, recipeID, limit)
+	self:EnsureGuildCache()
+	local targets = {}
+	local added = {}
+	professionID = NormalizeGuildProfessionID(self, professionID) or 0
+	recipeID = tonumber(recipeID) or 0
+	limit = tonumber(limit) or 30
+	if professionID == 0 or recipeID == 0 or limit <= 0 or not IsInGuild or not IsInGuild() then
+		return targets
+	end
+
+	local function addTarget(name)
+		name = self:ResolveGuildMemberName(name, false)
+		if not name or added[name] or IsCurrentPlayer(self, name) then
+			return
+		end
+		local rosterEntry = self:GetCachedGuildRosterEntry(name)
+		if rosterEntry and rosterEntry.online == true then
+			table.insert(targets, name)
+			added[name] = true
+		end
+	end
+
+	local recipeData = self.guildRecipeMembers and self.guildRecipeMembers[BuildRecipeKey(professionID, recipeID)]
+	for _, memberName in ipairs(recipeData and recipeData.members or {}) do
+		addTarget(memberName)
+		if #targets >= limit then
+			return targets
+		end
+	end
+
+	local professionCache = self.guildProfessionMembers and self.guildProfessionMembers[tostring(professionID)]
+	for name, member in pairs(professionCache and professionCache.members or {}) do
+		if member.recipeIDs and member.recipeIDs[tostring(recipeID)] == true then
+			addTarget(name)
+			if #targets >= limit then
+				return targets
+			end
+		end
+	end
+
+	return targets
+end
+
 function AF:GetGuildProfessionRows(itemID, professionID, filterText, seenNames, recipeID)
 	self:EnsureGuildCache()
 	local rows = {}
