@@ -192,6 +192,7 @@ function AF:BroadcastQuery(itemID, professionID)
 		itemID,
 		normalizedProfessionID,
 		requestTime,
+		self:EncodeField(self.playerName or self:GetPlayerFullName(), 48),
 	}, "|")
 
 	local sent = false
@@ -250,9 +251,10 @@ function AF:OnAddonMessage(prefix, message, channel, sender)
 	if version ~= self.PROTOCOL_VERSION then
 		return
 	end
+	self:Print("DEBUG addon " .. tostring(kind or "?") .. " from " .. tostring(normalizedSender or sender or "?") .. " via " .. tostring(channel or "?"))
 
 	if kind == "Q" then
-		self:HandleQuery(parts, normalizedSender)
+		self:HandleQuery(parts, normalizedSender, channel)
 	elseif kind == "R" then
 		self:HandleResponse(parts, normalizedSender)
 	elseif kind == "DR" then
@@ -313,22 +315,27 @@ function AF:FindProfileItem(characterName, itemID, recipeID)
 	return nil
 end
 
-function AF:HandleQuery(parts, sender)
+function AF:HandleQuery(parts, sender, channel)
 	if not self.available then
+		self:Print("DEBUG query ignored: availability off, sender=" .. tostring(sender or "?") .. ", via=" .. tostring(channel or "?"))
 		return
 	end
 
 	local itemID = tonumber(parts[3])
 	local professionID = tonumber(parts[4]) or 0
 	local queryToken = tonumber(parts[5]) or self:Now()
+	local requesterName = self:NormalizeName(self:DecodeField(parts[6])) or sender
 	if not itemID then
+		self:Print("DEBUG query ignored: missing item, sender=" .. tostring(sender or "?") .. ", via=" .. tostring(channel or "?"))
 		return
 	end
 
 	local matches = self:GetAdvertisedItemMatches(itemID, professionID)
 	if #matches == 0 then
+		self:Print("DEBUG query no matches: item=" .. tostring(itemID) .. ", profession=" .. tostring(professionID) .. ", sender=" .. tostring(sender or "?") .. ", via=" .. tostring(channel or "?"))
 		return
 	end
+	self:Print("DEBUG query matched " .. tostring(#matches) .. ": item=" .. tostring(itemID) .. ", profession=" .. tostring(professionID) .. ", sender=" .. tostring(sender or "?") .. ", via=" .. tostring(channel or "?"))
 
 	for _, match in ipairs(matches) do
 		local item = match.item
@@ -370,6 +377,7 @@ function AF:HandleQuery(parts, sender)
 				tonumber(item.optionalQuality) or "",
 				tonumber(item.optionalConcentrationQuality) or "",
 				tonumber(item.optionalSlotCount) or "",
+				channel == "GUILD" and self:EncodeField(requesterName, 48) or "",
 			}
 			local payload = table.concat(payloadParts, "|")
 			if #payload > 255 then
@@ -396,8 +404,13 @@ function AF:HandleQuery(parts, sender)
 				payload = table.concat(payloadParts, "|")
 			end
 
-			if self:SendAddon(payload, "WHISPER", sender, "NORMAL", "R:" .. tostring(sender)) then
+			local responseChannel = channel == "GUILD" and "GUILD" or "WHISPER"
+			local responseTarget = responseChannel == "WHISPER" and sender or nil
+			if self:SendAddon(payload, responseChannel, responseTarget, "NORMAL", "R:" .. tostring(sender)) then
 				self.db.responseThrottle[throttleKey] = self:Now()
+				self:Print("DEBUG response sent: crafter=" .. tostring(crafterName or "?") .. ", to=" .. tostring(sender or "?") .. ", via=" .. tostring(responseChannel))
+			else
+				self:Print("DEBUG response failed: crafter=" .. tostring(crafterName or "?") .. ", to=" .. tostring(sender or "?") .. ", via=" .. tostring(responseChannel))
 			end
 		end
 	end
@@ -518,11 +531,19 @@ function AF:HandleResponse(parts, sender)
 	local optionalQuality = tonumber(parts[27])
 	local optionalConcentrationQuality = tonumber(parts[28])
 	local optionalSlotCount = tonumber(parts[29])
+	local responseTarget = self:NormalizeName(self:DecodeField(parts[30]))
 	local cacheKey = crafterName
 
 	if not itemID then
+		self:Print("DEBUG response ignored: missing item, sender=" .. tostring(sender or "?"))
 		return
 	end
+	if responseTarget and responseTarget ~= self:NormalizeName(self.playerName or self:GetPlayerFullName()) then
+		self:Print("DEBUG response ignored: target=" .. tostring(responseTarget) .. ", sender=" .. tostring(sender or "?"))
+		return
+	end
+	local guildResponse = responseTarget ~= nil
+	local guildRosterEntry = guildResponse and self.GetCachedGuildRosterEntry and self:GetCachedGuildRosterEntry(crafterName) or nil
 
 	local verifiedForCurrentQuery = queryToken
 		and self.currentCustomerQueryToken
@@ -577,7 +598,11 @@ function AF:HandleResponse(parts, sender)
 		verifiedAt = verifiedForCurrentQuery and self:Now() or nil,
 		lastQueryToken = queryToken,
 		lastQueryAt = verifiedForCurrentQuery and self.lastQueryAt or nil,
+		guildMember = guildResponse or nil,
+		guildOnline = guildResponse and true or nil,
+		guildMemberGUID = guildRosterEntry and guildRosterEntry.guid or nil,
 	}
+	self:Print("DEBUG response stored: crafter=" .. tostring(crafterName or "?") .. ", sender=" .. tostring(sender or "?") .. ", item=" .. tostring(itemID) .. ", verified=" .. tostring(verifiedForCurrentQuery == true) .. ", guild=" .. tostring(guildResponse == true))
 	self:ApplyPendingReagentDetail(sender, itemID, recipeID, queryToken, crafterName)
 
 	self:RefreshCustomerResults()
