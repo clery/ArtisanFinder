@@ -60,10 +60,6 @@ function AF:PrintSlashHelp()
 	end
 	self:Print(self:Text("TUTORIAL_HELP_RESET"))
 	self:Print(self:Text("CLEAR_HELP"))
-	self:Print(self:Text("DEBUG_HELP_ON"))
-	self:Print(self:Text("DEBUG_HELP_OFF"))
-	self:Print(self:Text("DEBUG_HELP_TOGGLE"))
-	self:Print(self:Text("DEBUG_HELP_STATE"))
 end
 
 function AF:PrintClearHelp()
@@ -145,6 +141,7 @@ function AF:ClearOptionsData()
 	self.db.autoAvailability = false
 	self.db.fastScan = false
 	self.db.tradeLeadMinutes = 15
+	self.db.freezeTradeLeadRows = false
 	self.db.offlineFallbackResults = 10
 	self.db.offlineFallbackMax = 20
 	self.db.showUncertifiedPeople = true

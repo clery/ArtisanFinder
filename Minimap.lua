@@ -3,18 +3,13 @@ local _, AF = ...
 local ICON = 7548932 -- inv-12-profession-blacksmithing-repairhammer-purple
 local ICON_COORDS = { 0, 1, 0, 1 }
 
-local function OpenProfessionPanel()
-	pcall(C_AddOns.LoadAddOn, "Blizzard_Professions")
-	if ProfessionsFrame and ProfessionsFrame:IsShown() then
-		AF:FocusCrafterUI()
-	elseif ToggleProfessionsBook then
-		ToggleProfessionsBook()
-	elseif ProfessionsFrame then
-		ShowUIPanel(ProfessionsFrame)
+local function OpenOptionsPanel()
+	if AF.InitializeOptions then
+		AF:InitializeOptions()
 	end
-	C_Timer.After(0.1, function()
-		AF:FocusCrafterUI()
-	end)
+	if Settings and Settings.OpenToCategory and AF.optionsCategory and AF.optionsCategory.GetID then
+		Settings.OpenToCategory(AF.optionsCategory:GetID())
+	end
 end
 
 function AF:PopulateMinimapTooltip(tooltip)
@@ -104,7 +99,7 @@ function AF:InitializeMinimap()
 			elseif button == "MiddleButton" then
 				AF:ToggleAutoAvailability()
 			elseif button == "RightButton" then
-				OpenProfessionPanel()
+				OpenOptionsPanel()
 			end
 		end,
 		OnTooltipShow = function(tooltip)

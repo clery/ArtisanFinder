@@ -223,6 +223,9 @@ local function ApplyDBDefaults(db)
 	if db.tradeLeadMinutes == nil then
 		db.tradeLeadMinutes = 15
 	end
+	if db.freezeTradeLeadRows == nil then
+		db.freezeTradeLeadRows = false
+	end
 	if db.offlineFallbackResults == nil then
 		db.offlineFallbackResults = 10
 	end

@@ -96,6 +96,7 @@ ArtisanFinder has an Options -> AddOns panel where you can configure:
 *   Cache cleanup frequency.
 *   Offline cached artisan fallback.
 *   Trade-chat lead duration.
+*   Stable trade-chat lead rows for busy servers.
 *   Which character professions are advertised.
 *   Automatic availability mode.
 *   Minimap button visibility.

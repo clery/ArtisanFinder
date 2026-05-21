@@ -16,6 +16,7 @@ local CUSTOMER_COLLAPSE_BUTTON_LEVEL_OFFSET = 1000
 local CUSTOMER_REFRESH_COOLDOWN = 5
 local CUSTOMER_QUERY_POLL_INTERVAL = 1.5
 local CUSTOMER_DEBUG_QUERY_POLL_INTERVAL = 5
+local CUSTOMER_ROW_AGE_TICK_INTERVAL = 30
 
 local function GetSortMode(index)
 	return SORT_MODES[index or 1] or SORT_MODES[1]
@@ -945,6 +946,7 @@ function AF:AttachCustomerUI()
 	self.customerFrame = frame
 	frame:SetScript("OnShow", function()
 		frame.elapsed = 0
+		frame.ageElapsed = 0
 		AF:SetCustomerPanelCollapsed(frame.collapsed, true)
 		AF:QueueCustomerSidePanelLayout()
 		if not frame.collapsed then
@@ -957,6 +959,13 @@ function AF:AttachCustomerUI()
 	frame:SetScript("OnUpdate", function(_, elapsed)
 		if frame.collapsed then
 			return
+		end
+		frame.ageElapsed = (frame.ageElapsed or 0) + elapsed
+		if frame.ageElapsed >= CUSTOMER_ROW_AGE_TICK_INTERVAL then
+			frame.ageElapsed = 0
+			if AF.RefreshCustomerRowAges then
+				AF:RefreshCustomerRowAges()
+			end
 		end
 		frame.elapsed = (frame.elapsed or 0) + elapsed
 		local pollInterval = AF.db and AF.db.debugSelfResults and CUSTOMER_DEBUG_QUERY_POLL_INTERVAL or CUSTOMER_QUERY_POLL_INTERVAL
@@ -1253,6 +1262,7 @@ function AF:RefreshCustomerQuery(force)
 		self.currentCustomerQueryToken = nil
 		self.currentCustomerQueryItemID = nil
 		self.currentCustomerQueryProfessionID = nil
+		self.customerTradeLeadSnapshot = nil
 		self:RefreshCustomerResults(self:Text("SELECT_ORDER_ITEM"))
 		self:UpdateCustomerRefreshButton()
 		return
@@ -1289,6 +1299,9 @@ function AF:RefreshCustomerQuery(force)
 	self:InjectDebugSelfResult(context.itemID, context.professionID)
 	if self.InjectDebugTradeLeads then
 		self:InjectDebugTradeLeads()
+	end
+	if (force or changed) and self.db.freezeTradeLeadRows == true and self.RebuildCustomerTradeLeadSnapshot then
+		self:RebuildCustomerTradeLeadSnapshot(context.itemID, context.professionID, context.recipeID)
 	end
 
 	self:RefreshCustomerResults()

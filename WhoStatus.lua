@@ -380,10 +380,27 @@ function AF:MarkCustomerWhoOnline(name)
 			lead.updatedAt = now
 		end
 	end
+	for _, lead in pairs(self.customerTradeLeadSnapshot and self.customerTradeLeadSnapshot.leads or {}) do
+		if EntryMatchesWhoName(lead, name) then
+			lead.snapshotUpdatedAt = now
+		end
+	end
+	for _, lead in pairs(self.customerTradeLeadSnapshot and self.customerTradeLeadSnapshot.cache or {}) do
+		if EntryMatchesWhoName(lead, name) then
+			lead.snapshotUpdatedAt = now
+		end
+	end
 	for _, row in ipairs(self.customerRows or {}) do
 		if row.entry and EntryMatchesWhoName(row.entry, name) then
-			row.entry.updatedAt = now
+			if row.entry.tradeLead then
+				row.entry.snapshotUpdatedAt = now
+			else
+				row.entry.updatedAt = now
+			end
 		end
+	end
+	if self.RefreshCustomerRowAges then
+		self:RefreshCustomerRowAges()
 	end
 end
 

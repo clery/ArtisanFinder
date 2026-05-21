@@ -305,7 +305,8 @@ function AF:FormatRelativeTime(timestamp)
 end
 
 function AF:FormatCustomerRowUpdatedAt(entry)
-	local relative = self:FormatRelativeTime(entry and entry.updatedAt)
+	local timestamp = entry and entry.tradeLead and (entry.snapshotUpdatedAt or entry.updatedAt) or entry and entry.updatedAt
+	local relative = self:FormatRelativeTime(timestamp)
 	if relative == "" then
 		return ""
 	end

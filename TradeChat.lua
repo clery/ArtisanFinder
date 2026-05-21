@@ -137,6 +137,23 @@ local function MarkTradeLeadSeen(seenNames, key, row)
 	end
 end
 
+local function CopyTradeLead(lead)
+	local copy = {}
+	for key, value in pairs(lead or {}) do
+		if key == "professionCandidates" and type(value) == "table" then
+			local candidates = {}
+			for candidate in pairs(value) do
+				candidates[candidate] = true
+			end
+			copy[key] = candidates
+		else
+			copy[key] = value
+		end
+	end
+	copy.snapshotUpdatedAt = copy.updatedAt
+	return copy
+end
+
 function AF:InitializeTradeChat()
 	self.db.tradeLeads = self.db.tradeLeads or {}
 	self.tradeLeads = self.db.tradeLeads
@@ -255,8 +272,9 @@ function AF:OnTradeChatMessage(message, sender, _, channelName, _, _, _, _, chan
 		self.tradeLeads[leadKey] = lead
 		self.db.tradeLeadCache[leadKey] = lead
 	end
-
-	self:RefreshCustomerResults()
+	if not (self.db and self.db.freezeTradeLeadRows == true) and self.RefreshCustomerResults then
+		self:RefreshCustomerResults()
+	end
 end
 
 function AF:PruneTradeLeads()
@@ -273,6 +291,42 @@ function AF:PruneTradeLeads()
 	end
 end
 
+function AF:RebuildCustomerTradeLeadSnapshot(itemID, professionID, recipeID)
+	self:PruneTradeLeads()
+	local leads = {}
+	for key, lead in pairs(self.tradeLeads or {}) do
+		leads[key] = CopyTradeLead(lead)
+	end
+	local cache = {}
+	for key, lead in pairs(self.db and self.db.tradeLeadCache or {}) do
+		cache[key] = CopyTradeLead(lead)
+	end
+	self.customerTradeLeadSnapshot = {
+		itemID = tonumber(itemID) or 0,
+		professionID = tonumber(professionID) or 0,
+		recipeID = tonumber(recipeID) or 0,
+		leads = leads,
+		cache = cache,
+	}
+end
+
+function AF:GetCustomerTradeLeadSnapshotLeads(itemID, professionID, recipeID, includeCache)
+	local snapshot = self.customerTradeLeadSnapshot
+	if not snapshot then
+		return nil
+	end
+	if snapshot.itemID ~= (tonumber(itemID) or 0)
+		or snapshot.professionID ~= (tonumber(professionID) or 0)
+		or snapshot.recipeID ~= (tonumber(recipeID) or 0)
+	then
+		return nil
+	end
+	if includeCache then
+		return snapshot.cache
+	end
+	return snapshot.leads
+end
+
 function AF:GetCachedTradeLeadFallbackRows(itemID, professionID, filterText, seenNames, recipeID)
 	local rows = {}
 	local now = self:Now()
@@ -280,8 +334,12 @@ function AF:GetCachedTradeLeadFallbackRows(itemID, professionID, filterText, see
 	local recipeProfessionCandidates = self:GetCustomerRecipeProfessionCandidates(recipeID, normalizedProfessionID)
 	local hasRecipeProfessionCandidates = next(recipeProfessionCandidates) ~= nil
 	filterText = tostring(filterText or ""):lower()
+	local sourceLeads = self.db and self.db.tradeLeadCache or {}
+	if self.db and self.db.freezeTradeLeadRows == true then
+		sourceLeads = self:GetCustomerTradeLeadSnapshotLeads(itemID, normalizedProfessionID, recipeID, true) or {}
+	end
 
-	for cacheKey, lead in pairs(self.db and self.db.tradeLeadCache or {}) do
+	for cacheKey, lead in pairs(sourceLeads) do
 		local updatedAt = tonumber(lead and lead.updatedAt) or 0
 		local hasProfessionCandidates = lead.professionCandidates and next(lead.professionCandidates) ~= nil
 		local exactProfessionMatch = hasRecipeProfessionCandidates
@@ -300,6 +358,7 @@ function AF:GetCachedTradeLeadFallbackRows(itemID, professionID, filterText, see
 				professionName = normalizedProfessionID ~= 0 and self:GetProfessionName(normalizedProfessionID) or lead.professionName,
 				professionLink = lead.professionLink,
 				updatedAt = lead.updatedAt,
+				snapshotUpdatedAt = lead.snapshotUpdatedAt or lead.updatedAt,
 				tradeLead = true,
 				certified = false,
 				tradeProfessionMatch = true,
@@ -329,14 +388,17 @@ function AF:GetCustomerRecipeProfessionCandidates(recipeID, professionID)
 end
 
 function AF:GetTradeLeadRows(itemID, professionID, filterText, seenNames, recipeID)
-	self:PruneTradeLeads()
 	local rows = {}
 	local normalizedProfessionID = tonumber(professionID) or 0
 	local recipeProfessionCandidates = self:GetCustomerRecipeProfessionCandidates(recipeID, normalizedProfessionID)
 	local hasRecipeProfessionCandidates = next(recipeProfessionCandidates) ~= nil
 	filterText = tostring(filterText or ""):lower()
+	local sourceLeads = self.tradeLeads or {}
+	if self.db and self.db.freezeTradeLeadRows == true then
+		sourceLeads = self:GetCustomerTradeLeadSnapshotLeads(itemID, normalizedProfessionID, recipeID) or {}
+	end
 
-	for name, lead in pairs(self.tradeLeads or {}) do
+	for name, lead in pairs(sourceLeads) do
 		local hasProfessionCandidates = lead.professionCandidates and next(lead.professionCandidates) ~= nil
 		local exactProfessionMatch = hasRecipeProfessionCandidates
 			and hasProfessionCandidates
@@ -350,6 +412,7 @@ function AF:GetTradeLeadRows(itemID, professionID, filterText, seenNames, recipe
 				professionName = normalizedProfessionID ~= 0 and self:GetProfessionName(normalizedProfessionID) or lead.professionName,
 				professionLink = lead.professionLink,
 				updatedAt = lead.updatedAt,
+				snapshotUpdatedAt = lead.snapshotUpdatedAt or lead.updatedAt,
 				tradeLead = true,
 				certified = false,
 				tradeProfessionMatch = exactProfessionMatch == true,

@@ -263,3 +263,12 @@ function AF:ApplyCustomerRowViewModel(row, viewModel, minimumHeight, bottomPaddi
 		6 + row.name:GetStringHeight() + 3 + row.detail:GetStringHeight() + 3 + row.capability:GetStringHeight() + bottomPadding
 	)
 end
+
+function AF:RefreshCustomerRowAges()
+	for _, row in ipairs(self.customerRows or {}) do
+		if row:IsShown() and row.entry and row.updatedAt then
+			row.updatedAt:SetText(self:FormatCustomerRowUpdatedAt(row.entry) or "")
+			row.updatedAt:SetWidth(math.max(1, math.ceil((row.updatedAt:GetStringWidth() or 0) + 2)))
+		end
+	end
+end

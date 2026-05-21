@@ -229,6 +229,24 @@ function AF:InitializeOptions()
 		return CreateRadioOptions(TRADE_LEAD_OPTIONS, "minutes")
 	end, self:Text("OPTIONS_TRADE_LEADS_LIFETIME_DESC"))
 
+	local freezeTradeLeadRows = RegisterProxySetting(
+		"ArtisanFinder_FreezeTradeLeadRows",
+		Settings.VarType.Boolean,
+		"OPTIONS_FREEZE_TRADE_LEAD_ROWS",
+		false,
+		function()
+			return AF.db.freezeTradeLeadRows == true
+		end,
+		function(value)
+			AF.db.freezeTradeLeadRows = value == true
+			AF.customerTradeLeadSnapshot = nil
+			if AF.RefreshCustomerQuery then
+				AF:RefreshCustomerQuery(true)
+			end
+		end
+	)
+	Settings.CreateCheckbox(category, freezeTradeLeadRows, self:Text("OPTIONS_FREEZE_TRADE_LEAD_ROWS_DESC"))
+
 	AddSection("OPTIONS_SECTION_SCANNING")
 	local fastScan = RegisterProxySetting(
 		"ArtisanFinder_FastScan",
