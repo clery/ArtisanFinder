@@ -249,13 +249,11 @@ AF.frame:SetScript("OnEvent", function(_, event, ...)
 			AF:OnTradeChatMessage(...)
 		end
 	elseif event == "GUILD_ROSTER_UPDATE" then
-		if AF.RefreshGuildRosterCache then
-			AF:RefreshGuildRosterCache(false)
-		end
-		if AF.RefreshCustomerResults then
-			AF:RefreshCustomerResults()
+		if AF.QueueGuildRosterCacheRefresh then
+			AF:QueueGuildRosterCacheRefresh(false)
 		end
 	elseif event == "GUILD_TRADESKILL_UPDATE" then
+		AF.guildTradeSkillParsedAt = nil
 		if AF.RefreshCustomerResults then
 			AF:RefreshCustomerResults()
 		end

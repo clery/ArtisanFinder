@@ -30,6 +30,9 @@ end
 function AF:SetDebugSelfResults(enabled)
 	self.db.debugSelfResults = enabled == true
 	if not self.db.debugSelfResults then
+		if self.ClearAllDebugSelfResults then
+			self:ClearAllDebugSelfResults()
+		end
 		self:ClearDebugTradeLeads()
 	end
 	self:Print(self:Text("DEBUG_SELF_CHANGED", self.db.debugSelfResults and self:Text("ENABLED") or self:Text("DISABLED")))
@@ -272,16 +275,6 @@ function AF:HandleSlash(message)
 		else
 			self:Print(self:Text("DEBUG_UNKNOWN", rest))
 			self:PrintSlashHelp()
-		end
-	elseif command == "who" then
-		if rest == "debug on" then
-			self:SetWhoStatusDebug(true)
-		elseif rest == "debug off" then
-			self:SetWhoStatusDebug(false)
-		elseif rest == "debug" then
-			self:SetWhoStatusDebug(not self.whoStatusDebug)
-		else
-			self:CheckWhoStatusNow(rest)
 		end
 	else
 		self:PrintSlashHelp()

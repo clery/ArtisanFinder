@@ -8,10 +8,6 @@
 - Added a loading indicators to artisan rows to indicate this data is stale, and may be inaccurate.
 - Added in-form Personal Order and Guild Order warnings so review reminders appear in the Crafting Order form instead of chat.
 
-### Changed
-
-- Offline fallback rows now show `/who` refresh controls when their online status still needs to be checked.
-
 ### Fixed
 
 - Crafter commission and note fields now keep in-progress edits while profession scans refresh the panel.

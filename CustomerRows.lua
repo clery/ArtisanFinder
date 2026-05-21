@@ -125,7 +125,7 @@ local function PositionWhoSpinner(row, shown)
 end
 
 function AF:IsCustomerEntryWhoPending(entry)
-	if not entry or entry.tutorialFake then
+	if not entry or entry.tutorialFake or entry.debug then
 		return false
 	end
 	return self:IsWhoStatusPending(entry.orderTarget or entry.name or entry.target) == true
@@ -147,7 +147,8 @@ function AF:UpdateCustomerRowWhoRefreshButton(row)
 		return
 	end
 	local enabled = row:IsShown() and self:IsCustomerEntryWhoRefreshAvailable(row.entry)
-	row.whoRefresh:SetShown(row:IsShown() and row.entry and not row.entry.tutorialFake and not row.entry.ownAlt)
+	-- Guild rows use roster presence; debug rows are local samples, so neither should start /who.
+	row.whoRefresh:SetShown(row:IsShown() and row.entry and not row.entry.tutorialFake and not row.entry.debug and not row.entry.ownAlt and not row.entry.guildMember)
 	row.whoRefresh:SetEnabled(enabled)
 	row.whoRefresh:SetAlpha(1)
 end
@@ -172,9 +173,16 @@ function AF:BuildCustomerRowViewModel(entry)
 	end
 
 	local displayName = self:GetDisplayPlayerName(entry.name or "?")
+	local statusTooltipText
 	local isOnline = self:IsCustomerEntryOnline(entry)
-	if self:IsCustomerEntryOffline(entry) then
-		displayName = displayName .. " |cff888888(" .. self:Text("OFFLINE") .. ")|r"
+	if self:IsCustomerEntryWhoCheckFailed(entry) then
+		local statusText = self:Text("ONLINE_CHECK_FAILED")
+		displayName = displayName .. " |cffaa5555(" .. statusText .. ")|r"
+		statusTooltipText = "(" .. statusText .. ")"
+	elseif self:IsCustomerEntryOffline(entry) then
+		local statusText = self:Text("OFFLINE")
+		displayName = displayName .. " |cff888888(" .. statusText .. ")|r"
+		statusTooltipText = "(" .. statusText .. ")"
 	elseif entry.unavailableFavorite and not isOnline then
 		displayName = displayName .. " |cff888888(" .. self:Text("UNAVAILABLE") .. ")|r"
 	elseif entry.offlineCached and not isOnline then
@@ -221,6 +229,7 @@ function AF:BuildCustomerRowViewModel(entry)
 		favorite = self:IsFavoriteArtisan(entry),
 		whoName = self:GetCustomerEntryWhoName(entry),
 		whoPending = self:IsCustomerEntryWhoPending(entry),
+		statusTooltipText = statusTooltipText,
 	}
 end
 
@@ -237,6 +246,10 @@ function AF:ApplyCustomerRowViewModel(row, viewModel, minimumHeight, bottomPaddi
 	row.favorite:SetShown(viewModel.favorite)
 	row.artisanFinderWhoName = viewModel.whoName
 	row.name:SetText(viewModel.displayName or "")
+	row.nameStatusTooltipText = nil
+	if viewModel.statusTooltipText and (row.name:GetStringWidth() or 0) > (row.name:GetWidth() or 0) + 1 then
+		row.nameStatusTooltipText = viewModel.statusTooltipText
+	end
 	row.updatedAt:SetText(viewModel.updatedAt or "")
 	row.updatedAt:SetWidth(math.max(1, math.ceil((row.updatedAt:GetStringWidth() or 0) + 2)))
 	local noteTruncated = SetFittedDetailText(row, viewModel.detail, viewModel.detailNote)

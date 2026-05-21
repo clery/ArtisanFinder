@@ -1,6 +1,12 @@
 local _, AF = ...
 
 local DEBUG_CERTIFIED_COUNT = 10
+local DEBUG_PINNED_COUNT = 6
+local DEBUG_OFFLINE_ROWS = {
+	[4] = true,
+	[7] = true,
+	[9] = true,
+}
 
 local DEBUG_CRAFTER_NAMES = {
 	"Aeloria",
@@ -69,6 +75,62 @@ local function GetDebugConcentrationQuality(bestQuality, enabled)
 	end
 	return nil
 end
+
+local function SetDebugWhoStatus(AF, name, online, failed)
+	name = AF:NormalizeName(name)
+	if not name then
+		return
+	end
+	AF.whoStatus = AF.whoStatus or {}
+	AF.whoStatus[name] = AF.whoStatus[name] or {}
+	local status = AF.whoStatus[name]
+	status.pending = nil
+	status.checkedAt = AF:Now()
+	status.online = online
+	status.checkFailedAt = failed and AF:Now() or nil
+	if online ~= true and AF.ClearCustomerWhoOnline then
+		AF:ClearCustomerWhoOnline(name)
+	end
+end
+
+local function HasDebugSelfResults(AF, itemKey)
+	local cache = AF.db.customerCache[tostring(itemKey or "")]
+	if not cache then
+		return false
+	end
+	for _, entry in pairs(cache) do
+		if entry.debug then
+			return true
+		end
+	end
+	return false
+end
+
+local function RefreshExistingDebugSelfResults(AF, itemKey)
+	local cache = AF.db.customerCache[tostring(itemKey or "")]
+	if not cache then
+		return
+	end
+	local now = AF:Now()
+	for key, entry in pairs(cache) do
+		if entry.debug then
+			entry.debugWhoRefresh = nil
+			if key == "__debug_self_5" then
+				SetDebugWhoStatus(AF, entry.orderTarget or entry.name or entry.target, true)
+			end
+			if key == "__debug_self_6" then
+				entry.verifiedAt = nil
+				entry.lastQueryToken = 0
+				entry.lastQueryAt = nil
+			else
+				entry.verifiedAt = entry.verifiedAt or now
+				entry.lastQueryToken = AF.currentCustomerQueryToken
+				entry.lastQueryAt = AF.lastQueryAt
+			end
+		end
+	end
+end
+
 function AF:ClearDebugSelfResults(itemID)
 	local cache = self.db.customerCache[tostring(itemID or "")]
 	if not cache then
@@ -81,8 +143,13 @@ function AF:ClearDebugSelfResults(itemID)
 	end
 end
 
+function AF:ClearAllDebugSelfResults()
+	for itemID in pairs(self.db and self.db.customerCache or {}) do
+		self:ClearDebugSelfResults(itemID)
+	end
+end
+
 function AF:InjectDebugSelfResult(itemID, professionID)
-	self:ClearDebugSelfResults(itemID)
 	if not self.db.debugSelfResults then
 		return
 	end
@@ -102,6 +169,11 @@ function AF:InjectDebugSelfResult(itemID, professionID)
 	end
 
 	local itemKey = tostring(itemID)
+	if HasDebugSelfResults(self, itemKey) then
+		RefreshExistingDebugSelfResults(self, itemKey)
+		return
+	end
+
 	local now = self:Now()
 	self.db.customerCache[itemKey] = self.db.customerCache[itemKey] or {}
 
@@ -152,6 +224,7 @@ function AF:InjectDebugSelfResult(itemID, professionID)
 		local bestQuality = math.min(5, baseQuality + 1)
 		local concentrationQuality = GetDebugConcentrationQuality(bestQuality, i ~= 2)
 		self:SetFavoriteArtisan(altName, i == 1)
+		SetDebugWhoStatus(self, altName, i == 1 and true or nil)
 		self.db.customerCache[itemKey]["__debug_alt_" .. i] = {
 			name = altName,
 			target = contactName,
@@ -198,10 +271,17 @@ function AF:InjectDebugSelfResult(itemID, professionID)
 		local concentrationQuality = GetDebugConcentrationQuality(bestQuality, i % 2 == 0)
 		local note = GetDebugValue(DEBUG_NOTES, i)
 		local debugName = GetDebugValue(DEBUG_CRAFTER_NAMES, i) .. "-" .. (GetRealmName() or "")
-		if i <= 6 then
+		local pinned = i <= DEBUG_PINNED_COUNT
+		local offline = DEBUG_OFFLINE_ROWS[i] == true
+		if pinned then
 			self:SetFavoriteArtisan(debugName, true)
 		else
 			self:SetFavoriteArtisan(debugName, false)
+		end
+		if offline then
+			SetDebugWhoStatus(self, debugName, false)
+		else
+			SetDebugWhoStatus(self, debugName, (i <= 3 or i == 5) and true or nil)
 		end
 		self.db.customerCache[itemKey]["__debug_self_" .. i] = {
 			name = debugName,
@@ -233,7 +313,7 @@ function AF:InjectDebugSelfResult(itemID, professionID)
 			bestReagentTruncated = item.bestReagentTruncated,
 			bestReagentPendingNames = item.bestReagentPendingNames,
 			professionLink = item.professionLink,
-			updatedAt = now,
+			updatedAt = pinned and now or (now - (i * 300)),
 			verifiedAt = i == 6 and nil or now,
 			lastQueryToken = i == 6 and 0 or self.currentCustomerQueryToken,
 			lastQueryAt = i == 6 and nil or self.lastQueryAt,

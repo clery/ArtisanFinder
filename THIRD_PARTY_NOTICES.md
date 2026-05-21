@@ -13,9 +13,8 @@ available under its own upstream license or notice terms.
 | LibDataBroker-1.1 | All Rights Reserved, per upstream project metadata | https://www.wowace.com/projects/libdatabroker-1-1 |
 | LibDBIcon-1.0 | Ace3 Style BSD, per upstream project metadata | https://www.wowace.com/projects/libdbicon-1-0 |
 | ChatThrottleLib | Public Domain | Bundled header notice in `Libs/ChatThrottleLib/ChatThrottleLib.lua` |
-| LibWho-2.0 | MIT License | Bundled license in `Libs/LibWho-2.0/LICENSE`; upstream: https://github.com/sylvanaar/who-lib |
 
 ## Notes
 
 When distributing ArtisanFinder, keep this file and any bundled third-party license files with the
-addon package, especially `Libs/LibWho-2.0/LICENSE`.
+addon package.

@@ -1,13 +1,9 @@
 local _, AF = ...
 
 local WHO_STATUS_TTL = 300
-local WHO_STATUS_LIMIT = 5
 local WHO_SYSTEM_SUPPRESS_AFTER_QUERY = 30
 local WHO_SYSTEM_SUPPRESS_AFTER_RESULT = 0.5
-
-local function GetLibWho()
-	return LibStub and LibStub:GetLibrary("LibWho-2.0", true)
-end
+local WHO_RESPONSE_TIMEOUT = 5
 
 local function IsWhoCountSystemMessage(message)
 	if type(message) ~= "string" then
@@ -85,35 +81,6 @@ local function IsWhoResultMatch(requestedName, result)
 	return requestedBase and resultBase and requestedBase:lower() == resultBase:lower()
 end
 
-local function ShouldWhoCheckEntry(entry)
-	if not entry or entry.ownAlt then
-		return false
-	end
-	if entry.guildMember then
-		return false
-	end
-	if AF:GetWhoStatus(GetEntryWhoName(entry)) == true then
-		return false
-	end
-	if entry.tradeLead or entry.offlineCached or entry.unavailableFavorite then
-		return true
-	end
-	return false
-end
-
-local function DebugPrint(...)
-	if AF.whoStatusDebug then
-		AF:Print(table.concat({ ... }, " "))
-	end
-end
-
-local function FormatWhoStatus(value)
-	if value == nil then
-		return "unknown"
-	end
-	return tostring(value)
-end
-
 local function EntryMatchesWhoName(entry, name)
 	if not entry or not name then
 		return false
@@ -130,61 +97,149 @@ local function EntryMatchesWhoName(entry, name)
 		or (baseName and targetBase and baseName:lower() == targetBase:lower())
 end
 
-local function KickWhoQueue(label)
-	local lib = GetLibWho()
-	if not lib or not lib.AskWhoNext then
+local function RefreshWhoUi()
+	if AF.RefreshCustomerWhoLoadingIndicators then
+		AF:RefreshCustomerWhoLoadingIndicators()
+	end
+	if AF.RefreshCustomerResults then
+		AF:RefreshCustomerResults()
+	end
+end
+
+local function CompleteWhoQuery(request, results, complete)
+	if not request or AF.whoStatusActive ~= request then
 		return
 	end
-	DebugPrint("who start", label or "")
+
+	local resultStatus = AF.whoStatus and AF.whoStatus[request.name]
+	if resultStatus then
+		resultStatus.pending = nil
+		local hasResults = results and #results > 0
+		if complete or hasResults then
+			resultStatus.checkFailedAt = nil
+			local previousCheckedAt = resultStatus.checkedAt
+			resultStatus.checkedAt = AF:Now()
+			local wasOnline = resultStatus.online == true
+			local matched = false
+			if complete and not hasResults and not wasOnline then
+				resultStatus.online = false
+			else
+				resultStatus.online = nil
+			end
+			for _, result in ipairs(results or {}) do
+				if IsWhoResultMatch(request.name, result) then
+					resultStatus.online = true
+					AF:MarkCustomerWhoOnline(request.name)
+					AF:MarkCustomerWhoOnline(GetWhoResultName(result))
+					matched = true
+					break
+				end
+			end
+			if wasOnline and not matched then
+				resultStatus.online = true
+				AF:MarkCustomerWhoOnline(request.name)
+				resultStatus.checkedAt = previousCheckedAt or resultStatus.checkedAt
+			elseif resultStatus.online ~= true then
+				AF:ClearCustomerWhoOnline(request.name)
+			end
+		else
+			resultStatus.online = nil
+			resultStatus.checkFailedAt = AF:Now()
+		end
+	end
+
+	AF.whoStatusActive = nil
+	AF.suppressWhoSystemUntil = AF:Now() + WHO_SYSTEM_SUPPRESS_AFTER_RESULT
+	RefreshWhoUi()
+	if AF.UpdateCustomerWhoRefreshButtons then
+		AF:UpdateCustomerWhoRefreshButtons()
+	end
+end
+
+local function ReadWhoResults()
+	local numWhos, totalCount = C_FriendList.GetNumWhoResults()
+	numWhos = tonumber(numWhos) or 0
+	totalCount = tonumber(totalCount) or numWhos
+	local results = {}
+	for index = 1, numWhos do
+		local info = C_FriendList.GetWhoInfo(index)
+		if info then
+			results[#results + 1] = info
+		end
+	end
+	local maxWhos = tonumber(MAX_WHOS_FROM_SERVER) or 50
+	local complete = totalCount == #results and totalCount < maxWhos
+	return results, complete
+end
+
+local function HandleNativeWhoEvent(_, event, message)
+	if not AF.whoStatusActive then
+		return
+	end
+	if event == "CHAT_MSG_SYSTEM" then
+		local isCount = IsWhoCountSystemMessage(message)
+		if not isCount then
+			return
+		end
+	end
+	local results, complete = ReadWhoResults()
+	CompleteWhoQuery(AF.whoStatusActive, results, complete)
+end
+
+local function EnsureWhoFrame()
+	if AF.whoStatusFrame then
+		return
+	end
+	AF.whoStatusFrame = CreateFrame("Frame")
+	AF.whoStatusFrame:RegisterEvent("WHO_LIST_UPDATE")
+	AF.whoStatusFrame:RegisterEvent("CHAT_MSG_SYSTEM")
+	AF.whoStatusFrame:SetScript("OnEvent", HandleNativeWhoEvent)
+end
+
+local function StartManualWhoQuery(name)
+	local baseName = tostring(name):match("^([^-]+)") or name
+	local request = {
+		name = name,
+		query = 'n-"' .. name .. '"',
+		startedAt = AF:Now(),
+		suppressNames = {
+			[name] = true,
+			[baseName] = true,
+		},
+	}
+	AF.whoStatusActive = request
 	AF.customerWhoLastKickAt = AF:Now()
 	AF.suppressWhoSystemUntil = AF:Now() + WHO_SYSTEM_SUPPRESS_AFTER_QUERY
+	AF.suppressWhoSystemNames = request.suppressNames
 	if AF.UpdateCustomerWhoRefreshButtons then
 		AF:UpdateCustomerWhoRefreshButtons()
 		C_Timer.After(tonumber(AF.LIVE_QUERY_TIMEOUT) or 5, function()
 			AF:UpdateCustomerWhoRefreshButtons()
 		end)
 	end
-	pcall(lib.AskWhoNext, lib)
-end
-
-local function PromoteWhoQuery(lib, query, queue)
-	local queued = lib and lib.Queue and queue and lib.Queue[queue]
-	if not queued then
-		return false
+	pcall(C_FriendList.SetWhoToUi, false)
+	local ok = pcall(C_FriendList.SendWho, request.query, Enum.SocialWhoOrigin.Social)
+	if ok then
+		local token = request
+		C_Timer.After(WHO_RESPONSE_TIMEOUT, function()
+			CompleteWhoQuery(token, {}, false)
+		end)
+	else
+		CompleteWhoQuery(request, {}, false)
 	end
-	for index, args in ipairs(queued) do
-		if args.query == query then
-			if index > 1 then
-				table.remove(queued, index)
-				table.insert(queued, 1, args)
-			end
-			return true
-		end
-	end
-	return false
+	return ok
 end
 
 function AF:InitializeWhoStatus()
 	self.whoStatus = self.whoStatus or {}
-	self.whoStatusDebug = self.whoStatusDebug == true
+	if C_AddOns and C_AddOns.LoadAddOn then
+		pcall(C_AddOns.LoadAddOn, "Blizzard_FriendsFrame")
+	end
+	EnsureWhoFrame()
 	if ChatFrame_AddMessageEventFilter and not self.whoStatusChatFilterRegistered then
 		ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", SuppressOwnWhoSystemMessage)
 		self.whoStatusChatFilterRegistered = true
 	end
-end
-
-function AF:SetWhoStatusDebug(enabled)
-	self.whoStatusDebug = enabled == true
-	local lib = GetLibWho()
-	if lib and lib.SetWhoLibDebug then
-		pcall(lib.SetWhoLibDebug, lib, self.whoStatusDebug)
-	end
-	self:Print(self:Text("WHO_DEBUG_CHANGED", self.whoStatusDebug and self:Text("ENABLED") or self:Text("DISABLED")))
-end
-
-function AF:StartCustomerWhoStatusChecks(duration)
-	self.customerWhoStatusStartUntil = self:Now() + (duration or 3)
-	self.customerWhoStatusBatchSeen = {}
 end
 
 function AF:GetWhoStatus(name, includeExpired)
@@ -214,12 +269,26 @@ function AF:IsWhoStatusPending(name)
 	return status and status.pending == true
 end
 
+function AF:IsWhoStatusFailed(name)
+	name = self:NormalizeName(name)
+	local status = name and self.whoStatus and self.whoStatus[name]
+	local failedAt = status and tonumber(status.checkFailedAt)
+	if not failedAt then
+		return false
+	end
+	return self:Now() - failedAt <= WHO_STATUS_TTL
+end
+
 function AF:IsCustomerWhoStatusReady()
 	local lastKickAt = tonumber(self.customerWhoLastKickAt)
-	return not lastKickAt or self:Now() - lastKickAt >= (tonumber(self.LIVE_QUERY_TIMEOUT) or 5)
+	return not self.whoStatusActive and (not lastKickAt or self:Now() - lastKickAt >= (tonumber(self.LIVE_QUERY_TIMEOUT) or 5))
 end
 
 function AF:GetCustomerWhoStatusReadyRemaining()
+	if self.whoStatusActive and self.whoStatusActive.startedAt then
+		local remaining = WHO_RESPONSE_TIMEOUT - (self:Now() - self.whoStatusActive.startedAt)
+		return math.max(0, math.ceil(remaining))
+	end
 	local lastKickAt = tonumber(self.customerWhoLastKickAt)
 	if not lastKickAt then
 		return 0
@@ -229,7 +298,7 @@ function AF:GetCustomerWhoStatusReadyRemaining()
 end
 
 function AF:IsCustomerEntryWhoRefreshAvailable(entry)
-	if not entry or entry.tutorialFake or entry.ownAlt then
+	if not entry or entry.tutorialFake or entry.debug or entry.ownAlt or entry.guildMember then
 		return false
 	end
 	local name = GetEntryWhoName(entry)
@@ -240,14 +309,27 @@ function AF:IsCustomerEntryOnline(entry)
 	if not entry or entry.ownAlt then
 		return false
 	end
+	if self:IsCustomerEntryWhoCheckFailed(entry) then
+		return false
+	end
 	if entry.guildMember then
 		return entry.guildOnline == true
 	end
 	return self:GetWhoStatus(GetEntryWhoName(entry)) == true
 end
 
+function AF:IsCustomerEntryWhoCheckFailed(entry)
+	if not entry or entry.ownAlt or entry.guildMember then
+		return false
+	end
+	return self:IsWhoStatusFailed(GetEntryWhoName(entry))
+end
+
 function AF:IsCustomerEntryOffline(entry)
 	if not entry or entry.ownAlt then
+		return false
+	end
+	if self:IsCustomerEntryWhoCheckFailed(entry) then
 		return false
 	end
 	if entry.guildMember then
@@ -294,159 +376,6 @@ function AF:ClearCustomerWhoOnline(name)
 	end
 end
 
-function AF:QueueWhoStatusCheck(name, preserveRealmless, forceRefresh, priority)
-	name = NormalizeWhoQueryName(name, preserveRealmless)
-	local lib = GetLibWho()
-	if not name or not lib or not lib.UserInfo then
-		DebugPrint("who unavailable for", tostring(name))
-		return false
-	end
-
-	self.whoStatus = self.whoStatus or {}
-	local now = self:Now()
-	local status = self.whoStatus[name]
-	local query = 'n-"' .. name .. '"'
-	if status and status.pending then
-		DebugPrint("who already queued", name)
-		if priority then
-			local promoted = PromoteWhoQuery(lib, query, lib.WHOLIB_QUEUE_QUIET)
-			if self.RefreshCustomerWhoLoadingIndicators then
-				self:RefreshCustomerWhoLoadingIndicators()
-			end
-			return promoted
-		end
-		return false
-	end
-	if not forceRefresh and status and status.checkedAt and now - status.checkedAt <= WHO_STATUS_TTL then
-		DebugPrint("who cached", name, FormatWhoStatus(status.online))
-		return false
-	end
-
-	self.whoStatus[name] = status or {}
-	status = self.whoStatus[name]
-	status.pending = true
-	status.queuedAt = now
-	DebugPrint("who queue", name)
-
-	local baseName = tostring(name):match("^([^-]+)") or name
-	local function onWhoResult(_, results, complete)
-		local resultStatus = AF.whoStatus and AF.whoStatus[name]
-		if not resultStatus then
-			return
-		end
-		resultStatus.pending = nil
-		local hasResults = results and #results > 0
-		if not complete and not hasResults then
-			DebugPrint("who result", name, FormatWhoStatus(resultStatus.online), "incomplete")
-			AF.suppressWhoSystemUntil = AF:Now() + WHO_SYSTEM_SUPPRESS_AFTER_RESULT
-			if AF.RefreshCustomerResults then
-				AF:RefreshCustomerResults()
-			end
-			return
-		end
-		local previousCheckedAt = resultStatus.checkedAt
-		resultStatus.checkedAt = AF:Now()
-		AF.suppressWhoSystemUntil = resultStatus.checkedAt + WHO_SYSTEM_SUPPRESS_AFTER_RESULT
-		local wasOnline = resultStatus.online == true
-		local matched = false
-		if complete and not hasResults and not wasOnline then
-			resultStatus.online = false
-		else
-			resultStatus.online = nil
-		end
-		for _, result in ipairs(results or {}) do
-			if IsWhoResultMatch(name, result) then
-				resultStatus.online = true
-				AF:MarkCustomerWhoOnline(name)
-				AF:MarkCustomerWhoOnline(GetWhoResultName(result))
-				matched = true
-				break
-			end
-		end
-		if wasOnline and not matched then
-			resultStatus.online = true
-			AF:MarkCustomerWhoOnline(name)
-			resultStatus.checkedAt = previousCheckedAt or resultStatus.checkedAt
-		elseif resultStatus.online ~= true then
-			AF:ClearCustomerWhoOnline(name)
-		end
-		DebugPrint("who result", name, FormatWhoStatus(resultStatus.online), "complete", tostring(complete))
-		if AF.RefreshCustomerResults then
-			AF:RefreshCustomerResults()
-		end
-	end
-
-	local ok = pcall(lib.Who, lib, query, {
-		queue = lib.WHOLIB_QUEUE_QUIET,
-		callback = onWhoResult,
-		noRetry = true,
-	})
-	if not ok then
-		DebugPrint("who queue failed", name)
-		status.pending = nil
-		status.checkedAt = now
-		status.online = nil
-		if self.RefreshCustomerWhoLoadingIndicators then
-			self:RefreshCustomerWhoLoadingIndicators()
-		end
-		return false
-	end
-	if priority then
-		PromoteWhoQuery(lib, query, lib.WHOLIB_QUEUE_QUIET)
-	end
-	self.suppressWhoSystemUntil = now + WHO_SYSTEM_SUPPRESS_AFTER_QUERY
-	self.suppressWhoSystemNames = {
-		[name] = true,
-		[baseName] = true,
-	}
-	return true
-end
-
-function AF:QueueCustomerWhoStatusChecks(rows, startQueue, batchSeen, kickPending, limit)
-	local lib = GetLibWho()
-	if not lib then
-		DebugPrint("LibWho not loaded")
-		return 0
-	end
-	if not startQueue then
-		return 0
-	end
-
-	local queued = 0
-	local skippedPending = 0
-	local queueLimit = tonumber(limit) or WHO_STATUS_LIMIT
-	local seen = {}
-	batchSeen = batchSeen or {}
-	for _, entry in ipairs(rows or {}) do
-		local name = GetEntryWhoName(entry)
-		if name and not seen[name] and not batchSeen[name] and ShouldWhoCheckEntry(entry) then
-			seen[name] = true
-			if self:IsWhoStatusPending(name) then
-				if kickPending then
-					DebugPrint("who skip queued", name)
-				end
-				skippedPending = skippedPending + 1
-			elseif self:QueueWhoStatusCheck(name) then
-				batchSeen[name] = true
-				queued = queued + 1
-				if queued >= queueLimit then
-					break
-				end
-			else
-				batchSeen[name] = true
-			end
-		end
-	end
-
-	if queued > 0 or (kickPending and skippedPending > 0) then
-		if self.RefreshCustomerWhoLoadingIndicators then
-			self:RefreshCustomerWhoLoadingIndicators()
-		end
-		KickWhoQueue(tostring(queued))
-	end
-	return queued
-end
-
 function AF:RefreshCustomerEntryWhoStatus(entry)
 	if not self:IsCustomerEntryWhoRefreshAvailable(entry) then
 		return false
@@ -457,35 +386,24 @@ function AF:RefreshCustomerEntryWhoStatus(entry)
 		return false
 	end
 
-	local queued = self:QueueWhoStatusCheck(name, nil, true, true)
+	self.whoStatus = self.whoStatus or {}
+	self.whoStatus[name] = self.whoStatus[name] or {}
+	local status = self.whoStatus[name]
+	status.pending = true
+	status.requestedAt = self:Now()
+
 	if self.RefreshCustomerWhoLoadingIndicators then
 		self:RefreshCustomerWhoLoadingIndicators()
 	end
-	if queued then
-		local now = self:Now()
-		local waitTime = tonumber(self.LIVE_QUERY_TIMEOUT) or 5
-		if not self.customerWhoLastKickAt or now - self.customerWhoLastKickAt >= waitTime then
-			KickWhoQueue(name)
+	local started = StartManualWhoQuery(name)
+	if not started then
+		status.pending = nil
+		if self.RefreshCustomerWhoLoadingIndicators then
+			self:RefreshCustomerWhoLoadingIndicators()
 		end
 	end
 	if self.UpdateCustomerWhoRefreshButtons then
 		self:UpdateCustomerWhoRefreshButtons()
 	end
-	return queued
-end
-
-function AF:CheckWhoStatusNow(name)
-	name = NormalizeWhoQueryName(name, true)
-	if not name then
-		self:Print(self:Text("WHO_USAGE"))
-		return
-	end
-	self.whoStatus = self.whoStatus or {}
-	self.whoStatus[name] = nil
-	if self:QueueWhoStatusCheck(name, true) then
-		KickWhoQueue(name)
-		self:Print(self:Text("WHO_CHECK_STARTED", name))
-	else
-		self:Print(self:Text("WHO_CHECK_NOT_STARTED", name))
-	end
+	return started
 end

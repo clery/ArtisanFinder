@@ -2,6 +2,7 @@ local _, AF = ...
 
 local GUILD_RECIPE_QUERY_THROTTLE = 8
 local GUILD_TRADE_SKILL_REFRESH_THROTTLE = 30
+local GUILD_TRADE_SKILL_PARSE_THROTTLE = 10
 local GUILD_OFFLINE_MAX_AGE = 30 * 24 * 60 * 60
 local GUILD_PROFESSION_SPELL_IDS = {
 	[2018] = 164, -- Blacksmithing
@@ -340,6 +341,24 @@ function AF:RefreshGuildRosterCache(requestRefresh)
 	return count
 end
 
+function AF:QueueGuildRosterCacheRefresh(requestRefresh)
+	if self.guildRosterRefreshQueued then
+		self.guildRosterRefreshRequest = self.guildRosterRefreshRequest or requestRefresh == true
+		return
+	end
+	self.guildRosterRefreshQueued = true
+	self.guildRosterRefreshRequest = requestRefresh == true
+	C_Timer.After(0.2, function()
+		AF.guildRosterRefreshQueued = nil
+		local shouldRequest = AF.guildRosterRefreshRequest == true
+		AF.guildRosterRefreshRequest = nil
+		AF:RefreshGuildRosterCache(shouldRequest)
+		if AF.RefreshCustomerResults then
+			AF:RefreshCustomerResults()
+		end
+	end)
+end
+
 function AF:GetGuildRosterEntry(name)
 	if not IsInGuild or not IsInGuild() then
 		return nil
@@ -348,8 +367,10 @@ function AF:GetGuildRosterEntry(name)
 	if not name then
 		return nil
 	end
-	if not self.guildRosterByName or not self.guildRosterByName[name] then
-		self:RefreshGuildRosterCache(true)
+	if not self.guildRosterByName then
+		self:RefreshGuildRosterCache(false)
+	end
+	if self.guildRosterByName and not self.guildRosterByName[name] then
 		name = self:ResolveGuildMemberName(name, false)
 	end
 	return self.guildRosterByName and self.guildRosterByName[name] or nil
@@ -648,7 +669,13 @@ function AF:GetGuildProfessionRows(itemID, professionID, filterText, seenNames, 
 	end
 
 	seenNames = seenNames or {}
-	if GetNumGuildTradeSkill and GetGuildTradeSkillInfo then
+	local professionKey = tostring(professionID)
+	self.guildTradeSkillParsedAt = self.guildTradeSkillParsedAt or {}
+	local now = self:Now()
+	local shouldParseGuildTradeSkills = GetNumGuildTradeSkill
+		and GetGuildTradeSkillInfo
+		and now - (tonumber(self.guildTradeSkillParsedAt[professionKey]) or 0) >= GUILD_TRADE_SKILL_PARSE_THROTTLE
+	if shouldParseGuildTradeSkills then
 		self:RefreshGuildTradeSkills()
 		self:EnsureGuildTradeSkillHeaderExpanded(professionID)
 		local currentProfessionID
@@ -676,6 +703,7 @@ function AF:GetGuildProfessionRows(itemID, professionID, filterText, seenNames, 
 				end
 			end
 		end
+		self.guildTradeSkillParsedAt[professionKey] = now
 	end
 
 	for _, entry in ipairs(self:GetGuildRecipeMemberRows(itemID, professionID, filterText, seenNames, recipeID)) do

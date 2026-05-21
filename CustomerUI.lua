@@ -13,7 +13,9 @@ local CUSTOMER_PANEL_WIDTH = 482
 local CUSTOMER_PANEL_COLLAPSED_WIDTH = 28
 local CUSTOMER_PANEL_ATTACH_OFFSET_X = -5
 local CUSTOMER_COLLAPSE_BUTTON_LEVEL_OFFSET = 1000
-local CUSTOMER_REFRESH_WHO_COOLDOWN = 5
+local CUSTOMER_REFRESH_COOLDOWN = 5
+local CUSTOMER_QUERY_POLL_INTERVAL = 1.5
+local CUSTOMER_DEBUG_QUERY_POLL_INTERVAL = 5
 
 local function GetSortMode(index)
 	return SORT_MODES[index or 1] or SORT_MODES[1]
@@ -332,21 +334,32 @@ local function HideCustomerNoteTooltip()
 	if tooltip then
 		tooltip:Hide()
 		tooltip.ownerRow = nil
+		tooltip.ownerRegion = nil
 	end
 end
 
-local function UpdateCustomerNoteTooltip(row)
-	if not row or not row.noteTooltipText or not IsCursorOverRegion(row.detail) then
+local function UpdateCustomerTextTooltip(row)
+	local text
+	local region
+	if row and row.nameStatusTooltipText and IsCursorOverRegion(row.name) then
+		text = row.nameStatusTooltipText
+		region = row.name
+	elseif row and row.noteTooltipText and IsCursorOverRegion(row.detail) then
+		text = row.noteTooltipText
+		region = row.detail
+	end
+	if not text then
 		HideCustomerNoteTooltip()
 		return
 	end
 	local tooltip = GetCustomerNoteTooltip()
-	if tooltip.ownerRow == row and tooltip:IsShown() then
+	if tooltip.ownerRow == row and tooltip.ownerRegion == region and tooltip:IsShown() then
 		return
 	end
 	tooltip.ownerRow = row
+	tooltip.ownerRegion = region
 	tooltip:SetOwner(row, "ANCHOR_CURSOR")
-	tooltip:SetText(row.noteTooltipText, 1, 1, 1, 1, true)
+	tooltip:SetText(text, 1, 1, 1, 1, true)
 	tooltip:Show()
 end
 
@@ -458,7 +471,7 @@ local function CreateCustomerRow(parent)
 			end
 			AF:StyleCustomerTooltip(GameTooltip)
 			GameTooltip:Show()
-			buttonFrame:SetScript("OnUpdate", UpdateCustomerNoteTooltip)
+			buttonFrame:SetScript("OnUpdate", UpdateCustomerTextTooltip)
 		end
 	end)
 	row:SetScript("OnLeave", function(buttonFrame)
@@ -804,17 +817,11 @@ function AF:AttachCustomerUI()
 			AF:UpdateCustomerRefreshButton()
 			return
 		end
-		AF.customerRefreshCooldownUntil = AF:Now() + CUSTOMER_REFRESH_WHO_COOLDOWN
+		AF.customerRefreshCooldownUntil = AF:Now() + CUSTOMER_REFRESH_COOLDOWN
 		AF:UpdateCustomerRefreshButton()
-		C_Timer.After(CUSTOMER_REFRESH_WHO_COOLDOWN, function()
+		C_Timer.After(CUSTOMER_REFRESH_COOLDOWN, function()
 			AF:UpdateCustomerRefreshButton()
 		end)
-		if AF.StartCustomerWhoStatusChecks then
-			AF:StartCustomerWhoStatusChecks()
-		end
-		if AF.QueueCustomerWhoStatusChecks then
-			AF:QueueCustomerWhoStatusChecks(AF:GetVisibleCustomerEntries(), true, nil, true)
-		end
 		AF:RefreshCustomerQuery(true)
 	end)
 
@@ -932,7 +939,8 @@ function AF:AttachCustomerUI()
 			return
 		end
 		frame.elapsed = (frame.elapsed or 0) + elapsed
-		if frame.elapsed >= 1.5 then
+		local pollInterval = AF.db and AF.db.debugSelfResults and CUSTOMER_DEBUG_QUERY_POLL_INTERVAL or CUSTOMER_QUERY_POLL_INTERVAL
+		if frame.elapsed >= pollInterval then
 			frame.elapsed = 0
 			AF:RefreshCustomerQuery()
 		end
@@ -1162,36 +1170,6 @@ function AF:GetCustomerOrderItemContext()
 	} or nil
 end
 
-function AF:GetCustomerAutoWhoKey(context)
-	if not context or not context.itemID then
-		return nil
-	end
-	return table.concat({
-		tostring(context.itemID),
-		tostring(context.recipeID or 0),
-		tostring(context.professionID or 0),
-	}, ":")
-end
-
-function AF:StartInitialCustomerWhoStatusChecks(context)
-	if not self.StartCustomerWhoStatusChecks then
-		return
-	end
-
-	local key = self:GetCustomerAutoWhoKey(context)
-	if not key then
-		return
-	end
-
-	self.customerAutoWhoSeenCrafts = self.customerAutoWhoSeenCrafts or {}
-	if self.customerAutoWhoSeenCrafts[key] then
-		return
-	end
-
-	self.customerAutoWhoSeenCrafts[key] = true
-	self:StartCustomerWhoStatusChecks()
-end
-
 function AF:IsCustomerLiveSearchPending()
 	local itemID = tonumber(self.currentCustomerItemID)
 	if not itemID then
@@ -1266,6 +1244,11 @@ function AF:RefreshCustomerQuery(force)
 	self.currentCustomerProfessionID = context.professionID
 	self.currentCustomerRecipeID = context.recipeID
 
+	if not force and not changed and self.currentCustomerQueryToken and not self:IsCustomerLiveSearchPending() then
+		self:UpdateCustomerRefreshButton()
+		return
+	end
+
 	if force then
 		self:BroadcastQuery(context.itemID, context.professionID)
 	elseif changed or not self.currentCustomerQueryToken then
@@ -1274,7 +1257,7 @@ function AF:RefreshCustomerQuery(force)
 		self.currentCustomerQueryProfessionID = nil
 		self:QueueBroadcastQuery(context.itemID, context.professionID)
 	end
-	if force or changed then
+	if (force or changed) and not self.db.debugSelfResults then
 		if self.QueueGuildRecipeMemberQuery then
 			self:QueueGuildRecipeMemberQuery(context.professionID, context.recipeID)
 		end
@@ -1283,10 +1266,6 @@ function AF:RefreshCustomerQuery(force)
 			self:RefreshGuildTradeSkills()
 		end
 	end
-	if changed and self.StartCustomerWhoStatusChecks then
-		self:StartInitialCustomerWhoStatusChecks(context)
-	end
-	self.customerWhoStatusKickPending = force == true
 	self:InjectDebugSelfResult(context.itemID, context.professionID)
 	if self.InjectDebugTradeLeads then
 		self:InjectDebugTradeLeads()
@@ -1354,18 +1333,6 @@ function AF:RefreshCustomerResults(statusOverride)
 	local queryToken = self.currentCustomerQueryToken
 	local tutorialActive = self.customerTutorialActive == true
 	local rows = tutorialActive and { self:GetCustomerTutorialRow() } or (itemID and self:GetCachedArtisans(itemID, filterText, sortMode, queryToken) or {})
-	local hasOfflineFallbackRows = false
-	for _, entry in ipairs(rows) do
-		if entry.offlineFallback then
-			hasOfflineFallbackRows = true
-			break
-		end
-	end
-	local startWhoChecks = self.customerWhoStatusStartUntil and self:Now() <= self.customerWhoStatusStartUntil
-	if self.customerWhoStatusStartUntil and not startWhoChecks then
-		self.customerWhoStatusStartUntil = nil
-		self.customerWhoStatusBatchSeen = nil
-	end
 	if tutorialActive then
 		self:SetCustomerStatusText(self:Text("TUTORIAL_CUSTOMER_STATUS"))
 	elseif statusOverride then
@@ -1410,17 +1377,6 @@ function AF:RefreshCustomerResults(statusOverride)
 	end
 	frame.content:SetHeight(math.max(1, contentHeight))
 	UpdateCustomerScrollBar(frame.modernScrollBar)
-	if itemID and not tutorialActive and self.QueueCustomerWhoStatusChecks then
-		if startWhoChecks or hasOfflineFallbackRows then
-			self:QueueCustomerWhoStatusChecks(rows, true, self.customerWhoStatusBatchSeen, self.customerWhoStatusKickPending)
-		end
-		self.customerWhoStatusKickPending = nil
-		if #rows > 0 then
-			self.customerWhoStatusStartUntil = nil
-			self.customerWhoStatusBatchSeen = nil
-		end
-	end
-
 	if #rows == 0 and itemID then
 		local hasAvailableUnfiltered = false
 		if filterText ~= "" then

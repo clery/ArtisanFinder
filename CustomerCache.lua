@@ -131,6 +131,12 @@ local function MarkGuildAffiliation(AF, entry)
 		end
 		return entry
 	end
+	if entry.debug then
+		entry.guildMember = nil
+		entry.guildOnline = nil
+		entry.guildMemberGUID = nil
+		return entry
+	end
 	if entry.ownAlt and AF:IsNameOnConnectedRealm(entry.orderTarget or entry.name or entry.target) then
 		entry.guildMember = nil
 		entry.guildOnline = nil
@@ -246,7 +252,7 @@ function AF:GetCachedArtisans(itemID, filterText, sortMode, queryToken)
 
 	for _, entry in pairs(itemCache or {}) do
 		local verifiedForQuery = queryToken and tonumber(entry.lastQueryToken) == tonumber(queryToken) and entry.verifiedAt
-		if verifiedForQuery and entry.updatedAt and now - entry.updatedAt <= self.CACHE_MAX_AGE then
+		if verifiedForQuery and not (entry.debug and self.db.debugSelfResults ~= true) and entry.updatedAt and now - entry.updatedAt <= self.CACHE_MAX_AGE then
 			if EntryMatchesCustomerFilter(self, entry, filterText) then
 				local rowEntry = CopyCustomerEntry(entry)
 				rowEntry.certified = true
@@ -262,7 +268,7 @@ function AF:GetCachedArtisans(itemID, filterText, sortMode, queryToken)
 
 	for _, entry in pairs(itemCache or {}) do
 		local favoriteKey = self:GetFavoriteArtisanKey(entry)
-		if favoriteKey and not seenNames[favoriteKey] and self:IsFavoriteArtisan(entry) and EntryMatchesCustomerFilter(self, entry, filterText) then
+		if favoriteKey and not (entry.debug and self.db.debugSelfResults ~= true) and not seenNames[favoriteKey] and self:IsFavoriteArtisan(entry) and EntryMatchesCustomerFilter(self, entry, filterText) then
 			local favoriteEntry = CopyCustomerEntry(entry)
 			favoriteEntry.certified = true
 			favoriteEntry.tradeLead = false
@@ -275,7 +281,8 @@ function AF:GetCachedArtisans(itemID, filterText, sortMode, queryToken)
 		end
 	end
 	local showUncertifiedPeople = self.db.showUncertifiedPeople ~= false
-	if showUncertifiedPeople and self.GetGuildProfessionRows then
+	local includeGuildRows = showUncertifiedPeople and self.db.debugSelfResults ~= true
+	if includeGuildRows and self.GetGuildProfessionRows then
 		for _, entry in ipairs(self:GetGuildProfessionRows(itemID, self.currentCustomerProfessionID, filterText, seenNames, self.currentCustomerRecipeID)) do
 			table.insert(rows, entry)
 			MarkSeen(self, seenNames, entry)
