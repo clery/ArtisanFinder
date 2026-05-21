@@ -99,6 +99,9 @@ local function MarkSeen(AF, seenNames, entry)
 end
 
 local function EntryMatchesCustomerFilter(AF, entry, filterText)
+	if filterText == "" then
+		return true
+	end
 	local haystack = table.concat({
 		entry.name or "",
 		entry.professionName or "",
@@ -107,7 +110,7 @@ local function EntryMatchesCustomerFilter(AF, entry, filterText)
 		AF:FormatCapability(entry),
 		entry.bestReagentSummary or "",
 	}, " "):lower()
-	return filterText == "" or haystack:find(filterText, 1, true)
+	return haystack:find(filterText, 1, true)
 end
 
 function AF:CustomerEntryMatchesFilter(entry, filterText)
@@ -130,7 +133,7 @@ local function ClearGuildAffiliation(entry)
 end
 
 local function MarkGuildAffiliation(AF, entry)
-	if not entry or not AF.GetGuildRosterEntry then
+	if not entry or not AF.GetCachedGuildRosterEntry then
 		if entry then
 			ClearGuildAffiliation(entry)
 		end
@@ -143,7 +146,7 @@ local function MarkGuildAffiliation(AF, entry)
 		return ClearGuildAffiliation(entry)
 	end
 
-	local rosterEntry = AF:GetGuildRosterEntry(entry.orderTarget or entry.name or entry.target)
+	local rosterEntry = AF:GetCachedGuildRosterEntry(entry.orderTarget or entry.name or entry.target)
 	if rosterEntry then
 		entry.guildMember = true
 		entry.guildOnline = rosterEntry.online
@@ -152,6 +155,37 @@ local function MarkGuildAffiliation(AF, entry)
 	end
 
 	return ClearGuildAffiliation(entry)
+end
+
+local function PrepareOwnAltOrderEligibility(AF, entry)
+	if not entry or not entry.ownAlt then
+		return true
+	end
+	if AF:IsNameOnConnectedRealm(entry.orderTarget or entry.name or entry.target) then
+		ClearGuildAffiliation(entry)
+		return true
+	end
+
+	MarkGuildAffiliation(AF, entry)
+	return entry.guildMember == true
+end
+
+function AF:IsCustomerEntryOrderEligible(entry)
+	if not entry then
+		return false
+	end
+	if entry.guildMember then
+		return true
+	end
+	if entry.ownAlt then
+		return PrepareOwnAltOrderEligibility(self, entry)
+	end
+	if self:IsNameOnConnectedRealm(entry.orderTarget or entry.name or entry.target) then
+		return true
+	end
+
+	MarkGuildAffiliation(self, entry)
+	return entry.guildMember == true
 end
 
 function AF:GetOwnAltRows(itemID, professionID, filterText, seenNames, recipeID)
@@ -233,8 +267,7 @@ function AF:GetOwnAltRows(itemID, professionID, filterText, seenNames, recipeID)
 		}
 		if EntryMatchesCustomerFilter(self, entry, filterText) then
 			local seenKey = GetSeenKey(self, entry)
-			if seenKey and not seenNames[seenKey] then
-				MarkGuildAffiliation(self, entry)
+			if seenKey and not seenNames[seenKey] and self:IsCustomerEntryOrderEligible(entry) then
 				table.insert(rows, entry)
 				MarkSeen(self, seenNames, entry)
 			end
@@ -263,9 +296,10 @@ function AF:GetCachedArtisans(itemID, filterText, sortMode, queryToken)
 				rowEntry.tradeLead = false
 				rowEntry.unavailableFavorite = nil
 				rowEntry.professionLink = rowEntry.professionLink or self:GetRememberedProfessionLink(rowEntry.orderTarget or rowEntry.name, rowEntry.professionID)
-				MarkGuildAffiliation(self, rowEntry)
-				table.insert(rows, rowEntry)
-				MarkSeen(self, seenNames, rowEntry)
+				if self:IsCustomerEntryOrderEligible(rowEntry) then
+					table.insert(rows, rowEntry)
+					MarkSeen(self, seenNames, rowEntry)
+				end
 			end
 		end
 	end
@@ -279,9 +313,10 @@ function AF:GetCachedArtisans(itemID, filterText, sortMode, queryToken)
 			favoriteEntry.unavailableFavorite = true
 			favoriteEntry.target = favoriteEntry.orderTarget or favoriteEntry.name
 			favoriteEntry.professionLink = favoriteEntry.professionLink or self:GetRememberedProfessionLink(favoriteEntry.orderTarget or favoriteEntry.name, favoriteEntry.professionID)
-			MarkGuildAffiliation(self, favoriteEntry)
-			table.insert(rows, favoriteEntry)
-			MarkSeen(self, seenNames, favoriteEntry)
+			if self:IsCustomerEntryOrderEligible(favoriteEntry) then
+				table.insert(rows, favoriteEntry)
+				MarkSeen(self, seenNames, favoriteEntry)
+			end
 		end
 	end
 	local showUncertifiedPeople = self.db.showUncertifiedPeople ~= false
@@ -294,8 +329,10 @@ function AF:GetCachedArtisans(itemID, filterText, sortMode, queryToken)
 	end
 	if showUncertifiedPeople and self.GetTradeLeadRows then
 		for _, entry in ipairs(self:GetTradeLeadRows(itemID, self.currentCustomerProfessionID, filterText, seenNames, self.currentCustomerRecipeID)) do
-			table.insert(rows, entry)
-			MarkSeen(self, seenNames, entry)
+			if self:IsCustomerEntryOrderEligible(entry) then
+				table.insert(rows, entry)
+				MarkSeen(self, seenNames, entry)
+			end
 		end
 	end
 
@@ -323,13 +360,16 @@ function AF:GetCachedArtisans(itemID, filterText, sortMode, queryToken)
 				offlineEntry.offlineFallback = true
 				offlineEntry.target = offlineEntry.orderTarget or offlineEntry.name
 				offlineEntry.professionLink = offlineEntry.professionLink or self:GetRememberedProfessionLink(offlineEntry.orderTarget or offlineEntry.name, offlineEntry.professionID)
-				MarkGuildAffiliation(self, offlineEntry)
-				table.insert(candidates, offlineEntry)
+				if self:IsCustomerEntryOrderEligible(offlineEntry) then
+					table.insert(candidates, offlineEntry)
+				end
 			end
 		end
 		if showUncertifiedPeople and self.GetCachedTradeLeadFallbackRows then
 			for _, entry in ipairs(self:GetCachedTradeLeadFallbackRows(itemID, self.currentCustomerProfessionID, filterText, seenNames, self.currentCustomerRecipeID)) do
-				table.insert(candidates, entry)
+				if self:IsCustomerEntryOrderEligible(entry) then
+					table.insert(candidates, entry)
+				end
 			end
 		end
 		table.sort(candidates, function(a, b)

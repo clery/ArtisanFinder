@@ -1,3 +1,5 @@
 Libs/
 .release/
 .wow-ui-source/
+release.sh
+setup-packager.sh

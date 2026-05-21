@@ -113,12 +113,15 @@ local function HasIntersection(left, right)
 end
 
 local function TradeLeadMatchesFilter(row, filterText)
+	if filterText == "" then
+		return true
+	end
 	local haystack = table.concat({
 		row.name or "",
 		row.professionName or "",
 		row.note or "",
 	}, " "):lower()
-	return filterText == "" or haystack:find(filterText, 1, true)
+	return haystack:find(filterText, 1, true)
 end
 
 local function MarkTradeLeadSeen(seenNames, key, row)
@@ -304,7 +307,7 @@ function AF:GetCachedTradeLeadFallbackRows(itemID, professionID, filterText, see
 				offlineFallback = true,
 				note = self:Text("MISSING_ADDON_DATA"),
 			}
-			if TradeLeadMatchesFilter(row, filterText) then
+			if TradeLeadMatchesFilter(row, filterText) and self:IsCustomerEntryOrderEligible(row) then
 				table.insert(rows, row)
 			end
 		end
@@ -352,7 +355,7 @@ function AF:GetTradeLeadRows(itemID, professionID, filterText, seenNames, recipe
 				tradeProfessionMatch = exactProfessionMatch == true,
 				note = self:Text("MISSING_ADDON_DATA"),
 			}
-			if TradeLeadMatchesFilter(row, filterText) then
+			if TradeLeadMatchesFilter(row, filterText) and self:IsCustomerEntryOrderEligible(row) then
 				table.insert(rows, row)
 				MarkTradeLeadSeen(seenNames, name, row)
 			end

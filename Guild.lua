@@ -376,6 +376,20 @@ function AF:GetGuildRosterEntry(name)
 	return self.guildRosterByName and self.guildRosterByName[name] or nil
 end
 
+function AF:GetCachedGuildRosterEntry(name)
+	if not IsInGuild or not IsInGuild() then
+		return nil
+	end
+	self:EnsureGuildCache()
+	local normalizedName = self:NormalizeName(name)
+	if normalizedName and self.guildRosterByName and self.guildRosterByName[normalizedName] then
+		return self.guildRosterByName[normalizedName]
+	end
+	local shortKey = GetGuildShortNameKey(name)
+	local resolvedName = shortKey and self.guildRosterNameByShort and self.guildRosterNameByShort[shortKey]
+	return resolvedName and self.guildRosterByName and self.guildRosterByName[resolvedName] or nil
+end
+
 function AF:GetGuildMemberGUID(name)
 	local entry = self:GetGuildRosterEntry(name)
 	return entry and entry.guid or nil

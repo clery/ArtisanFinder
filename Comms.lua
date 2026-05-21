@@ -185,9 +185,6 @@ function AF:BroadcastQuery(itemID, professionID)
 	self.currentCustomerQueryProfessionID = normalizedProfessionID
 
 	local channelID = self:GetDiscoveryChannelID()
-	if not channelID or channelID == 0 then
-		return false
-	end
 
 	local payload = table.concat({
 		"Q",
@@ -197,7 +194,15 @@ function AF:BroadcastQuery(itemID, professionID)
 		requestTime,
 	}, "|")
 
-	return self:SendAddon(payload, "CHANNEL", tostring(channelID), "NORMAL", table.concat({ "Q", itemID, normalizedProfessionID }, ":"))
+	local sent = false
+	local queueName = table.concat({ "Q", itemID, normalizedProfessionID }, ":")
+	if channelID and channelID ~= 0 then
+		sent = self:SendAddon(payload, "CHANNEL", tostring(channelID), "NORMAL", queueName .. ":CHANNEL") or sent
+	end
+	if IsInGuild and IsInGuild() then
+		sent = self:SendAddon(payload, "GUILD", nil, "NORMAL", queueName .. ":GUILD") or sent
+	end
+	return sent
 end
 
 function AF:QueueBroadcastQuery(itemID, professionID)

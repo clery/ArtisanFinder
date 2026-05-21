@@ -14,6 +14,7 @@ local PROFESSION_ID_ALIASES = {
 	[10] = 356, -- Midnight Fishing
 	[12] = 755, -- Midnight Jewelcrafting
 }
+local REALM_CONNECTION_CACHE_MAX_AGE = 30 * 24 * 60 * 60
 local DEFAULT_OFF_ADVERTISING_NAMES = {
 	["cooking"] = true,
 	["fishing"] = true,
@@ -195,6 +196,7 @@ local function ApplyDBDefaults(db)
 	db.tradeLeads = db.tradeLeads or {}
 	db.tradeLeadCache = db.tradeLeadCache or {}
 	db.whoOnlineCache = db.whoOnlineCache or {}
+	db.connectedRealmCache = db.connectedRealmCache or {}
 	db.guildCache = db.guildCache or {}
 	db.guildCache.rosterByName = db.guildCache.rosterByName or {}
 	db.guildCache.recipeMembers = db.guildCache.recipeMembers or {}
@@ -290,6 +292,10 @@ end
 
 MIGRATIONS[10] = function(db)
 	db.tutorial = db.tutorial or {}
+end
+
+MIGRATIONS[11] = function(db)
+	db.connectedRealmCache = db.connectedRealmCache or {}
 end
 
 function AF:MigrateDB(db)
@@ -641,6 +647,74 @@ local function GetRealmKey(realm)
 	return tostring(realm or ""):gsub("%s+", ""):lower()
 end
 
+local function AddRealmKey(keys, realm)
+	local key = GetRealmKey(realm)
+	if key ~= "" then
+		keys[key] = true
+	end
+	return key
+end
+
+local function BuildConnectedRealmKeys()
+	local keys = {}
+	AddRealmKey(keys, GetRealmName())
+	if GetNormalizedRealmName then
+		AddRealmKey(keys, GetNormalizedRealmName())
+	end
+	if GetAutoCompleteRealms then
+		local realms = { GetAutoCompleteRealms() }
+		realms = type(realms[1]) == "table" and realms[1] or realms
+		for _, realm in ipairs(realms) do
+			AddRealmKey(keys, realm)
+		end
+	end
+	return keys
+end
+
+local function GetConnectedRealmCacheKey()
+	local key = AddRealmKey({}, GetNormalizedRealmName and GetNormalizedRealmName() or GetRealmName())
+	if key ~= "" then
+		return key
+	end
+	key = AddRealmKey({}, GetRealmName())
+	return key ~= "" and key or nil
+end
+
+local function IsConnectedRealmCacheFresh(AF, cacheEntry)
+	local updatedAt = tonumber(cacheEntry and cacheEntry.updatedAt) or 0
+	return updatedAt > 0 and AF:Now() - updatedAt <= REALM_CONNECTION_CACHE_MAX_AGE
+end
+
+local function GetConnectedRealmKeys(AF)
+	if AF.connectedRealmKeys then
+		return AF.connectedRealmKeys
+	end
+
+	local cacheKey = GetConnectedRealmCacheKey()
+	local cached = cacheKey and AF.db and AF.db.connectedRealmCache and AF.db.connectedRealmCache[cacheKey]
+	local keys = cached and cached.realms
+	if type(keys) == "table" and next(keys) and IsConnectedRealmCacheFresh(AF, cached) then
+		AddRealmKey(keys, GetRealmName())
+		if GetNormalizedRealmName then
+			AddRealmKey(keys, GetNormalizedRealmName())
+		end
+		AF.connectedRealmKeys = keys
+		return keys
+	end
+
+	keys = BuildConnectedRealmKeys()
+	if cacheKey and AF.db then
+		AF.db.connectedRealmCache = AF.db.connectedRealmCache or {}
+		AF.db.connectedRealmCache[cacheKey] = {
+			realms = keys,
+			updatedAt = AF:Now(),
+		}
+	end
+
+	AF.connectedRealmKeys = keys
+	return keys
+end
+
 function AF:GetNameRealm(name)
 	name = self:NormalizeName(name)
 	return name and name:match("^[^-]+%-(.+)$") or nil
@@ -652,23 +726,13 @@ function AF:IsNameOnConnectedRealm(name)
 		return true
 	end
 
-	local currentRealm = GetRealmKey(GetRealmName())
-	if targetRealm == currentRealm then
-		return true
+	self.connectedRealmNameCache = self.connectedRealmNameCache or {}
+	if self.connectedRealmNameCache[targetRealm] ~= nil then
+		return self.connectedRealmNameCache[targetRealm]
 	end
-	if GetNormalizedRealmName and targetRealm == GetRealmKey(GetNormalizedRealmName()) then
-		return true
-	end
-	if GetAutoCompleteRealms then
-		local realms = { GetAutoCompleteRealms() }
-		realms = type(realms[1]) == "table" and realms[1] or realms
-		for _, realm in ipairs(realms) do
-			if targetRealm == GetRealmKey(realm) then
-				return true
-			end
-		end
-	end
-	return false
+	local connected = GetConnectedRealmKeys(self)[targetRealm] == true
+	self.connectedRealmNameCache[targetRealm] = connected
+	return connected
 end
 
 function AF:IsGuildOrderEntry(entry)
