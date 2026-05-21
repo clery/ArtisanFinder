@@ -1,11 +1,27 @@
 # Changelog
 
+## 1.2.3 - 2026-05-21
+
+### Added
+
+- Added first-run minimap button guidance explaining availability, auto-availability, profession panel, and hide shortcuts.
+- Added preliminary optional reagent difficulty and quality estimate support for customer rows and tooltips when scan data is available.
+
+### Changed
+
+- Reduced profession scan queue overhead for large recipe lists.
+- Reused customer row frames with a frame pool and refactored shared UI styling, option dropdown creation, and event registration code.
+
+### Fixed
+
+- Fixed the hidden discovery channel so it waits for Trade before joining and moves behind visible channels if it joined too early.
+
 ## 1.2.2 - 2026-05-20
 
 ### Added
 
 - Added per-row customer refresh buttons for checking whether stale or offline-fallback artisans are online.
-- Added a loading indicators to artisan rows to indicate this data is stale, and may be inaccurate.
+- Added loading indicators to artisan rows while a manual online-status refresh is in progress.
 - Added in-form Personal Order and Guild Order warnings so review reminders appear in the Crafting Order form instead of chat.
 
 ### Fixed

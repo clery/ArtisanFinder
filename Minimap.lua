@@ -120,6 +120,9 @@ function AF:InitializeMinimap()
 	self.minimapIcon = icon
 	self:StyleMinimapButton()
 	self:RefreshMinimap()
+	C_Timer.After(0.1, function()
+		AF:MaybeShowMinimapTutorial()
+	end)
 end
 
 function AF:StyleMinimapButton()
@@ -136,9 +139,15 @@ function AF:SetMinimapHidden(hidden)
 	self.db.minimap.hide = hidden == true
 	if self.minimapIcon then
 		if self.db.minimap.hide then
+			if self.CloseMinimapTutorial then
+				self:CloseMinimapTutorial(false)
+			end
 			self.minimapIcon:Hide("ArtisanFinder")
 		else
 			self.minimapIcon:Show("ArtisanFinder")
+			C_Timer.After(0.1, function()
+				AF:MaybeShowMinimapTutorial()
+			end)
 		end
 	end
 	if self.RefreshOptionsPanel then
@@ -162,6 +171,9 @@ function AF:RefreshMinimap()
 			self.minimapIcon:Hide("ArtisanFinder")
 		else
 			self.minimapIcon:Show("ArtisanFinder")
+			C_Timer.After(0.1, function()
+				AF:MaybeShowMinimapTutorial()
+			end)
 		end
 	end
 	self:RefreshOpenMinimapTooltip()

@@ -1,4 +1,9 @@
 [] Think of a way to advertise a multi-character "shop", so people may find you, and potentially a more complete description of your specializations and such.
-[] Take into account Optional Reagents, such as "Add Embellishment" and "Customize Secondary Stats" which can increase the craft's difficulty. Most customer orders will at least customize secondary stats, and sometimes add an embellishment. Make it as concise and precise as possible in the customer view tooltip and row description, without adding too much row space, or if it would make it really easier to read, increase the width of the ArtisanFinder customer view (but not so much that the "Current Listings" panel would go off screen)
+
+[] Finish optional reagent support, such as "Add Embellishment" and "Customize Secondary Stats", so the customer view consistently shows added difficulty, resulting quality, and suggested optional reagent information where the game exposes it.
 
 [] See if adding communities as broadcast channels is possible.
+
+[] When clicking the a row, prefill the Crafting order like the current "Personal Order" and "Guild Order" buttons do, and add information to the Crafting Order panel with suggested reagent and optional reagent for best results (with or without each optional reagent)
+
+[] Fix components names in tooltip showing in the crafter's locale instead of the game's locale.

@@ -122,26 +122,25 @@ local function CopyCustomerEntry(entry)
 	return copy
 end
 
+local function ClearGuildAffiliation(entry)
+	entry.guildMember = nil
+	entry.guildOnline = nil
+	entry.guildMemberGUID = nil
+	return entry
+end
+
 local function MarkGuildAffiliation(AF, entry)
 	if not entry or not AF.GetGuildRosterEntry then
 		if entry then
-			entry.guildMember = nil
-			entry.guildOnline = nil
-			entry.guildMemberGUID = nil
+			ClearGuildAffiliation(entry)
 		end
 		return entry
 	end
 	if entry.debug then
-		entry.guildMember = nil
-		entry.guildOnline = nil
-		entry.guildMemberGUID = nil
-		return entry
+		return ClearGuildAffiliation(entry)
 	end
 	if entry.ownAlt and AF:IsNameOnConnectedRealm(entry.orderTarget or entry.name or entry.target) then
-		entry.guildMember = nil
-		entry.guildOnline = nil
-		entry.guildMemberGUID = nil
-		return entry
+		return ClearGuildAffiliation(entry)
 	end
 
 	local rosterEntry = AF:GetGuildRosterEntry(entry.orderTarget or entry.name or entry.target)
@@ -152,10 +151,7 @@ local function MarkGuildAffiliation(AF, entry)
 		return entry
 	end
 
-	entry.guildMember = nil
-	entry.guildOnline = nil
-	entry.guildMemberGUID = nil
-	return entry
+	return ClearGuildAffiliation(entry)
 end
 
 function AF:GetOwnAltRows(itemID, professionID, filterText, seenNames, recipeID)
@@ -220,6 +216,13 @@ function AF:GetOwnAltRows(itemID, professionID, filterText, seenNames, recipeID)
 			bestReagentSummaryUpdatedAt = item.bestReagentSummaryUpdatedAt,
 			bestReagentTruncated = item.bestReagentTruncated,
 			bestReagentPendingNames = item.bestReagentPendingNames,
+			optionalDifficultyDelta = item.optionalDifficultyDelta,
+			optionalQuality = item.optionalQuality,
+			optionalQualityAtlas = item.optionalQualityAtlas,
+			optionalConcentrationQuality = item.optionalConcentrationQuality,
+			optionalConcentrationQualityAtlas = item.optionalConcentrationQualityAtlas,
+			optionalReagentSummary = item.optionalReagentSummary,
+			optionalSlotCount = item.optionalSlotCount,
 			professionLink = professionLink,
 			updatedAt = item.updatedAt or profile.updatedAt or self:Now(),
 			verifiedAt = self:Now(),

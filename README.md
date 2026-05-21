@@ -18,7 +18,7 @@ The addon is built around a simple idea: customers should be able to find the ri
 *   Personal order field helper for recipient and commission review.
 *   Profession-link opening from customer results.
 *   Collapsible customer and crafter panels that stay out of the way when you need more room.
-*   Reagent recommendations with reagent icons in tooltips.
+*   Reagent recommendations with reagent icons in tooltips, plus preliminary optional reagent difficulty estimates when scan data is available.
 *   Trade-chat profession leads for crafters who do not use the addon, with configurable duration and offline fallback.
 *   Background recipe scanning that resumes if the profession window closes.
 *   Official Options -> AddOns configuration panel.
@@ -75,6 +75,8 @@ If you craft on multiple characters, scan each character's professions once. Whe
 For addon-enabled crafters, ArtisanFinder can show suggested reagents for the selected craft. These recommendations are meant to answer a practical customer question: which reagent qualities should I provide to get the best useful result from this crafter?
 
 Recommendations prefer lower-quality reagents when higher-quality reagents do not improve the result, and higher-quality reagents when they do. Reagent names and icons are shown directly in the customer tooltip, so you do not need to interpret item IDs or external notes.
+
+When a craft exposes common optional difficulty modifiers such as embellishments or secondary-stat customization during scanning, ArtisanFinder can also estimate the added difficulty and resulting quality so customers can plan more realistic orders.
 
 ## Commission Values
 

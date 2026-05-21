@@ -340,6 +340,11 @@ function AF:FormatCapability(entry)
 		table.insert(parts, self:Text("RECOMMENDED_REAGENTS_QUALITY", self:GetQualityIconMarkup(bestQuality, entry.bestQualityAtlas, 16) or ("Q" .. bestQuality)))
 	end
 
+	local optionalText = self:FormatOptionalReagentImpact(entry, true)
+	if optionalText ~= "" then
+		table.insert(parts, optionalText)
+	end
+
 	local line = table.concat(parts, " - ")
 	if concentrationQuality and concentrationQuality > (bestQuality or normalQuality or 0) then
 		local concentrationText = self:Text("CONCENTRATION_QUALITY", self:GetQualityIconMarkup(concentrationQuality, concentrationAtlas, 16) or ("Q" .. concentrationQuality))
@@ -352,9 +357,50 @@ function AF:FormatCapability(entry)
 	return line
 end
 
+function AF:FormatOptionalReagentImpact(entry, compact)
+	local delta = tonumber(entry and entry.optionalDifficultyDelta)
+	if not delta or delta <= 0 then
+		return ""
+	end
+	local quality = tonumber(entry.optionalQuality)
+	local concentrationQuality = tonumber(entry.optionalConcentrationQuality)
+	local qualityText = quality and quality > 0 and (self:GetQualityIconMarkup(quality, entry.optionalQualityAtlas, 16) or ("Q" .. quality)) or nil
+	local concentrationText = concentrationQuality and concentrationQuality > (quality or 0)
+		and (self:GetQualityIconMarkup(concentrationQuality, entry.optionalConcentrationQualityAtlas, 16) or ("Q" .. concentrationQuality))
+		or nil
+	if compact then
+		if concentrationText then
+			return self:Text("OPTIONAL_REAGENTS_ROW_CONCENTRATION", delta, qualityText or "?", concentrationText)
+		end
+		if qualityText then
+			return self:Text("OPTIONAL_REAGENTS_ROW", delta, qualityText)
+		end
+		return self:Text("OPTIONAL_REAGENTS_ROW_DIFFICULTY", delta)
+	end
+	if concentrationText then
+		return self:Text("OPTIONAL_REAGENTS_TOOLTIP_CONCENTRATION", delta, qualityText or "?", concentrationText)
+	end
+	if qualityText then
+		return self:Text("OPTIONAL_REAGENTS_TOOLTIP", delta, qualityText)
+	end
+	return self:Text("OPTIONAL_REAGENTS_TOOLTIP_DIFFICULTY", delta)
+end
+
 function AF:AddCapabilityTooltipLines(tooltip, entry)
 	if not tooltip or not entry then
 		return
+	end
+
+	local optionalText = self:FormatOptionalReagentImpact(entry, false)
+	if optionalText ~= "" then
+		tooltip:AddLine(" ")
+		tooltip:AddLine(self:Text("OPTIONAL_REAGENTS"), 1, 0.82, 0)
+		tooltip:AddLine(optionalText, 1, 1, 1, true)
+		if entry.optionalReagentSummary and entry.optionalReagentSummary ~= "" then
+			tooltip:AddLine(entry.optionalReagentSummary, 0.75, 0.75, 0.75, true)
+		elseif tonumber(entry.optionalSlotCount) and tonumber(entry.optionalSlotCount) > 0 then
+			tooltip:AddLine(self:Text("OPTIONAL_REAGENTS_SLOT_COUNT", entry.optionalSlotCount), 0.75, 0.75, 0.75, true)
+		end
 	end
 
 	if entry.bestReagentSummary and entry.bestReagentSummary ~= "" then

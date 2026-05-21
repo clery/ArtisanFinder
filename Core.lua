@@ -2,39 +2,57 @@ local addonName, AF = ...
 
 AF.frame = CreateFrame("Frame")
 
-local function RegisterEvent(frame, event)
-	local ok = pcall(frame.RegisterEvent, frame, event)
-	if not ok then
-		AF:Print(AF:Text("EVENT_UNAVAILABLE", event))
-	end
+local EVENTS = {
+	"ADDON_LOADED",
+	"PLAYER_LOGIN",
+	"PLAYER_REGEN_ENABLED",
+	"PLAYER_REGEN_DISABLED",
+	"PLAYER_ENTERING_WORLD",
+	"ZONE_CHANGED",
+	"ZONE_CHANGED_INDOORS",
+	"ZONE_CHANGED_NEW_AREA",
+	"CHANNEL_UI_UPDATE",
+	"CHAT_MSG_CHANNEL_NOTICE",
+	"CHAT_MSG_ADDON",
+	"CHAT_MSG_CHANNEL",
+	"GUILD_ROSTER_UPDATE",
+	"GUILD_TRADESKILL_UPDATE",
+	"GUILD_RECIPE_KNOWN_BY_MEMBERS",
+	"CRAFTINGORDERS_SHOW_CUSTOMER",
+	"TRADE_SKILL_SHOW",
+	"TRADE_SKILL_CLOSE",
+	"TRADE_SKILL_LIST_UPDATE",
+	"TRADE_SKILL_DATA_SOURCE_CHANGED",
+	"SKILL_LINES_CHANGED",
+	"SPELLS_CHANGED",
+	"PLAYER_EQUIPMENT_CHANGED",
+	"PROFESSION_EQUIPMENT_CHANGED",
+	"TRAIT_CONFIG_UPDATED",
+	"TRAIT_NODE_CHANGED",
+}
+
+for _, event in ipairs(EVENTS) do
+	AF.frame:RegisterEvent(event)
 end
 
-RegisterEvent(AF.frame, "ADDON_LOADED")
-RegisterEvent(AF.frame, "PLAYER_LOGIN")
-RegisterEvent(AF.frame, "PLAYER_REGEN_ENABLED")
-RegisterEvent(AF.frame, "PLAYER_REGEN_DISABLED")
-RegisterEvent(AF.frame, "PLAYER_ENTERING_WORLD")
-RegisterEvent(AF.frame, "ZONE_CHANGED")
-RegisterEvent(AF.frame, "ZONE_CHANGED_INDOORS")
-RegisterEvent(AF.frame, "ZONE_CHANGED_NEW_AREA")
-RegisterEvent(AF.frame, "CHANNEL_UI_UPDATE")
-RegisterEvent(AF.frame, "CHAT_MSG_CHANNEL_NOTICE")
-RegisterEvent(AF.frame, "CHAT_MSG_ADDON")
-RegisterEvent(AF.frame, "CHAT_MSG_CHANNEL")
-RegisterEvent(AF.frame, "GUILD_ROSTER_UPDATE")
-RegisterEvent(AF.frame, "GUILD_TRADESKILL_UPDATE")
-RegisterEvent(AF.frame, "GUILD_RECIPE_KNOWN_BY_MEMBERS")
-RegisterEvent(AF.frame, "CRAFTINGORDERS_SHOW_CUSTOMER")
-RegisterEvent(AF.frame, "TRADE_SKILL_SHOW")
-RegisterEvent(AF.frame, "TRADE_SKILL_CLOSE")
-RegisterEvent(AF.frame, "TRADE_SKILL_LIST_UPDATE")
-RegisterEvent(AF.frame, "TRADE_SKILL_DATA_SOURCE_CHANGED")
-RegisterEvent(AF.frame, "SKILL_LINES_CHANGED")
-RegisterEvent(AF.frame, "SPELLS_CHANGED")
-RegisterEvent(AF.frame, "PLAYER_EQUIPMENT_CHANGED")
-RegisterEvent(AF.frame, "PROFESSION_EQUIPMENT_CHANGED")
-RegisterEvent(AF.frame, "TRAIT_CONFIG_UPDATED")
-RegisterEvent(AF.frame, "TRAIT_NODE_CHANGED")
+local AUTO_AVAILABILITY_EVENTS = {
+	PLAYER_ENTERING_WORLD = true,
+	ZONE_CHANGED = true,
+	ZONE_CHANGED_INDOORS = true,
+	ZONE_CHANGED_NEW_AREA = true,
+	CHANNEL_UI_UPDATE = true,
+	CHAT_MSG_CHANNEL_NOTICE = true,
+}
+
+local SCAN_CHANGE_EVENTS = {
+	TRADE_SKILL_LIST_UPDATE = true,
+	SKILL_LINES_CHANGED = true,
+	SPELLS_CHANGED = true,
+	PLAYER_EQUIPMENT_CHANGED = true,
+	PROFESSION_EQUIPMENT_CHANGED = true,
+	TRAIT_CONFIG_UPDATED = true,
+	TRAIT_NODE_CHANGED = true,
+}
 
 function AF:OnAddonLoaded(name)
 	if name ~= addonName then
@@ -83,24 +101,21 @@ function AF:ToggleAvailable()
 	self:SetAvailable(not self.available)
 end
 
-function AF:HasTradeChatAccess()
-	if GetChannelList then
-		local channels = { GetChannelList() }
-		for _, value in ipairs(channels) do
-			if type(value) == "string" and self:IsTradeChannelName(value) then
-				return true
-			end
-		end
-	end
-	if EnumerateServerChannels then
-		local channels = { EnumerateServerChannels() }
-		for _, channelName in ipairs(channels) do
-			if self:IsTradeChannelName(channelName) then
-				return true
-			end
+local function ContainsTradeChannelName(...)
+	for i = 1, select("#", ...) do
+		local value = select(i, ...)
+		if type(value) == "string" and AF:IsTradeChannelName(value) then
+			return true
 		end
 	end
 	return false
+end
+
+function AF:HasTradeChatAccess()
+	if GetChannelList and ContainsTradeChannelName(GetChannelList()) then
+		return true
+	end
+	return EnumerateServerChannels and ContainsTradeChannelName(EnumerateServerChannels()) or false
 end
 
 function AF:ShouldAutoBeAvailable()
@@ -221,7 +236,7 @@ AF.frame:SetScript("OnEvent", function(_, event, ...)
 			AF.deferredScanResume = nil
 			AF:ResumeCurrentProfessionScanIfNeeded()
 		end
-	elseif event == "PLAYER_ENTERING_WORLD" or event == "ZONE_CHANGED" or event == "ZONE_CHANGED_INDOORS" or event == "ZONE_CHANGED_NEW_AREA" or event == "CHANNEL_UI_UPDATE" or event == "CHAT_MSG_CHANNEL_NOTICE" then
+	elseif AUTO_AVAILABILITY_EVENTS[event] then
 		if AF:IsInCombatLocked() then
 			AF.deferredAutoAvailabilityRefresh = true
 			return
@@ -323,7 +338,7 @@ AF.frame:SetScript("OnEvent", function(_, event, ...)
 		else
 			AF.activeScan = nil
 		end
-	elseif event == "TRADE_SKILL_LIST_UPDATE" or event == "SKILL_LINES_CHANGED" or event == "SPELLS_CHANGED" or event == "PLAYER_EQUIPMENT_CHANGED" or event == "PROFESSION_EQUIPMENT_CHANGED" or event == "TRAIT_CONFIG_UPDATED" or event == "TRAIT_NODE_CHANGED" then
+	elseif SCAN_CHANGE_EVENTS[event] then
 		if AF:IsInCombatLocked() then
 			AF.deferredAutoScanReason = event
 			if event == "PROFESSION_EQUIPMENT_CHANGED" then

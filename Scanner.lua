@@ -22,6 +22,9 @@ local function GetRecommendationSnapshot(item)
 		tostring(item.rawBestQuality or ""),
 		tostring(item.bestReagentTruncated == true),
 		tostring(item.bestReagentPendingNames == true),
+		tostring(item.optionalDifficultyDelta or ""),
+		tostring(item.optionalQuality or ""),
+		tostring(item.optionalConcentrationQuality or ""),
 	}, "|")
 end
 
@@ -336,6 +339,23 @@ function AF:BuildScanProgress(profession, professionEntry, signature, force, mod
 	return professionEntry.scanProgress
 end
 
+local function GetPendingIndex(progress)
+	return math.max(1, tonumber(progress and progress.pendingIndex) or 1)
+end
+
+local function GetPendingCount(progress)
+	local pending = progress and progress.pending
+	if not pending then
+		return 0
+	end
+	return math.max(0, #pending - GetPendingIndex(progress) + 1)
+end
+
+local function GetNextPendingJob(progress)
+	local pending = progress and progress.pending
+	return pending and pending[GetPendingIndex(progress)]
+end
+
 function AF:IsLowerOrEqualEquipmentProbe(existing, probe)
 	if not existing or not probe then
 		return false
@@ -546,7 +566,7 @@ function AF:ProcessScanQueue()
 	self.scanQueueToken = (self.scanQueueToken or 0) + 1
 	local token = self.scanQueueToken
 	local active, professionEntry, progress = self:GetActiveScanProgress()
-	local nextJob = progress and progress.pending and progress.pending[1]
+	local nextJob = GetNextPendingJob(progress)
 	C_Timer.After(self:GetScanJobDelay(nextJob), function()
 		if token ~= AF.scanQueueToken then
 			return
@@ -566,13 +586,14 @@ function AF:ProcessScanQueue()
 			return
 		end
 
-		local jobsToProcess = AF:GetScanJobsPerTick(progress.pending and progress.pending[1])
+		local jobsToProcess = AF:GetScanJobsPerTick(GetNextPendingJob(progress))
 		local profession = { id = active.professionID, name = professionEntry.name }
 		for _ = 1, jobsToProcess do
-			local job = table.remove(progress.pending, 1)
+			local job = GetNextPendingJob(progress)
 			if not job then
 				break
 			end
+			progress.pendingIndex = GetPendingIndex(progress) + 1
 			local result = AF:ScanJob(profession, professionEntry, job)
 			if result == false then
 				return
@@ -585,7 +606,7 @@ function AF:ProcessScanQueue()
 		end
 		AF:RefreshScanProgressUI()
 
-		if #progress.pending == 0 then
+		if GetPendingCount(progress) == 0 then
 			AF:CompleteActiveScan(active, professionEntry, progress)
 		else
 			AF:ProcessScanQueue()
@@ -609,7 +630,7 @@ function AF:PauseActiveProfessionScan(silent)
 		return
 	end
 	local progress = professionEntry and professionEntry.scanProgress
-	local remaining = progress and progress.pending and #progress.pending or 0
+	local remaining = GetPendingCount(progress)
 	self.activeScan = nil
 	self:RefreshScanProgressUI(true)
 
@@ -661,7 +682,7 @@ function AF:StartOrResumeCurrentProfessionScan(force, silent, mode, forceProbe, 
 		professionEntry.equipmentSignature = self:GetCurrentProfessionEquipmentSignature(profession) or professionEntry.equipmentSignature
 	end
 	if professionEntry.scanSignature == currentSignature and professionEntry.scanProgress then
-		local remaining = professionEntry.scanProgress.pending and #professionEntry.scanProgress.pending or 0
+		local remaining = GetPendingCount(professionEntry.scanProgress)
 		if remaining == 0 then
 			professionEntry.scanProgress = nil
 		end
@@ -683,7 +704,7 @@ function AF:StartOrResumeCurrentProfessionScan(force, silent, mode, forceProbe, 
 		end
 		return 0
 	end
-	if #progress.pending == 0 then
+	if GetPendingCount(progress) == 0 then
 		professionEntry.scanSignature = currentSignature
 		professionEntry.scanMode = mode
 		professionEntry.scannedAt = self:Now()
@@ -701,7 +722,7 @@ function AF:StartOrResumeCurrentProfessionScan(force, silent, mode, forceProbe, 
 		self:Print(self:Text(progress.scanned and progress.scanned > 0 and "SCAN_RESUMED" or "SCAN_STARTED", profession.name))
 	end
 	self:ProcessScanQueue()
-	return #progress.pending
+	return GetPendingCount(progress)
 end
 
 function AF:ProfessionHasPendingReagentNameWork(professionID)

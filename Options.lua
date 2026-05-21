@@ -47,40 +47,15 @@ local function CreateSortOptions()
 	return options
 end
 
-local function CreateCleanupOptions()
-	local options = {}
-	for _, option in ipairs(CLEANUP_OPTIONS) do
-		table.insert(options, {
-			controlType = Settings.ControlType.Radio,
-			label = AF:Text(option.labelKey),
-			text = AF:Text(option.labelKey),
-			value = option.days,
-		})
-	end
-	return options
-end
-
-local function CreateTradeLeadOptions()
-	local options = {}
-	for _, option in ipairs(TRADE_LEAD_OPTIONS) do
-		table.insert(options, {
-			controlType = Settings.ControlType.Radio,
-			label = AF:Text(option.labelKey),
-			text = AF:Text(option.labelKey),
-			value = option.minutes,
-		})
-	end
-	return options
-end
-
-local function CreateCountOptions(optionTable)
+local function CreateRadioOptions(optionTable, valueKey)
 	local options = {}
 	for _, option in ipairs(optionTable) do
+		local text = AF:Text(option.labelKey)
 		table.insert(options, {
 			controlType = Settings.ControlType.Radio,
-			label = AF:Text(option.labelKey),
-			text = AF:Text(option.labelKey),
-			value = option.count,
+			label = text,
+			text = text,
+			value = option[valueKey],
 		})
 	end
 	return options
@@ -189,7 +164,9 @@ function AF:InitializeOptions()
 			AF.db.cacheCleanupDays = tonumber(value) or 7
 		end
 	)
-	Settings.CreateDropdown(category, cleanupFrequency, CreateCleanupOptions, self:Text("OPTIONS_CLEANUP_FREQUENCY_DESC"))
+	Settings.CreateDropdown(category, cleanupFrequency, function()
+		return CreateRadioOptions(CLEANUP_OPTIONS, "days")
+	end, self:Text("OPTIONS_CLEANUP_FREQUENCY_DESC"))
 
 	local offlineFallbackResults = RegisterProxySetting(
 		"ArtisanFinder_OfflineFallbackResults",
@@ -207,7 +184,7 @@ function AF:InitializeOptions()
 		end
 	)
 	Settings.CreateDropdown(category, offlineFallbackResults, function()
-		return CreateCountOptions(OFFLINE_FALLBACK_RESULT_OPTIONS)
+		return CreateRadioOptions(OFFLINE_FALLBACK_RESULT_OPTIONS, "count")
 	end, self:Text("OPTIONS_OFFLINE_FALLBACK_RESULTS_DESC"))
 
 	local offlineFallbackMax = RegisterProxySetting(
@@ -226,7 +203,7 @@ function AF:InitializeOptions()
 		end
 	)
 	Settings.CreateDropdown(category, offlineFallbackMax, function()
-		return CreateCountOptions(OFFLINE_FALLBACK_MAX_OPTIONS)
+		return CreateRadioOptions(OFFLINE_FALLBACK_MAX_OPTIONS, "count")
 	end, self:Text("OPTIONS_OFFLINE_FALLBACK_MAX_DESC"))
 
 	AddSection("OPTIONS_SECTION_TRADE_LEADS")
@@ -248,7 +225,9 @@ function AF:InitializeOptions()
 			end
 		end
 	)
-	Settings.CreateDropdown(category, tradeLeadLifetime, CreateTradeLeadOptions, self:Text("OPTIONS_TRADE_LEADS_LIFETIME_DESC"))
+	Settings.CreateDropdown(category, tradeLeadLifetime, function()
+		return CreateRadioOptions(TRADE_LEAD_OPTIONS, "minutes")
+	end, self:Text("OPTIONS_TRADE_LEADS_LIFETIME_DESC"))
 
 	AddSection("OPTIONS_SECTION_SCANNING")
 	local fastScan = RegisterProxySetting(

@@ -363,8 +363,7 @@ local function UpdateCustomerTextTooltip(row)
 	tooltip:Show()
 end
 
-local function CreateCustomerRow(parent)
-	local row = CreateFrame("Button", nil, parent, "ArtisanFinderCustomerRowTemplate")
+local function ConfigureCustomerRow(row)
 	AF:StyleListRow(row)
 	row:EnableMouse(true)
 	row:RegisterForClicks("LeftButtonUp")
@@ -481,6 +480,24 @@ local function CreateCustomerRow(parent)
 	end)
 
 	return row
+end
+
+local function ResetCustomerRow(_, row)
+	row:SetScript("OnUpdate", nil)
+	row.entry = nil
+	row.artisanFinderWhoName = nil
+	row.nameStatusTooltipText = nil
+	row.noteTooltipText = nil
+	if row.whoSpinner then
+		row.whoSpinner:Hide()
+		row.artisanFinderWhoSpinnerName = nil
+	end
+	if row.whoRefresh then
+		row.whoRefresh:Hide()
+	end
+	HideCustomerNoteTooltip()
+	row:ClearAllPoints()
+	row:Hide()
 end
 
 function AF:HookCustomerCurrentListings()
@@ -833,6 +850,8 @@ function AF:AttachCustomerUI()
 	frame.content:SetSize(394, 1)
 	frame.content:SetClipsChildren(true)
 	frame.scroll:SetScrollChild(frame.content)
+	self.customerRows = self.customerRows or {}
+	self.customerRowPool = CreateFramePool("Button", frame.content, "ArtisanFinderCustomerRowTemplate", ResetCustomerRow, nil, ConfigureCustomerRow)
 	frame.scrollInset:ClearAllPoints()
 	frame.scrollInset:SetPoint("TOPLEFT", frame.scroll, "TOPLEFT", -4, 4)
 	frame.scrollInset:SetPoint("BOTTOMRIGHT", frame.scroll, "BOTTOMRIGHT", 23, -4)
@@ -1274,13 +1293,16 @@ function AF:RefreshCustomerQuery(force)
 	self:RefreshCustomerResults()
 end
 
-function AF:EnsureCustomerRows(count)
+function AF:AcquireCustomerRows(count)
 	local frame = self.customerFrame
-	if not frame then
+	if not frame or not self.customerRowPool then
 		return
 	end
-	for i = #self.customerRows + 1, count do
-		local row = CreateCustomerRow(frame.content)
+	self.customerRowPool:ReleaseAll()
+	table.wipe(self.customerRows)
+	for i = 1, count do
+		local row = self.customerRowPool:Acquire()
+		row:SetParent(frame.content)
 		self.customerRows[i] = row
 	end
 end
@@ -1342,7 +1364,7 @@ function AF:RefreshCustomerResults(statusOverride)
 	else
 		self:SetCustomerStatusText(self:Text("SELECT_ORDER_ITEM"))
 	end
-	self:EnsureCustomerRows(#rows)
+	self:AcquireCustomerRows(#rows)
 	frame.content:SetWidth(math.max(1, frame.scroll:GetWidth() - 4))
 	frame.scrollBar:SetShown(true)
 	frame.scrollBar:SetAlpha(0)
@@ -1350,30 +1372,17 @@ function AF:RefreshCustomerResults(statusOverride)
 	local contentHeight = ROW_TOP_PADDING
 	for i, row in ipairs(self.customerRows or {}) do
 		local entry = rows[i]
-		if entry then
-			row.entry = entry
-			row:ClearAllPoints()
-			row:SetPoint("TOPLEFT", 0, -contentHeight)
-			row:SetWidth(math.max(280, frame.scroll:GetWidth() - 4))
-			row.name:ClearAllPoints()
-			row.name:SetPoint("TOPLEFT", row.certified, "TOPRIGHT", 4, 0)
-			row.name:SetPoint("RIGHT", row.updatedAt, "LEFT", -4, 0)
-			local rowHeight = self:ApplyCustomerRowViewModel(row, self:BuildCustomerRowViewModel(entry), ROW_HEIGHT, ROW_BOTTOM_PADDING)
-			row:SetHeight(rowHeight)
-			contentHeight = contentHeight + rowHeight
-			row:Show()
-		else
-			row.entry = nil
-			row.artisanFinderWhoName = nil
-			if row.whoSpinner then
-				row.whoSpinner:Hide()
-				row.artisanFinderWhoSpinnerName = nil
-			end
-			if row.whoRefresh then
-				row.whoRefresh:Hide()
-			end
-			row:Hide()
-		end
+		row.entry = entry
+		row:ClearAllPoints()
+		row:SetPoint("TOPLEFT", 0, -contentHeight)
+		row:SetWidth(math.max(280, frame.scroll:GetWidth() - 4))
+		row.name:ClearAllPoints()
+		row.name:SetPoint("TOPLEFT", row.certified, "TOPRIGHT", 4, 0)
+		row.name:SetPoint("RIGHT", row.updatedAt, "LEFT", -4, 0)
+		local rowHeight = self:ApplyCustomerRowViewModel(row, self:BuildCustomerRowViewModel(entry), ROW_HEIGHT, ROW_BOTTOM_PADDING)
+		row:SetHeight(rowHeight)
+		contentHeight = contentHeight + rowHeight
+		row:Show()
 	end
 	frame.content:SetHeight(math.max(1, contentHeight))
 	UpdateCustomerScrollBar(frame.modernScrollBar)

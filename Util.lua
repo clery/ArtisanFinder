@@ -83,6 +83,20 @@ function AF:ApplyCustomerSidePanel(frame)
 	frame.TopTileStreaks:Hide()
 end
 
+local function ApplyInsetNineSlice(frame, rightOffset)
+	if frame.NineSlice then
+		return
+	end
+	frame.NineSlice = CreateFrame("Frame", nil, frame, "NineSlicePanelTemplate")
+	frame.NineSlice:SetPoint("TOPLEFT", 0, 0)
+	frame.NineSlice:SetPoint("BOTTOMRIGHT", rightOffset or 0, 0)
+	frame.NineSlice:SetFrameLevel(frame:GetFrameLevel())
+	frame.NineSlice.layoutType = "InsetFrameTemplate"
+	if NineSliceUtil and NineSliceUtil.ApplyLayoutByName then
+		NineSliceUtil.ApplyLayoutByName(frame.NineSlice, frame.NineSlice.layoutType)
+	end
+end
+
 function AF:ApplyCustomerListInset(frame)
 	if not frame.Background then
 		frame.Background = frame:CreateTexture(nil, "BACKGROUND")
@@ -91,16 +105,7 @@ function AF:ApplyCustomerListInset(frame)
 		frame.Background:SetPoint("BOTTOMRIGHT", -30, 0)
 	end
 
-	if not frame.NineSlice then
-		frame.NineSlice = CreateFrame("Frame", nil, frame, "NineSlicePanelTemplate")
-		frame.NineSlice:SetPoint("TOPLEFT", 0, 0)
-		frame.NineSlice:SetPoint("BOTTOMRIGHT", -27, 0)
-		frame.NineSlice:SetFrameLevel(frame:GetFrameLevel())
-		frame.NineSlice.layoutType = "InsetFrameTemplate"
-		if NineSliceUtil and NineSliceUtil.ApplyLayoutByName then
-			NineSliceUtil.ApplyLayoutByName(frame.NineSlice, frame.NineSlice.layoutType)
-		end
-	end
+	ApplyInsetNineSlice(frame, -27)
 end
 
 function AF:ApplyCustomerPopupPanel(frame)
@@ -112,16 +117,7 @@ function AF:ApplyCustomerPopupPanel(frame)
 	frame.Background:SetPoint("TOPLEFT", 3, -3)
 	frame.Background:SetPoint("BOTTOMRIGHT", -3, 3)
 
-	if not frame.NineSlice then
-		frame.NineSlice = CreateFrame("Frame", nil, frame, "NineSlicePanelTemplate")
-		frame.NineSlice:SetPoint("TOPLEFT", 0, 0)
-		frame.NineSlice:SetPoint("BOTTOMRIGHT", 0, 0)
-		frame.NineSlice:SetFrameLevel(frame:GetFrameLevel())
-		frame.NineSlice.layoutType = "InsetFrameTemplate"
-		if NineSliceUtil and NineSliceUtil.ApplyLayoutByName then
-			NineSliceUtil.ApplyLayoutByName(frame.NineSlice, frame.NineSlice.layoutType)
-		end
-	end
+	ApplyInsetNineSlice(frame)
 
 	if not frame.TopDivider then
 		frame.TopDivider = frame:CreateTexture(nil, "ARTWORK")
@@ -147,6 +143,13 @@ function AF:StyleListRow(row)
 	row.divider:SetAlpha(0.35)
 end
 
+local function SetChildFrameLevels(level, ...)
+	for i = 1, select("#", ...) do
+		local child = select(i, ...)
+		child:SetFrameLevel(level)
+	end
+end
+
 function AF:RaiseButtonAboveAnchor(button, anchor, levelOffset)
 	if not button or not anchor then
 		return
@@ -156,9 +159,7 @@ function AF:RaiseButtonAboveAnchor(button, anchor, levelOffset)
 		button:SetFrameStrata(anchor:GetFrameStrata())
 	end
 	button:SetFrameLevel(level)
-	for _, child in ipairs({ button:GetChildren() }) do
-		child:SetFrameLevel(level + 1)
-	end
+	SetChildFrameLevels(level + 1, button:GetChildren())
 end
 
 function AF:AddDivider(parent, anchor, offsetY)

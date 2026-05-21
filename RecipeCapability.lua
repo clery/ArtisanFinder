@@ -1,10 +1,11 @@
 local _, AF = ...
 
 local MAX_REAGENT_COMBINATIONS = 72
+local MAX_OPTIONAL_REAGENT_TESTS_PER_SLOT = 8
 local MAX_REAGENT_SUMMARY_BYTES = 900
-local SCAN_SIGNATURE_VERSION = 22
+local SCAN_SIGNATURE_VERSION = 23
 local SKILL_PROBE_SIGNATURE_VERSION = 1
-local FULL_SCAN_SIGNATURE_VERSION = 1
+local FULL_SCAN_SIGNATURE_VERSION = 2
 local GetOperationQuality
 local GetRecipeDisplayQuality
 local GetRecipeDisplayQualityInfo
@@ -150,6 +151,14 @@ local function GetOperationUpperThreshold(operationInfo)
 	return operationInfo and (operationInfo.upperSkillTreshold or operationInfo.upperSkillThreshold) or nil
 end
 
+local function GetOperationDifficulty(operationInfo)
+	if type(operationInfo) ~= "table" then
+		return nil
+	end
+	local difficulty = (tonumber(operationInfo.baseDifficulty) or 0) + (tonumber(operationInfo.bonusDifficulty) or 0)
+	return difficulty > 0 and difficulty or nil
+end
+
 local function FormatOperationDebug(operationInfo)
 	if type(operationInfo) ~= "table" then
 		return "-"
@@ -219,10 +228,35 @@ local function AddReagentInfo(tbl, reagentSlotSchematic, reagent)
 	})
 end
 
+local function CopyReagentInfo(reagentInfo)
+	local copy = {}
+	for _, info in ipairs(reagentInfo or {}) do
+		copy[#copy + 1] = {
+			reagent = info.reagent,
+			dataSlotIndex = info.dataSlotIndex,
+			quantity = info.quantity,
+		}
+	end
+	return copy
+end
+
 local function IsModifiedReagentSlot(reagentSlotSchematic)
 	return not Enum
 		or not Enum.TradeskillSlotDataType
 		or reagentSlotSchematic.dataSlotType == Enum.TradeskillSlotDataType.ModifiedReagent
+end
+
+local function IsOptionalDifficultySlot(reagentSlotSchematic)
+	if reagentSlotSchematic.required or reagentSlotSchematic.hiddenInCraftingForm then
+		return false
+	end
+	if type(reagentSlotSchematic.reagents) ~= "table" or #reagentSlotSchematic.reagents == 0 then
+		return false
+	end
+	return IsModifiedReagentSlot(reagentSlotSchematic)
+		or not Enum
+		or not Enum.CraftingReagentType
+		or reagentSlotSchematic.reagentType == Enum.CraftingReagentType.Modifying
 end
 
 local function TryCraftingOperationInfo(recipeID, reagentVariants, applyConcentration)
@@ -246,6 +280,15 @@ local function BuildSummaryEntry(reagentSlotSchematic, reagent)
 	local itemIcon = reagent.itemID and (AF:GetItemIconMarkup(reagent.itemID, 16) or "") or ""
 	local qualityText = GetReagentQuality(reagent) > 0 and (" " .. (GetReagentQualityMarkup(reagent) or "")) or ""
 	return string.format("%s%s x%d%s", itemIcon ~= "" and (itemIcon .. " ") or "", reagentName, quantity, qualityText)
+end
+
+local function GetOptionalSlotText(reagentSlotSchematic, reagent)
+	local slotInfo = reagentSlotSchematic and reagentSlotSchematic.slotInfo
+	local slotText = slotInfo and slotInfo.slotText
+	if slotText and slotText ~= "" then
+		return slotText
+	end
+	return GetReagentName(reagent)
 end
 
 local function TrimSummaryByLine(summary, maxBytes)
@@ -374,6 +417,87 @@ GetRecipeDisplayQuality = function(recipeID, operationInfo, reagentInfo)
 	return quality
 end
 
+function AF:GetOptionalReagentImpact(recipeID, baseReagentInfo, baseOperationInfo)
+	local baseDifficulty = GetOperationDifficulty(baseOperationInfo)
+	if not baseDifficulty then
+		return nil
+	end
+
+	local recipeInfo = C_TradeSkillUI.GetRecipeInfo(recipeID)
+	local recipeLevel = recipeInfo and recipeInfo.unlockedRecipeLevel
+	local okSchematic, schematic = pcall(C_TradeSkillUI.GetRecipeSchematic, recipeID, false, recipeLevel)
+	if not okSchematic or type(schematic) ~= "table" or type(schematic.reagentSlotSchematics) ~= "table" then
+		return nil
+	end
+
+	local selected = {}
+	for _, slot in ipairs(schematic.reagentSlotSchematics) do
+		if IsOptionalDifficultySlot(slot) then
+			local bestReagent
+			local bestDifficulty = baseDifficulty
+			for reagentIndex, reagent in ipairs(slot.reagents) do
+				if reagentIndex > MAX_OPTIONAL_REAGENT_TESTS_PER_SLOT and bestReagent then
+					break
+				end
+				local reagentInfo = CopyReagentInfo(baseReagentInfo)
+				AddReagentInfo(reagentInfo, slot, reagent)
+				local optionalOnly = {}
+				AddReagentInfo(optionalOnly, slot, reagent)
+				local normalInfo = TryCraftingOperationInfo(recipeID, {
+					{ name = "base+optional", reagents = reagentInfo },
+					{ name = "optional", reagents = optionalOnly },
+				}, false)
+				local difficulty = GetOperationDifficulty(normalInfo) or 0
+				if difficulty > bestDifficulty then
+					bestReagent = reagent
+					bestDifficulty = difficulty
+				end
+			end
+			if bestReagent then
+				selected[#selected + 1] = { slot = slot, reagent = bestReagent }
+			end
+		end
+	end
+	if #selected == 0 then
+		return nil
+	end
+
+	local reagentInfo = CopyReagentInfo(baseReagentInfo)
+	local optionalOnly = {}
+	local labels = {}
+	for _, selection in ipairs(selected) do
+		AddReagentInfo(reagentInfo, selection.slot, selection.reagent)
+		AddReagentInfo(optionalOnly, selection.slot, selection.reagent)
+		local label = GetOptionalSlotText(selection.slot, selection.reagent)
+		if label and label ~= "" then
+			labels[#labels + 1] = label
+		end
+	end
+
+	local normalInfo = TryCraftingOperationInfo(recipeID, {
+		{ name = "base+optional-all", reagents = reagentInfo },
+		{ name = "optional-all", reagents = optionalOnly },
+	}, false)
+	local optionalDifficulty = GetOperationDifficulty(normalInfo)
+	if not optionalDifficulty or optionalDifficulty <= baseDifficulty then
+		return nil
+	end
+	local concentrationInfo = TryCraftingOperationInfo(recipeID, {
+		{ name = "base+optional-all", reagents = reagentInfo },
+		{ name = "optional-all", reagents = optionalOnly },
+	}, true)
+
+	return {
+		difficultyDelta = optionalDifficulty - baseDifficulty,
+		quality = GetRecipeDisplayQuality(recipeID, normalInfo, reagentInfo),
+		qualityAtlas = select(2, GetRecipeDisplayQualityInfo(recipeID, normalInfo, reagentInfo)),
+		concentrationQuality = GetRecipeDisplayQuality(recipeID, concentrationInfo, reagentInfo),
+		concentrationQualityAtlas = select(2, GetRecipeDisplayQualityInfo(recipeID, concentrationInfo, reagentInfo)),
+		summary = table.concat(labels, "; "),
+		slotCount = #selected,
+	}
+end
+
 function AF:GetProfessionLink()
 	local okCanLink, canLink = pcall(C_TradeSkillUI.CanTradeSkillListLink)
 	if not okCanLink then
@@ -462,6 +586,17 @@ function AF:GetRecipeCapability(recipeID)
 		capability.bestReagentPendingNames = best.debugReason == "waiting for reagent item names"
 	else
 		capability.debugBestCandidateReason = "no best candidate"
+	end
+
+	local optionalImpact = self:GetOptionalReagentImpact(recipeID, best and best.reagentInfo, best and best.normalInfo or operationInfo)
+	if optionalImpact then
+		capability.optionalDifficultyDelta = optionalImpact.difficultyDelta
+		capability.optionalQuality = optionalImpact.quality
+		capability.optionalQualityAtlas = optionalImpact.qualityAtlas
+		capability.optionalConcentrationQuality = optionalImpact.concentrationQuality
+		capability.optionalConcentrationQualityAtlas = optionalImpact.concentrationQualityAtlas
+		capability.optionalReagentSummary = optionalImpact.summary
+		capability.optionalSlotCount = optionalImpact.slotCount
 	end
 
 	capability.professionLink = self:CaptureCurrentProfessionLink()
@@ -925,6 +1060,8 @@ function AF:GetBestReagentCapability(recipeID)
 	summaryTruncated = summaryTruncated or lineTruncated
 
 	return {
+		normalInfo = best.normalInfo,
+		reagentInfo = best.reagentInfo,
 		rawBestQuality = GetOperationQuality(best.normalInfo),
 		bestQuality = GetRecipeDisplayQuality(recipeID, best.normalInfo, best.reagentInfo),
 		bestQualityAtlas = select(2, GetRecipeDisplayQualityInfo(recipeID, best.normalInfo, best.reagentInfo)),
@@ -962,6 +1099,13 @@ function AF:ApplyRecipeCapability(item, recipeID)
 	item.bestReagentSummaryUpdatedAt = capability.bestReagentSummary and capability.bestReagentSummary ~= "" and self:Now() or nil
 	item.bestReagentTruncated = capability.bestReagentTruncated == true
 	item.bestReagentPendingNames = capability.bestReagentPendingNames == true
+	item.optionalDifficultyDelta = capability.optionalDifficultyDelta
+	item.optionalQuality = capability.optionalQuality
+	item.optionalQualityAtlas = capability.optionalQualityAtlas
+	item.optionalConcentrationQuality = capability.optionalConcentrationQuality
+	item.optionalConcentrationQualityAtlas = capability.optionalConcentrationQualityAtlas
+	item.optionalReagentSummary = capability.optionalReagentSummary
+	item.optionalSlotCount = capability.optionalSlotCount
 	item.debugBestCandidateQuality = capability.debugBestCandidateQuality
 	item.debugBestCandidateAtlas = capability.debugBestCandidateAtlas
 	item.debugBestCandidateRawQuality = capability.debugBestCandidateRawQuality

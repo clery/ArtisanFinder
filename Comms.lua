@@ -5,18 +5,78 @@ function AF:InitializeComms()
 	self:QueueDiscoveryChannelJoin(8)
 end
 
-function AF:HasJoinedServerChannel()
-	local channels = { GetChannelList() }
-	for _, value in ipairs(channels) do
-		if type(value) == "string" and value ~= self.CHANNEL_NAME then
+local function HasVisibleServerChannel(channelName, ...)
+	for i = 1, select("#", ...) do
+		local value = select(i, ...)
+		if type(value) == "string" and value ~= channelName then
 			return true
 		end
 	end
 	return false
 end
 
+function AF:HasJoinedServerChannel()
+	return HasVisibleServerChannel(self.CHANNEL_NAME, GetChannelList())
+end
+
+function AF:HasJoinedTradeChannel()
+	return self:GetJoinedTradeChannelID() ~= nil
+end
+
+function AF:GetJoinedTradeChannelID()
+	if not GetChannelList then
+		return nil
+	end
+	local channels = { GetChannelList() }
+	for index, value in ipairs(channels) do
+		if type(value) == "string" and value ~= self.CHANNEL_NAME and self:IsTradeChannelName(value) then
+			return tonumber(channels[index - 1]) or GetChannelName(value)
+		end
+	end
+	return nil
+end
+
+function AF:GetLastVisibleServerChannelID()
+	if not GetChannelList then
+		return nil
+	end
+	local lastID
+	local channels = { GetChannelList() }
+	for index, value in ipairs(channels) do
+		if type(value) == "string" and value ~= self.CHANNEL_NAME then
+			lastID = math.max(lastID or 0, tonumber(channels[index - 1]) or 0)
+		end
+	end
+	return lastID
+end
+
+function AF:DiscoveryChannelNeedsMove()
+	local discoveryID = GetChannelName(self.CHANNEL_NAME)
+	if discoveryID == 0 then
+		return false
+	end
+	local lastVisibleID = self:GetLastVisibleServerChannelID()
+	return lastVisibleID and discoveryID < lastVisibleID
+end
+
+function AF:MoveDiscoveryChannelAfterVisibleChannels()
+	local discoveryID = GetChannelName(self.CHANNEL_NAME)
+	local lastVisibleID = self:GetLastVisibleServerChannelID()
+	if discoveryID == 0 or not lastVisibleID or discoveryID >= lastVisibleID then
+		return
+	end
+	while discoveryID < lastVisibleID do
+		C_ChatInfo.SwapChatChannelsByChannelIndex(discoveryID, discoveryID + 1)
+		discoveryID = discoveryID + 1
+	end
+end
+
 function AF:QueueDiscoveryChannelJoin(delay)
-	if self.discoveryChannelJoinQueued or GetChannelName(self.CHANNEL_NAME) ~= 0 then
+	if self.discoveryChannelJoinQueued then
+		return
+	end
+	if GetChannelName(self.CHANNEL_NAME) ~= 0 and not self:DiscoveryChannelNeedsMove() then
+		self:HideDiscoveryChannelFromChat()
 		return
 	end
 	self.discoveryChannelJoinQueued = true
@@ -26,7 +86,11 @@ function AF:QueueDiscoveryChannelJoin(delay)
 			AF.deferredDiscoveryChannelJoin = true
 			return
 		end
-		if not AF:HasJoinedServerChannel() then
+		if AF:DiscoveryChannelNeedsMove() then
+			AF:MoveDiscoveryChannelAfterVisibleChannels()
+			AF:HideDiscoveryChannelFromChat()
+		end
+		if not AF:HasJoinedTradeChannel() then
 			AF:QueueDiscoveryChannelJoin(2)
 			return
 		end
@@ -38,6 +102,7 @@ function AF:JoinDiscoveryChannel()
 	if GetChannelName(self.CHANNEL_NAME) == 0 then
 		JoinTemporaryChannel(self.CHANNEL_NAME)
 	end
+	self:MoveDiscoveryChannelAfterVisibleChannels()
 	self:HideDiscoveryChannelFromChat()
 	self:HideDiscoveryChannelFromChat(0.5)
 	self:HideDiscoveryChannelFromChat(2)
@@ -47,7 +112,7 @@ end
 function AF:GetDiscoveryChannelID()
 	local id = GetChannelName(self.CHANNEL_NAME)
 	if id == 0 then
-		if not self:HasJoinedServerChannel() then
+		if not self:HasJoinedTradeChannel() then
 			self:QueueDiscoveryChannelJoin(2)
 			return 0
 		end
@@ -279,6 +344,10 @@ function AF:HandleQuery(parts, sender)
 				self:EncodeField(item.bestQualityAtlas, 48),
 				item.bestReagentSummary and item.bestReagentSummary ~= "" and 1 or 0,
 				self:EncodeField(crafterName, 48),
+				tonumber(item.optionalDifficultyDelta) or "",
+				tonumber(item.optionalQuality) or "",
+				tonumber(item.optionalConcentrationQuality) or "",
+				tonumber(item.optionalSlotCount) or "",
 			}
 			local payload = table.concat(payloadParts, "|")
 			if #payload > 255 then
@@ -298,6 +367,10 @@ function AF:HandleQuery(parts, sender)
 				payloadParts[22] = ""
 				payloadParts[23] = ""
 				payloadParts[24] = 0
+				payloadParts[26] = ""
+				payloadParts[27] = ""
+				payloadParts[28] = ""
+				payloadParts[29] = ""
 				payload = table.concat(payloadParts, "|")
 			end
 
@@ -417,6 +490,10 @@ function AF:HandleResponse(parts, sender)
 	local bestQualityAtlas = self:DecodeField(parts[23])
 	local hasReagentSummary = tonumber(parts[24]) == 1
 	local crafterName = self:NormalizeName(self:DecodeField(parts[25])) or sender
+	local optionalDifficultyDelta = tonumber(parts[26])
+	local optionalQuality = tonumber(parts[27])
+	local optionalConcentrationQuality = tonumber(parts[28])
+	local optionalSlotCount = tonumber(parts[29])
 	local cacheKey = crafterName
 
 	if not itemID then
@@ -466,6 +543,10 @@ function AF:HandleResponse(parts, sender)
 		bestReagentSummary = previousRecipeID == recipeID and previous and previous.bestReagentSummary or nil,
 		bestReagentSummaryUpdatedAt = previousRecipeID == recipeID and previous and previous.bestReagentSummaryUpdatedAt or nil,
 		hasReagentSummary = hasReagentSummary,
+		optionalDifficultyDelta = optionalDifficultyDelta,
+		optionalQuality = optionalQuality,
+		optionalConcentrationQuality = optionalConcentrationQuality,
+		optionalSlotCount = optionalSlotCount,
 		professionLink = professionLink ~= "" and professionLink or nil,
 		updatedAt = timestamp,
 		verifiedAt = verifiedForCurrentQuery and self:Now() or nil,

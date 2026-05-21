@@ -15,6 +15,9 @@ local function StopActiveTutorial()
 	if HelpTip and HelpTip.HideAllSystem then
 		HelpTip:HideAllSystem(TUTORIAL_SYSTEM)
 	end
+	if AF.CloseMinimapTutorial then
+		AF:CloseMinimapTutorial(false)
+	end
 	if HelpPlate and HelpPlate.Hide and AF.activeTutorialHelpPlateInfo then
 		HelpPlate.Hide(false)
 	end
@@ -271,6 +274,7 @@ function AF:InitializeTutorial()
 	self.db.tutorial = self.db.tutorial or {}
 	C_Timer.After(1, function()
 		AF:MaybeShowIntroTutorial()
+		AF:MaybeShowMinimapTutorial()
 	end)
 end
 
@@ -287,6 +291,10 @@ function AF:MaybeShowIntroTutorial()
 		autoHorizontalSlide = true,
 		onAcknowledgeCallback = function()
 			AF.db.tutorial.introSeen = true
+			AF.introTutorialHelpTipText = nil
+			C_Timer.After(0.2, function()
+				AF:MaybeShowMinimapTutorial()
+			end)
 		end,
 	}
 	self.introTutorialHelpTipText = info.text
@@ -306,6 +314,61 @@ end
 
 function AF:IsIntroTutorialActive()
 	return self.introTutorialHelpTipText ~= nil
+end
+
+function AF:GetMinimapTutorialButton()
+	if not self.minimapIcon or not self.minimapIcon.GetMinimapButton then
+		return nil
+	end
+	return self.minimapIcon:GetMinimapButton("ArtisanFinder")
+end
+
+function AF:CloseMinimapTutorial(markSeen)
+	if self.minimapTutorialHelpTipText and HelpTip and HelpTip.Hide then
+		HelpTip:Hide(UIParent, self.minimapTutorialHelpTipText)
+	end
+	if markSeen and self.db and self.db.tutorial then
+		self.db.tutorial.minimapSeen = true
+	end
+	self.minimapTutorialHelpTipText = nil
+end
+
+function AF:MaybeShowMinimapTutorial()
+	if not self.db or not self.db.tutorial or self.db.tutorial.minimapSeen or not self.db.tutorial.introSeen or not HelpTip then
+		return
+	end
+	if self.minimapTutorialHelpTipText or self.minimapTutorialQueued or self.customerTutorialActive or self.activeTutorialKind or self.db.minimap.hide then
+		return
+	end
+	local button = self:GetMinimapTutorialButton()
+	if not button or not button:IsShown() then
+		return
+	end
+	self.minimapTutorialQueued = true
+	C_Timer.After(0.1, function()
+		AF.minimapTutorialQueued = nil
+		if not AF.db or not AF.db.tutorial or AF.db.tutorial.minimapSeen or not AF.db.tutorial.introSeen or AF.db.minimap.hide then
+			return
+		end
+		local minimapButton = AF:GetMinimapTutorialButton()
+		if not minimapButton or not minimapButton:IsShown() or AF.customerTutorialActive or AF.activeTutorialKind then
+			return
+		end
+		local info = {
+			text = AF:Text("TUTORIAL_MINIMAP_BUTTON"),
+			buttonStyle = HelpTip.ButtonStyle.GotIt,
+			targetPoint = HelpTip.Point.LeftEdgeCenter,
+			alignment = HelpTip.Alignment.Center,
+			system = TUTORIAL_SYSTEM,
+			autoHorizontalSlide = true,
+			onAcknowledgeCallback = function()
+				AF.db.tutorial.minimapSeen = true
+				AF.minimapTutorialHelpTipText = nil
+			end,
+		}
+		AF.minimapTutorialHelpTipText = info.text
+		HelpTip:Show(UIParent, info, minimapButton)
+	end)
 end
 
 function AF:SetupCrafterTutorialButton(defaults)
@@ -526,6 +589,8 @@ function AF:ResetTutorial()
 	end
 	self.db.tutorial = {}
 	self.introTutorialHelpTipText = nil
+	self.minimapTutorialHelpTipText = nil
+	self.minimapTutorialQueued = nil
 	self.crafterTutorialInitialQueued = nil
 	self.customerTutorialInitialQueued = nil
 	self.crafterTutorialShowing = nil
