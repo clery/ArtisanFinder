@@ -85,8 +85,7 @@ local function RegisterAdvertisingOptions(self, category)
 		if not self.advertisingOptionRegistered[key] then
 			local label = self:GetDisplayPlayerName(characterName) .. " - " .. tostring(row.professionName)
 			local variable = "ArtisanFinder_Advertise_" .. key:gsub("[^%w_]", "_")
-			local defaultAdvertised = (not self:IsProfessionDefaultOffByName(row.professionName))
-				and self:IsProfessionAdvertisedByDefault(self:GetProfessionDefaultAdvertisingID(professionID, row))
+			local defaultAdvertised = self:IsProfessionAdvertisedByDefault(self:GetProfessionDefaultAdvertisingID(professionID, row))
 			local advertiseProfession = Settings.RegisterProxySetting(
 				category,
 				variable,

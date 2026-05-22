@@ -1188,7 +1188,7 @@ function AF:GetCustomerOrderItemContext()
 		end
 		local professionInfo = C_TradeSkillUI.GetProfessionInfoByRecipeID(recipeID)
 		professionID = professionInfo and (professionInfo.parentProfessionID or professionInfo.professionID)
-		professionID = self:GetBaseProfessionID(professionID)
+		professionID = self:GetSupportedProfessionID(professionID)
 	end
 
 	return itemID and {

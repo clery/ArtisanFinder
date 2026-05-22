@@ -182,7 +182,7 @@ function AF:ClearExternalArtisans()
 	self.db.customerCache = {}
 	self.db.tradeLeads = {}
 	self.db.tradeLeadCache = {}
-	self.db.responseThrottle = {}
+	self.responseThrottle = {}
 	self.tradeLeads = self.db.tradeLeads
 	ClearCustomerQueryState(self)
 	self:RefreshAfterClear()

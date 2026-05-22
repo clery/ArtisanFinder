@@ -1,12 +1,15 @@
 local _, AF = ...
 
 local MIGRATIONS = {}
-local DEFAULT_OFF_ADVERTISING_PROFESSIONS = {
-	[182] = true, -- Herbalism
-	[185] = true, -- Cooking
-	[186] = true, -- Mining
-	[356] = true, -- Fishing
-	[393] = true, -- Skinning
+local SUPPORTED_PROFESSIONS = {
+	[164] = true, -- Blacksmithing
+	[165] = true, -- Leatherworking
+	[171] = true, -- Alchemy
+	[197] = true, -- Tailoring
+	[202] = true, -- Engineering
+	[333] = true, -- Enchanting
+	[755] = true, -- Jewelcrafting
+	[773] = true, -- Inscription
 }
 local PROFESSION_ID_ALIASES = {
 	[5] = 185, -- Midnight Cooking
@@ -15,13 +18,8 @@ local PROFESSION_ID_ALIASES = {
 	[12] = 755, -- Midnight Jewelcrafting
 }
 local REALM_CONNECTION_CACHE_MAX_AGE = 30 * 24 * 60 * 60
-local DEFAULT_OFF_ADVERTISING_NAMES = {
-	["cooking"] = true,
-	["fishing"] = true,
-	["herbalism"] = true,
-	["mining"] = true,
-	["skinning"] = true,
-}
+local ApplyDBDefaults
+local legacyReagentDisplayCache = {}
 local BASE_PROFESSION_SPELLS = {
 	[164] = 2018, -- Blacksmithing
 	[165] = 2108, -- Leatherworking
@@ -58,8 +56,23 @@ local function GetBaseProfessionID(professionID)
 	return PROFESSION_ID_ALIASES[professionID] or professionID
 end
 
-local function GetProfessionKey(professionID)
+local function GetSupportedProfessionID(professionID)
 	professionID = GetBaseProfessionID(professionID)
+	return professionID and SUPPORTED_PROFESSIONS[professionID] and professionID or nil
+end
+
+local function GetSupportedProfessionIDForEntry(professionID, entry)
+	if type(entry) == "table" then
+		return GetSupportedProfessionID(entry.parentProfessionID)
+			or GetSupportedProfessionID(entry.baseProfessionID)
+			or GetSupportedProfessionID(entry.id)
+			or GetSupportedProfessionID(professionID)
+	end
+	return GetSupportedProfessionID(professionID)
+end
+
+local function GetProfessionKey(professionID)
+	professionID = GetSupportedProfessionID(professionID)
 	return professionID and tostring(professionID) or nil
 end
 
@@ -67,14 +80,12 @@ function AF:GetBaseProfessionID(professionID)
 	return GetBaseProfessionID(professionID)
 end
 
-local function GetBaseProfessionIDFromName(professionName)
-	professionName = tostring(professionName or ""):lower()
-	for professionID, professionNamePattern in pairs(BASE_PROFESSION_NAMES) do
-		if professionName:find(professionNamePattern:lower(), 1, true) then
-			return professionID
-		end
-	end
-	return nil
+function AF:GetSupportedProfessionID(professionID, entry)
+	return GetSupportedProfessionIDForEntry(professionID, entry)
+end
+
+function AF:IsSupportedProfession(professionID, entry)
+	return GetSupportedProfessionIDForEntry(professionID, entry) ~= nil
 end
 
 local function EnsureProfileContainers(profile)
@@ -102,10 +113,7 @@ local function InvalidateScannedData(db)
 end
 
 local function GetMigrationProfessionID(professionKey, profession)
-	return GetBaseProfessionID(profession and (profession.parentProfessionID or profession.baseProfessionID))
-		or GetBaseProfessionIDFromName(profession and profession.name)
-		or GetBaseProfessionID(profession and profession.id)
-		or GetBaseProfessionID(professionKey)
+	return GetSupportedProfessionIDForEntry(professionKey, profession)
 end
 
 local function PreserveEffectiveAdvertising(db)
@@ -184,14 +192,302 @@ local function NormalizeProfessionKeyedSettings(db)
 	end
 end
 
-local function ApplyDBDefaults(db)
+local function ClearLocalizedCraftFields(item)
+	if type(item) ~= "table" then
+		return
+	end
+	item.itemName = nil
+	item.recipeName = nil
+	item.professionName = nil
+	item.bestReagentSummary = nil
+	item.bestReagentDetails = nil
+	item.bestReagentSummaryUpdatedAt = nil
+	item.hasReagentSummary = nil
+	item.reagentDetailRequested = nil
+	item.optionalReagentSummary = nil
+	item.debugBestCandidateSummary = nil
+end
+
+local function ClearVolatileCraftFields(item)
+	if type(item) ~= "table" then
+		return
+	end
+	item.baseSkill = nil
+	item.bonusSkill = nil
+	item.bonusDifficulty = nil
+	item.lowerSkillThreshold = nil
+	item.upperSkillThreshold = nil
+	item.rawConcentrationQuality = nil
+	item.debugBaseOperation = nil
+	item.debugBestCandidateQuality = nil
+	item.debugBestCandidateAtlas = nil
+	item.debugBestCandidateRawQuality = nil
+	item.debugBestCandidateAccepted = nil
+	item.debugBestCandidateOperation = nil
+	item.debugBestCandidateReason = nil
+	item.skillProbeAt = nil
+	item.fullScanAt = nil
+end
+
+local function GetLegacyReagentDisplayKey(entry)
+	if type(entry) ~= "table" then
+		return nil
+	end
+	local itemID = tonumber(entry.itemID)
+	local recipeID = tonumber(entry.recipeID) or 0
+	local professionID = GetSupportedProfessionIDForEntry(entry.professionID, entry) or 0
+	local name = AF:NormalizeName(entry.orderTarget or entry.name or entry.target)
+	if not itemID or not name then
+		return nil
+	end
+	return table.concat({ name, itemID, recipeID, professionID }, ":")
+end
+
+local function PreserveLegacyReagentDisplay(entry)
+	if type(entry) ~= "table" or entry.bestReagents then
+		return
+	end
+	local details = type(entry.bestReagentDetails) == "string" and entry.bestReagentDetails or nil
+	local summary = type(entry.bestReagentSummary) == "string" and entry.bestReagentSummary or nil
+	if (not details or details == "") and (not summary or summary == "") then
+		return
+	end
+	local key = GetLegacyReagentDisplayKey(entry)
+	if key then
+		legacyReagentDisplayCache[key] = {
+			details = details,
+			summary = summary,
+			truncated = entry.bestReagentTruncated,
+		}
+	end
+end
+
+function AF:GetLegacyReagentDisplay(entry)
+	local key = GetLegacyReagentDisplayKey(entry)
+	return key and legacyReagentDisplayCache[key] or nil
+end
+
+local function MergeProfessionEntry(target, source, professionID)
+	target.id = professionID
+	target.recipes = target.recipes or {}
+	for recipeID, value in pairs(source.recipes or {}) do
+		target.recipes[recipeID] = value
+	end
+	for _, key in ipairs({
+		"parentProfessionID",
+		"baseProfessionID",
+		"skillLineID",
+		"childProfessionID",
+		"icon",
+		"professionLink",
+		"scanSignature",
+		"scanMode",
+		"scannedAt",
+		"updatedAt",
+		"equipmentSignature",
+		"bestProfessionSkillAt",
+	}) do
+		if source[key] ~= nil and (target[key] == nil or key == "updatedAt" and (tonumber(source[key]) or 0) > (tonumber(target[key]) or 0)) then
+			target[key] = source[key]
+		end
+	end
+	if type(source.bestProfessionSkillTotals) == "table" then
+		target.bestProfessionSkillTotals = target.bestProfessionSkillTotals or {}
+		for key, value in pairs(source.bestProfessionSkillTotals) do
+			local total = tonumber(value)
+			if total and total > (tonumber(target.bestProfessionSkillTotals[key]) or 0) then
+				target.bestProfessionSkillTotals[key] = total
+			end
+		end
+	end
+end
+
+local function NormalizeCraftProfile(profile)
+	if type(profile) ~= "table" then
+		return
+	end
+	EnsureProfileContainers(profile)
+
+	local professionMap = {}
+	local normalizedProfessions = {}
+	for professionKey, profession in pairs(profile.professions or {}) do
+		if type(profession) == "table" then
+			local supportedID = GetMigrationProfessionID(professionKey, profession)
+			if supportedID then
+				local normalizedKey = tostring(supportedID)
+				professionMap[tostring(professionKey)] = supportedID
+				if profession.id then
+					professionMap[tostring(profession.id)] = supportedID
+				end
+				if profession.parentProfessionID then
+					professionMap[tostring(profession.parentProfessionID)] = supportedID
+				end
+				if profession.baseProfessionID then
+					professionMap[tostring(profession.baseProfessionID)] = supportedID
+				end
+				local target = normalizedProfessions[normalizedKey] or { id = supportedID, recipes = {} }
+				normalizedProfessions[normalizedKey] = target
+				profession.name = nil
+				MergeProfessionEntry(target, profession, supportedID)
+			end
+		end
+	end
+	profile.professions = normalizedProfessions
+
+	local normalizedPrices = {}
+	for professionKey, entry in pairs(profile.professionPrices or {}) do
+		local supportedID = professionMap[tostring(professionKey)] or GetSupportedProfessionID(professionKey)
+		if supportedID and type(entry) == "table" then
+			normalizedPrices[tostring(supportedID)] = entry
+		end
+	end
+	profile.professionPrices = normalizedPrices
+
+	for itemKey, item in pairs(profile.items or {}) do
+		if type(item) ~= "table" then
+			profile.items[itemKey] = nil
+		else
+			local supportedID = professionMap[tostring(item.professionID or "")]
+				or GetSupportedProfessionIDForEntry(item.professionID, item)
+			if supportedID then
+				item.professionID = supportedID
+				ClearLocalizedCraftFields(item)
+				ClearVolatileCraftFields(item)
+			else
+				profile.items[itemKey] = nil
+			end
+		end
+	end
+end
+
+local function NormalizeCharacterProfessionSettings(settings)
+	if type(settings) ~= "table" then
+		return
+	end
+	for professionKey, value in pairs(settings) do
+		local supportedID = GetSupportedProfessionID(professionKey)
+		settings[professionKey] = nil
+		if supportedID then
+			settings[tostring(supportedID)] = value
+		end
+	end
+end
+
+local function NormalizeProfessionLinks(db)
+	local normalized = {}
+	for key, link in pairs(db.professionLinks or {}) do
+		local characterName, professionKey = tostring(key):match("^(.-):([^:]+)$")
+		local supportedID = GetSupportedProfessionID(professionKey)
+		if characterName and supportedID then
+			normalized[characterName .. ":" .. tostring(supportedID)] = link
+		end
+	end
+	db.professionLinks = normalized
+end
+
+local function NormalizeCustomerCacheEntry(entry)
+	if type(entry) ~= "table" then
+		return nil
+	end
+	local supportedID = GetSupportedProfessionIDForEntry(entry.professionID, entry)
+	if not supportedID then
+		return nil
+	end
+	entry.professionID = supportedID
+	PreserveLegacyReagentDisplay(entry)
+	ClearLocalizedCraftFields(entry)
+	ClearVolatileCraftFields(entry)
+	return entry
+end
+
+local function NormalizeCustomerCache(db)
+	for itemKey, itemCache in pairs(db.customerCache or {}) do
+		if type(itemCache) == "table" then
+			for cacheKey, entry in pairs(itemCache) do
+				itemCache[cacheKey] = NormalizeCustomerCacheEntry(entry)
+			end
+			if next(itemCache) == nil then
+				db.customerCache[itemKey] = nil
+			end
+		else
+			db.customerCache[itemKey] = nil
+		end
+	end
+end
+
+local function NormalizeTradeLead(lead)
+	if type(lead) ~= "table" then
+		return nil
+	end
+	lead.professionName = nil
+	local candidates = {}
+	for professionID in pairs(lead.professionCandidates or {}) do
+		local supportedID = GetSupportedProfessionID(professionID)
+		if supportedID then
+			candidates[supportedID] = true
+		end
+	end
+	if next(candidates) == nil then
+		return nil
+	end
+	lead.professionCandidates = candidates
+	return lead
+end
+
+local function NormalizeTradeLeads(tbl)
+	for key, lead in pairs(tbl or {}) do
+		tbl[key] = NormalizeTradeLead(lead)
+	end
+end
+
+local function NormalizeGuildProfessionCache(db)
+	local professionMembers = db.guildCache and db.guildCache.professionMembers
+	if type(professionMembers) ~= "table" then
+		return
+	end
+	for professionKey, cache in pairs(professionMembers) do
+		local supportedID = GetSupportedProfessionID(professionKey)
+		professionMembers[professionKey] = nil
+		if supportedID and type(cache) == "table" then
+			cache.professionID = supportedID
+			cache.professionName = nil
+			for _, member in pairs(cache.members or {}) do
+				if type(member) == "table" then
+					member.professionName = nil
+				end
+			end
+			professionMembers[tostring(supportedID)] = cache
+		end
+	end
+end
+
+local function NormalizeIDOnlyCraftData(db)
+	ApplyDBDefaults(db)
+	NormalizeCraftProfile(db.artisanProfile)
+	for _, profile in pairs(db.artisanCharacters or {}) do
+		NormalizeCraftProfile(profile)
+	end
+	for _, settings in pairs(db.advertising or {}) do
+		NormalizeCharacterProfessionSettings(settings)
+	end
+	for _, settings in pairs(db.advertisingKnown or {}) do
+		NormalizeCharacterProfessionSettings(settings)
+	end
+	NormalizeProfessionLinks(db)
+	NormalizeCustomerCache(db)
+	NormalizeTradeLeads(db.tradeLeads)
+	NormalizeTradeLeads(db.tradeLeadCache)
+	NormalizeGuildProfessionCache(db)
+	db.responseThrottle = nil
+end
+
+function ApplyDBDefaults(db)
 	db.artisanProfile = EnsureProfileContainers(db.artisanProfile)
 	db.artisanCharacters = db.artisanCharacters or {}
 	db.advertising = db.advertising or {}
 	db.advertisingKnown = db.advertisingKnown or {}
 	db.customerCache = db.customerCache or {}
 	db.favoriteArtisans = db.favoriteArtisans or {}
-	db.responseThrottle = db.responseThrottle or {}
 	db.professionLinks = db.professionLinks or {}
 	db.artisanContacts = db.artisanContacts or {}
 	db.tradeLeads = db.tradeLeads or {}
@@ -306,6 +602,14 @@ MIGRATIONS[12] = function(db)
 	db.artisanContacts = db.artisanContacts or {}
 end
 
+MIGRATIONS[13] = function(db)
+	NormalizeIDOnlyCraftData(db)
+end
+
+MIGRATIONS[14] = function(db)
+	NormalizeIDOnlyCraftData(db)
+end
+
 function AF:MigrateDB(db)
 	local version = tonumber(db.schemaVersion) or 0
 	while version < self.SCHEMA_VERSION do
@@ -360,6 +664,20 @@ function AF:CleanupCustomerCache()
 		local updatedAt = tonumber(entry and entry.updatedAt) or 0
 		if updatedAt <= 0 or updatedAt < cutoff then
 			self.db.tradeLeadCache[leadKey] = nil
+			removed = removed + 1
+		end
+	end
+	for name, updatedAt in pairs(self.db.whoOnlineCache or {}) do
+		updatedAt = tonumber(updatedAt) or 0
+		if updatedAt <= 0 or updatedAt < cutoff then
+			self.db.whoOnlineCache[name] = nil
+			removed = removed + 1
+		end
+	end
+	for cacheKey, entry in pairs(self.db.connectedRealmCache or {}) do
+		local updatedAt = tonumber(entry and entry.updatedAt) or 0
+		if updatedAt <= 0 or self:Now() - updatedAt > REALM_CONNECTION_CACHE_MAX_AGE then
+			self.db.connectedRealmCache[cacheKey] = nil
 			removed = removed + 1
 		end
 	end
@@ -447,43 +765,25 @@ function AF:ForEachArtisanProfile(callback)
 end
 
 function AF:IsProfessionAdvertisedByDefault(professionID)
-	professionID = GetBaseProfessionID(professionID)
-	if not professionID then
-		return false
-	end
-	return DEFAULT_OFF_ADVERTISING_PROFESSIONS[professionID] ~= true
+	return GetSupportedProfessionID(professionID) ~= nil
 end
 
 function AF:GetProfessionDefaultAdvertisingID(professionID, profileOrRow)
-	professionID = GetBaseProfessionID(professionID)
+	professionID = GetSupportedProfessionID(professionID)
 	if type(profileOrRow) == "table" then
-		local parentProfessionID = GetBaseProfessionID(profileOrRow.parentProfessionID or profileOrRow.baseProfessionID)
+		local parentProfessionID = GetSupportedProfessionID(profileOrRow.parentProfessionID or profileOrRow.baseProfessionID)
 		if parentProfessionID then
 			return parentProfessionID
 		end
-		local namedProfessionID = GetBaseProfessionIDFromName(profileOrRow.name or profileOrRow.professionName)
-		if namedProfessionID then
-			return namedProfessionID
-		end
 		if profileOrRow.professions and professionID then
 			local profession = profileOrRow.professions[tostring(professionID)]
-			parentProfessionID = GetBaseProfessionID(profession and profession.parentProfessionID)
+			parentProfessionID = GetSupportedProfessionID(profession and profession.parentProfessionID)
 			if parentProfessionID then
 				return parentProfessionID
 			end
 		end
 	end
 	return professionID
-end
-
-function AF:IsProfessionDefaultOffByName(professionName)
-	professionName = tostring(professionName or ""):lower()
-	for name in pairs(DEFAULT_OFF_ADVERTISING_NAMES) do
-		if professionName:find(name, 1, true) then
-			return true
-		end
-	end
-	return false
 end
 
 function AF:IsProfessionAdvertised(characterName, professionID)
@@ -503,9 +803,6 @@ function AF:IsProfessionAdvertised(characterName, professionID)
 	local profile = self.db and self.db.artisanCharacters and self.db.artisanCharacters[characterName]
 	local profession = profile and profile.professions and profile.professions[professionKey]
 	local defaultID = self:GetProfessionDefaultAdvertisingID(professionKey, profession)
-	if self:IsProfessionDefaultOffByName(profession and profession.name) then
-		return false
-	end
 	return self:IsProfessionAdvertisedByDefault(defaultID)
 end
 
@@ -522,8 +819,7 @@ function AF:SetProfessionAdvertised(characterName, professionID, enabled)
 	self.db.advertising[characterName] = self.db.advertising[characterName] or {}
 	local profile = self.db and self.db.artisanCharacters and self.db.artisanCharacters[characterName]
 	local profession = profile and profile.professions and profile.professions[professionKey]
-	local defaultAdvertised = (not self:IsProfessionDefaultOffByName(profession and profession.name))
-		and self:IsProfessionAdvertisedByDefault(self:GetProfessionDefaultAdvertisingID(professionKey, profession))
+	local defaultAdvertised = self:IsProfessionAdvertisedByDefault(self:GetProfessionDefaultAdvertisingID(professionKey, profession))
 	enabled = enabled == true
 	if enabled == defaultAdvertised then
 		self.db.advertising[characterName][professionKey] = nil
@@ -569,13 +865,13 @@ function AF:RememberProfessionLink(characterName, professionID, professionLink)
 	self.db.professionLinks[key] = professionLink
 end
 
-function AF:StoreProfessionLink(characterName, professionID, professionLink, professionName)
+function AF:StoreProfessionLink(characterName, professionID, professionLink)
 	if type(professionLink) ~= "string" or professionLink == "" or not self.db then
 		return nil
 	end
 
 	characterName = self:NormalizeName(characterName or self.activeArtisanCharacter or self.playerName or self:GetPlayerFullName())
-	professionID = tonumber(professionID)
+	professionID = GetSupportedProfessionID(professionID)
 	if not characterName or not professionID then
 		return nil
 	end
@@ -603,12 +899,10 @@ function AF:StoreProfessionLink(characterName, professionID, professionLink, pro
 	local professionKey = tostring(professionID)
 	local profession = profile.professions[professionKey] or {
 		id = professionID,
-		name = professionName or self:GetProfessionName(professionID, profile),
 		recipes = {},
 	}
 	profile.professions[professionKey] = profession
 	profession.id = professionID
-	profession.name = professionName or profession.name
 	profession.professionLink = professionLink
 	if not profession.icon then
 		local currentProfession = self:GetCurrentProfessionInfo()
@@ -823,10 +1117,13 @@ function AF:GetProfessionScannedCount(profile, professionID)
 	if not profile or not professionID then
 		return 0
 	end
-	local baseProfessionID = self:GetBaseProfessionID(professionID)
+	local baseProfessionID = self:GetSupportedProfessionID(professionID)
+	if not baseProfessionID then
+		return 0
+	end
 	local count = 0
 	for _, item in pairs(profile.items or {}) do
-		if self:GetBaseProfessionID(item.professionID) == baseProfessionID then
+		if self:GetSupportedProfessionID(item.professionID, item) == baseProfessionID then
 			count = count + 1
 		end
 	end
@@ -848,7 +1145,7 @@ function AF:GetScannedProfessionRows()
 	self:ForEachArtisanProfile(function(characterName, profile)
 		local added = {}
 		for professionKey, profession in pairs(profile.professions or {}) do
-			local professionID = tonumber(profession.id) or tonumber(professionKey)
+			local professionID = self:GetSupportedProfessionID(professionKey, profession)
 			local count = self:GetProfessionScannedCount(profile, professionID)
 			if professionID and count > 0 then
 				local displayProfessionID = self:GetProfessionDefaultAdvertisingID(professionID, profession)
@@ -866,7 +1163,7 @@ function AF:GetScannedProfessionRows()
 			end
 		end
 		for _, item in pairs(profile.items or {}) do
-			local professionID = tonumber(item.professionID)
+			local professionID = self:GetSupportedProfessionID(item.professionID, item)
 			if professionID and not added[professionID] then
 				local displayProfessionID = self:GetProfessionDefaultAdvertisingID(professionID, item)
 				added[professionID] = true
@@ -906,7 +1203,7 @@ function AF:GetAdvertisingProfessionRows()
 	for characterName, characterSettings in pairs(self.db and self.db.advertising or {}) do
 		if type(characterSettings) == "table" then
 			for professionKey in pairs(characterSettings) do
-				local professionID = tonumber(professionKey)
+				local professionID = self:GetSupportedProfessionID(professionKey)
 				local key = tostring(characterName or "") .. ":" .. tostring(professionID or "")
 				if professionID and not added[key] then
 					local baseProfessionID = self:GetProfessionDefaultAdvertisingID(professionID)
@@ -928,7 +1225,7 @@ function AF:GetAdvertisingProfessionRows()
 	for characterName, characterSettings in pairs(self.db and self.db.advertisingKnown or {}) do
 		if type(characterSettings) == "table" then
 			for professionKey in pairs(characterSettings) do
-				local professionID = tonumber(professionKey)
+				local professionID = self:GetSupportedProfessionID(professionKey)
 				local key = tostring(characterName or "") .. ":" .. tostring(professionID or "")
 				if professionID and not added[key] then
 					local baseProfessionID = self:GetProfessionDefaultAdvertisingID(professionID)
@@ -959,16 +1256,7 @@ function AF:GetAdvertisingProfessionRows()
 end
 
 function AF:GetProfessionName(professionID, profile)
-	profile = profile or (self.db and self.db.artisanProfile)
-	local info = profile and profile.professions and profile.professions[tostring(professionID or "")]
-	local namedProfessionID = GetBaseProfessionIDFromName(info and info.name)
-	if namedProfessionID and namedProfessionID ~= tonumber(professionID) then
-		return self:GetProfessionName(namedProfessionID)
-	end
-	if info and info.name then
-		return info.name
-	end
-	professionID = GetBaseProfessionID(professionID)
+	professionID = GetSupportedProfessionID(professionID) or GetBaseProfessionID(professionID)
 	local spellID = BASE_PROFESSION_SPELLS[professionID]
 	if spellID then
 		local ok, name = pcall(C_Spell.GetSpellName, spellID)

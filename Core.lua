@@ -15,6 +15,8 @@ local EVENTS = {
 	"CHAT_MSG_CHANNEL_NOTICE",
 	"CHAT_MSG_ADDON",
 	"CHAT_MSG_CHANNEL",
+	"GET_ITEM_INFO_RECEIVED",
+	"ITEM_DATA_LOAD_RESULT",
 	"GUILD_ROSTER_UPDATE",
 	"GUILD_TRADESKILL_UPDATE",
 	"GUILD_RECIPE_KNOWN_BY_MEMBERS",
@@ -262,6 +264,10 @@ AF.frame:SetScript("OnEvent", function(_, event, ...)
 		end
 		if AF.OnTradeChatMessage then
 			AF:OnTradeChatMessage(...)
+		end
+	elseif event == "GET_ITEM_INFO_RECEIVED" or event == "ITEM_DATA_LOAD_RESULT" then
+		if AF.OnItemDataLoaded then
+			AF:OnItemDataLoaded(...)
 		end
 	elseif event == "GUILD_ROSTER_UPDATE" then
 		if AF.QueueGuildRosterCacheRefresh then

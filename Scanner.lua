@@ -24,8 +24,7 @@ local function GetRecommendationSnapshot(item)
 		return ""
 	end
 	return table.concat({
-		tostring(item.bestReagentSummary or ""),
-		tostring(item.bestReagentDetails or ""),
+		tostring(item.bestReagentSignature or ""),
 		tostring(item.bestQuality or ""),
 		tostring(item.bestQualityAtlas or ""),
 		tostring(item.rawBestQuality or ""),
@@ -264,16 +263,20 @@ function AF:PrepareProfessionForScan(profession)
 	end
 
 	local profile = self.db.artisanProfile
-	local professionKey = tostring(profession.id)
+	local supportedProfessionID = self:GetSupportedProfessionID(profession.id, profession)
+	if not supportedProfessionID then
+		return nil
+	end
+	profession.id = supportedProfessionID
+	local professionKey = tostring(supportedProfessionID)
 	profile.professions[professionKey] = profile.professions[professionKey] or {
-		id = profession.id,
-		name = profession.name,
+		id = supportedProfessionID,
 		recipes = {},
 		updatedAt = self:Now(),
 	}
 	local professionEntry = profile.professions[professionKey]
-	professionEntry.id = profession.id
-	professionEntry.name = profession.name
+	professionEntry.id = supportedProfessionID
+	professionEntry.name = nil
 	professionEntry.parentProfessionID = profession.parentProfessionID
 	professionEntry.skillLineID = profession.skillLineID
 	professionEntry.childProfessionID = profession.childProfessionID
@@ -314,8 +317,7 @@ function AF:BuildScanProgress(profession, professionEntry, signature, force, mod
 					or not existing
 					or tonumber(existing.recipeID) ~= tonumber(recipeID)
 					or tonumber(existing.professionID) ~= tonumber(profession.id)
-					or not existing.bestReagentSummary
-					or existing.bestReagentSummary == ""
+					or not existing.bestReagents
 					or existing.bestReagentPendingNames == true
 				if force or not completed[key] then
 					table.insert(pending, {
@@ -323,7 +325,6 @@ function AF:BuildScanProgress(profession, professionEntry, signature, force, mod
 						kind = needsFull and "full" or mode,
 						recipeID = recipeID,
 						itemID = itemID,
-						recipeName = recipeInfo and recipeInfo.name,
 					})
 				end
 			end
@@ -395,15 +396,14 @@ function AF:ScanJob(profession, professionEntry, job)
 	end
 	existing.itemID = job.itemID
 	existing.recipeID = job.recipeID
-	existing.recipeName = job.recipeName or existing.recipeName or self:Text("RECIPE_FALLBACK", tostring(job.recipeID))
-	existing.itemName = self:GetDisplayItemName(job.itemID, existing.itemName)
 	existing.professionID = profession.id
-	existing.professionName = profession.name
+	existing.itemName = nil
+	existing.recipeName = nil
+	existing.professionName = nil
 	if job.kind == "probe" then
 		local probe = self:GetRecipeSkillProbe(job.recipeID)
 		if probe then
 			if professionEntry.scanProgress and professionEntry.scanProgress.reason == "PROFESSION_EQUIPMENT_CHANGED" and self:IsLowerOrEqualEquipmentProbe(existing, probe) then
-				existing.skillProbeAt = self:Now()
 				professionEntry.scanProgress.skillDowngradesSkipped = (tonumber(professionEntry.scanProgress.skillDowngradesSkipped) or 0) + 1
 				return
 			end
@@ -427,7 +427,6 @@ function AF:ScanJob(profession, professionEntry, job)
 					kind = "full",
 					recipeID = job.recipeID,
 					itemID = job.itemID,
-					recipeName = job.recipeName,
 				})
 				professionEntry.scanProgress.total = professionEntry.scanProgress.total + 1
 				return true
@@ -438,7 +437,6 @@ function AF:ScanJob(profession, professionEntry, job)
 				kind = "full",
 				recipeID = job.recipeID,
 				itemID = job.itemID,
-				recipeName = job.recipeName,
 			})
 			professionEntry.scanProgress.total = professionEntry.scanProgress.total + 1
 			return true
@@ -447,7 +445,7 @@ function AF:ScanJob(profession, professionEntry, job)
 		local beforeRecommendation = GetRecommendationSnapshot(existing)
 		self:ApplyRecipeCapability(existing, job.recipeID)
 		local afterRecommendation = GetRecommendationSnapshot(existing)
-		if beforeRecommendation ~= afterRecommendation and existing.bestReagentSummary and existing.bestReagentSummary ~= "" then
+		if beforeRecommendation ~= afterRecommendation and existing.bestReagents then
 			professionEntry.scanProgress.recommendationsUpdated = (tonumber(professionEntry.scanProgress.recommendationsUpdated) or 0) + 1
 		end
 	end
@@ -561,11 +559,11 @@ function AF:CompleteActiveScan(active, professionEntry, progress)
 	self:StoreBestProfessionEquipmentState(currentProfession, self:GetCurrentProfessionEquipmentState(currentProfession))
 	self:StoreBestProfessionSkillSnapshots(currentProfession, self:GetCurrentProfessionSkillSnapshots(currentProfession))
 	if progress.reason == "PROFESSION_EQUIPMENT_CHANGED" and (tonumber(progress.skillUpgrades) or 0) == 0 then
-		self:Print(self:Text("SCAN_EQUIPMENT_NO_UPGRADES", tonumber(progress.skillDowngradesSkipped) or 0, professionEntry.name))
+		self:Print(self:Text("SCAN_EQUIPMENT_NO_UPGRADES", tonumber(progress.skillDowngradesSkipped) or 0, self:GetProfessionName(professionEntry.id)))
 		return
 	end
-	self:Print(self:Text("SCAN_COMPLETE", tonumber(progress.scanned) or 0, professionEntry.name))
-	self:Print(self:Text("SCAN_RECOMMENDATIONS_UPDATED", tonumber(progress.recommendationsUpdated) or 0, professionEntry.name))
+	self:Print(self:Text("SCAN_COMPLETE", tonumber(progress.scanned) or 0, self:GetProfessionName(professionEntry.id)))
+	self:Print(self:Text("SCAN_RECOMMENDATIONS_UPDATED", tonumber(progress.recommendationsUpdated) or 0, self:GetProfessionName(professionEntry.id)))
 end
 
 function AF:ProcessScanQueue()
@@ -605,7 +603,7 @@ function AF:ProcessScanQueue()
 		end
 
 		local jobsToProcess = AF:GetScanJobsPerTick(GetNextPendingJob(progress))
-		local profession = { id = active.professionID, name = professionEntry.name }
+		local profession = { id = active.professionID }
 		for _ = 1, jobsToProcess do
 			local job = GetNextPendingJob(progress)
 			if not job then
@@ -653,7 +651,7 @@ function AF:PauseActiveProfessionScan(silent)
 	self:RefreshScanProgressUI(true)
 
 	if remaining > 0 and not silent then
-		self:Print(self:Text("SCAN_PAUSED", professionEntry.name or self:Text("PROFESSION_FALLBACK", tostring(active.professionID)), remaining))
+		self:Print(self:Text("SCAN_PAUSED", self:GetProfessionName(active.professionID), remaining))
 	end
 end
 
@@ -679,6 +677,10 @@ function AF:StartOrResumeCurrentProfessionScan(force, silent, mode, forceProbe, 
 		if not silent then
 			self:Print(self:Text("SCAN_NO_PROFESSION"))
 		end
+		return 0
+	end
+	profession.id = self:GetSupportedProfessionID(profession.id, profession)
+	if not profession.id then
 		return 0
 	end
 

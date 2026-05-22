@@ -364,18 +364,24 @@ function AF:GetCurrentCraftingRecipeContext()
 	end
 
 	local professionID = currentProfession.id
+	professionID = self:GetSupportedProfessionID(professionID, currentProfession)
+	if not professionID then
+		return nil
+	end
 
 	return itemID and {
 		itemID = itemID,
-		itemName = self:GetDisplayItemName(itemID, recipeInfo.name),
 		recipeID = recipeID,
-		recipeName = recipeInfo.name,
 		learned = recipeInfo.learned ~= false,
 		isRecraft = isRecraft,
 		professionID = professionID,
-		professionName = currentProfession.name,
 		professionIcon = currentProfession.icon,
 	} or nil
+end
+
+function AF:GetCurrentSupportedProfessionID()
+	local profession = self:GetCurrentProfessionInfo()
+	return self:GetSupportedProfessionID(profession and profession.id, profession), profession
 end
 
 function AF:EnsureCurrentRecipeEntry(context)
@@ -391,10 +397,10 @@ function AF:EnsureCurrentRecipeEntry(context)
 	self.db.artisanProfile.items[itemKey] = item
 	item.itemID = context.itemID
 	item.recipeID = context.recipeID
-	item.recipeName = context.recipeName or item.recipeName
-	item.itemName = context.itemName or item.itemName
 	item.professionID = context.professionID or item.professionID
-	item.professionName = context.professionName or item.professionName
+	item.recipeName = nil
+	item.itemName = nil
+	item.professionName = nil
 	item.professionIcon = context.professionIcon or item.professionIcon
 	self:ApplyRecipeCapability(item, context.recipeID)
 	item.updatedAt = self:Now()
@@ -403,11 +409,10 @@ function AF:EnsureCurrentRecipeEntry(context)
 		local professionKey = tostring(context.professionID)
 		local profession = self.db.artisanProfile.professions[professionKey] or {
 			id = context.professionID,
-			name = context.professionName or AF:Text("PROFESSION_FALLBACK", tostring(context.professionID)),
 			recipes = {},
 		}
 		self.db.artisanProfile.professions[professionKey] = profession
-		profession.name = context.professionName or profession.name
+		profession.name = nil
 		profession.icon = context.professionIcon or profession.icon
 		profession.updatedAt = self:Now()
 		profession.professionLink = item.professionLink or profession.professionLink
@@ -520,8 +525,7 @@ function AF:AttachCrafterUI()
 		local context = AF:GetCurrentCraftingRecipeContext()
 		local professionID = context and context.professionID
 		if not professionID then
-			local profession = AF:GetCurrentProfessionInfo()
-			professionID = profession and profession.id
+			professionID = AF:GetCurrentSupportedProfessionID()
 		end
 		if not professionID then
 			AF:Print(AF:Text("OPEN_PROFESSION_DEFAULT"))
@@ -573,9 +577,9 @@ function AF:AttachCrafterUI()
 	defaults.advertiseCheck.Text:SetText(self:Text("CRAFTER_PANEL_ADVERTISE_PROFESSION"))
 	defaults.advertiseCheck.Text:SetPoint("LEFT", defaults.advertiseCheck, "RIGHT", 2, 0)
 	defaults.advertiseCheck:SetScript("OnClick", function(self)
-		local profession = AF:GetCurrentProfessionInfo()
-		if profession and profession.id then
-			AF:SetProfessionAdvertised(AF.playerName, profession.id, self:GetChecked() == true)
+		local professionID = AF:GetCurrentSupportedProfessionID()
+		if professionID then
+			AF:SetProfessionAdvertised(AF.playerName, professionID, self:GetChecked() == true)
 		end
 	end)
 
@@ -691,13 +695,13 @@ function AF:UpdateFastScanButton()
 		return
 	end
 	local active = self.activeScan
-	local currentProfession = self:GetCurrentProfessionInfo()
+	local currentProfessionID, currentProfession = self:GetCurrentSupportedProfessionID()
 	local fastScanText = self:Text("FAST_SCAN_BUTTON")
 	if self.db and self.db.fastScan == true then
 		fastScanText = "|TInterface\\Buttons\\UI-CheckBox-Check:14:14:0:0|t " .. fastScanText
 	end
 	SizeButtonForText(button, fastScanText, 108, 140)
-	if currentProfession then
+	if currentProfessionID then
 		button:Enable()
 	else
 		button:Disable()
@@ -707,7 +711,7 @@ function AF:UpdateFastScanButton()
 		SizeButtonForText(forceRescanButton, self:Text("FORCE_RESCAN_BUTTON"), 76, 120)
 		forceRescanButton:ClearAllPoints()
 		forceRescanButton:SetPoint("LEFT", button, "RIGHT", 6, 0)
-		if currentProfession and not active then
+		if currentProfessionID and not active then
 			forceRescanButton:Enable()
 		else
 			forceRescanButton:Disable()
@@ -754,8 +758,7 @@ function AF:UpdateCrafterDirtyState()
 
 	local professionID = context and context.professionID
 	if not professionID then
-		local profession = self:GetCurrentProfessionInfo()
-		professionID = profession and profession.id
+		professionID = self:GetCurrentSupportedProfessionID()
 	end
 	local default = professionID and self:GetProfessionPriceEntry(self.db.artisanProfile, professionID)
 	local defaultNote = default and default.note or ""
@@ -786,13 +789,22 @@ function AF:RefreshCrafterUI()
 	end
 
 	self:PositionCrafterUI()
-	self:UpdateFastScanButton()
 
 	local context = self:GetCurrentCraftingRecipeContext()
-	local profession = self:GetCurrentProfessionInfo()
-	local professionID = context and context.professionID or (profession and profession.id)
+	local professionID, profession = self:GetCurrentSupportedProfessionID()
+	if not professionID then
+		frame:Hide()
+		defaults:Hide()
+		if self.crafterDefaultsCollapseButton then
+			self.crafterDefaultsCollapseButton:Hide()
+		end
+		return
+	end
+	self:UpdateFastScanButton()
+
+	professionID = context and context.professionID or professionID
 	if professionID then
-		self:CaptureCurrentProfessionLink(profession or { id = professionID, name = context and context.professionName }, "crafter-ui-refresh")
+		self:CaptureCurrentProfessionLink(profession or { id = professionID }, "crafter-ui-refresh")
 	end
 	if not context or context.learned == false or context.isRecraft then
 		frame:Hide()

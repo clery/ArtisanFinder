@@ -18,31 +18,18 @@ local PROFESSION_SPELL_TO_SKILL_LINE = {
 	[25229] = 755, -- Jewelcrafting
 	[2108] = 165, -- Leatherworking
 	[3908] = 197, -- Tailoring
-	[2550] = 185, -- Cooking
 }
 
 local KNOWN_PROFESSION_SKILL_LINES = {
 	[164] = true, -- Blacksmithing
 	[165] = true, -- Leatherworking
 	[171] = true, -- Alchemy
-	[182] = true, -- Herbalism
-	[185] = true, -- Cooking
-	[186] = true, -- Mining
 	[197] = true, -- Tailoring
 	[202] = true, -- Engineering
 	[333] = true, -- Enchanting
-	[356] = true, -- Fishing
-	[393] = true, -- Skinning
 	[755] = true, -- Jewelcrafting
 	[773] = true, -- Inscription
 }
-local PROFESSION_SKILL_LINE_ALIASES = {
-	[5] = 185, -- Midnight Cooking
-	[6] = 186, -- Midnight Mining
-	[10] = 356, -- Midnight Fishing
-	[12] = 755, -- Midnight Jewelcrafting
-}
-
 local function ExtractTradeLinks(message)
 	local links = {}
 	local seen = {}
@@ -81,12 +68,9 @@ local function GetTradeLinkProfessionCandidates(link)
 end
 
 local function AddCandidate(candidates, value)
-	value = tonumber(value)
+	value = AF:GetSupportedProfessionID(value)
 	if value and value ~= 0 then
 		candidates[value] = true
-		if PROFESSION_SKILL_LINE_ALIASES[value] then
-			candidates[PROFESSION_SKILL_LINE_ALIASES[value]] = true
-		end
 	end
 end
 
@@ -187,11 +171,10 @@ function AF:InjectDebugTradeLeads()
 	for professionKey, profession in pairs(profile and profile.professions or {}) do
 		local professionID = tonumber(profession.id) or tonumber(professionKey)
 		if professionID then
-			table.insert(professions, {
-				id = professionID,
-				link = profession.professionLink,
-				name = self:GetProfessionName(professionID, profile),
-			})
+		table.insert(professions, {
+			id = professionID,
+			link = profession.professionLink,
+		})
 		end
 	end
 	if #professions == 0 then
@@ -216,7 +199,6 @@ function AF:InjectDebugTradeLeads()
 			name = name,
 			target = name,
 			professionLink = profession.link,
-			professionName = profession.name,
 			professionCandidates = candidates,
 			updatedAt = now,
 			tradeLead = true,
@@ -263,7 +245,6 @@ function AF:OnTradeChatMessage(message, sender, _, channelName, _, _, _, _, chan
 			name = name,
 			target = name,
 			professionLink = linkInfo.link,
-			professionName = linkInfo.name,
 			professionCandidates = GetTradeLinkProfessionCandidates(linkInfo.link),
 			updatedAt = now,
 			tradeLead = true,
@@ -355,7 +336,7 @@ function AF:GetCachedTradeLeadFallbackRows(itemID, professionID, filterText, see
 				target = lead.target,
 				itemID = itemID,
 				professionID = normalizedProfessionID,
-				professionName = normalizedProfessionID ~= 0 and self:GetProfessionName(normalizedProfessionID) or lead.professionName,
+				professionName = normalizedProfessionID ~= 0 and self:GetProfessionName(normalizedProfessionID) or nil,
 				professionLink = lead.professionLink,
 				updatedAt = lead.updatedAt,
 				snapshotUpdatedAt = lead.snapshotUpdatedAt or lead.updatedAt,
@@ -409,7 +390,7 @@ function AF:GetTradeLeadRows(itemID, professionID, filterText, seenNames, recipe
 				target = lead.target,
 				itemID = itemID,
 				professionID = normalizedProfessionID,
-				professionName = normalizedProfessionID ~= 0 and self:GetProfessionName(normalizedProfessionID) or lead.professionName,
+				professionName = normalizedProfessionID ~= 0 and self:GetProfessionName(normalizedProfessionID) or nil,
 				professionLink = lead.professionLink,
 				updatedAt = lead.updatedAt,
 				snapshotUpdatedAt = lead.snapshotUpdatedAt or lead.updatedAt,

@@ -391,26 +391,33 @@ function AF:AddCapabilityTooltipLines(tooltip, entry)
 	if not tooltip or not entry then
 		return
 	end
+	local legacyReagentDisplay = self:GetLegacyReagentDisplay(entry)
 
 	local optionalText = self:FormatOptionalReagentImpact(entry, false)
 	if optionalText ~= "" then
 		tooltip:AddLine(" ")
 		tooltip:AddLine(self:Text("OPTIONAL_REAGENTS"), 1, 0.82, 0)
 		tooltip:AddLine(optionalText, 1, 1, 1, true)
-		if entry.optionalReagentSummary and entry.optionalReagentSummary ~= "" then
-			tooltip:AddLine(entry.optionalReagentSummary, 0.75, 0.75, 0.75, true)
+		if entry.optionalReagents and self:AddReagentLines(tooltip, entry.optionalReagents, 0.75, 0.75, 0.75) then
+			-- Reagent lines added above.
 		elseif tonumber(entry.optionalSlotCount) and tonumber(entry.optionalSlotCount) > 0 then
 			tooltip:AddLine(self:Text("OPTIONAL_REAGENTS_SLOT_COUNT", entry.optionalSlotCount), 0.75, 0.75, 0.75, true)
 		end
 	end
 
-	if (entry.bestReagentSummary and entry.bestReagentSummary ~= "") or (entry.bestReagentDetails and entry.bestReagentDetails ~= "") then
+	if entry.bestReagents
+		or (legacyReagentDisplay and ((legacyReagentDisplay.details and legacyReagentDisplay.details ~= "") or (legacyReagentDisplay.summary and legacyReagentDisplay.summary ~= "")))
+		or (entry.bestReagentDetails and entry.bestReagentDetails ~= "") then
 		tooltip:AddLine(" ")
 		tooltip:AddLine(self:Text("SUGGESTED_REAGENTS"), 1, 0.82, 0)
-		if entry.bestReagentDetails and entry.bestReagentDetails ~= "" then
+		if entry.bestReagents then
+			self:AddReagentLines(tooltip, entry.bestReagents, 1, 1, 1)
+		elseif legacyReagentDisplay and legacyReagentDisplay.details and legacyReagentDisplay.details ~= "" then
+			self:AddReagentDetailTooltipLines(tooltip, legacyReagentDisplay.details)
+		elseif legacyReagentDisplay and legacyReagentDisplay.summary and legacyReagentDisplay.summary ~= "" then
+			self:AddReagentSummaryTooltipLines(tooltip, legacyReagentDisplay.summary, legacyReagentDisplay.truncated)
+		elseif entry.bestReagentDetails and entry.bestReagentDetails ~= "" then
 			self:AddReagentDetailTooltipLines(tooltip, entry.bestReagentDetails)
-		else
-			self:AddReagentSummaryTooltipLines(tooltip, entry.bestReagentSummary, entry.bestReagentTruncated)
 		end
 	elseif entry.bestReagentPendingNames or entry.reagentDetailRequested then
 		tooltip:AddLine(" ")
@@ -421,6 +428,45 @@ function AF:AddCapabilityTooltipLines(tooltip, entry)
 		tooltip:AddLine(self:Text("NO_REAGENT_RECOMMENDATION"), 0.75, 0.75, 0.75, true)
 	end
 
+end
+
+function AF:AddReagentLines(tooltip, reagents, r, g, b)
+	local added = false
+	local requestedItemData = false
+	local missing = {}
+	for _, reagent in ipairs(reagents or {}) do
+		local quantity = tonumber(reagent.quantity) or 1
+		if reagent.kind == "currency" and reagent.currencyID and C_CurrencyInfo and C_CurrencyInfo.GetCurrencyInfo then
+			local currencyInfo = C_CurrencyInfo.GetCurrencyInfo(reagent.currencyID)
+			local currencyName = currencyInfo and currencyInfo.name
+			if currencyName and currencyName ~= "" then
+				local icon = currencyInfo.iconFileID and CreateTextureMarkup and CreateTextureMarkup(currencyInfo.iconFileID, 16, 16, 16, 16, 0, 1, 0, 1) or ""
+				tooltip:AddLine(string.format("%s%s x%d", icon ~= "" and (icon .. " ") or "", currencyName, quantity), r or 1, g or 1, b or 1, true)
+				added = true
+			end
+		else
+			local itemID = tonumber(reagent.itemID or reagent.id)
+			if itemID then
+				local itemName = self:GetItemName(itemID)
+				if itemName and itemName ~= "" then
+					local itemIcon = self:GetItemIconMarkup(itemID, 16) or ""
+					local qualityText = self:GetQualityIconMarkup(reagent.quality, reagent.qualityAtlas, 16) or ""
+					tooltip:AddLine(string.format("%s%s x%d%s", itemIcon ~= "" and (itemIcon .. " ") or "", itemName, quantity, qualityText ~= "" and (" " .. qualityText) or ""), r or 1, g or 1, b or 1, true)
+					added = true
+				else
+					requestedItemData = true
+					table.insert(missing, tostring(itemID))
+				end
+			end
+		end
+	end
+	if not added and type(reagents) == "table" and #reagents > 0 then
+		tooltip:AddLine(self:Text("LOADING_REAGENT_NAMES"), 0.75, 0.75, 0.75, true)
+	end
+	if requestedItemData then
+		self.pendingReagentItemData = true
+	end
+	return added
 end
 
 local function GetLocalReagentQualityMarkup(itemID)
@@ -529,4 +575,14 @@ end
 
 function AF:GetDisplayItemName(itemID, fallback)
 	return self:GetItemName(itemID) or fallback or self:Text("ITEM_FALLBACK")
+end
+
+function AF:OnItemDataLoaded()
+	if not self.pendingReagentItemData then
+		return
+	end
+	self.pendingReagentItemData = nil
+	if self.RefreshCustomerResults then
+		self:RefreshCustomerResults()
+	end
 end

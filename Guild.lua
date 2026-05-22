@@ -427,7 +427,7 @@ function AF:RememberGuildProfessionMember(professionID, name, professionName, on
 		members = {},
 	}
 	self.guildProfessionMembers[professionKey] = professionCache
-	professionCache.professionName = professionName or professionCache.professionName
+	professionCache.professionName = nil
 
 	local member = professionCache.members[name] or { name = name }
 	local now = updatedAt or self:Now()
@@ -443,7 +443,7 @@ function AF:RememberGuildProfessionMember(professionID, name, professionName, on
 	professionCache.members[name] = member
 	member.name = name
 	member.online = isOnline
-	member.professionName = professionName or member.professionName or professionCache.professionName
+	member.professionName = nil
 	if isOnline then
 		member.updatedAt = now
 		member.lastAvailableAt = now
@@ -501,7 +501,7 @@ function AF:GetGuildCachedProfessionMemberRows(itemID, professionID, filterText,
 					orderTarget = name,
 					itemID = itemID,
 					professionID = professionID,
-					professionName = member.professionName or professionCache.professionName or self:GetProfessionName(professionID),
+					professionName = self:GetProfessionName(professionID),
 					updatedAt = rowUpdatedAt,
 					verifiedAt = member.updatedAt or professionCache.updatedAt or self:Now(),
 					certified = false,

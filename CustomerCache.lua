@@ -108,7 +108,6 @@ local function EntryMatchesCustomerFilter(AF, entry, filterText)
 		entry.note or "",
 		AF:FormatMoney(entry.priceCopper, entry.freeCommission),
 		AF:FormatCapability(entry),
-		entry.bestReagentSummary or "",
 	}, " "):lower()
 	return haystack:find(filterText, 1, true)
 end
@@ -246,8 +245,7 @@ function AF:GetOwnAltRows(itemID, professionID, filterText, seenNames, recipeID)
 			bestConcentrationQualityAtlas = item.bestConcentrationQualityAtlas,
 			bestTotalSkill = item.bestTotalSkill,
 			bestConcentrationCost = item.bestConcentrationCost,
-			bestReagentSummary = item.bestReagentSummary,
-			bestReagentDetails = item.bestReagentDetails,
+			bestReagents = item.bestReagents,
 			bestReagentSummaryUpdatedAt = item.bestReagentSummaryUpdatedAt,
 			bestReagentTruncated = item.bestReagentTruncated,
 			bestReagentPendingNames = item.bestReagentPendingNames,
@@ -256,7 +254,7 @@ function AF:GetOwnAltRows(itemID, professionID, filterText, seenNames, recipeID)
 			optionalQualityAtlas = item.optionalQualityAtlas,
 			optionalConcentrationQuality = item.optionalConcentrationQuality,
 			optionalConcentrationQualityAtlas = item.optionalConcentrationQualityAtlas,
-			optionalReagentSummary = item.optionalReagentSummary,
+			optionalReagents = item.optionalReagents,
 			optionalSlotCount = item.optionalSlotCount,
 			professionLink = professionLink,
 			updatedAt = item.updatedAt or profile.updatedAt or self:Now(),
