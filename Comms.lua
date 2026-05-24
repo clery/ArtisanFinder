@@ -165,6 +165,9 @@ function AF:SendAddon(prefixPayload, chatType, target, priority, queueName)
 	priority = priority or "NORMAL"
 	queueName = queueName or table.concat({ self.PREFIX, chatType or "", target or "" }, ":")
 	ChatThrottleLib:SendAddonMessage(priority, self.PREFIX, prefixPayload, chatType, target, queueName)
+	if self:IsDevTrafficLogsEnabled() then
+		self:DebugLog("send", string.format("%s %s %s", tostring(chatType or "?"), tostring(target or ""), tostring(prefixPayload or "")))
+	end
 	return true
 end
 
@@ -214,6 +217,7 @@ function AF:BroadcastQuery(itemID, professionID)
 			sent = self:SendAddon(payload, "WHISPER", target, "BULK", queueName .. ":GUILD_WHISPER:" .. tostring(target)) or sent
 		end
 	end
+	self:DebugLog("query", string.format("sent item=%s profession=%s channel=%s guild=%s result=%s", tostring(itemID), tostring(normalizedProfessionID), tostring(channelID or 0), tostring(IsInGuild and IsInGuild() == true), tostring(sent == true)))
 	return sent
 end
 
@@ -261,6 +265,9 @@ function AF:OnAddonMessage(prefix, message, channel, sender)
 	local kind, version = parts[1], parts[2]
 	if version ~= self.PROTOCOL_VERSION then
 		return
+	end
+	if self:IsDevTrafficLogsEnabled() then
+		self:DebugLog("recv", string.format("%s %s %s", tostring(channel or "?"), tostring(normalizedSender or "?"), tostring(message or "")))
 	end
 
 	if kind == "Q" then
@@ -675,6 +682,16 @@ function AF:HandleResponse(parts, sender)
 		self.db.customerCache[itemKey][cacheKey].bestReagentSummaryUpdatedAt = self:Now()
 		self.db.customerCache[itemKey][cacheKey].reagentDetailRequested = nil
 	end
+	self:DebugLog("response", string.format(
+		"stored crafter=%s sender=%s item=%s profession=%s queryMatch=%s guild=%s reagents=%s",
+		tostring(crafterName or ""),
+		tostring(sender or ""),
+		tostring(itemID or ""),
+		tostring(professionID or ""),
+		tostring(verifiedForCurrentQuery == true),
+		tostring(guildResponse == true),
+		tostring(responseReagents ~= nil)
+	))
 	self:ApplyPendingReagentDetail(sender, itemID, recipeID, queryToken, crafterName)
 
 	self:RefreshCustomerResults()
@@ -811,6 +828,15 @@ function AF:HandleReagentDetail(parts, sender)
 		if not pending.reagents then
 			pending.unsupported = true
 		end
+		self:DebugLog("details", string.format(
+			"complete crafter=%s sender=%s item=%s recipe=%s chunks=%d unsupported=%s",
+			tostring(crafterName or ""),
+			tostring(sender or ""),
+			tostring(itemID or ""),
+			tostring(recipeID or ""),
+			tonumber(total) or 0,
+			tostring(pending.unsupported == true)
+		))
 		self:ApplyPendingReagentDetail(sender, itemID, recipeID, queryToken, crafterName)
 		self:RefreshCustomerResults()
 	end

@@ -227,11 +227,13 @@ end
 local function BuildReagentEntry(reagentSlotSchematic, reagent)
 	local quantity = GetQuantityRequired(reagentSlotSchematic, reagent)
 	if reagent.itemID and reagent.itemID ~= 0 then
+		local quality, qualityAtlas = GetReagentQualityInfoFromItemID(reagent.itemID)
 		return {
 			kind = "item",
 			itemID = reagent.itemID,
 			quantity = quantity,
-			quality = GetReagentQuality(reagent),
+			quality = quality or GetReagentQuality(reagent),
+			qualityAtlas = qualityAtlas,
 			dataSlotIndex = reagentSlotSchematic.dataSlotIndex,
 		}
 	end

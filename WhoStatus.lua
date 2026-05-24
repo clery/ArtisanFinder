@@ -325,6 +325,9 @@ function AF:IsCustomerEntryOnline(entry)
 	if entry.guildMember then
 		return entry.guildOnline == true
 	end
+	if not self:IsCustomerEntryWhoRefreshable(entry) then
+		return false
+	end
 	return self:GetWhoStatus(GetEntryWhoName(entry)) == true
 end
 
@@ -363,13 +366,6 @@ function AF:MarkCustomerWhoOnline(name)
 	local now = self:Now()
 	self.db.whoOnlineCache = self.db.whoOnlineCache or {}
 	self.db.whoOnlineCache[name] = now
-	for _, itemCache in pairs(self.db and self.db.customerCache or {}) do
-		for _, entry in pairs(itemCache or {}) do
-			if EntryMatchesWhoName(entry, name) then
-				entry.updatedAt = now
-			end
-		end
-	end
 	for _, lead in pairs(self.db and self.db.tradeLeadCache or {}) do
 		if EntryMatchesWhoName(lead, name) then
 			lead.updatedAt = now

@@ -501,8 +501,23 @@ function ApplyDBDefaults(db)
 	db.minimap = db.minimap or { angle = 225, hide = false }
 	db.tutorial = db.tutorial or {}
 
-	if db.debugSelfResults == nil then
-		db.debugSelfResults = false
+	if db.debugSelfResults == true then
+		db.debugEnabled = true
+		db.devEnabled = true
+		db.devFakeRows = true
+	end
+	db.debugSelfResults = false
+	if db.debugEnabled == nil then
+		db.debugEnabled = false
+	end
+	if db.devEnabled == nil then
+		db.devEnabled = false
+	end
+	if db.devFakeRows == nil then
+		db.devFakeRows = false
+	end
+	if db.devTrafficLogs == nil then
+		db.devTrafficLogs = false
 	end
 	if db.defaultSort == nil then
 		db.defaultSort = "best"

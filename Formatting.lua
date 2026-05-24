@@ -155,6 +155,18 @@ local PROFESSION_ICON_SPELLS = {
 	[773] = 45357,
 }
 
+local function GetReagentDisplayQualityInfo(itemID, reagent)
+	itemID = tonumber(itemID)
+	if itemID then
+		local ok, qualityInfo = pcall(C_TradeSkillUI.GetItemReagentQualityInfo, itemID)
+		if ok and qualityInfo then
+			return tonumber(qualityInfo.quality) or tonumber(reagent and reagent.quality),
+				qualityInfo.iconSmall or qualityInfo.icon or reagent and reagent.qualityAtlas
+		end
+	end
+	return tonumber(reagent and reagent.quality), reagent and reagent.qualityAtlas
+end
+
 local function GetTextureMarkup(texture, size)
 	texture = texture and tostring(texture) or ""
 	if texture == "" then
@@ -450,7 +462,8 @@ function AF:AddReagentLines(tooltip, reagents, r, g, b)
 				local itemName = self:GetItemName(itemID)
 				if itemName and itemName ~= "" then
 					local itemIcon = self:GetItemIconMarkup(itemID, 16) or ""
-					local qualityText = self:GetQualityIconMarkup(reagent.quality, reagent.qualityAtlas, 16) or ""
+					local quality, qualityAtlas = GetReagentDisplayQualityInfo(itemID, reagent)
+					local qualityText = self:GetQualityIconMarkup(quality, qualityAtlas, 16) or ""
 					tooltip:AddLine(string.format("%s%s x%d%s", itemIcon ~= "" and (itemIcon .. " ") or "", itemName, quantity, qualityText ~= "" and (" " .. qualityText) or ""), r or 1, g or 1, b or 1, true)
 					added = true
 				else

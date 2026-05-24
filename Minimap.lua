@@ -92,6 +92,9 @@ function AF:InitializeMinimap()
 		icon = ICON,
 		iconCoords = ICON_COORDS,
 		OnClick = function(_, button)
+			if AF.CloseMinimapTutorial then
+				AF:CloseMinimapTutorial(true)
+			end
 			if IsShiftKeyDown() then
 				AF:SetMinimapHidden(true)
 			elseif button == "LeftButton" then

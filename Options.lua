@@ -69,6 +69,12 @@ local function RegisterAdvertisingOptions(self, category)
 	self.advertisingOptionRegistered = self.advertisingOptionRegistered or {}
 	if not self.advertisingOptionsSectionRegistered then
 		local initializer = CreateSettingsListSectionHeaderInitializer(self:Text("OPTIONS_SECTION_ADVERTISING"), self:Text("OPTIONS_SECTION_ADVERTISING_DESC"))
+		self.optionsSectionInitializers = self.optionsSectionInitializers or {}
+		table.insert(self.optionsSectionInitializers, {
+			initializer = initializer,
+			labelKey = "OPTIONS_SECTION_ADVERTISING",
+			descriptionKey = "OPTIONS_SECTION_ADVERTISING_DESC",
+		})
 		if initializer.AddShownPredicate then
 			initializer:AddShownPredicate(function()
 				return #AF:GetAdvertisingProfessionRows() > 0
@@ -83,14 +89,16 @@ local function RegisterAdvertisingOptions(self, category)
 		local preservedSetting = row.preservedSetting == true
 		local key = tostring(characterName) .. ":" .. tostring(professionID)
 		if not self.advertisingOptionRegistered[key] then
-			local label = self:GetDisplayPlayerName(characterName) .. " - " .. tostring(row.professionName)
+			local function GetLabel()
+				return self:GetDisplayPlayerName(characterName) .. " - " .. tostring(self:GetProfessionName(professionID, row))
+			end
 			local variable = "ArtisanFinder_Advertise_" .. key:gsub("[^%w_]", "_")
 			local defaultAdvertised = self:IsProfessionAdvertisedByDefault(self:GetProfessionDefaultAdvertisingID(professionID, row))
 			local advertiseProfession = Settings.RegisterProxySetting(
 				category,
 				variable,
 				Settings.VarType.Boolean,
-				label,
+				GetLabel,
 				defaultAdvertised,
 				function()
 					return AF:IsProfessionAdvertised(characterName, professionID)
@@ -99,7 +107,9 @@ local function RegisterAdvertisingOptions(self, category)
 					AF:SetProfessionAdvertised(characterName, professionID, value == true)
 				end
 			)
-			local initializer = Settings.CreateCheckbox(category, advertiseProfession, self:Text("OPTIONS_ADVERTISE_PROFESSION_DESC"))
+			local initializer = Settings.CreateCheckbox(category, advertiseProfession, function()
+				return AF:Text("OPTIONS_ADVERTISE_PROFESSION_DESC")
+			end)
 			if initializer and initializer.AddShownPredicate then
 				initializer:AddShownPredicate(function()
 					return AF:HasScannedProfession(characterName, professionID) or preservedSetting
@@ -118,9 +128,16 @@ function AF:InitializeOptions()
 
 	local category = Settings.RegisterVerticalLayoutCategory("ArtisanFinder")
 	self.optionsCategory = category
+	self.optionsSectionInitializers = {}
 
 	local function AddSection(labelKey, descriptionKey)
-		Settings.RegisterInitializer(category, CreateSettingsListSectionHeaderInitializer(self:Text(labelKey), descriptionKey and self:Text(descriptionKey) or nil))
+		local initializer = CreateSettingsListSectionHeaderInitializer(self:Text(labelKey), descriptionKey and self:Text(descriptionKey) or nil)
+		table.insert(self.optionsSectionInitializers, {
+			initializer = initializer,
+			labelKey = labelKey,
+			descriptionKey = descriptionKey,
+		})
+		Settings.RegisterInitializer(category, initializer)
 	end
 
 	local function RegisterProxySetting(variable, varType, labelKey, defaultValue, getter, setter)
@@ -128,7 +145,9 @@ function AF:InitializeOptions()
 			category,
 			variable,
 			varType,
-			self:Text(labelKey),
+			function()
+				return AF:Text(labelKey)
+			end,
 			defaultValue,
 			getter,
 			setter
@@ -148,7 +167,9 @@ function AF:InitializeOptions()
 			AF:SetDefaultSort(value)
 		end
 	)
-	Settings.CreateDropdown(category, defaultSort, CreateSortOptions, self:Text("OPTIONS_DEFAULT_SORT_DESC"))
+	Settings.CreateDropdown(category, defaultSort, CreateSortOptions, function()
+		return AF:Text("OPTIONS_DEFAULT_SORT_DESC")
+	end)
 
 	AddSection("OPTIONS_SECTION_CACHE")
 	local cleanupFrequency = RegisterProxySetting(
@@ -165,7 +186,9 @@ function AF:InitializeOptions()
 	)
 	Settings.CreateDropdown(category, cleanupFrequency, function()
 		return CreateRadioOptions(CLEANUP_OPTIONS, "days")
-	end, self:Text("OPTIONS_CLEANUP_FREQUENCY_DESC"))
+	end, function()
+		return AF:Text("OPTIONS_CLEANUP_FREQUENCY_DESC")
+	end)
 
 	local offlineFallbackResults = RegisterProxySetting(
 		"ArtisanFinder_OfflineFallbackResults",
@@ -184,7 +207,9 @@ function AF:InitializeOptions()
 	)
 	Settings.CreateDropdown(category, offlineFallbackResults, function()
 		return CreateRadioOptions(OFFLINE_FALLBACK_RESULT_OPTIONS, "count")
-	end, self:Text("OPTIONS_OFFLINE_FALLBACK_RESULTS_DESC"))
+	end, function()
+		return AF:Text("OPTIONS_OFFLINE_FALLBACK_RESULTS_DESC")
+	end)
 
 	local offlineFallbackMax = RegisterProxySetting(
 		"ArtisanFinder_OfflineFallbackMax",
@@ -203,7 +228,9 @@ function AF:InitializeOptions()
 	)
 	Settings.CreateDropdown(category, offlineFallbackMax, function()
 		return CreateRadioOptions(OFFLINE_FALLBACK_MAX_OPTIONS, "count")
-	end, self:Text("OPTIONS_OFFLINE_FALLBACK_MAX_DESC"))
+	end, function()
+		return AF:Text("OPTIONS_OFFLINE_FALLBACK_MAX_DESC")
+	end)
 
 	AddSection("OPTIONS_SECTION_TRADE_LEADS")
 	local tradeLeadLifetime = RegisterProxySetting(
@@ -226,7 +253,9 @@ function AF:InitializeOptions()
 	)
 	Settings.CreateDropdown(category, tradeLeadLifetime, function()
 		return CreateRadioOptions(TRADE_LEAD_OPTIONS, "minutes")
-	end, self:Text("OPTIONS_TRADE_LEADS_LIFETIME_DESC"))
+	end, function()
+		return AF:Text("OPTIONS_TRADE_LEADS_LIFETIME_DESC")
+	end)
 
 	local freezeTradeLeadRows = RegisterProxySetting(
 		"ArtisanFinder_FreezeTradeLeadRows",
@@ -244,7 +273,9 @@ function AF:InitializeOptions()
 			end
 		end
 	)
-	Settings.CreateCheckbox(category, freezeTradeLeadRows, self:Text("OPTIONS_FREEZE_TRADE_LEAD_ROWS_DESC"))
+	Settings.CreateCheckbox(category, freezeTradeLeadRows, function()
+		return AF:Text("OPTIONS_FREEZE_TRADE_LEAD_ROWS_DESC")
+	end)
 
 	AddSection("OPTIONS_SECTION_SCANNING")
 	local fastScan = RegisterProxySetting(
@@ -259,7 +290,9 @@ function AF:InitializeOptions()
 			AF:SetFastScan(value == true)
 		end
 	)
-	Settings.CreateCheckbox(category, fastScan, self:Text("OPTIONS_FAST_SCAN_DESC"))
+	Settings.CreateCheckbox(category, fastScan, function()
+		return AF:Text("OPTIONS_FAST_SCAN_DESC")
+	end)
 
 	AddSection("OPTIONS_SECTION_AVAILABILITY")
 	local autoAvailability = RegisterProxySetting(
@@ -274,7 +307,9 @@ function AF:InitializeOptions()
 			AF:SetAutoAvailability(value == true)
 		end
 	)
-	Settings.CreateCheckbox(category, autoAvailability, self:Text("OPTIONS_AUTO_AVAILABILITY_DESC"))
+	Settings.CreateCheckbox(category, autoAvailability, function()
+		return AF:Text("OPTIONS_AUTO_AVAILABILITY_DESC")
+	end)
 
 	AddSection("OPTIONS_SECTION_MINIMAP")
 	local hideMinimap = RegisterProxySetting(
@@ -289,7 +324,9 @@ function AF:InitializeOptions()
 			AF:SetMinimapHidden(value == true)
 		end
 	)
-	Settings.CreateCheckbox(category, hideMinimap, self:Text("OPTIONS_HIDE_MINIMAP_DESC"))
+	Settings.CreateCheckbox(category, hideMinimap, function()
+		return AF:Text("OPTIONS_HIDE_MINIMAP_DESC")
+	end)
 
 	RegisterAdvertisingOptions(self, category)
 
@@ -298,6 +335,18 @@ end
 
 function AF:RefreshOptionsPanel()
 	if self.optionsCategory then
+		for _, section in ipairs(self.optionsSectionInitializers or {}) do
+			local data = section.initializer and section.initializer.GetData and section.initializer:GetData()
+			if data then
+				data.name = self:Text(section.labelKey)
+				data.tooltip = section.descriptionKey and self:Text(section.descriptionKey) or nil
+			end
+		end
 		RegisterAdvertisingOptions(self, self.optionsCategory)
+		if SettingsPanel and SettingsPanel:IsShown() and SettingsPanel.GetCurrentCategory and SettingsPanel:GetCurrentCategory() == self.optionsCategory then
+			SettingsPanel:DisplayCategory(self.optionsCategory)
+		elseif SettingsPanel and SettingsPanel:IsShown() and SettingsPanel.RepairDisplay then
+			SettingsPanel:RepairDisplay()
+		end
 	end
 end

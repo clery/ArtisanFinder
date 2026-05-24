@@ -161,7 +161,7 @@ end
 function AF:InjectDebugTradeLeads()
 	self.tradeLeads = self.tradeLeads or self.db and self.db.tradeLeads or {}
 	self:ClearDebugTradeLeads()
-	if not self.db or not self.db.debugSelfResults then
+	if not self:IsDevFakeRowsEnabled() then
 		return
 	end
 
@@ -220,6 +220,9 @@ function AF:OnTradeChatMessage(message, sender, _, channelName, _, _, _, _, chan
 	end
 
 	local links = ExtractTradeLinks(message)
+	if self:IsDevTrafficLogsEnabled() and #links > 0 then
+		self:DebugLog("trade", string.format("%s: %d profession link(s)", tostring(sender or "?"), #links))
+	end
 	if #links == 0 or not sender then
 		return
 	end
@@ -253,6 +256,7 @@ function AF:OnTradeChatMessage(message, sender, _, channelName, _, _, _, _, chan
 		self.tradeLeads[leadKey] = lead
 		self.db.tradeLeadCache[leadKey] = lead
 	end
+	self:DebugLog("trade", string.format("stored leads sender=%s count=%d", tostring(name or ""), #links))
 	if not (self.db and self.db.freezeTradeLeadRows == true) and self.RefreshCustomerResults then
 		self:RefreshCustomerResults()
 	end

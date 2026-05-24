@@ -97,6 +97,9 @@ function AF:SetAvailable(value, silent)
 	if not silent and wasAvailable ~= self.available then
 		self:Print(self:Text("AVAILABILITY_CHANGED", self.available and self:Text("ENABLED") or self:Text("DISABLED")))
 	end
+	if wasAvailable ~= self.available then
+		self:DebugLog("state", string.format("availability=%s silent=%s", tostring(self.available), tostring(silent == true)))
+	end
 end
 
 function AF:ToggleAvailable()
@@ -135,7 +138,9 @@ function AF:RefreshAutoAvailability(silent)
 		self.deferredAutoAvailabilityRefresh = true
 		return
 	end
-	self:SetAvailable(self:ShouldAutoBeAvailable(), silent)
+	local shouldBeAvailable = self:ShouldAutoBeAvailable()
+	self:DebugLog("auto", string.format("refresh shouldBeAvailable=%s silent=%s", tostring(shouldBeAvailable), tostring(silent == true)))
+	self:SetAvailable(shouldBeAvailable, silent)
 end
 
 function AF:QueueAutoAvailabilityRefresh()
@@ -159,6 +164,7 @@ end
 
 function AF:SetAutoAvailability(enabled)
 	self.db.autoAvailability = enabled == true
+	self:DebugLog("auto", "mode=" .. tostring(self.db.autoAvailability))
 	self:Print(self:Text("AUTO_AVAILABILITY_CHANGED", self.db.autoAvailability and self:Text("ENABLED") or self:Text("DISABLED")))
 	if self.db.autoAvailability then
 		self:QueueAutoAvailabilityRefresh()
@@ -299,7 +305,9 @@ AF.frame:SetScript("OnEvent", function(_, event, ...)
 		if AF:IsInCombatLocked() then
 			return
 		end
-		local closeProfessionBook = event == "TRADE_SKILL_SHOW" and AF.IsIntroTutorialActive and AF:IsIntroTutorialActive()
+		local closeProfessionBook = event == "TRADE_SKILL_SHOW"
+			and ((AF.IsIntroTutorialActive and AF:IsIntroTutorialActive())
+				or (AF.IsMinimapTutorialActive and AF:IsMinimapTutorialActive()))
 		if event == "TRADE_SKILL_SHOW" and AF.CloseIntroTutorial then
 			AF:CloseIntroTutorial()
 		end

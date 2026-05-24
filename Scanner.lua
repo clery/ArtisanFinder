@@ -559,9 +559,23 @@ function AF:CompleteActiveScan(active, professionEntry, progress)
 	self:StoreBestProfessionEquipmentState(currentProfession, self:GetCurrentProfessionEquipmentState(currentProfession))
 	self:StoreBestProfessionSkillSnapshots(currentProfession, self:GetCurrentProfessionSkillSnapshots(currentProfession))
 	if progress.reason == "PROFESSION_EQUIPMENT_CHANGED" and (tonumber(progress.skillUpgrades) or 0) == 0 then
+		self:DebugLog("scan", string.format(
+			"complete profession=%s mode=%s scanned=%d recommendations=%d noEquipmentUpgrades=true",
+			tostring(professionEntry.id),
+			tostring(progress.mode),
+			tonumber(progress.scanned) or 0,
+			tonumber(progress.recommendationsUpdated) or 0
+		))
 		self:Print(self:Text("SCAN_EQUIPMENT_NO_UPGRADES", tonumber(progress.skillDowngradesSkipped) or 0, self:GetProfessionName(professionEntry.id)))
 		return
 	end
+	self:DebugLog("scan", string.format(
+		"complete profession=%s mode=%s scanned=%d recommendations=%d",
+		tostring(professionEntry.id),
+		tostring(progress.mode),
+		tonumber(progress.scanned) or 0,
+		tonumber(progress.recommendationsUpdated) or 0
+	))
 	self:Print(self:Text("SCAN_COMPLETE", tonumber(progress.scanned) or 0, self:GetProfessionName(professionEntry.id)))
 	self:Print(self:Text("SCAN_RECOMMENDATIONS_UPDATED", tonumber(progress.recommendationsUpdated) or 0, self:GetProfessionName(professionEntry.id)))
 end
@@ -649,6 +663,7 @@ function AF:PauseActiveProfessionScan(silent)
 	local remaining = GetPendingCount(progress)
 	self.activeScan = nil
 	self:RefreshScanProgressUI(true)
+	self:DebugLog("scan", string.format("paused profession=%s remaining=%d silent=%s", tostring(active.professionID), tonumber(remaining) or 0, tostring(silent == true)))
 
 	if remaining > 0 and not silent then
 		self:Print(self:Text("SCAN_PAUSED", self:GetProfessionName(active.professionID), remaining))
@@ -657,15 +672,18 @@ end
 
 function AF:StartOrResumeCurrentProfessionScan(force, silent, mode, forceProbe, reason)
 	if self:IsInCombatLocked() then
+		self:DebugLog("scan", "deferred start: combat")
 		self.deferredScanResume = true
 		return 0
 	end
 	if self.IsOwnProfessionWindowOpen and not self:IsOwnProfessionWindowOpen() then
+		self:DebugLog("scan", "start skipped: profession window closed")
 		self.activeScan = nil
 		return 0
 	end
 
 	if not C_TradeSkillUI.IsTradeSkillReady() then
+		self:DebugLog("scan", "start skipped: trade skill not ready")
 		if not silent then
 			self:Print(self:Text("SCAN_OPEN_PROFESSION"))
 		end
@@ -674,6 +692,7 @@ function AF:StartOrResumeCurrentProfessionScan(force, silent, mode, forceProbe, 
 
 	local profession = self:GetCurrentProfessionInfo()
 	if not profession then
+		self:DebugLog("scan", "start skipped: no current profession")
 		if not silent then
 			self:Print(self:Text("SCAN_NO_PROFESSION"))
 		end
@@ -681,11 +700,13 @@ function AF:StartOrResumeCurrentProfessionScan(force, silent, mode, forceProbe, 
 	end
 	profession.id = self:GetSupportedProfessionID(profession.id, profession)
 	if not profession.id then
+		self:DebugLog("scan", "start skipped: unsupported profession")
 		return 0
 	end
 
 	local currentSignature = self:GetCurrentProfessionScanSignature(profession)
 	if not currentSignature then
+		self:DebugLog("scan", "start skipped: missing scan signature")
 		return 0
 	end
 	mode = force and "full" or (mode or "probe")
@@ -708,6 +729,7 @@ function AF:StartOrResumeCurrentProfessionScan(force, silent, mode, forceProbe, 
 		end
 	end
 	if not force and not forceProbe and professionEntry.scanSignature == currentSignature and not professionEntry.scanProgress then
+		self:DebugLog("scan", string.format("start skipped: unchanged profession=%s mode=%s", tostring(profession.id), tostring(mode)))
 		return 0
 	end
 
@@ -719,12 +741,14 @@ function AF:StartOrResumeCurrentProfessionScan(force, silent, mode, forceProbe, 
 		progress = self:BuildScanProgress(profession, professionEntry, currentSignature, force, mode, reason)
 	end
 	if not progress then
+		self:DebugLog("scan", string.format("start skipped: no recipes profession=%s mode=%s", tostring(profession.id), tostring(mode)))
 		if not silent then
 			self:Print(self:Text("SCAN_NO_RECIPES"))
 		end
 		return 0
 	end
 	if GetPendingCount(progress) == 0 then
+		self:DebugLog("scan", string.format("start skipped: no pending jobs profession=%s mode=%s", tostring(profession.id), tostring(mode)))
 		professionEntry.scanSignature = currentSignature
 		professionEntry.scanMode = mode
 		professionEntry.scannedAt = self:Now()
@@ -736,6 +760,14 @@ function AF:StartOrResumeCurrentProfessionScan(force, silent, mode, forceProbe, 
 		professionID = profession.id,
 		signature = progress.signature,
 	}
+	self:DebugLog("scan", string.format(
+		"started profession=%s mode=%s pending=%d force=%s reason=%s",
+		tostring(profession.id),
+		tostring(mode),
+		GetPendingCount(progress),
+		tostring(force == true),
+		tostring(reason or "")
+	))
 	professionEntry.scanSignature = nil
 	self:RefreshScanProgressUI(true)
 	if reason ~= "PROFESSION_EQUIPMENT_CHANGED" then

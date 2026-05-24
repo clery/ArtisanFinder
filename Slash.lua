@@ -27,18 +27,6 @@ function AF:RefreshMainUI(statusText)
 	self:RefreshOptionsPanel()
 end
 
-function AF:SetDebugSelfResults(enabled)
-	self.db.debugSelfResults = enabled == true
-	if not self.db.debugSelfResults then
-		if self.ClearAllDebugSelfResults then
-			self:ClearAllDebugSelfResults()
-		end
-		self:ClearDebugTradeLeads()
-	end
-	self:Print(self:Text("DEBUG_SELF_CHANGED", self.db.debugSelfResults and self:Text("ENABLED") or self:Text("DISABLED")))
-	self:RefreshCustomerQuery(true)
-end
-
 function AF:SetShowUncertifiedPeople(enabled)
 	self.db.showUncertifiedPeople = enabled == true
 	self:Print(self:Text("SHOW_UNCERTIFIED_CHANGED", self.db.showUncertifiedPeople and self:Text("ENABLED") or self:Text("DISABLED")))
@@ -55,11 +43,28 @@ function AF:PrintSlashHelp()
 	self:Print(self:Text("SHOW_UNCERTIFIED_HELP_OFF"))
 	self:Print(self:Text("SHOW_UNCERTIFIED_HELP_TOGGLE"))
 	self:Print(self:Text("SHOW_UNCERTIFIED_HELP_STATE"))
-	if self.db and self.db.debugSelfResults then
-		self:Print(self:Text("LOCALE_HELP"))
-	end
+	self:Print(self:Text("DEBUG_HELP"))
 	self:Print(self:Text("TUTORIAL_HELP_RESET"))
 	self:Print(self:Text("CLEAR_HELP"))
+end
+
+function AF:PrintDebugHelp()
+	self:Print(self:Text("DEBUG_HELP_ON"))
+	self:Print(self:Text("DEBUG_HELP_OFF"))
+	self:Print(self:Text("DEBUG_HELP_TOGGLE"))
+	self:Print(self:Text("DEBUG_HELP_STATE"))
+	self:Print(self:Text("DEBUG_HELP_LOGS"))
+	self:Print(self:Text("DEBUG_HELP_CLEAR"))
+	self:Print(self:Text("DEBUG_HELP_LOCALE"))
+end
+
+function AF:PrintDevHelp()
+	self:Print(self:Text("DEV_HELP_ON"))
+	self:Print(self:Text("DEV_HELP_OFF"))
+	self:Print(self:Text("DEV_HELP_TOGGLE"))
+	self:Print(self:Text("DEV_HELP_STATE"))
+	self:Print(self:Text("DEV_HELP_FAKE"))
+	self:Print(self:Text("DEV_HELP_TRAFFIC"))
 end
 
 function AF:PrintClearHelp()
@@ -110,7 +115,10 @@ function AF:ClearAllData()
 	local minimap = self.db and self.db.minimap or nil
 	ArtisanFinderDB = {
 		minimap = minimap,
-		debugSelfResults = false,
+		debugEnabled = false,
+		devEnabled = false,
+		devFakeRows = false,
+		devTrafficLogs = false,
 	}
 	self.db = ArtisanFinderDB
 	self.activeScan = nil
@@ -146,7 +154,10 @@ function AF:ClearOptionsData()
 	self.db.offlineFallbackMax = 20
 	self.db.showUncertifiedPeople = true
 	self.db.minimap = { angle = 225, hide = false }
-	self.db.debugSelfResults = false
+	self.db.debugEnabled = false
+	self.db.devEnabled = false
+	self.db.devFakeRows = false
+	self.db.devTrafficLogs = false
 	self.db.advertising = {}
 	self.db.advertisingKnown = {}
 	self:ClearDebugTradeLeads()
@@ -202,6 +213,79 @@ function AF:ClearGuildCaches()
 	self:Print(self:Text("CLEAR_GUILD_DONE"))
 end
 
+function AF:HandleDebugSlash(rest)
+	local command, commandRest = NormalizeCommand(rest)
+	if command == "on" then
+		self:SetDebugEnabled(true)
+	elseif command == "off" then
+		self:SetDebugEnabled(false)
+	elseif command == "toggle" then
+		self:SetDebugEnabled(not self:IsDebugEnabled())
+	elseif command == "state" then
+		self:Print(self:Text("DEBUG_STATE", self:IsDebugEnabled() and self:Text("ENABLED") or self:Text("DISABLED")))
+	elseif command == "" then
+		self:PrintDebugHelp()
+	elseif command == "logs" then
+		self:OpenDebugLogFrame()
+	elseif command == "clear" then
+		self:ClearDebugLog()
+	elseif command == "locale" then
+		if self:IsDebugEnabled() then
+			self:SetLocaleOverride(commandRest)
+		else
+			self:PrintSlashHelp()
+		end
+	else
+		self:Print(self:Text("DEBUG_UNKNOWN", rest))
+		self:PrintDebugHelp()
+	end
+end
+
+function AF:HandleDevSlash(rest)
+	local command, commandRest = NormalizeCommand(rest)
+	if command == "on" then
+		self:SetDevEnabled(true)
+	elseif command == "off" then
+		self:SetDevEnabled(false)
+	elseif command == "toggle" then
+		self:SetDevEnabled(not self:IsDevEnabled())
+	elseif command == "state" then
+		self:Print(self:Text(
+			"DEV_STATE",
+			self:IsDevEnabled() and self:Text("ENABLED") or self:Text("DISABLED"),
+			self:IsDevFakeRowsEnabled() and self:Text("ENABLED") or self:Text("DISABLED"),
+			self:IsDevTrafficLogsEnabled() and self:Text("ENABLED") or self:Text("DISABLED")
+		))
+	elseif command == "" then
+		self:PrintDevHelp()
+	elseif command == "fake" then
+		local subcommand = NormalizeCommand(commandRest)
+		if subcommand == "on" then
+			self:SetDevFakeRows(true)
+		elseif subcommand == "off" then
+			self:SetDevFakeRows(false)
+		elseif subcommand == "toggle" then
+			self:SetDevFakeRows(not self:IsDevFakeRowsEnabled())
+		else
+			self:Print(self:Text("DEV_FAKE_STATE", self:IsDevFakeRowsEnabled() and self:Text("ENABLED") or self:Text("DISABLED")))
+		end
+	elseif command == "traffic" then
+		local subcommand = NormalizeCommand(commandRest)
+		if subcommand == "on" then
+			self:SetDevTrafficLogs(true)
+		elseif subcommand == "off" then
+			self:SetDevTrafficLogs(false)
+		elseif subcommand == "toggle" then
+			self:SetDevTrafficLogs(not self:IsDevTrafficLogsEnabled())
+		else
+			self:Print(self:Text("DEV_TRAFFIC_STATE", self:IsDevTrafficLogsEnabled() and self:Text("ENABLED") or self:Text("DISABLED")))
+		end
+	else
+		self:Print(self:Text("DEV_UNKNOWN", rest))
+		self:PrintDevHelp()
+	end
+end
+
 function AF:HandleSlash(message)
 	local command, rest = NormalizeCommand(message)
 	if command == "scan" then
@@ -232,12 +316,6 @@ function AF:HandleSlash(message)
 			self:Print(self:Text("SHOW_UNCERTIFIED_UNKNOWN", rest))
 			self:PrintSlashHelp()
 		end
-	elseif command == "locale" then
-		if self.db and self.db.debugSelfResults then
-			self:SetLocaleOverride(rest)
-		else
-			self:PrintSlashHelp()
-		end
 	elseif command == "tutorial" then
 		if rest == "reset" then
 			self:ResetTutorial()
@@ -261,18 +339,9 @@ function AF:HandleSlash(message)
 			self:PrintClearHelp()
 		end
 	elseif command == "debug" then
-		if rest == "on" then
-			self:SetDebugSelfResults(true)
-		elseif rest == "off" then
-			self:SetDebugSelfResults(false)
-		elseif rest == "toggle" then
-			self:SetDebugSelfResults(not self.db.debugSelfResults)
-		elseif rest == "" then
-			self:Print(self:Text("DEBUG_SELF_STATE", self.db.debugSelfResults and self:Text("ENABLED") or self:Text("DISABLED")))
-		else
-			self:Print(self:Text("DEBUG_UNKNOWN", rest))
-			self:PrintSlashHelp()
-		end
+		self:HandleDebugSlash(rest)
+	elseif command == "dev" then
+		self:HandleDevSlash(rest)
 	else
 		self:PrintSlashHelp()
 	end

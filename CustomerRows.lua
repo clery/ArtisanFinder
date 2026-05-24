@@ -185,7 +185,11 @@ function AF:BuildCustomerRowViewModel(entry)
 		local statusText = self:Text("OFFLINE")
 		displayName = displayName .. " |cff888888(" .. statusText .. ")|r"
 		statusTooltipText = "(" .. statusText .. ")"
-	elseif entry.offlineCached and not isOnline and (entry.tradeLead or not self:IsCustomerLiveSearchPending()) then
+	elseif entry.unavailableFavorite then
+		local statusText = self:Text("UNAVAILABLE")
+		displayName = displayName .. " |cff888888(" .. statusText .. ")|r"
+		statusTooltipText = "(" .. statusText .. ")"
+	elseif entry.offlineCached and not isOnline then
 		displayName = displayName .. " |cff888888(" .. self:Text(entry.tradeLead and "UNKNOWN" or "UNAVAILABLE") .. ")|r"
 	end
 

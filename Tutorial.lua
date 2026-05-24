@@ -321,6 +321,10 @@ function AF:IsIntroTutorialActive()
 	return self.introTutorialHelpTipText ~= nil
 end
 
+function AF:IsMinimapTutorialActive()
+	return self.minimapTutorialHelpTipText ~= nil
+end
+
 function AF:GetMinimapTutorialButton()
 	if not self.minimapIcon or not self.minimapIcon.GetMinimapButton then
 		return nil

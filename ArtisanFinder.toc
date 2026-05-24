@@ -59,4 +59,5 @@ CustomerUI.lua
 CrafterUI.lua
 Tutorial.lua
 Minimap.lua
+Debug.lua
 Slash.lua

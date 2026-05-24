@@ -150,7 +150,7 @@ function AF:ClearAllDebugSelfResults()
 end
 
 function AF:InjectDebugSelfResult(itemID, professionID)
-	if not self.db.debugSelfResults then
+	if not self:IsDevFakeRowsEnabled() then
 		return
 	end
 	if not self.currentCustomerQueryToken then

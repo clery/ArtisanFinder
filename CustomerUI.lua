@@ -968,7 +968,7 @@ function AF:AttachCustomerUI()
 			end
 		end
 		frame.elapsed = (frame.elapsed or 0) + elapsed
-		local pollInterval = AF.db and AF.db.debugSelfResults and CUSTOMER_DEBUG_QUERY_POLL_INTERVAL or CUSTOMER_QUERY_POLL_INTERVAL
+		local pollInterval = AF.IsDevFakeRowsEnabled and AF:IsDevFakeRowsEnabled() and CUSTOMER_DEBUG_QUERY_POLL_INTERVAL or CUSTOMER_QUERY_POLL_INTERVAL
 		if frame.elapsed >= pollInterval then
 			frame.elapsed = 0
 			AF:RefreshCustomerQuery()
@@ -1280,14 +1280,16 @@ function AF:RefreshCustomerQuery(force)
 	end
 
 	if force then
+		self:DebugLog("query", string.format("broadcast item=%s profession=%s force=true", tostring(context.itemID), tostring(context.professionID)))
 		self:BroadcastQuery(context.itemID, context.professionID)
 	elseif changed or not self.currentCustomerQueryToken then
 		self.currentCustomerQueryToken = nil
 		self.currentCustomerQueryItemID = nil
 		self.currentCustomerQueryProfessionID = nil
+		self:DebugLog("query", string.format("queue item=%s profession=%s changed=%s", tostring(context.itemID), tostring(context.professionID), tostring(changed == true)))
 		self:QueueBroadcastQuery(context.itemID, context.professionID)
 	end
-	if (force or changed) and not self.db.debugSelfResults then
+	if (force or changed) and not self:IsDevFakeRowsEnabled() then
 		if self.QueueGuildRecipeMemberQuery then
 			self:QueueGuildRecipeMemberQuery(context.professionID, context.recipeID)
 		end
@@ -1305,6 +1307,7 @@ function AF:RefreshCustomerQuery(force)
 	end
 
 	self:RefreshCustomerResults()
+	self:DebugLog("query", string.format("refresh item=%s profession=%s changed=%s force=%s", tostring(context.itemID), tostring(context.professionID), tostring(changed == true), tostring(force == true)))
 end
 
 function AF:AcquireCustomerRows(count)
@@ -1369,6 +1372,11 @@ function AF:RefreshCustomerResults(statusOverride)
 	local queryToken = self.currentCustomerQueryToken
 	local tutorialActive = self.customerTutorialActive == true
 	local rows = tutorialActive and { self:GetCustomerTutorialRow() } or (itemID and self:GetCachedArtisans(itemID, filterText, sortMode, queryToken) or {})
+	local previousLoggedCount = frame.debugLastResultCount
+	if itemID and previousLoggedCount ~= #rows then
+		frame.debugLastResultCount = #rows
+		self:DebugLog("results", string.format("item=%s rows=%d filter=%s sort=%s", tostring(itemID), #rows, tostring(filterText), tostring(sortMode)))
+	end
 	if tutorialActive then
 		self:SetCustomerStatusText(self:Text("TUTORIAL_CUSTOMER_STATUS"))
 	elseif statusOverride then
@@ -1405,7 +1413,7 @@ function AF:RefreshCustomerResults(statusOverride)
 		if filterText ~= "" then
 			hasAvailableUnfiltered = #self:GetCachedArtisans(itemID, "", sortMode, queryToken) > 0
 		end
-		if self.db.debugSelfResults and not self.db.artisanProfile.items[tostring(itemID)] then
+		if self:IsDevFakeRowsEnabled() and not self.db.artisanProfile.items[tostring(itemID)] then
 			self:SetCustomerStatusItem(itemID, itemName, "DEBUG_NOT_SCANNED")
 		elseif filterText ~= "" and hasAvailableUnfiltered then
 			self:SetCustomerStatusItem(itemID, itemName, "NO_FILTER_MATCH")
