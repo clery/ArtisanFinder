@@ -6,6 +6,10 @@ local function BoolText(AF, value)
 	return value and AF:Text("ENABLED") or AF:Text("DISABLED")
 end
 
+local function EscapeLogText(value)
+	return tostring(value or ""):gsub("|", "||")
+end
+
 function AF:IsDebugEnabled()
 	return self.db and self.db.debugEnabled == true
 end
@@ -27,7 +31,7 @@ function AF:DebugLog(category, message)
 		return
 	end
 	self.debugLogLines = self.debugLogLines or {}
-	local line = string.format("[%s] %s", tostring(category or "debug"), tostring(message or ""))
+	local line = string.format("[%s] %s", EscapeLogText(category or "debug"), EscapeLogText(message))
 	table.insert(self.debugLogLines, line)
 	while #self.debugLogLines > DEBUG_LOG_LIMIT do
 		table.remove(self.debugLogLines, 1)
@@ -53,6 +57,13 @@ function AF:RefreshDebugLogFrame()
 	end
 	frame.editBox:SetHeight(math.max(340, (#(self.debugLogLines or {}) * 14) + 24))
 	frame.editBox:SetText(self:GetDebugLogText())
+	frame.editBox:SetCursorPosition(0)
+	if frame.scroll.SetHorizontalScroll then
+		frame.scroll:SetHorizontalScroll(0)
+	end
+	if frame.scroll.SetVerticalScroll then
+		frame.scroll:SetVerticalScroll(0)
+	end
 end
 
 function AF:CreateDebugLogFrame()
@@ -83,6 +94,7 @@ function AF:CreateDebugLogFrame()
 	frame.editBox:SetAutoFocus(false)
 	frame.editBox:SetFontObject(ChatFontNormal)
 	frame.editBox:SetSize(560, 340)
+	frame.editBox:SetPoint("TOPLEFT")
 	frame.editBox:SetScript("OnEscapePressed", function(box)
 		box:ClearFocus()
 	end)
