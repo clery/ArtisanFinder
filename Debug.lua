@@ -32,9 +32,6 @@ function AF:DebugLog(category, message)
 	while #self.debugLogLines > DEBUG_LOG_LIMIT do
 		table.remove(self.debugLogLines, 1)
 	end
-	if self.debugLogFrame and self.debugLogFrame:IsShown() then
-		self:RefreshDebugLogFrame()
-	end
 end
 
 function AF:ClearDebugLog()
@@ -56,7 +53,6 @@ function AF:RefreshDebugLogFrame()
 	end
 	frame.editBox:SetHeight(math.max(340, (#(self.debugLogLines or {}) * 14) + 24))
 	frame.editBox:SetText(self:GetDebugLogText())
-	frame.editBox:HighlightText(0, 0)
 end
 
 function AF:CreateDebugLogFrame()
@@ -112,8 +108,6 @@ function AF:OpenDebugLogFrame()
 	local frame = self.debugLogFrame or self:CreateDebugLogFrame()
 	self:RefreshDebugLogFrame()
 	frame:Show()
-	frame.editBox:SetFocus()
-	frame.editBox:HighlightText()
 end
 
 function AF:SetDebugEnabled(enabled)

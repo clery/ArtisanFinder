@@ -94,11 +94,11 @@ function AF:SetAvailable(value, silent)
 	if self.RefreshMinimap then
 		self:RefreshMinimap()
 	end
-	if not silent and wasAvailable ~= self.available then
-		self:Print(self:Text("AVAILABILITY_CHANGED", self.available and self:Text("ENABLED") or self:Text("DISABLED")))
-	end
 	if wasAvailable ~= self.available then
 		self:DebugLog("state", string.format("availability=%s silent=%s", tostring(self.available), tostring(silent == true)))
+	end
+	if not silent and wasAvailable ~= self.available then
+		self:Print(self:Text("AVAILABILITY_CHANGED", self.available and self:Text("ENABLED") or self:Text("DISABLED")))
 	end
 end
 

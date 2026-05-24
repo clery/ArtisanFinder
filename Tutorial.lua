@@ -283,6 +283,20 @@ function AF:InitializeTutorial()
 	end)
 end
 
+function AF:FinishIntroTutorial()
+	if not self.db or not self.db.tutorial then
+		return
+	end
+	if self.db.tutorial.introSeen and not self.introTutorialHelpTipText then
+		return
+	end
+	self.db.tutorial.introSeen = true
+	self.introTutorialHelpTipText = nil
+	C_Timer.After(0.2, function()
+		AF:MaybeShowMinimapTutorial()
+	end)
+end
+
 function AF:MaybeShowIntroTutorial()
 	if not self.db or not self.db.tutorial or self.db.tutorial.introSeen or not HelpTip or not ProfessionMicroButton then
 		return
@@ -295,15 +309,15 @@ function AF:MaybeShowIntroTutorial()
 		system = TUTORIAL_SYSTEM,
 		autoHorizontalSlide = true,
 		onAcknowledgeCallback = function()
-			AF.db.tutorial.introSeen = true
-			AF.introTutorialHelpTipText = nil
-			C_Timer.After(0.2, function()
-				AF:MaybeShowMinimapTutorial()
-			end)
+			AF:FinishIntroTutorial()
+		end,
+		onHideCallback = function()
+			AF:FinishIntroTutorial()
 		end,
 	}
-	self.introTutorialHelpTipText = info.text
-	HelpTip:Show(UIParent, info, ProfessionMicroButton)
+	if HelpTip:Show(UIParent, info, ProfessionMicroButton) then
+		self.introTutorialHelpTipText = info.text
+	end
 end
 
 function AF:CloseIntroTutorial()
@@ -313,8 +327,7 @@ function AF:CloseIntroTutorial()
 	if HelpTip and HelpTip.Hide then
 		HelpTip:Hide(UIParent, self.introTutorialHelpTipText)
 	end
-	self.db.tutorial.introSeen = true
-	self.introTutorialHelpTipText = nil
+	self:FinishIntroTutorial()
 end
 
 function AF:IsIntroTutorialActive()
