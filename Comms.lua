@@ -278,6 +278,8 @@ function AF:OnAddonMessage(prefix, message, channel, sender)
 		self:HandleReagentDetailRequest(parts, normalizedSender)
 	elseif kind == "D" then
 		self:HandleReagentDetail(parts, normalizedSender)
+	elseif kind == "O" then
+		self:HandleOrderNotification(parts, normalizedSender)
 	end
 end
 
@@ -316,7 +318,12 @@ end
 
 function AF:GetAdvertisedItemMatches(itemID, professionID, requesterName, channel)
 	local matches = {}
+	local currentOnly = self:IsCurrentCharacterOnlyAvailable()
+	local playerName = self:NormalizeName(self.playerName or self:GetPlayerFullName())
 	self:ForEachArtisanProfile(function(characterName, profile)
+		if currentOnly and self:NormalizeName(characterName) ~= playerName then
+			return
+		end
 		local item = profile.items and profile.items[tostring(itemID)]
 		if CanRespondForCrafter(self, characterName, requesterName, channel)
 			and ItemMatchesQuery(item, itemID, professionID)
@@ -356,7 +363,7 @@ function AF:FindProfileItem(characterName, itemID, recipeID)
 end
 
 function AF:HandleQuery(parts, sender, channel)
-	if not self.available then
+	if not self:IsAvailable() then
 		return
 	end
 
@@ -417,6 +424,7 @@ function AF:HandleQuery(parts, sender, channel)
 				tonumber(item.optionalSlotCount) or "",
 				channel == "GUILD" and self:EncodeField(requesterName, 48) or "",
 				encodedReagents,
+				UnitIsAFK and UnitIsAFK("player") and 1 or 0,
 			}
 			local payload = table.concat(payloadParts, "|")
 			if #payload > 255 then
@@ -608,6 +616,7 @@ function AF:HandleResponse(parts, sender)
 	local responseTarget = self:NormalizeName(self:DecodeField(parts[30]))
 	local responseSupportsReagentDetails = parts[31] ~= nil
 	local responseReagents = self:DecodeReagentEntries(self:DecodeField(parts[31]))
+	local afk = tonumber(parts[32]) == 1
 	local cacheKey = crafterName
 
 	if not itemID then
@@ -677,6 +686,7 @@ function AF:HandleResponse(parts, sender)
 		guildMember = guildResponse or nil,
 		guildOnline = guildResponse and true or nil,
 		guildMemberGUID = guildRosterEntry and guildRosterEntry.guid or nil,
+		afk = afk or nil,
 	}
 	if responseReagents then
 		self.db.customerCache[itemKey][cacheKey].bestReagentSummaryUpdatedAt = self:Now()

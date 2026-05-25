@@ -49,7 +49,11 @@ local function SuppressOwnWhoSystemMessage(_, _, message)
 end
 
 function AF:GetCustomerEntryWhoName(entry)
-	return AF:NormalizeName(entry and (entry.orderTarget or entry.name or entry.target))
+	local name = AF:NormalizeName(entry and (entry.orderTarget or entry.name or entry.target))
+	if AF:IsOwnArtisanCharacter(name) then
+		return nil
+	end
+	return name
 end
 
 local function GetEntryWhoName(entry)
@@ -310,6 +314,7 @@ function AF:IsCustomerEntryWhoRefreshable(entry)
 		and not entry.tutorialFake
 		and not entry.debug
 		and not entry.ownAlt
+		and not self:IsOwnArtisanCharacter(entry.orderTarget or entry.name or entry.target)
 		and not entry.guildMember
 		and entry.tradeLead == true
 		and GetEntryWhoName(entry) ~= nil

@@ -16,6 +16,24 @@ local TRADE_LEAD_OPTIONS = {
 	{ minutes = 60, labelKey = "OPTIONS_TRADE_LEADS_60_MINUTES" },
 }
 
+local ORDER_SOUND_OPTIONS = {
+	{ key = "CATALOG_SHOP_OPEN_LOADING_SCREEN", labelKey = "OPTIONS_ORDER_SOUND_CATALOG_SHOP_OPEN" },
+	{ key = "UI_IG_STORE_PURCHASE_DELIVERED_TOAST_01", labelKey = "OPTIONS_ORDER_SOUND_STORE_DELIVERY" },
+	{ key = "UI_IG_STORE_WINDOW_OPEN_BUTTON", labelKey = "OPTIONS_ORDER_SOUND_STORE_OPEN" },
+	{ key = "UI_BNET_TOAST", labelKey = "OPTIONS_ORDER_SOUND_BNET_TOAST" },
+	{ key = "UI_PROFESSIONS_NEW_RECIPE_LEARNED_TOAST", labelKey = "OPTIONS_ORDER_SOUND_PROFESSION_TOAST" },
+	{ key = "READY_CHECK", labelKey = "OPTIONS_ORDER_SOUND_READY_CHECK" },
+	{ key = "AUCTION_WINDOW_OPEN", labelKey = "OPTIONS_ORDER_SOUND_AUCTION" },
+}
+
+local ORDER_SOUND_CHANNEL_OPTIONS = {
+	{ key = "Master", labelKey = "OPTIONS_SOUND_CHANNEL_DEFAULT" },
+	{ key = "SFX", labelKey = "OPTIONS_SOUND_CHANNEL_SFX" },
+	{ key = "Music", labelKey = "OPTIONS_SOUND_CHANNEL_MUSIC" },
+	{ key = "Ambience", labelKey = "OPTIONS_SOUND_CHANNEL_AMBIENCE" },
+	{ key = "Dialog", labelKey = "OPTIONS_SOUND_CHANNEL_DIALOG" },
+}
+
 local OFFLINE_FALLBACK_RESULT_OPTIONS = {
 	{ count = 0, labelKey = "OPTIONS_OFFLINE_FALLBACK_DISABLED" },
 	{ count = 5, labelKey = "OPTIONS_OFFLINE_FALLBACK_5" },
@@ -32,6 +50,14 @@ local OFFLINE_FALLBACK_MAX_OPTIONS = {
 	{ count = 30, labelKey = "OPTIONS_OFFLINE_FALLBACK_30" },
 	{ count = 40, labelKey = "OPTIONS_OFFLINE_FALLBACK_40" },
 	{ count = 50, labelKey = "OPTIONS_OFFLINE_FALLBACK_50" },
+}
+
+local AUTO_AVAILABILITY_ACTIVITY_OPTIONS = {
+	{ key = "party", labelKey = "OPTIONS_AUTO_DISABLE_PARTY", descKey = "OPTIONS_AUTO_DISABLE_PARTY_DESC" },
+	{ key = "raid", labelKey = "OPTIONS_AUTO_DISABLE_RAID", descKey = "OPTIONS_AUTO_DISABLE_RAID_DESC" },
+	{ key = "pvp", labelKey = "OPTIONS_AUTO_DISABLE_PVP", descKey = "OPTIONS_AUTO_DISABLE_PVP_DESC" },
+	{ key = "arena", labelKey = "OPTIONS_AUTO_DISABLE_ARENA", descKey = "OPTIONS_AUTO_DISABLE_ARENA_DESC" },
+	{ key = "delve", labelKey = "OPTIONS_AUTO_DISABLE_DELVE", descKey = "OPTIONS_AUTO_DISABLE_DELVE_DESC" },
 }
 
 local function CreateSortOptions()
@@ -135,6 +161,168 @@ function AF:InitializeOptions()
 		)
 	end
 
+	AddSection("OPTIONS_SECTION_MINIMAP")
+	local hideMinimap = RegisterProxySetting(
+		"ArtisanFinder_HideMinimap",
+		Settings.VarType.Boolean,
+		"OPTIONS_HIDE_MINIMAP",
+		false,
+		function()
+			return AF.db.minimap and AF.db.minimap.hide == true
+		end,
+		function(value)
+			AF:SetMinimapHidden(value == true)
+		end
+	)
+	Settings.CreateCheckbox(category, hideMinimap, self:Text("OPTIONS_HIDE_MINIMAP_DESC"))
+
+	local standaloneMinimap = RegisterProxySetting(
+		"ArtisanFinder_StandaloneMinimap",
+		Settings.VarType.Boolean,
+		"OPTIONS_STANDALONE_MINIMAP",
+		false,
+		function()
+			return AF.db.minimap and AF.db.minimap.standalone == true
+		end,
+		function(value)
+			AF:SetMinimapStandalone(value == true)
+		end
+	)
+	Settings.CreateCheckbox(category, standaloneMinimap, self:Text("OPTIONS_STANDALONE_MINIMAP_DESC"))
+
+	Settings.RegisterInitializer(category, CreateSettingsButtonInitializer(
+		self:Text("OPTIONS_RESET_MINIMAP_POSITION"),
+		self:Text("OPTIONS_RESET_POSITION_BUTTON"),
+		function()
+			AF:ResetMinimapButtonPosition()
+		end,
+		self:Text("OPTIONS_RESET_MINIMAP_POSITION_DESC"),
+		true
+	))
+
+	AddSection("OPTIONS_SECTION_AVAILABILITY")
+	local autoAvailability = RegisterProxySetting(
+		"ArtisanFinder_AutoAvailability",
+		Settings.VarType.Boolean,
+		"OPTIONS_AUTO_AVAILABILITY",
+		false,
+		function()
+			return AF.db.autoAvailability == true
+		end,
+		function(value)
+			AF:SetAutoAvailability(value == true)
+		end
+	)
+	Settings.CreateCheckbox(category, autoAvailability, self:Text("OPTIONS_AUTO_AVAILABILITY_DESC"))
+
+	for _, option in ipairs(AUTO_AVAILABILITY_ACTIVITY_OPTIONS) do
+		local activityKey = option.key
+		local labelKey = option.labelKey
+		local descKey = option.descKey
+		local setting = RegisterProxySetting(
+			"ArtisanFinder_AutoDisable_" .. activityKey,
+			Settings.VarType.Boolean,
+			labelKey,
+			true,
+			function()
+				return AF:IsAutoAvailabilityActivityDisabled(activityKey)
+			end,
+			function(value)
+				AF:SetAutoAvailabilityActivityDisabled(activityKey, value == true)
+			end
+		)
+		Settings.CreateCheckbox(category, setting, self:Text(descKey))
+	end
+
+	AddSection("OPTIONS_SECTION_TRADE_LEADS")
+	local tradeLeadLifetime = RegisterProxySetting(
+		"ArtisanFinder_TradeLeadMinutes",
+		Settings.VarType.Number,
+		"OPTIONS_TRADE_LEADS_LIFETIME",
+		15,
+		function()
+			return tonumber(AF.db.tradeLeadMinutes) or 15
+		end,
+		function(value)
+			AF.db.tradeLeadMinutes = tonumber(value) or 15
+			if AF.PruneTradeLeads then
+				AF:PruneTradeLeads()
+			end
+			if AF.RefreshCustomerResults then
+				AF:RefreshCustomerResults()
+			end
+		end
+	)
+	Settings.CreateDropdown(category, tradeLeadLifetime, function()
+		return CreateRadioOptions(TRADE_LEAD_OPTIONS, "minutes")
+	end, self:Text("OPTIONS_TRADE_LEADS_LIFETIME_DESC"))
+
+	local freezeTradeLeadRows = RegisterProxySetting(
+		"ArtisanFinder_FreezeTradeLeadRows",
+		Settings.VarType.Boolean,
+		"OPTIONS_FREEZE_TRADE_LEAD_ROWS",
+		false,
+		function()
+			return AF.db.freezeTradeLeadRows == true
+		end,
+		function(value)
+			AF.db.freezeTradeLeadRows = value == true
+			AF.customerTradeLeadSnapshot = nil
+			if AF.RefreshCustomerQuery then
+				AF:RefreshCustomerQuery(true)
+			end
+		end
+	)
+	Settings.CreateCheckbox(category, freezeTradeLeadRows, self:Text("OPTIONS_FREEZE_TRADE_LEAD_ROWS_DESC"))
+
+	AddSection("OPTIONS_SECTION_SOUND")
+	local orderSound = RegisterProxySetting(
+		"ArtisanFinder_OrderNotificationSound",
+		Settings.VarType.String,
+		"OPTIONS_ORDER_SOUND",
+		"CATALOG_SHOP_OPEN_LOADING_SCREEN",
+		function()
+			return AF.db.orderNotificationSound or "CATALOG_SHOP_OPEN_LOADING_SCREEN"
+		end,
+		function(value)
+			AF.db.orderNotificationSound = value or "CATALOG_SHOP_OPEN_LOADING_SCREEN"
+			if AF.PlayOrderNotificationSound then
+				AF:PlayOrderNotificationSound()
+			end
+		end
+	)
+	Settings.CreateDropdown(category, orderSound, function()
+		return CreateRadioOptions(ORDER_SOUND_OPTIONS, "key")
+	end, self:Text("OPTIONS_ORDER_SOUND_DESC"))
+
+	local orderSoundChannel = RegisterProxySetting(
+		"ArtisanFinder_OrderNotificationChannel",
+		Settings.VarType.String,
+		"OPTIONS_ORDER_SOUND_CHANNEL",
+		"default",
+		function()
+			return AF.db.orderNotificationChannel or "default"
+		end,
+		function(value)
+			AF.db.orderNotificationChannel = value or "default"
+		end
+	)
+	Settings.CreateDropdown(category, orderSoundChannel, function()
+		return CreateRadioOptions(ORDER_SOUND_CHANNEL_OPTIONS, "key")
+	end, self:Text("OPTIONS_ORDER_SOUND_CHANNEL_DESC"))
+
+	Settings.RegisterInitializer(category, CreateSettingsButtonInitializer(
+		"",
+		self:Text("OPTIONS_PLAY_ORDER_SOUND"),
+		function()
+			if AF.PlayOrderNotificationSound then
+				AF:PlayOrderNotificationSound()
+			end
+		end,
+		self:Text("OPTIONS_PLAY_ORDER_SOUND_DESC"),
+		true
+	))
+
 	AddSection("OPTIONS_SECTION_CUSTOMER")
 	local defaultSort = RegisterProxySetting(
 		"ArtisanFinder_DefaultSort",
@@ -205,47 +393,6 @@ function AF:InitializeOptions()
 		return CreateRadioOptions(OFFLINE_FALLBACK_MAX_OPTIONS, "count")
 	end, self:Text("OPTIONS_OFFLINE_FALLBACK_MAX_DESC"))
 
-	AddSection("OPTIONS_SECTION_TRADE_LEADS")
-	local tradeLeadLifetime = RegisterProxySetting(
-		"ArtisanFinder_TradeLeadMinutes",
-		Settings.VarType.Number,
-		"OPTIONS_TRADE_LEADS_LIFETIME",
-		15,
-		function()
-			return tonumber(AF.db.tradeLeadMinutes) or 15
-		end,
-		function(value)
-			AF.db.tradeLeadMinutes = tonumber(value) or 15
-			if AF.PruneTradeLeads then
-				AF:PruneTradeLeads()
-			end
-			if AF.RefreshCustomerResults then
-				AF:RefreshCustomerResults()
-			end
-		end
-	)
-	Settings.CreateDropdown(category, tradeLeadLifetime, function()
-		return CreateRadioOptions(TRADE_LEAD_OPTIONS, "minutes")
-	end, self:Text("OPTIONS_TRADE_LEADS_LIFETIME_DESC"))
-
-	local freezeTradeLeadRows = RegisterProxySetting(
-		"ArtisanFinder_FreezeTradeLeadRows",
-		Settings.VarType.Boolean,
-		"OPTIONS_FREEZE_TRADE_LEAD_ROWS",
-		false,
-		function()
-			return AF.db.freezeTradeLeadRows == true
-		end,
-		function(value)
-			AF.db.freezeTradeLeadRows = value == true
-			AF.customerTradeLeadSnapshot = nil
-			if AF.RefreshCustomerQuery then
-				AF:RefreshCustomerQuery(true)
-			end
-		end
-	)
-	Settings.CreateCheckbox(category, freezeTradeLeadRows, self:Text("OPTIONS_FREEZE_TRADE_LEAD_ROWS_DESC"))
-
 	AddSection("OPTIONS_SECTION_SCANNING")
 	local fastScan = RegisterProxySetting(
 		"ArtisanFinder_FastScan",
@@ -260,36 +407,6 @@ function AF:InitializeOptions()
 		end
 	)
 	Settings.CreateCheckbox(category, fastScan, self:Text("OPTIONS_FAST_SCAN_DESC"))
-
-	AddSection("OPTIONS_SECTION_AVAILABILITY")
-	local autoAvailability = RegisterProxySetting(
-		"ArtisanFinder_AutoAvailability",
-		Settings.VarType.Boolean,
-		"OPTIONS_AUTO_AVAILABILITY",
-		false,
-		function()
-			return AF.db.autoAvailability == true
-		end,
-		function(value)
-			AF:SetAutoAvailability(value == true)
-		end
-	)
-	Settings.CreateCheckbox(category, autoAvailability, self:Text("OPTIONS_AUTO_AVAILABILITY_DESC"))
-
-	AddSection("OPTIONS_SECTION_MINIMAP")
-	local hideMinimap = RegisterProxySetting(
-		"ArtisanFinder_HideMinimap",
-		Settings.VarType.Boolean,
-		"OPTIONS_HIDE_MINIMAP",
-		false,
-		function()
-			return AF.db.minimap and AF.db.minimap.hide == true
-		end,
-		function(value)
-			AF:SetMinimapHidden(value == true)
-		end
-	)
-	Settings.CreateCheckbox(category, hideMinimap, self:Text("OPTIONS_HIDE_MINIMAP_DESC"))
 
 	RegisterAdvertisingOptions(self, category)
 

@@ -192,6 +192,9 @@ function AF:BuildCustomerRowViewModel(entry)
 	elseif entry.offlineCached and not isOnline then
 		displayName = displayName .. " |cff888888(" .. self:Text(entry.tradeLead and "UNKNOWN" or "UNAVAILABLE") .. ")|r"
 	end
+	if entry.afk then
+		displayName = displayName .. " |cffffd100(" .. self:Text("AWAY") .. ")|r"
+	end
 
 	local detail
 	local detailNote

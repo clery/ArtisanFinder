@@ -499,6 +499,7 @@ function ApplyDBDefaults(db)
 	db.guildCache.recipeMembers = db.guildCache.recipeMembers or {}
 	db.guildCache.professionMembers = db.guildCache.professionMembers or {}
 	db.minimap = db.minimap or { angle = 225, hide = false }
+	db.autoAvailabilityDisable = db.autoAvailabilityDisable or {}
 	db.tutorial = db.tutorial or {}
 
 	if db.debugSelfResults == true then
@@ -528,6 +529,24 @@ function ApplyDBDefaults(db)
 	if db.autoAvailability == nil then
 		db.autoAvailability = false
 	end
+	if db.lastAvailabilityMode == nil then
+		db.lastAvailabilityMode = AF.AVAILABILITY_ACCOUNT
+	end
+	if db.autoAvailabilityDisable.party == nil then
+		db.autoAvailabilityDisable.party = true
+	end
+	if db.autoAvailabilityDisable.raid == nil then
+		db.autoAvailabilityDisable.raid = true
+	end
+	if db.autoAvailabilityDisable.pvp == nil then
+		db.autoAvailabilityDisable.pvp = true
+	end
+	if db.autoAvailabilityDisable.arena == nil then
+		db.autoAvailabilityDisable.arena = true
+	end
+	if db.autoAvailabilityDisable.delve == nil then
+		db.autoAvailabilityDisable.delve = true
+	end
 	if db.fastScan == nil then
 		db.fastScan = false
 	end
@@ -536,6 +555,12 @@ function ApplyDBDefaults(db)
 	end
 	if db.freezeTradeLeadRows == nil then
 		db.freezeTradeLeadRows = false
+	end
+	if db.orderNotificationSound == nil or db.orderNotificationSound == "ACCOUNT_STORE_OPEN" then
+		db.orderNotificationSound = "CATALOG_SHOP_OPEN_LOADING_SCREEN"
+	end
+	if db.orderNotificationChannel == nil then
+		db.orderNotificationChannel = "default"
 	end
 	if db.offlineFallbackResults == nil then
 		db.offlineFallbackResults = 10
@@ -551,6 +576,15 @@ function ApplyDBDefaults(db)
 	end
 	if db.minimap.hide == nil then
 		db.minimap.hide = false
+	end
+	if db.minimap.standalone == nil then
+		db.minimap.standalone = false
+	end
+	if db.minimap.standaloneX == nil then
+		db.minimap.standaloneX = -180
+	end
+	if db.minimap.standaloneY == nil then
+		db.minimap.standaloneY = -120
 	end
 end
 
@@ -1100,6 +1134,22 @@ function AF:GetDisplayPlayerName(name)
 	return name
 end
 
+function AF:GetFullDisplayPlayerName(name)
+	name = self:NormalizeName(name) or tostring(name or "")
+	return name
+end
+
+function AF:IsOwnArtisanCharacter(name)
+	name = self:NormalizeName(name)
+	if not name then
+		return false
+	end
+	if name == self:NormalizeName(self.playerName or self:GetPlayerFullName()) then
+		return false
+	end
+	return self.db and self.db.artisanCharacters and self.db.artisanCharacters[name] ~= nil
+end
+
 function AF:GetFavoriteArtisanKey(entryOrName)
 	local name = type(entryOrName) == "table" and (entryOrName.orderTarget or entryOrName.name or entryOrName.target) or entryOrName
 	return self:NormalizeName(name)
@@ -1222,9 +1272,16 @@ function AF:GetScannedProfessionRows()
 	local rows = {}
 	self:ForEachArtisanProfile(function(characterName, profile)
 		local added = {}
+		local counts = {}
+		for _, item in pairs(profile.items or {}) do
+			local professionID = self:GetSupportedProfessionID(item.professionID, item)
+			if professionID then
+				counts[professionID] = (counts[professionID] or 0) + 1
+			end
+		end
 		for professionKey, profession in pairs(profile.professions or {}) do
 			local professionID = self:GetSupportedProfessionID(professionKey, profession)
-			local count = self:GetProfessionScannedCount(profile, professionID)
+			local count = professionID and counts[professionID] or 0
 			if professionID and count > 0 then
 				local displayProfessionID = self:GetProfessionDefaultAdvertisingID(professionID, profession)
 				added[professionID] = true
@@ -1237,6 +1294,7 @@ function AF:GetScannedProfessionRows()
 					professionIcon = profession.icon or profession.professionIcon or profession.iconTexture,
 					count = count,
 					advertised = self:IsProfessionAdvertised(characterName, professionID),
+					outdated = self:IsDeprecatedScannedProfession(profile, professionID, profession),
 				})
 			end
 		end
@@ -1252,8 +1310,9 @@ function AF:GetScannedProfessionRows()
 					parentProfessionID = item.parentProfessionID,
 					professionName = self:GetProfessionName(displayProfessionID, profile),
 					professionIcon = item.professionIcon or item.icon or item.iconTexture,
-					count = self:GetProfessionScannedCount(profile, professionID),
+					count = counts[professionID] or 0,
 					advertised = self:IsProfessionAdvertised(characterName, professionID),
+					outdated = self:IsDeprecatedScannedProfession(profile, professionID, profile.professions and profile.professions[tostring(professionID)]),
 				})
 			end
 		end

@@ -4,8 +4,11 @@ _G.ArtisanFinder = AF
 
 AF.ADDON_NAME = addonName
 AF.PREFIX = "ARTFIND1"
-AF.PROTOCOL_VERSION = "1"
+AF.PROTOCOL_VERSION = "2"
 AF.CHANNEL_NAME = "ArtisanFinder"
+AF.AVAILABILITY_UNAVAILABLE = "unavailable"
+AF.AVAILABILITY_CURRENT = "current"
+AF.AVAILABILITY_ACCOUNT = "account"
 AF.CACHE_MAX_AGE = 14 * 24 * 60 * 60
 AF.RESPONSE_THROTTLE = 60
 AF.DETAIL_REQUEST_THROTTLE = 30
@@ -47,8 +50,9 @@ function AF:IsTradeChannelName(name)
 end
 
 function AF:IsInUnavailableActivity()
+	local disabled = self.db and self.db.autoAvailabilityDisable or {}
 	if C_PartyInfo.IsDelveInProgress() then
-		return true
+		return disabled.delve ~= false
 	end
 	if not IsInInstance then
 		return false
@@ -57,10 +61,39 @@ function AF:IsInUnavailableActivity()
 	if not inInstance then
 		return false
 	end
-	return instanceType == "party"
-		or instanceType == "raid"
-		or instanceType == "pvp"
-		or instanceType == "arena"
+	if instanceType == "party" then
+		return disabled.party ~= false
+	end
+	if instanceType == "raid" then
+		return disabled.raid ~= false
+	end
+	if instanceType == "pvp" then
+		return disabled.pvp ~= false
+	end
+	if instanceType == "arena" then
+		return disabled.arena ~= false
+	end
+	return false
+end
+
+function AF:SetAutoAvailabilityActivityDisabled(activity, disabled)
+	if not self.db then
+		return
+	end
+	self.db.autoAvailabilityDisable = self.db.autoAvailabilityDisable or {}
+	self.db.autoAvailabilityDisable[activity] = disabled == true
+	self:QueueAutoAvailabilityRefresh()
+	if self.RefreshOptionsPanel then
+		self:RefreshOptionsPanel()
+	end
+end
+
+function AF:IsAutoAvailabilityActivityDisabled(activity)
+	local disabled = self.db and self.db.autoAvailabilityDisable
+	if disabled and disabled[activity] ~= nil then
+		return disabled[activity] == true
+	end
+	return true
 end
 
 function AF:ApplyProfessionPanel(frame)

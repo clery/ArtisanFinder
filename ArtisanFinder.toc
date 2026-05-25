@@ -50,6 +50,7 @@ Options.lua
 Core.lua
 Comms.lua
 TradeChat.lua
+OrderNotifications.lua
 RecipeCapability.lua
 Scanner.lua
 ArtisanFinder.xml

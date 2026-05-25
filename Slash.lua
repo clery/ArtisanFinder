@@ -1,9 +1,9 @@
 local _, AF = ...
 
 local function NormalizeCommand(message)
-	message = tostring(message or ""):lower():match("^%s*(.-)%s*$")
+	message = tostring(message or ""):match("^%s*(.-)%s*$")
 	local command, rest = message:match("^(%S+)%s*(.-)$")
-	return command or "", rest or ""
+	return command and command:lower() or "", rest or ""
 end
 
 local function ClearCustomerQueryState(AF)
@@ -60,6 +60,7 @@ function AF:PrintDebugHelp()
 	self:Print(self:Text("DEBUG_HELP_LOGS"))
 	self:Print(self:Text("DEBUG_HELP_CLEAR"))
 	self:Print(self:Text("DEBUG_HELP_LOCALE"))
+	self:Print(self:Text("DEBUG_HELP_ORDERS"))
 end
 
 function AF:PrintDevHelp()
@@ -69,6 +70,9 @@ function AF:PrintDevHelp()
 	self:Print(self:Text("DEV_HELP_STATE"))
 	self:Print(self:Text("DEV_HELP_FAKE"))
 	self:Print(self:Text("DEV_HELP_TRAFFIC"))
+	self:Print(self:Text("DEV_HELP_NOTIFY"))
+	self:Print(self:Text("DEV_HELP_ORDERS"))
+	self:Print(self:Text("DEV_HELP_SOUND"))
 end
 
 function AF:PrintClearHelp()
@@ -151,13 +155,16 @@ function AF:ClearOptionsData()
 	self.db.defaultSort = "best"
 	self.db.cacheCleanupDays = 7
 	self.db.autoAvailability = false
+	self.db.autoAvailabilityDisable = { party = true, raid = true, pvp = true, arena = true, delve = true }
 	self.db.fastScan = false
 	self.db.tradeLeadMinutes = 15
 	self.db.freezeTradeLeadRows = false
+	self.db.orderNotificationSound = "CATALOG_SHOP_OPEN_LOADING_SCREEN"
+	self.db.orderNotificationChannel = "default"
 	self.db.offlineFallbackResults = 10
 	self.db.offlineFallbackMax = 20
 	self.db.showUncertifiedPeople = true
-	self.db.minimap = { angle = 225, hide = false }
+	self.db.minimap = { angle = 225, hide = false, standalone = false, standaloneX = -180, standaloneY = -120 }
 	self.db.debugEnabled = false
 	self.db.devEnabled = false
 	self.db.devFakeRows = false
@@ -239,6 +246,12 @@ function AF:HandleDebugSlash(rest)
 		else
 			self:PrintSlashHelp()
 		end
+	elseif command == "orders" then
+		if self:IsDebugEnabled() and self.PrintOrderDebugState then
+			self:PrintOrderDebugState()
+		else
+			self:PrintSlashHelp()
+		end
 	else
 		self:Print(self:Text("DEBUG_UNKNOWN", rest))
 		self:PrintDebugHelp()
@@ -283,6 +296,31 @@ function AF:HandleDevSlash(rest)
 			self:SetDevTrafficLogs(not self:IsDevTrafficLogsEnabled())
 		else
 			self:Print(self:Text("DEV_TRAFFIC_STATE", self:IsDevTrafficLogsEnabled() and self:Text("ENABLED") or self:Text("DISABLED")))
+		end
+	elseif command == "notify" then
+		local characterName, count = commandRest:match("^(%S+)%s*(%d*)")
+		self:DevNotifyOrder(characterName ~= "" and characterName or self:GetPlayerFullName(), tonumber(count) or 1)
+	elseif command == "orders" then
+		local subcommand, subRest = NormalizeCommand(commandRest)
+		if subcommand == "current" then
+			self:DevSetCurrentOrders(tonumber(subRest) or 1)
+		elseif subcommand == "alt" then
+			local characterName, professionName, count = subRest:match("^(%S+)%s*(.-)%s+(%d+)$")
+			if not characterName then
+				characterName, professionName = subRest:match("^(%S+)%s*(.*)$")
+			end
+			self:DevSetAltOrders(characterName or self:GetPlayerFullName(), professionName, tonumber(count) or 1)
+		elseif subcommand == "clear" then
+			self:DevClearOrders()
+		else
+			self:Print(self:Text("DEV_HELP_ORDERS"))
+		end
+	elseif command == "sound" then
+		local subcommand = NormalizeCommand(commandRest)
+		if subcommand == "order" and self.PlayOrderNotificationSound then
+			self:PlayOrderNotificationSound()
+		else
+			self:Print(self:Text("DEV_HELP_SOUND"))
 		end
 	else
 		self:Print(self:Text("DEV_UNKNOWN", rest))

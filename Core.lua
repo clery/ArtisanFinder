@@ -21,6 +21,8 @@ local EVENTS = {
 	"GUILD_TRADESKILL_UPDATE",
 	"GUILD_RECIPE_KNOWN_BY_MEMBERS",
 	"CRAFTINGORDERS_SHOW_CUSTOMER",
+	"CRAFTINGORDERS_ORDER_PLACEMENT_RESPONSE",
+	"CRAFTINGORDERS_UPDATE_PERSONAL_ORDER_COUNTS",
 	"TRADE_SKILL_SHOW",
 	"TRADE_SKILL_CLOSE",
 	"TRADE_SKILL_LIST_UPDATE",
@@ -67,7 +69,7 @@ function AF:OnPlayerLogin()
 	self:EnsureDB()
 	self.playerName = self:GetPlayerFullName()
 	self:SelectActiveArtisanProfile(self.playerName)
-	self.available = false
+	self:SetAvailabilityMode(self.AVAILABILITY_UNAVAILABLE, true)
 
 	self:InitializeComms()
 	self:InitializeWhoStatus()
@@ -77,6 +79,7 @@ function AF:OnPlayerLogin()
 	self:InitializeCrafterUI()
 	self:InitializeSlashCommands()
 	self:InitializeTradeChat()
+	self:InitializeOrderNotifications()
 	self:InitializeOptions()
 	self:CleanupCustomerCache()
 	self:InitializeTutorial()
@@ -88,9 +91,28 @@ function AF:OnPlayerLogin()
 	self:QueueAutoAvailabilityRefresh()
 end
 
-function AF:SetAvailable(value, silent)
-	local wasAvailable = self.available == true
-	self.available = value == true
+function AF:GetAvailabilityMode()
+	return self.availabilityMode or self.AVAILABILITY_UNAVAILABLE
+end
+
+function AF:IsAvailable()
+	return self:GetAvailabilityMode() ~= self.AVAILABILITY_UNAVAILABLE
+end
+
+function AF:IsCurrentCharacterOnlyAvailable()
+	return self:GetAvailabilityMode() == self.AVAILABILITY_CURRENT
+end
+
+function AF:SetAvailabilityMode(mode, silent)
+	if mode ~= self.AVAILABILITY_CURRENT and mode ~= self.AVAILABILITY_ACCOUNT then
+		mode = self.AVAILABILITY_UNAVAILABLE
+	end
+	local oldMode = self:GetAvailabilityMode()
+	self.availabilityMode = mode
+	self.available = mode ~= self.AVAILABILITY_UNAVAILABLE
+	if mode ~= self.AVAILABILITY_UNAVAILABLE and self.db then
+		self.db.lastAvailabilityMode = mode
+	end
 	if self.RefreshCrafterUIScanSafe then
 		self:RefreshCrafterUIScanSafe()
 	elseif self.RefreshCrafterUI then
@@ -99,16 +121,38 @@ function AF:SetAvailable(value, silent)
 	if self.RefreshMinimap then
 		self:RefreshMinimap()
 	end
-	if wasAvailable ~= self.available then
-		self:DebugLog("state", string.format("availability=%s silent=%s", tostring(self.available), tostring(silent == true)))
+	if oldMode ~= mode then
+		self:DebugLog("state", string.format("availabilityMode=%s silent=%s", tostring(mode), tostring(silent == true)))
 	end
-	if not silent and wasAvailable ~= self.available then
-		self:Print(self:Text("AVAILABILITY_CHANGED", self.available and self:Text("ENABLED") or self:Text("DISABLED")))
+	if not silent and oldMode ~= mode then
+		self:Print(self:Text("AVAILABILITY_CHANGED", self:GetAvailabilityModeText(mode)))
 	end
 end
 
+function AF:GetAvailabilityModeText(mode)
+	mode = mode or self:GetAvailabilityMode()
+	if mode == self.AVAILABILITY_ACCOUNT then
+		return self:Text("AVAILABILITY_ACCOUNT")
+	end
+	if mode == self.AVAILABILITY_CURRENT then
+		return self:Text("AVAILABILITY_CURRENT")
+	end
+	return self:Text("UNAVAILABLE")
+end
+
+function AF:SetAvailable(value, silent)
+	self:SetAvailabilityMode(value and self.AVAILABILITY_ACCOUNT or self.AVAILABILITY_UNAVAILABLE, silent)
+end
+
 function AF:ToggleAvailable()
-	self:SetAvailable(not self.available)
+	local mode = self:GetAvailabilityMode()
+	if mode == self.AVAILABILITY_UNAVAILABLE then
+		self:SetAvailabilityMode(self.AVAILABILITY_CURRENT)
+	elseif mode == self.AVAILABILITY_CURRENT then
+		self:SetAvailabilityMode(self.AVAILABILITY_ACCOUNT)
+	else
+		self:SetAvailabilityMode(self.AVAILABILITY_UNAVAILABLE)
+	end
 end
 
 local function ContainsTradeChannelName(...)
@@ -132,7 +176,10 @@ function AF:ShouldAutoBeAvailable()
 	if self:IsInUnavailableActivity() then
 		return false
 	end
-	return self:HasTradeChatAccess()
+	if self:HasTradeChatAccess() then
+		return true
+	end
+	return false
 end
 
 function AF:RefreshAutoAvailability(silent)
@@ -145,7 +192,11 @@ function AF:RefreshAutoAvailability(silent)
 	end
 	local shouldBeAvailable = self:ShouldAutoBeAvailable()
 	self:DebugLog("auto", string.format("refresh shouldBeAvailable=%s silent=%s", tostring(shouldBeAvailable), tostring(silent == true)))
-	self:SetAvailable(shouldBeAvailable, silent)
+	local availableMode = self.db.lastAvailabilityMode
+	if availableMode ~= self.AVAILABILITY_CURRENT and availableMode ~= self.AVAILABILITY_ACCOUNT then
+		availableMode = self.AVAILABILITY_ACCOUNT
+	end
+	self:SetAvailabilityMode(shouldBeAvailable and availableMode or self.AVAILABILITY_UNAVAILABLE, silent)
 end
 
 function AF:QueueAutoAvailabilityRefresh()
@@ -308,6 +359,14 @@ AF.frame:SetScript("OnEvent", function(_, event, ...)
 				AF:RefreshCustomerQuery()
 			end
 		end)
+	elseif event == "CRAFTINGORDERS_ORDER_PLACEMENT_RESPONSE" then
+		if AF.OnOrderPlacementResponse then
+			AF:OnOrderPlacementResponse(...)
+		end
+	elseif event == "CRAFTINGORDERS_UPDATE_PERSONAL_ORDER_COUNTS" then
+		if AF.OnPersonalOrderCountsUpdated then
+			AF:OnPersonalOrderCountsUpdated()
+		end
 	elseif event == "TRADE_SKILL_SHOW" or event == "TRADE_SKILL_DATA_SOURCE_CHANGED" then
 		if AF:IsInCombatLocked() then
 			return
