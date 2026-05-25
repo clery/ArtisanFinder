@@ -6,6 +6,8 @@ local CRAFTER_COLLAPSE_BUTTON_LEVEL_OFFSET = 1000
 local COMMISSION_PRICE_FIELD_WIDTH = 150
 local COMMISSION_FIELD_HEIGHT = 36
 local COMMISSION_PRICE_MAX_LETTERS = 9
+local CRAFTER_REOPEN_ICON = 7548932 -- inv-12-profession-blacksmithing-repairhammer-purple
+local CUSTOMER_PREVIEW_ATLAS = "UI-HUD-Minimap-CraftingOrder-Up"
 
 local function UpdatePlaceholder(box)
 	box.Placeholder:SetShown((box:GetText() or "") == "")
@@ -56,6 +58,15 @@ local function WatchEditBox(box, callback)
 			local lastText = self.artisanFinderLastSettingText
 			self.artisanFinderDirty = lastText == nil or (self:GetText() or "") ~= lastText
 			callback()
+		end
+	end)
+end
+
+local function SaveOnEnter(box, saveButton)
+	box:SetScript("OnEnterPressed", function(self)
+		self:ClearFocus()
+		if saveButton and saveButton:IsEnabled() then
+			saveButton:Click()
 		end
 	end)
 end
@@ -179,6 +190,50 @@ local function ConfigureInfoButton(button, tooltipTitle, tooltipText)
 		GameTooltip:AddLine(AF:Text("COMMISSION_HELP_0"), 0.8, 0.8, 0.8, true)
 		GameTooltip:AddLine(AF:Text("COMMISSION_HELP_FREE"), 0.8, 0.8, 0.8, true)
 		GameTooltip:AddLine(AF:Text("COMMISSION_HELP_POSITIVE"), 0.8, 0.8, 0.8, true)
+		GameTooltip:Show()
+	end)
+	button:SetScript("OnLeave", function()
+		GameTooltip:Hide()
+	end)
+	return button
+end
+
+local function CreateCustomerPreviewButton(parent)
+	local button = CreateFrame("Button", nil, parent)
+	button:SetSize(18, 18)
+	button:SetNormalAtlas(CUSTOMER_PREVIEW_ATLAS)
+	button:SetPushedAtlas(CUSTOMER_PREVIEW_ATLAS)
+	return button
+end
+
+local function ConfigureCustomerPreviewButton(button, getEntry)
+	button:SetScript("OnEnter", function(self)
+		local entry, defaultEntry = getEntry()
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		GameTooltip:SetText(AF:Text("CUSTOMER_SIDE_PREVIEW"), 1, 0.82, 0)
+		if entry or defaultEntry then
+			local priceCopper, freeCommission = AF:GetEntryCommission(entry)
+			if not priceCopper then
+				priceCopper, freeCommission = AF:GetEntryCommission(defaultEntry)
+			end
+			GameTooltip:AddLine(AF:FormatMoney(priceCopper or 0, freeCommission), 1, 1, 1, true)
+			local note = AF:GetEntryNote(entry)
+			if not note then
+				note = AF:GetEntryNote(defaultEntry)
+			end
+			if note and note ~= "" then
+				GameTooltip:AddLine(note, 0.85, 0.85, 0.85, true)
+			end
+			local capability = AF:FormatCapability(entry)
+			if capability and capability ~= "" then
+				GameTooltip:AddLine(capability, 0.65, 0.65, 0.65, true)
+			end
+			if entry then
+				AF:AddCapabilityTooltipLines(GameTooltip, entry)
+			end
+		else
+			GameTooltip:AddLine(AF:Text("CUSTOMER_SIDE_PREVIEW_EMPTY"), 0.65, 0.65, 0.65, true)
+		end
 		GameTooltip:Show()
 	end)
 	button:SetScript("OnLeave", function()
@@ -329,6 +384,7 @@ function AF:ApplyCrafterDefaultsCollapsed(collapsed)
 
 	self.crafterDefaultsCollapsed = collapsed and true or false
 	defaults:SetWidth(self.crafterDefaultsCollapsed and 28 or DEFAULT_COMMISSION_PANEL_WIDTH)
+	defaults:SetShown(not self.crafterDefaultsCollapsed)
 	for _, region in ipairs(defaults.collapsibleRegions or {}) do
 		region:SetShown(not self.crafterDefaultsCollapsed)
 	end
@@ -337,7 +393,7 @@ function AF:ApplyCrafterDefaultsCollapsed(collapsed)
 	defaults.NineSlice:SetShown(not self.crafterDefaultsCollapsed)
 	defaults.Bg:SetShown(not self.crafterDefaultsCollapsed)
 	defaults.TopTileStreaks:SetShown(not self.crafterDefaultsCollapsed)
-	defaults.collapsedRail:SetShown(self.crafterDefaultsCollapsed)
+	defaults.collapsedRail:SetShown(false)
 	defaults.collapsedRail:ClearAllPoints()
 	defaults.collapsedRail:SetPoint("TOPLEFT", defaults, "TOPLEFT", 0, 0)
 	defaults.collapsedRail:SetPoint("BOTTOMRIGHT", defaults, "BOTTOMRIGHT", 0, 0)
@@ -349,7 +405,9 @@ function AF:ApplyCrafterDefaultsCollapsed(collapsed)
 	if collapseButton then
 		collapseButton:ClearAllPoints()
 		if self.crafterDefaultsCollapsed then
-			collapseButton:SetPoint("TOP", defaults.collapsedRail, "TOP", 0, -2)
+			local form = self:GetCraftingSchematicForm()
+			local anchor = form and form.Details or form or ProfessionsFrame
+			collapseButton:SetPoint("LEFT", anchor, "RIGHT", 4, 0)
 			collapseButton:SetMaximizedLook()
 		else
 			collapseButton:SetPoint("TOPRIGHT", defaults, "TOPRIGHT", 1, 0)
@@ -390,6 +448,55 @@ end
 
 function AF:IsProfessionPanelMinimized()
 	return ProfessionsUtil and ProfessionsUtil.IsCraftingMinimized and ProfessionsUtil.IsCraftingMinimized() == true
+end
+
+function AF:EnsureCrafterReopenButton()
+	if self.crafterReopenButton then
+		return self.crafterReopenButton
+	end
+	local form = self:GetCraftingSchematicForm()
+	if not form then
+		return nil
+	end
+
+	local button = CreateFrame("Button", "ArtisanFinderCrafterReopenButton", form, "UIPanelButtonTemplate")
+	button:SetSize(32, 32)
+	button:SetFrameLevel((form:GetFrameLevel() or 0) + 20)
+	button.icon = button:CreateTexture(nil, "ARTWORK")
+	button.icon:SetTexture(CRAFTER_REOPEN_ICON)
+	button.icon:SetSize(20, 20)
+	button.icon:SetPoint("CENTER")
+	button:SetScript("OnClick", function()
+		if ProfessionsFrame and ProfessionsFrame.SetMaximized then
+			ProfessionsFrame:SetMaximized()
+		elseif ProfessionsFrame and ProfessionsFrame.CraftingPage and ProfessionsFrame.CraftingPage.SetMaximized then
+			ProfessionsFrame.CraftingPage:SetMaximized()
+		end
+		AF:RefreshCrafterUI()
+	end)
+	button:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		GameTooltip:SetText("ArtisanFinder", 1, 0.82, 0)
+		GameTooltip:AddLine(AF:Text("CRAFTER_REOPEN_TOOLTIP"), 1, 1, 1, true)
+		GameTooltip:Show()
+	end)
+	button:SetScript("OnLeave", function()
+		GameTooltip:Hide()
+	end)
+	button:Hide()
+	self.crafterReopenButton = button
+	return button
+end
+
+function AF:RefreshCrafterReopenButton()
+	local button = self:EnsureCrafterReopenButton()
+	local form = self:GetCraftingSchematicForm()
+	if not button or not form then
+		return
+	end
+	button:ClearAllPoints()
+	button:SetPoint("BOTTOMRIGHT", form, "BOTTOMRIGHT", -8, 8)
+	button:SetShown(self:IsOwnProfessionWindowOpen() and self:IsProfessionPanelMinimized())
 end
 
 function AF:GetCurrentCraftingRecipeContext()
@@ -506,6 +613,13 @@ function AF:AttachCrafterUI()
 
 	local frame = CreateFrame("Frame", "ArtisanFinderCrafterFrame", form, "ArtisanFinderCrafterItemTemplate")
 	frame.info = ConfigureInfoButton(frame.info, "ITEM_SPECIFIC_COMMISSION", "ITEM_SPECIFIC_TOOLTIP")
+	frame.customerPreview = ConfigureCustomerPreviewButton(CreateCustomerPreviewButton(frame), function()
+		local context = AF:GetCurrentCraftingRecipeContext()
+		local item = context and AF.db.artisanProfile.items[tostring(context.itemID or "")]
+		local defaultEntry = context and context.professionID and AF:GetProfessionPriceEntry(AF.db.artisanProfile, context.professionID)
+		return item, defaultEntry
+	end)
+	frame.customerPreview:SetPoint("RIGHT", frame.info, "LEFT", -2, 0)
 	frame.priceLabel:SetJustifyH("LEFT")
 	frame.priceLabel:SetText(self:Text("COMMISSION"))
 
@@ -672,6 +786,10 @@ function AF:AttachCrafterUI()
 	WatchEditBox(frame.note, markItemDirty)
 	WatchEditBox(defaults.price, markDefaultDirty)
 	WatchEditBox(defaults.note, markDefaultDirty)
+	SaveOnEnter(frame.price, frame.save)
+	SaveOnEnter(frame.note, frame.save)
+	SaveOnEnter(defaults.price, defaults.save)
+	SaveOnEnter(defaults.note, defaults.save)
 
 	self.crafterFrame = frame
 	self.crafterDefaultsFrame = defaults
@@ -889,8 +1007,10 @@ function AF:RefreshCrafterUI()
 		if self.crafterDefaultsCollapseButton then
 			self.crafterDefaultsCollapseButton:Hide()
 		end
+		self:RefreshCrafterReopenButton()
 		return
 	end
+	self:RefreshCrafterReopenButton()
 
 	self:PositionCrafterUI()
 
