@@ -9,15 +9,16 @@ ArtisanFinder helps players find available crafters directly from the Crafting O
 *   Multi-character advertising for scanned professions from your alts.
 *   Guild and trade-chat crafter discovery.
 *   Favorites, search, sorting, online checks, and personal order helpers.
+*   Personal order notifications for addon-enabled customers and artisans.
 *   Background recipe scanning for supported crafting professions.
-*   Minimap and Options -> AddOns controls.
+*   Minimap, movable button, and Options -> AddOns controls.
 *   Localization for English, French, German, Spanish, Russian, and Chinese.
 
 ![Addon features gif](Images/Example.gif)
 
 ## For Customers
 
-When you choose an item in the Crafting Order form, ArtisanFinder shows matching artisans who can help with that craft. Results can include commission, note, quality, recommended reagents, guild source, trade-chat leads, and actions for whispering or preparing an order.
+When you choose an item in the Crafting Order form, ArtisanFinder shows matching artisans who can help with that craft. Results can include commission, note, quality, recommended reagents, AFK state, guild source, trade-chat leads, and actions for whispering or preparing an order.
 
 ArtisanFinder does not place orders for you. It only helps fill or open the right information so you can review everything before submitting an order yourself.
 
@@ -25,9 +26,11 @@ ArtisanFinder does not place orders for you. It only helps fill or open the righ
 
 ## For Crafters
 
-ArtisanFinder adds lightweight controls to the Professions UI for item-specific and profession-default commissions, notes, and availability. It scans crafting professions in the background and can advertise scanned professions from your other characters while you are online.
+ArtisanFinder adds lightweight controls to the Professions UI for item-specific and profession-default commissions, notes, and availability. It scans crafting professions in the background and can advertise scanned professions from your other characters while you are online. The crafter panel also includes a customer preview tooltip so you can check what customers will see.
 
-Availability is session-based and resets after login or reload. You can toggle it from the minimap button, or let automatic availability enable it in trade-chat areas and disable it in instances.
+Availability is session-based and resets after login or reload. You can cycle between unavailable, current-character availability, and account-wide availability from the minimap button, or let automatic availability enable it in trade-chat areas and disable it in selected instance types.
+
+If an addon-enabled customer places a personal order for one of your characters while you are on another character, ArtisanFinder can play your selected notification sound and show a center-screen notification. The Blizzard crafting order minimap icon can also show known alt orders.
 
 ![ArtisanFinder crafter view](Images/CrafterView.png)
 
@@ -47,7 +50,7 @@ An item-specific commission takes priority over a profession default. If an item
 
 ## Options
 
-ArtisanFinder has an Options -> AddOns panel for result sorting, cache behavior, trade-chat leads, advertised professions, automatic availability, and minimap visibility.
+ArtisanFinder has an Options -> AddOns panel ordered around common controls first: minimap/button behavior, availability, trade-chat leads, order notification sound/channel, result sorting, cache behavior, scanning, and advertised character professions.
 
 ![ArtisanFinder options](Images/Options1.png)
 ![ArtisanFinder options](Images/Options2.png)
@@ -65,6 +68,8 @@ ArtisanFinder includes localization support for English, French, German, Spanish
 *   `/af auto off`: disables automatic availability.
 *   `/af auto toggle`: toggles the auto availability mode.
 *   `/af clear`: show clear data commands.
+*   `/af debug orders`: show personal order notification debug state.
+*   `/af dev notify`, `/af dev orders`, `/af dev sound order`: test order notification behavior while developer helpers are enabled.
 
 ## Inspiration
 

@@ -308,7 +308,7 @@ function AF:RefreshCraftingOrderIndicator()
 	local hasAlt = altTotal > 0
 	local icon = frame.Icon or _G.MiniMapCraftingOrderIcon
 	if hasAlt and icon then
-		icon:SetVertexColor(0.45, 0.85, 1)
+		icon:SetVertexColor(0.15, 0.95, 1)
 	elseif icon then
 		icon:SetVertexColor(1, 1, 1)
 	end

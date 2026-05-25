@@ -407,7 +407,7 @@ function AF:ApplyCrafterDefaultsCollapsed(collapsed)
 		if self.crafterDefaultsCollapsed then
 			local form = self:GetCraftingSchematicForm()
 			local anchor = form and form.Details or form or ProfessionsFrame
-			collapseButton:SetPoint("LEFT", anchor, "RIGHT", 4, 0)
+			collapseButton:SetPoint("LEFT", anchor, "RIGHT", -1, 0)
 			collapseButton:SetMaximizedLook()
 		else
 			collapseButton:SetPoint("TOPRIGHT", defaults, "TOPRIGHT", 1, 0)
