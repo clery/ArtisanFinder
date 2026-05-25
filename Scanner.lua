@@ -508,6 +508,14 @@ function AF:GetCurrentProfessionScanPercent(profession)
 end
 
 function AF:RefreshScanProgressUI(force)
+	if self.activeScan then
+		self.scanRefreshCounter = 0
+		if self.UpdateCrafterScanProgressText then
+			self:UpdateCrafterScanProgressText()
+		end
+		return
+	end
+
 	self.scanRefreshCounter = (self.scanRefreshCounter or 0) + 1
 	if force or self.scanRefreshCounter >= 8 then
 		self.scanRefreshCounter = 0

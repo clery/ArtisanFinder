@@ -825,6 +825,10 @@ function AF:GetCurrentProfessionScanSignature(profession)
 	return table.concat({ SCAN_SIGNATURE_VERSION, recipeSignature }, "|")
 end
 
+function AF:GetCurrentProfessionScanSignatureVersion()
+	return SCAN_SIGNATURE_VERSION
+end
+
 function AF:GetBestReagentCapability(recipeID)
 	local recipeInfo = C_TradeSkillUI.GetRecipeInfo(recipeID)
 	local recipeLevel = recipeInfo and recipeInfo.unlockedRecipeLevel

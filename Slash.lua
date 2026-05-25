@@ -22,7 +22,11 @@ end
 
 function AF:RefreshMainUI(statusText)
 	self:RefreshCustomerResults(statusText)
-	self:RefreshCrafterUI()
+	if self.RefreshCrafterUIScanSafe then
+		self:RefreshCrafterUIScanSafe()
+	else
+		self:RefreshCrafterUI()
+	end
 	self:RefreshMinimap()
 	self:RefreshOptionsPanel()
 end

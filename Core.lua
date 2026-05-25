@@ -82,13 +82,18 @@ function AF:OnPlayerLogin()
 	self:InitializeTutorial()
 
 	self:Print(self:Text("ADDON_LOADED"))
+	C_Timer.After(3, function()
+		AF:PrintDeprecatedScanWarning()
+	end)
 	self:QueueAutoAvailabilityRefresh()
 end
 
 function AF:SetAvailable(value, silent)
 	local wasAvailable = self.available == true
 	self.available = value == true
-	if self.RefreshCrafterUI then
+	if self.RefreshCrafterUIScanSafe then
+		self:RefreshCrafterUIScanSafe()
+	elseif self.RefreshCrafterUI then
 		self:RefreshCrafterUI()
 	end
 	if self.RefreshMinimap then
@@ -188,7 +193,9 @@ function AF:SetFastScan(enabled)
 		self.scanQueueToken = (self.scanQueueToken or 0) + 1
 		self:ProcessScanQueue()
 	end
-	if self.RefreshCrafterUI then
+	if self.RefreshCrafterUIScanSafe then
+		self:RefreshCrafterUIScanSafe()
+	elseif self.RefreshCrafterUI then
 		self:RefreshCrafterUI()
 	end
 	if self.RefreshOptionsPanel then
@@ -324,7 +331,11 @@ AF.frame:SetScript("OnEvent", function(_, event, ...)
 			end
 			AF:TryAttachProfessionUIs()
 			if AF.RefreshCrafterUI then
-				AF:RefreshCrafterUI()
+				if event == "TRADE_SKILL_DATA_SOURCE_CHANGED" and AF.RefreshCrafterUIScanSafe then
+					AF:RefreshCrafterUIScanSafe()
+				else
+					AF:RefreshCrafterUI()
+				end
 			end
 			local ownProfessionWindowOpen = AF.IsOwnProfessionWindowOpen and AF:IsOwnProfessionWindowOpen()
 			if event == "TRADE_SKILL_DATA_SOURCE_CHANGED" and ownProfessionWindowOpen and AF.QueueProfessionDataSourceProbe then

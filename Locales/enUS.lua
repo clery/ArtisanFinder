@@ -98,6 +98,7 @@ L.SCAN_EQUIPMENT_NO_UPGRADES = "profession equipment check for %2$s found no bet
 L.SCAN_RESUMED = "resuming %s scan in the background."
 L.SCAN_PAUSED = "paused %s scan with %d item entries remaining. Reopen the profession to resume."
 L.SCAN_HELP_FORCE = "/af scan - force a fresh scan of the currently open profession"
+L.DEPRECATED_ALT_SCANS = "WARNING: outdated scan data found. Open these characters' professions and rescan them: %s."
 L.RECIPE_FALLBACK = "Recipe %s"
 
 L.MINIMAP_AVAILABLE = "Available this session"

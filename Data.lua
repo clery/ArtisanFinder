@@ -849,7 +849,11 @@ function AF:SetProfessionAdvertised(characterName, professionID, enabled)
 		self.db.advertising[characterName] = nil
 	end
 	self:RefreshMinimap()
-	self:RefreshCrafterUI()
+	if self.RefreshCrafterUIScanSafe then
+		self:RefreshCrafterUIScanSafe()
+	else
+		self:RefreshCrafterUI()
+	end
 	self:RefreshOptionsPanel()
 end
 
@@ -1143,6 +1147,65 @@ function AF:GetProfessionScannedCount(profile, professionID)
 		end
 	end
 	return count
+end
+
+local function GetScanSignatureVersion(signature)
+	return tonumber(tostring(signature or ""):match("^(%d+)|"))
+end
+
+function AF:IsDeprecatedScannedProfession(profile, professionID, profession)
+	if not profile or not professionID then
+		return false
+	end
+	if self:GetProfessionScannedCount(profile, professionID) <= 0 then
+		return false
+	end
+	local currentVersion = self.GetCurrentProfessionScanSignatureVersion and self:GetCurrentProfessionScanSignatureVersion()
+	if not currentVersion then
+		return false
+	end
+	return GetScanSignatureVersion(profession and profession.scanSignature) ~= currentVersion
+end
+
+function AF:GetDeprecatedScanSummaries()
+	local summaries = {}
+	self:ForEachArtisanProfile(function(characterName, profile)
+		characterName = self:NormalizeName(characterName) or characterName
+		if characterName then
+			local professions = {}
+			local seenProfessions = {}
+			for professionKey, profession in pairs(profile.professions or {}) do
+				local professionID = self:GetSupportedProfessionID(professionKey, profession)
+				if self:IsDeprecatedScannedProfession(profile, professionID, profession) then
+					seenProfessions[professionID] = true
+					table.insert(professions, self:GetProfessionName(professionID, profile))
+				end
+			end
+			for _, item in pairs(profile.items or {}) do
+				local professionID = self:GetSupportedProfessionID(item.professionID, item)
+				if professionID and not seenProfessions[professionID] then
+					local profession = profile.professions and profile.professions[tostring(professionID)]
+					if self:IsDeprecatedScannedProfession(profile, professionID, profession) then
+						seenProfessions[professionID] = true
+						table.insert(professions, self:GetProfessionName(professionID, profile))
+					end
+				end
+			end
+			if #professions > 0 then
+				table.sort(professions)
+				table.insert(summaries, string.format("%s (%s)", self:GetDisplayPlayerName(characterName), table.concat(professions, ", ")))
+			end
+		end
+	end)
+	table.sort(summaries)
+	return summaries
+end
+
+function AF:PrintDeprecatedScanWarning()
+	local summaries = self:GetDeprecatedScanSummaries()
+	if #summaries > 0 then
+		self:Print(self:Text("DEPRECATED_ALT_SCANS", table.concat(summaries, "; ")))
+	end
 end
 
 function AF:HasScannedProfession(characterName, professionID)

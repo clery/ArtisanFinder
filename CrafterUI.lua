@@ -19,6 +19,7 @@ local function SetEditBoxText(box, text, updateLastSettingText)
 	box.artisanFinderSettingText = false
 	if updateLastSettingText ~= false then
 		box.artisanFinderLastSettingText = text
+		box.artisanFinderDirty = false
 	end
 	UpdatePlaceholder(box)
 end
@@ -52,9 +53,25 @@ local function WatchEditBox(box, callback)
 	box:SetScript("OnTextChanged", function(self)
 		UpdatePlaceholder(self)
 		if not self.artisanFinderSettingText then
+			local lastText = self.artisanFinderLastSettingText
+			self.artisanFinderDirty = lastText == nil or (self:GetText() or "") ~= lastText
 			callback()
 		end
 	end)
+end
+
+local function IsEditBoxDirty(box)
+	return box and box.artisanFinderDirty == true
+end
+
+local function SetPanelInputSource(panel, sourceKey)
+	sourceKey = tostring(sourceKey or "")
+	if panel.artisanFinderInputSource ~= sourceKey then
+		panel.artisanFinderInputSource = sourceKey
+		if not IsEditBoxDirty(panel.price) and not IsEditBoxDirty(panel.note) then
+			panel.artisanFinderDirty = false
+		end
+	end
 end
 
 local function ClampCommissionEditBox(box)
@@ -183,6 +200,64 @@ end
 
 local function HasPanelError(panel)
 	return panel and panel.errorText and panel.errorText:IsShown()
+end
+
+local function IsDefaultsSaveDirty(defaults)
+	if not defaults or not defaults.price or not defaults.note then
+		return false
+	end
+	if defaults.artisanFinderLoadedPriceText == nil or defaults.artisanFinderLoadedNoteText == nil then
+		return defaults.artisanFinderDirty == true or IsEditBoxDirty(defaults.price) or IsEditBoxDirty(defaults.note)
+	end
+	return (defaults.price:GetText() or "") ~= defaults.artisanFinderLoadedPriceText
+		or (defaults.note:GetText() or "") ~= defaults.artisanFinderLoadedNoteText
+end
+
+local function ShouldEnableDefaultsSave(AF, defaults)
+	return IsDefaultsSaveDirty(defaults)
+		and (defaults.artisanFinderLoadedProfessionID or AF:GetCurrentSupportedProfessionID()) ~= nil
+		and not HasPanelError(defaults)
+end
+
+local function GetDefaultsRefreshProfessionID(AF, defaults, currentProfessionID)
+	if currentProfessionID then
+		return currentProfessionID
+	end
+	local loadedProfessionID = defaults and defaults.artisanFinderLoadedProfessionID
+	if loadedProfessionID and (IsDefaultsSaveDirty(defaults) or (AF.activeScan and tonumber(AF.activeScan.professionID) == tonumber(loadedProfessionID))) then
+		return loadedProfessionID
+	end
+	return nil
+end
+
+local function SetDefaultsLoadedState(AF, defaults, professionID, default)
+	local priceText = default and AF:FormatCommissionInput(default) or ""
+	local noteText = default and default.note or ""
+	defaults.artisanFinderLoadedProfessionID = professionID
+	defaults.artisanFinderLoadedPriceText = priceText
+	defaults.artisanFinderLoadedNoteText = noteText
+	defaults.artisanFinderDirty = false
+	SetEditBoxText(defaults.price, priceText)
+	SetEditBoxText(defaults.note, noteText)
+	defaults.price.artisanFinderDirty = false
+	defaults.note.artisanFinderDirty = false
+end
+
+local function RefreshDefaultsTextForProfession(AF, defaults, professionID)
+	local sourceKey = "profession:" .. tostring(professionID or "")
+	local default = professionID and AF:GetProfessionPriceEntry(AF.db.artisanProfile, professionID)
+	if defaults.artisanFinderInputSource ~= sourceKey then
+		if IsDefaultsSaveDirty(defaults) then
+			return defaults.artisanFinderInputSource or sourceKey
+		end
+		SetPanelInputSource(defaults, sourceKey)
+		SetDefaultsLoadedState(AF, defaults, professionID, default)
+		return sourceKey
+	end
+	if not IsDefaultsSaveDirty(defaults) then
+		SetDefaultsLoadedState(AF, defaults, professionID, default)
+	end
+	return sourceKey
 end
 
 local function ValidateCommissionInput(box, panel)
@@ -469,6 +544,9 @@ function AF:AttachCrafterUI()
 		AF:SetItemPrice(item.itemID, copper, free, frame.note:GetText(), state)
 		SetEditBoxText(frame.price, AF:FormatCommissionInput(item))
 		SetEditBoxText(frame.note, item.note or "")
+		frame.price.artisanFinderDirty = false
+		frame.note.artisanFinderDirty = false
+		frame.artisanFinderDirty = false
 		AF:RefreshCrafterUI()
 	end)
 
@@ -522,11 +600,7 @@ function AF:AttachCrafterUI()
 	defaults.errorText:SetHeight(28)
 	defaults.save:Disable()
 	defaults.save:SetScript("OnClick", function()
-		local context = AF:GetCurrentCraftingRecipeContext()
-		local professionID = context and context.professionID
-		if not professionID then
-			professionID = AF:GetCurrentSupportedProfessionID()
-		end
+		local professionID = defaults.artisanFinderLoadedProfessionID or AF:GetCurrentSupportedProfessionID()
 		if not professionID then
 			AF:Print(AF:Text("OPEN_PROFESSION_DEFAULT"))
 			return
@@ -539,8 +613,7 @@ function AF:AttachCrafterUI()
 
 		AF:SetProfessionPrice(professionID, copper, free, defaults.note:GetText(), state)
 		local savedDefault = AF:GetProfessionPriceEntry(AF.db.artisanProfile, professionID)
-		SetEditBoxText(defaults.price, AF:FormatCommissionInput(savedDefault))
-		SetEditBoxText(defaults.note, savedDefault and savedDefault.note or "")
+		SetDefaultsLoadedState(AF, defaults, professionID, savedDefault)
 		AF:RefreshCrafterUI()
 	end)
 
@@ -562,7 +635,7 @@ function AF:AttachCrafterUI()
 	local forceRescanButton = defaults.forceRescanButton
 	forceRescanButton:SetScript("OnClick", function()
 		AF:StartOrResumeCurrentProfessionScan(true, false)
-		AF:RefreshCrafterUI()
+		AF:RefreshCrafterUIScanSafe()
 	end)
 	forceRescanButton:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
@@ -586,11 +659,13 @@ function AF:AttachCrafterUI()
 	local markItemDirty = function()
 		ClampCommissionEditBox(frame.price)
 		ValidateCommissionInput(frame.price, frame)
+		frame.artisanFinderDirty = IsEditBoxDirty(frame.price) or IsEditBoxDirty(frame.note)
 		AF:UpdateCrafterDirtyState()
 	end
 	local markDefaultDirty = function()
 		ClampCommissionEditBox(defaults.price)
 		ValidateCommissionInput(defaults.price, defaults)
+		defaults.artisanFinderDirty = IsDefaultsSaveDirty(defaults)
 		AF:UpdateCrafterDirtyState()
 	end
 	WatchEditBox(frame.price, markItemDirty)
@@ -686,6 +761,50 @@ function AF:PositionCrafterUI()
 	defaults:SetPoint("BOTTOMLEFT", ProfessionsFrame, "BOTTOMRIGHT", -5, 24)
 end
 
+function AF:UpdateCrafterScanProgressText()
+	local scanProgressText = self.crafterScanProgressText
+	local defaults = self.crafterDefaultsFrame
+	if not scanProgressText or not defaults then
+		return
+	end
+
+	local active = self.activeScan
+	local professionEntry = active
+		and self.db
+		and self.db.artisanProfile
+		and self.db.artisanProfile.professions
+		and self.db.artisanProfile.professions[tostring(active.professionID)]
+	local progress = professionEntry and professionEntry.scanProgress
+	if active and progress and progress.signature == active.signature then
+		local total = tonumber(progress.total) or 0
+		local completed = self:TableCount(progress.completed)
+		local percent = total > 0 and math.floor((completed / total) * 100) or 0
+		percent = math.max(0, math.min(100, percent))
+		scanProgressText:SetText(string.format("%d%%", percent))
+		scanProgressText:SetShown(defaults:IsShown() and not self.crafterDefaultsCollapsed)
+	else
+		scanProgressText:SetText("")
+		scanProgressText:Hide()
+	end
+end
+
+function AF:IsActiveScanForCurrentProfession()
+	local active = self.activeScan
+	if not active or not active.professionID then
+		return false
+	end
+	local currentProfessionID = self:GetCurrentSupportedProfessionID()
+	return currentProfessionID and tonumber(active.professionID) == tonumber(currentProfessionID) or false
+end
+
+function AF:RefreshCrafterUIScanSafe()
+	if self:IsActiveScanForCurrentProfession() then
+		self:UpdateCrafterScanProgressText()
+	else
+		self:RefreshCrafterUI()
+	end
+end
+
 function AF:UpdateFastScanButton()
 	local button = self.crafterFastScanButton
 	local forceRescanButton = self.crafterForceRescanButton
@@ -695,7 +814,7 @@ function AF:UpdateFastScanButton()
 		return
 	end
 	local active = self.activeScan
-	local currentProfessionID, currentProfession = self:GetCurrentSupportedProfessionID()
+	local currentProfessionID = self:GetCurrentSupportedProfessionID()
 	local fastScanText = self:Text("FAST_SCAN_BUTTON")
 	if self.db and self.db.fastScan == true then
 		fastScanText = "|TInterface\\Buttons\\UI-CheckBox-Check:14:14:0:0|t " .. fastScanText
@@ -725,14 +844,7 @@ function AF:UpdateFastScanButton()
 		else
 			scanProgressText:SetPoint("LEFT", button, "RIGHT", 8, 0)
 		end
-		local percent = self:GetCurrentProfessionScanPercent(currentProfession)
-		if percent then
-			scanProgressText:SetText(string.format("%d%%", percent))
-			scanProgressText:SetShown(defaults:IsShown() and not self.crafterDefaultsCollapsed)
-		else
-			scanProgressText:SetText("")
-			scanProgressText:Hide()
-		end
+		self:UpdateCrafterScanProgressText()
 	end
 end
 
@@ -745,8 +857,8 @@ function AF:UpdateCrafterDirtyState()
 
 	local context = self:GetCurrentCraftingRecipeContext()
 	local item = context and self.db.artisanProfile.items[tostring(context.itemID or "")]
-	local itemDirty = false
-	if item then
+	local itemDirty = frame.artisanFinderDirty == true or IsEditBoxDirty(frame.price) or IsEditBoxDirty(frame.note)
+	if not itemDirty and item then
 		itemDirty = self:IsCommissionInputDirty(frame.price:GetText(), item)
 			or (frame.note:GetText() or "") ~= (item.note or "")
 	end
@@ -756,15 +868,7 @@ function AF:UpdateCrafterDirtyState()
 		frame.save:Disable()
 	end
 
-	local professionID = context and context.professionID
-	if not professionID then
-		professionID = self:GetCurrentSupportedProfessionID()
-	end
-	local default = professionID and self:GetProfessionPriceEntry(self.db.artisanProfile, professionID)
-	local defaultNote = default and default.note or ""
-	local defaultDirty = self:IsCommissionInputDirty(defaults.price:GetText(), default)
-		or (defaults.note:GetText() or "") ~= defaultNote
-	if defaultDirty and not HasPanelError(defaults) then
+	if ShouldEnableDefaultsSave(self, defaults) then
 		defaults.save:Enable()
 	else
 		defaults.save:Disable()
@@ -791,8 +895,9 @@ function AF:RefreshCrafterUI()
 	self:PositionCrafterUI()
 
 	local context = self:GetCurrentCraftingRecipeContext()
-	local professionID, profession = self:GetCurrentSupportedProfessionID()
-	if not professionID then
+	local currentProfessionID, profession = self:GetCurrentSupportedProfessionID()
+	local defaultsProfessionID = GetDefaultsRefreshProfessionID(self, defaults, currentProfessionID)
+	if not currentProfessionID and not defaultsProfessionID then
 		frame:Hide()
 		defaults:Hide()
 		if self.crafterDefaultsCollapseButton then
@@ -802,9 +907,9 @@ function AF:RefreshCrafterUI()
 	end
 	self:UpdateFastScanButton()
 
-	professionID = context and context.professionID or professionID
-	if professionID then
-		self:CaptureCurrentProfessionLink(profession or { id = professionID }, "crafter-ui-refresh")
+	local itemProfessionID = context and context.professionID or currentProfessionID
+	if itemProfessionID then
+		self:CaptureCurrentProfessionLink(profession or { id = itemProfessionID }, "crafter-ui-refresh")
 	end
 	if not context or context.learned == false or context.isRecraft then
 		frame:Hide()
@@ -817,6 +922,7 @@ function AF:RefreshCrafterUI()
 				frame.artisanFinderErrorSource = sourceKey
 				ClearPanelError(frame)
 			end
+			SetPanelInputSource(frame, sourceKey)
 			SetEditBoxTextForSource(frame.price, self:FormatCommissionInput(item), sourceKey)
 			SetEditBoxTextForSource(frame.note, item.note or "", sourceKey)
 		else
@@ -825,25 +931,17 @@ function AF:RefreshCrafterUI()
 		end
 	end
 
-	if professionID then
+	if defaultsProfessionID then
 		defaults:Show()
 		self:ApplyCrafterDefaultsCollapsed(self.crafterDefaultsCollapsed)
 		if self.MaybeShowCrafterTutorial then
 			self:MaybeShowCrafterTutorial()
 		end
-		defaults.advertiseCheck:SetChecked(self:IsProfessionAdvertised(self.playerName, professionID))
-		local default = self:GetProfessionPriceEntry(self.db.artisanProfile, professionID)
-		local sourceKey = "profession:" .. tostring(professionID or "")
+		defaults.advertiseCheck:SetChecked(self:IsProfessionAdvertised(self.playerName, defaultsProfessionID))
+		local sourceKey = RefreshDefaultsTextForProfession(self, defaults, defaultsProfessionID)
 		if defaults.artisanFinderErrorSource ~= sourceKey then
 			defaults.artisanFinderErrorSource = sourceKey
 			ClearPanelError(defaults)
-		end
-		if default then
-			SetEditBoxTextForSource(defaults.price, self:FormatCommissionInput(default), sourceKey)
-			SetEditBoxTextForSource(defaults.note, default.note or "", sourceKey)
-		else
-			SetEditBoxTextForSource(defaults.price, "", sourceKey)
-			SetEditBoxTextForSource(defaults.note, "", sourceKey)
 		end
 	else
 		ClearPanelError(defaults)
