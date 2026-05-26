@@ -299,6 +299,10 @@ function AF:HandleDevSlash(rest)
 		end
 	elseif command == "notify" then
 		local characterName, count = commandRest:match("^(%S+)%s*(%d*)")
+		if tonumber(characterName) and (not count or count == "") then
+			count = characterName
+			characterName = nil
+		end
 		self:DevNotifyOrder(characterName ~= "" and characterName or self:GetPlayerFullName(), tonumber(count) or 1)
 	elseif command == "orders" then
 		local subcommand, subRest = NormalizeCommand(commandRest)

@@ -215,10 +215,8 @@ function AF:InitializeStandaloneMinimapButton()
 	end
 	local button = CreateFrame("Button", "ArtisanFinderStandaloneButton", UIParent, "BackdropTemplate")
 	button:SetSize(42, 42)
-	button:SetMovable(true)
 	button:EnableMouse(true)
 	button:RegisterForClicks("LeftButtonUp", "RightButtonUp", "MiddleButtonUp")
-	button:RegisterForDrag("LeftButton")
 	button:SetClampedToScreen(true)
 	self:ApplyProfessionPanel(button)
 	button.icon = button:CreateTexture(nil, "ARTWORK")
@@ -227,17 +225,6 @@ function AF:InitializeStandaloneMinimapButton()
 	button.icon:SetPoint("CENTER")
 	button:SetScript("OnClick", function(self, clickButton)
 		HandleMinimapClick(self, clickButton)
-	end)
-	button:SetScript("OnDragStart", function(self)
-		HideMinimapTooltip()
-		self:StartMoving()
-	end)
-	button:SetScript("OnDragStop", function(self)
-		self:StopMovingOrSizing()
-		local centerX, centerY = self:GetCenter()
-		local parentX, parentY = UIParent:GetCenter()
-		AF.db.minimap.standaloneX = math.floor((centerX or parentX) - parentX + 0.5)
-		AF.db.minimap.standaloneY = math.floor((centerY or parentY) - parentY + 0.5)
 	end)
 	button:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
@@ -251,6 +238,10 @@ function AF:InitializeStandaloneMinimapButton()
 	end)
 	button:Hide()
 	self.standaloneMinimapButton = button
+end
+
+function AF:GetStandaloneMinimapButton()
+	return self.standaloneMinimapButton
 end
 
 function AF:HookMinimapButtonDrag()
@@ -268,12 +259,14 @@ function AF:PositionStandaloneMinimapButton()
 		return
 	end
 	button:ClearAllPoints()
-	button:SetPoint("CENTER", UIParent, "CENTER", self.db.minimap.standaloneX or -180, self.db.minimap.standaloneY or -120)
+	local point = self.db.minimap.standalonePoint or "CENTER"
+	button:SetPoint(point, UIParent, point, self.db.minimap.standaloneX or -180, self.db.minimap.standaloneY or -120)
 end
 
 function AF:ResetMinimapButtonPosition()
 	self.db.minimap = self.db.minimap or {}
 	if self.db.minimap.standalone then
+		self.db.minimap.standalonePoint = "CENTER"
 		self.db.minimap.standaloneX = 0
 		self.db.minimap.standaloneY = 0
 	else

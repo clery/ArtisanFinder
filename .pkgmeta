@@ -9,6 +9,7 @@ externals:
   Libs/LibDataBroker-1.1: https://repos.curseforge.com/wow/libdatabroker-1-1
   Libs/LibDBIcon-1.0: https://repos.curseforge.com/wow/libdbicon-1-0/trunk/LibDBIcon-1.0
   Libs/ChatThrottleLib: https://repos.curseforge.com/wow/chatthrottlelib/trunk
+  Libs/LibEditMode: https://github.com/p3lim-wow/LibEditMode.git
 
 ignore:
   - .githooks

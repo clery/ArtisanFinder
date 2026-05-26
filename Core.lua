@@ -60,6 +60,9 @@ local SCAN_CHANGE_EVENTS = {
 
 function AF:OnAddonLoaded(name)
 	if name ~= addonName then
+		if name == "Blizzard_ProfessionsCustomerOrders" and self.InitializeCustomerOrderFormHook then
+			self:InitializeCustomerOrderFormHook()
+		end
 		return
 	end
 	self:EnsureDB()
@@ -83,6 +86,7 @@ function AF:OnPlayerLogin()
 	self:InitializeOptions()
 	self:CleanupCustomerCache()
 	self:InitializeTutorial()
+	self:InitializeEditMode()
 
 	self:Print(self:Text("ADDON_LOADED"))
 	C_Timer.After(3, function()

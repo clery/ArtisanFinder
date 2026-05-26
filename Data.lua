@@ -578,6 +578,27 @@ function ApplyDBDefaults(db)
 	if db.orderNotificationChannel == nil then
 		db.orderNotificationChannel = "default"
 	end
+	if db.orderNotificationPoint == nil then
+		db.orderNotificationPoint = "TOP"
+	end
+	if db.orderNotificationX == nil then
+		db.orderNotificationX = 0
+	end
+	if db.orderNotificationY == nil then
+		db.orderNotificationY = -170
+	end
+	if db.orderNotificationScale == nil then
+		db.orderNotificationScale = 1
+	end
+	if db.orderNotificationGrowDirection == nil then
+		db.orderNotificationGrowDirection = "DOWN"
+	end
+	if db.editModeShowOrderToast == nil then
+		db.editModeShowOrderToast = true
+	end
+	if db.editModeShowStandaloneButton == nil then
+		db.editModeShowStandaloneButton = true
+	end
 	if db.offlineFallbackResults == nil then
 		db.offlineFallbackResults = 10
 	end
@@ -601,6 +622,9 @@ function ApplyDBDefaults(db)
 	end
 	if db.minimap.standaloneY == nil then
 		db.minimap.standaloneY = -120
+	end
+	if db.minimap.standalonePoint == nil then
+		db.minimap.standalonePoint = "CENTER"
 	end
 end
 
@@ -673,6 +697,10 @@ end
 
 MIGRATIONS[14] = function(db)
 	NormalizeIDOnlyCraftData(db)
+end
+
+MIGRATIONS[15] = function(db)
+	ApplyDBDefaults(db)
 end
 
 function AF:MigrateDB(db)

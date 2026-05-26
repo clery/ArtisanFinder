@@ -13,6 +13,7 @@ available under its own upstream license or notice terms.
 | LibDataBroker-1.1 | All Rights Reserved, per upstream project metadata | https://www.wowace.com/projects/libdatabroker-1-1 |
 | LibDBIcon-1.0 | Ace3 Style BSD, per upstream project metadata | https://www.wowace.com/projects/libdbicon-1-0 |
 | ChatThrottleLib | Public Domain | Bundled header notice in `Libs/ChatThrottleLib/ChatThrottleLib.lua` |
+| LibEditMode | Custom addon library license, see `Libs/LibEditMode/LICENSE.txt` | https://github.com/p3lim-wow/LibEditMode |
 
 ## Notes
 
