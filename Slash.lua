@@ -184,20 +184,40 @@ function AF:ClearCurrentCharacterScans()
 	if not characterName then
 		return
 	end
+	self:ClearCharacterScans(characterName)
+end
+
+function AF:ClearCharacterScans(characterName)
+	if not characterName then
+		return
+	end
+	characterName = self:NormalizeName(characterName)
+	if not characterName then
+		return
+	end
 	local profile = self.db.artisanCharacters and self.db.artisanCharacters[characterName] or self.db.artisanProfile
 	profile = self:NormalizeArtisanProfile(profile, characterName)
 	profile.professions = {}
 	profile.items = {}
 	self.db.artisanCharacters[characterName] = profile
+	
 	if self.activeArtisanCharacter == characterName then
 		self.db.artisanProfile = profile
 	end
+	
+	for key in pairs(self.db.professionLinks or {}) do
+		local keyCharacter = tostring(key):match("^(.-):([^:]+)$")
+		if keyCharacter == characterName then
+			self.db.professionLinks[key] = nil
+		end
+	end
+	
 	self.activeScan = nil
 	self.pendingAutoScanReason = nil
 	self.autoScanQueued = false
 	self.scanProcessing = false
 	self:RefreshAfterClear()
-	self:Print(self:Text("CLEAR_SCANS_DONE"))
+	self:Print(self:Text("CLEAR_SCANS_DONE", characterName))
 end
 
 function AF:ClearExternalArtisans()
@@ -373,8 +393,13 @@ function AF:HandleSlash(message)
 			self:ClearAllData()
 		elseif rest == "options" then
 			self:ClearOptionsData()
-		elseif rest == "scans" then
-			self:ClearCurrentCharacterScans()
+		elseif rest:match("^scans") then
+			local scansRest = rest:match("^scans%s+(.-)%s*$") or ""
+			if scansRest == "" then
+				self:ClearCurrentCharacterScans()
+			else
+				self:ClearCharacterScans(scansRest)
+			end
 		elseif rest == "artisans" then
 			self:ClearExternalArtisans()
 		elseif rest == "artisans favorite" then

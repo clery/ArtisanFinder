@@ -15,11 +15,7 @@
     [] Add `/af debug showSelf` to allow seeing your own row in customer view
     [] If suggested reagents with or without optionals is not different, keep only one suggested reagent section including optionals to simplify
 
-
-[] Put "Add Embellishment ..." and other optional reagent "comments" in white except for the "With optional reagent..." line. Add item rarity color to optional reagents such as "Myth Dawncrest" in Epic rarity purple.
-[] Currently, customer preview and row tooltip can appear without color/formatting, fix
-[] Toast
-    [] Backdrop not large enough, small gap at the top
-    [] Reduce padding from content to reduce overall size
-    [] Changing scale in edit mode does not change the visualization overlays dynamically
-    [] Change to framexml as much as possible
+[] Find way to add rows to HUD Edit Mode
+[] Fix notification from one alt to another showing placeholders
+[] Add `/af clear scans Fullname-Server` to clear specific characters' scans
+[] Sometimes, clear scans doesn't remove a character from minimap info or options
