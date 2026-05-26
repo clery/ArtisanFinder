@@ -500,7 +500,6 @@ function AF:SetupCustomerTutorialButton(frame)
 end
 
 function AF:GetCustomerTutorialRow()
-	local baseQuality = self:Text("BASE_QUALITY", self:GetQualityIconMarkup(3, nil, 16) or "Q3")
 	local bestQuality = self:Text("RECOMMENDED_REAGENTS_QUALITY", self:GetQualityIconMarkup(4, nil, 16) or "Q4")
 	local concentrationQuality = self:Text("CONCENTRATION_QUALITY", self:GetQualityIconMarkup(5, nil, 16) or "Q5")
 	return {
@@ -511,7 +510,7 @@ function AF:GetCustomerTutorialRow()
 		professionID = self.currentCustomerProfessionID or 164,
 		professionName = self.currentCustomerProfessionID and self:GetProfessionName(self.currentCustomerProfessionID) or self:Text("PROFESSION_FALLBACK", "Tutorial"),
 		note = self:Text("TUTORIAL_FAKE_ARTISAN_NOTE"),
-		capabilityText = table.concat({ baseQuality, bestQuality, concentrationQuality }, " - "),
+		capabilityText = table.concat({ bestQuality, concentrationQuality }, " - "),
 		quality = 3,
 		bestQuality = 4,
 		bestConcentrationQuality = 5,

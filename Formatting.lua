@@ -341,13 +341,6 @@ function AF:FormatCapability(entry)
 		concentrationQuality = baseConcentrationQuality
 		concentrationAtlas = entry.concentrationQualityAtlas
 	end
-	local baseText
-	if normalQuality and normalQuality > 0 then
-		baseText = self:Text("BASE_QUALITY", self:GetQualityIconMarkup(normalQuality, entry.qualityAtlas, 16) or ("Q" .. normalQuality))
-	end
-	if baseText then
-		table.insert(parts, baseText)
-	end
 
 	if bestQuality and bestQuality > 0 then
 		local qualityText = self:GetQualityIconMarkup(bestQuality, entry.bestQualityAtlas, 16) or ("Q" .. bestQuality)
@@ -380,9 +373,9 @@ function AF:FormatOptionalReagentImpact(entry, compact)
 	local qualityText = quality and quality > 0 and (self:GetQualityIconMarkup(quality, entry.optionalQualityAtlas, 16) or ("Q" .. quality)) or nil
 	if compact then
 		if qualityText then
-			return self:Text("OPTIONAL_REAGENTS_ROW", delta, qualityText)
+			return self:Text("OPTIONAL_REAGENTS_ROW", qualityText)
 		end
-		return self:Text("OPTIONAL_REAGENTS_ROW_DIFFICULTY", delta)
+		return self:Text("OPTIONAL_REAGENTS_ROW_DIFFICULTY")
 	end
 	if qualityText then
 		return self:Text("OPTIONAL_REAGENTS_TOOLTIP", delta, qualityText)
