@@ -930,7 +930,7 @@ function AF:UpdateCrafterScanProgressText()
 	local progress = professionEntry and professionEntry.scanProgress
 	if active and progress and progress.signature == active.signature then
 		local total = tonumber(progress.total) or 0
-		local completed = self:TableCount(progress.completed)
+		local completed = tonumber(progress.completedCount) or self:TableCount(progress.completed)
 		local percent = total > 0 and math.floor((completed / total) * 100) or 0
 		percent = math.max(0, math.min(100, percent))
 		scanProgressText:SetText(string.format("%d%%", percent))

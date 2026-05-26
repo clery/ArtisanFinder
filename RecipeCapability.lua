@@ -3,6 +3,7 @@ local _, AF = ...
 local MAX_REAGENT_COMBINATIONS = 72
 local MAX_OPTIONAL_REAGENT_TESTS_PER_SLOT = 8
 local MAX_OPTIONAL_REAGENT_COMBINATIONS = 96
+local HEAVY_JOB_QUALITY_TIER_THRESHOLD = 12
 local SCAN_SIGNATURE_VERSION = 32
 local SKILL_PROBE_SIGNATURE_VERSION = 1
 local FULL_SCAN_SIGNATURE_VERSION = 3
@@ -948,6 +949,37 @@ function AF:GetCurrentProfessionScanSignatureVersion()
 	return SCAN_SIGNATURE_VERSION
 end
 
+function AF:EstimateRecipeQualityTierCombinations(recipeID)
+	local recipeInfo = C_TradeSkillUI.GetRecipeInfo(recipeID)
+	local recipeLevel = recipeInfo and recipeInfo.unlockedRecipeLevel
+	local okSchematic, schematic = pcall(C_TradeSkillUI.GetRecipeSchematic, recipeID, false, recipeLevel)
+	if not okSchematic or type(schematic) ~= "table" or type(schematic.reagentSlotSchematics) ~= "table" then
+		return 0
+	end
+
+	local combinations = 1
+	for _, reagentSlotSchematic in ipairs(schematic.reagentSlotSchematics) do
+		if not reagentSlotSchematic.hiddenInCraftingForm and type(reagentSlotSchematic.reagents) == "table" and #reagentSlotSchematic.reagents > 0 then
+			local reagentType = reagentSlotSchematic.reagentType
+			local isBasic = Enum and Enum.CraftingReagentType and reagentType == Enum.CraftingReagentType.Basic
+			local isRequired = reagentSlotSchematic.required == true
+			if (isBasic or isRequired) and #reagentSlotSchematic.reagents > 1 then
+				local uniqueQualities = {}
+				for _, reagent in ipairs(reagentSlotSchematic.reagents) do
+					local quality = GetReagentQuality(reagent) or 0
+					uniqueQualities[quality] = true
+				end
+				local tierCount = 0
+				for _ in pairs(uniqueQualities) do
+					tierCount = tierCount + 1
+				end
+				combinations = combinations * math.max(1, tierCount)
+			end
+		end
+	end
+	return combinations
+end
+
 function AF:GetBestReagentCapability(recipeID, forcedReagents, normalOnly)
 	local recipeInfo = C_TradeSkillUI.GetRecipeInfo(recipeID)
 	local recipeLevel = recipeInfo and recipeInfo.unlockedRecipeLevel
@@ -995,16 +1027,6 @@ function AF:GetBestReagentCapability(recipeID, forcedReagents, normalOnly)
 		return { debugReason = visibleSlots == 0 and "no visible reagent slots" or "no required or finite reagent candidates" }
 	end
 
-	local combinations = 1
-	for _, candidate in ipairs(candidateSlots) do
-		local optionCount = math.max(1, #candidate.slot.reagents)
-		if candidate.optional then
-			optionCount = optionCount + 1
-		end
-		combinations = combinations * optionCount
-	end
-
-	local useGreedy = combinations > MAX_REAGENT_COMBINATIONS
 	local best
 	local function Evaluate(selectedReagents, truncated)
 		local allReagentInfo = {}
@@ -1061,43 +1083,48 @@ function AF:GetBestReagentCapability(recipeID, forcedReagents, normalOnly)
 		end
 	end
 
-	if useGreedy then
-		local function SelectReagents(isBetter)
-			local selected = {}
-			for slotIndex, candidate in ipairs(candidateSlots) do
-				local slot = candidate.slot
-				local bestReagent = candidate.optional and nil or slot.reagents[1]
-				for _, reagent in ipairs(slot.reagents) do
-					if isBetter(reagent, bestReagent) then
+	local slotQualityTiers = {}
+	for slotIndex, candidate in ipairs(candidateSlots) do
+		local tiers = {}
+		for _, reagent in ipairs(candidate.slot.reagents) do
+			local quality = GetReagentQuality(reagent) or 0
+			tiers[quality] = true
+		end
+		slotQualityTiers[slotIndex] = {}
+		for quality in pairs(tiers) do
+			table.insert(slotQualityTiers[slotIndex], quality)
+		end
+		table.sort(slotQualityTiers[slotIndex])
+	end
+
+	local selected = {}
+	local function VisitByQuality(slotIndex)
+		if slotIndex > #candidateSlots then
+			Evaluate(selected, false)
+			return
+		end
+		local candidate = candidateSlots[slotIndex]
+		if candidate.optional then
+			selected[slotIndex] = nil
+			VisitByQuality(slotIndex + 1)
+		end
+		for _, targetQuality in ipairs(slotQualityTiers[slotIndex]) do
+			local bestReagent = nil
+			for _, reagent in ipairs(candidate.slot.reagents) do
+				if (GetReagentQuality(reagent) or 0) == targetQuality then
+					if not bestReagent or IsHigherQualityReagent(reagent, bestReagent) then
 						bestReagent = reagent
 					end
 				end
+			end
+			if bestReagent then
 				selected[slotIndex] = bestReagent
+				VisitByQuality(slotIndex + 1)
 			end
-			return selected
 		end
-		Evaluate(SelectReagents(IsLowerQualityReagent), true)
-		Evaluate(SelectReagents(IsHigherQualityReagent), true)
-	else
-		local selected = {}
-		local function Visit(slotIndex)
-			if slotIndex > #candidateSlots then
-				Evaluate(selected, false)
-				return
-			end
-			local candidate = candidateSlots[slotIndex]
-			if candidate.optional then
-				selected[slotIndex] = nil
-				Visit(slotIndex + 1)
-			end
-			for _, reagent in ipairs(candidate.slot.reagents) do
-				selected[slotIndex] = reagent
-				Visit(slotIndex + 1)
-			end
-			selected[slotIndex] = nil
-		end
-		Visit(1)
+		selected[slotIndex] = nil
 	end
+	VisitByQuality(1)
 
 	if not best then
 		return {}

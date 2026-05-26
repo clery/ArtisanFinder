@@ -2,10 +2,21 @@ local _, AF = ...
 
 local SCAN_PROBE_JOB_DELAY = 0.05
 local SCAN_FULL_JOB_DELAY = 0.25
-local FAST_SCAN_PROBE_JOB_DELAY = 0
-local FAST_SCAN_FULL_JOB_DELAY = 0
+local FAST_SCAN_PROBE_JOB_DELAY = 0.01
+local FAST_SCAN_FULL_JOB_DELAY = 0.01
 local FAST_SCAN_PROBE_JOBS_PER_TICK = 25
 local FAST_SCAN_FULL_JOBS_PER_TICK = 4
+local FAST_SCAN_TICK_BUDGET_MS = 8
+local SLOW_SCAN_TICK_WARNING_MS = 1000
+local SCAN_GC_STEP_SIZE = 32
+local HEAVY_JOB_QUALITY_TIER_THRESHOLD = 12
+
+local function GetScanTimeMS()
+	if debugprofilestop then
+		return debugprofilestop()
+	end
+	return GetTime() * 1000
+end
 
 local function GetScanJobKey(recipeID, itemID)
 	return tostring(recipeID or 0) .. ":" .. tostring(itemID or 0)
@@ -306,6 +317,7 @@ function AF:BuildScanProgress(profession, professionEntry, signature, force, mod
 	if not force and previous and previous.signature == progressSignature and type(previous.completed) == "table" then
 		completed = previous.completed
 	end
+	local completedCount = self:TableCount(completed)
 
 	local profile = self.db.artisanProfile
 	local pending = {}
@@ -340,9 +352,11 @@ function AF:BuildScanProgress(profession, professionEntry, signature, force, mod
 		professionSignature = signature,
 		mode = mode,
 		pending = pending,
+		pendingTotal = #pending,
 		completed = completed,
-		total = #pending + self:TableCount(completed),
-		scanned = self:TableCount(completed),
+		completedCount = completedCount,
+		total = #pending + completedCount,
+		scanned = completedCount,
 		recommendationsUpdated = previous and previous.signature == progressSignature and tonumber(previous.recommendationsUpdated) or 0,
 		skillUpgrades = previous and previous.signature == progressSignature and tonumber(previous.skillUpgrades) or 0,
 		skillDowngradesSkipped = previous and previous.signature == progressSignature and tonumber(previous.skillDowngradesSkipped) or 0,
@@ -357,17 +371,30 @@ local function GetPendingIndex(progress)
 	return math.max(1, tonumber(progress and progress.pendingIndex) or 1)
 end
 
+local function GetPendingTotal(progress)
+	return tonumber(progress and progress.pendingTotal) or #(progress and progress.pending or {})
+end
+
 local function GetPendingCount(progress)
 	local pending = progress and progress.pending
 	if not pending then
 		return 0
 	end
-	return math.max(0, #pending - GetPendingIndex(progress) + 1)
+	return math.max(0, GetPendingTotal(progress) - GetPendingIndex(progress) + 1)
 end
 
 local function GetNextPendingJob(progress)
 	local pending = progress and progress.pending
 	return pending and pending[GetPendingIndex(progress)]
+end
+
+local function AppendPendingJob(progress, job)
+	if not progress or not progress.pending or not job then
+		return
+	end
+	local index = GetPendingTotal(progress) + 1
+	progress.pending[index] = job
+	progress.pendingTotal = index
 end
 
 function AF:IsLowerOrEqualEquipmentProbe(existing, probe)
@@ -426,21 +453,25 @@ function AF:ScanJob(profession, professionEntry, job)
 				profile.items[itemKey] = existing
 			end
 			if needsFull then
-				table.insert(professionEntry.scanProgress.pending, {
+				local qualityTierCombinations = self:EstimateRecipeQualityTierCombinations(job.recipeID)
+				AppendPendingJob(professionEntry.scanProgress, {
 					key = "full:" .. GetScanJobKey(job.recipeID, job.itemID),
 					kind = "full",
 					recipeID = job.recipeID,
 					itemID = job.itemID,
+					qualityTierCombinations = qualityTierCombinations,
 				})
 				professionEntry.scanProgress.total = professionEntry.scanProgress.total + 1
 				return true
 			end
 		else
-			table.insert(professionEntry.scanProgress.pending, {
+			local qualityTierCombinations = self:EstimateRecipeQualityTierCombinations(job.recipeID)
+			AppendPendingJob(professionEntry.scanProgress, {
 				key = "full:" .. GetScanJobKey(job.recipeID, job.itemID),
 				kind = "full",
 				recipeID = job.recipeID,
 				itemID = job.itemID,
+				qualityTierCombinations = qualityTierCombinations,
 			})
 			professionEntry.scanProgress.total = professionEntry.scanProgress.total + 1
 			return true
@@ -500,7 +531,7 @@ function AF:GetCurrentProfessionScanPercent(profession)
 		return 0
 	end
 
-	local completed = self:TableCount(progress.completed)
+	local completed = tonumber(progress.completedCount) or self:TableCount(progress.completed)
 	local percent = math.floor((completed / total) * 100)
 	if percent < 0 then
 		return 0
@@ -546,6 +577,9 @@ function AF:GetScanJobsPerTick(job)
 		return 1
 	end
 	if job and job.kind == "full" then
+		if job.qualityTierCombinations and job.qualityTierCombinations > HEAVY_JOB_QUALITY_TIER_THRESHOLD then
+			return 1
+		end
 		return FAST_SCAN_FULL_JOBS_PER_TICK
 	end
 	return FAST_SCAN_PROBE_JOBS_PER_TICK
@@ -629,22 +663,68 @@ function AF:ProcessScanQueue()
 		end
 
 		local jobsToProcess = AF:GetScanJobsPerTick(GetNextPendingJob(progress))
+		local tickStarted = GetScanTimeMS()
 		local profession = { id = active.professionID }
-		for _ = 1, jobsToProcess do
+		local processedCount = 0
+		local lastJob
+		local slowestJob
+		local slowestJobMS = 0
+		for processed = 1, jobsToProcess do
+			local pendingIndex = GetPendingIndex(progress)
 			local job = GetNextPendingJob(progress)
 			if not job then
 				break
 			end
-			progress.pendingIndex = GetPendingIndex(progress) + 1
+			local jobStarted = GetScanTimeMS()
 			local result = AF:ScanJob(profession, professionEntry, job)
+			local jobMS = GetScanTimeMS() - jobStarted
+			if jobMS > slowestJobMS then
+				slowestJobMS = jobMS
+				slowestJob = job
+			end
 			if result == false then
 				return
 			end
+			processedCount = processed
+			lastJob = job
+			progress.pendingIndex = pendingIndex + 1
+			progress.pending[pendingIndex] = nil
 			progress.completed[job.key] = true
+			progress.completedCount = (tonumber(progress.completedCount) or 0) + 1
 			if result ~= "skipped" then
 				progress.scanned = (tonumber(progress.scanned) or 0) + 1
 			end
 			progress.updatedAt = AF:Now()
+			if AF.db and AF.db.fastScan == true and processed > 0 and GetScanTimeMS() - tickStarted >= FAST_SCAN_TICK_BUDGET_MS then
+				break
+			end
+		end
+		if collectgarbage then
+			collectgarbage("step", SCAN_GC_STEP_SIZE)
+		end
+		local tickMS = GetScanTimeMS() - tickStarted
+		if tickMS >= SLOW_SCAN_TICK_WARNING_MS then
+			AF:DebugLog("scan", string.format(
+				"slow tick ms=%.1f processed=%d budget=%d fast=%s profession=%s mode=%s pending=%d/%d scanned=%d completed=%d total=%d last=%s:%s:%s slowest=%.1fms:%s:%s:%s",
+				tickMS,
+				processedCount,
+				jobsToProcess,
+				tostring(AF.db and AF.db.fastScan == true),
+				tostring(active.professionID),
+				tostring(progress.mode),
+				GetPendingCount(progress),
+				GetPendingTotal(progress),
+				tonumber(progress.scanned) or 0,
+				tonumber(progress.completedCount) or 0,
+				tonumber(progress.total) or 0,
+				tostring(lastJob and lastJob.kind or ""),
+				tostring(lastJob and lastJob.recipeID or ""),
+				tostring(lastJob and lastJob.itemID or ""),
+				slowestJobMS,
+				tostring(slowestJob and slowestJob.kind or ""),
+				tostring(slowestJob and slowestJob.recipeID or ""),
+				tostring(slowestJob and slowestJob.itemID or "")
+			))
 		end
 		AF:RefreshScanProgressUI()
 
