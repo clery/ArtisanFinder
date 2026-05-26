@@ -14,9 +14,5 @@ externals:
 ignore:
   - .githooks
   - README.md
-  - Images/CrafterView.png
-  - Images/CustomerView.png
-  - Images/CustomerViewPopup.png
-  - Images/Example.gif
-  - Images/Options1.png
-  - Images/Options2.png
+  - "Images/*.png"
+  - "Images/*.gif"

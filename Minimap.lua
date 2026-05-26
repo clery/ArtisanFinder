@@ -1,6 +1,6 @@
 local _, AF = ...
 
-local ICON = 7548932 -- inv-12-profession-blacksmithing-repairhammer-purple
+local ICON = "Interface\\Icons\\inv_12_profession_blacksmithing_repairhammer_purple"
 local ICON_COORDS = { 0, 1, 0, 1 }
 local OUTDATED_BADGE_TEXTURE = "Interface\\DialogFrame\\UI-Dialog-Icon-AlertNew"
 
