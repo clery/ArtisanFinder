@@ -1,9 +1,9 @@
 local _, AF = ...
 
 local ORDER_SOUND_FALLBACK = "CATALOG_SHOP_OPEN_LOADING_SCREEN" -- catalog_shop_open_loading_screen_1
-local TOAST_WIDTH = 360
-local TOAST_HEIGHT = 92
-local TOAST_SPACING = 8
+local TOAST_WIDTH = 340
+local TOAST_HEIGHT = 80
+local TOAST_SPACING = 6
 local TOAST_FADE_IN_SECONDS = 0.18
 local TOAST_HOLD_SECONDS = 4.4
 local TOAST_FADE_OUT_SECONDS = 0.7
@@ -27,6 +27,16 @@ end
 local function GetOrderSoundChannel()
 	local channel = AF.db and AF.db.orderNotificationChannel
 	return channel and channel ~= "" and channel ~= "default" and channel or nil
+end
+
+local function CanShowOrderNotification(self)
+	if self:IsInCombatLocked() then
+		return false
+	end
+	if self:IsInUnavailableActivity() then
+		return false
+	end
+	return true
 end
 
 local function CountPersonalOrders()
@@ -166,6 +176,9 @@ function AF:PlayOrderNotificationSound(force)
 	if not force and self.db and (self.db.orderNotificationsEnabled == false or self.db.orderNotificationSoundEnabled == false) then
 		return
 	end
+	-- if not force and not CanShowOrderNotification(self) then
+	-- 	return
+	-- end
 	local sound = GetOrderSound()
 	if sound then
 		PlaySound(sound, GetOrderSoundChannel())
@@ -176,6 +189,9 @@ function AF:ShowOrderNotification(characterName, count, details)
 	if self.db and (self.db.orderNotificationsEnabled == false or self.db.orderNotificationBannerEnabled == false) then
 		return
 	end
+	-- if not CanShowOrderNotification(self) then
+	-- 	return
+	-- end
 	self:ShowOrderNotificationToast(characterName, count, details)
 end
 
@@ -531,7 +547,7 @@ function AF:CreateOrderNotificationToast()
 		bgFile = "Interface\\Buttons\\WHITE8x8",
 		edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
 		edgeSize = 14,
-		insets = { left = 4, right = 4, top = 4, bottom = 4 },
+		insets = { left = 3, right = 3, top = 3, bottom = 3 },
 	})
 	frame:SetBackdropColor(0.02, 0.018, 0.014, 0.92)
 	frame:SetBackdropBorderColor(0.86, 0.72, 0.34, 0.95)
@@ -539,7 +555,7 @@ function AF:CreateOrderNotificationToast()
 
 	frame.Icon = frame:CreateTexture(nil, "ARTWORK")
 	frame.Icon:SetSize(48, 48)
-	frame.Icon:SetPoint("LEFT", 18, 0)
+	frame.Icon:SetPoint("LEFT", 14, 0)
 	frame.Icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
 
 	frame.IconBorder = frame:CreateTexture(nil, "OVERLAY")
@@ -549,27 +565,27 @@ function AF:CreateOrderNotificationToast()
 	frame.IconBorder:Hide()
 
 	frame.Title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-	frame.Title:SetPoint("TOPLEFT", frame.Icon, "TOPRIGHT", 12, 7)
-	frame.Title:SetPoint("RIGHT", frame, "RIGHT", -18, 0)
+	frame.Title:SetPoint("TOPLEFT", frame, "TOPLEFT", 72, -10)
+	frame.Title:SetPoint("RIGHT", frame, "RIGHT", -14, 0)
 	frame.Title:SetJustifyH("LEFT")
 	frame.Title:SetWordWrap(false)
 
 	frame.ItemName = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalMed3")
-	frame.ItemName:SetPoint("TOPLEFT", frame.Title, "BOTTOMLEFT", 0, -3)
-	frame.ItemName:SetPoint("RIGHT", frame, "RIGHT", -18, 0)
+	frame.ItemName:SetPoint("TOPLEFT", frame.Title, "BOTTOMLEFT", 0, -2)
+	frame.ItemName:SetPoint("RIGHT", frame, "RIGHT", -14, 0)
 	frame.ItemName:SetJustifyH("LEFT")
 	frame.ItemName:SetWordWrap(false)
 
 	frame.Meta = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	frame.Meta:SetPoint("TOPLEFT", frame.ItemName, "BOTTOMLEFT", 0, -3)
-	frame.Meta:SetPoint("RIGHT", frame, "RIGHT", -18, 0)
+	frame.Meta:SetPoint("TOPLEFT", frame.ItemName, "BOTTOMLEFT", 0, -1)
+	frame.Meta:SetPoint("RIGHT", frame, "RIGHT", -14, 0)
 	frame.Meta:SetJustifyH("LEFT")
 	frame.Meta:SetTextColor(0.82, 0.82, 0.82)
 	frame.Meta:SetWordWrap(false)
 
 	frame.Commission = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	frame.Commission:SetPoint("TOPLEFT", frame.Meta, "BOTTOMLEFT", 0, -2)
-	frame.Commission:SetPoint("RIGHT", frame, "RIGHT", -18, 0)
+	frame.Commission:SetPoint("TOPLEFT", frame.Meta, "BOTTOMLEFT", 0, -1)
+	frame.Commission:SetPoint("RIGHT", frame, "RIGHT", -14, 0)
 	frame.Commission:SetJustifyH("LEFT")
 	frame.Commission:SetTextColor(1, 0.82, 0)
 	frame.Commission:SetWordWrap(false)
@@ -683,6 +699,8 @@ function AF:RefreshOrderNotificationToasts()
 	end
 	local anchor = self:GetOrderNotificationAnchor()
 	local scale = self:GetOrderNotificationScale()
+	anchor:SetScale(scale)
+	anchor:SetSize(TOAST_WIDTH, TOAST_HEIGHT)
 	local growUp = self:GetOrderNotificationGrowDirection() == "UP"
 	local offsetStep = (TOAST_HEIGHT + TOAST_SPACING) * scale
 	for index, toast in ipairs(activeToasts) do

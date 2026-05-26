@@ -391,6 +391,7 @@ function AF:FormatOptionalReagentImpact(entry, compact)
 end
 
 local TOOLTIP_COMMENT_COLOR = { 0.65, 0.65, 0.65 }
+local TOOLTIP_OPTIONAL_COMMENT_COLOR = { 1, 1, 1 }
 local TOOLTIP_PROFESSION_COLOR = { 0.35, 1, 0.35 }
 local TOOLTIP_SECTION_COLOR = { 1, 0.82, 0 }
 
@@ -419,6 +420,10 @@ local function GetTooltipItemQualityColor(itemID)
 	return 1, 1, 1
 end
 
+local function GetTooltipColorCode(r, g, b)
+	return string.format("|cff%02x%02x%02x", math.floor((r or 1) * 255 + 0.5), math.floor((g or 1) * 255 + 0.5), math.floor((b or 1) * 255 + 0.5))
+end
+
 local function AddItemTooltipLine(AF, tooltip, itemID, text, fallbackR, fallbackG, fallbackB)
 	local r, g, b = GetTooltipItemQualityColor(itemID)
 	if not C_Item.GetItemInfo(itemID) then
@@ -438,15 +443,15 @@ function AF:AddCapabilityTooltipLines(tooltip, entry)
 		tooltip:AddLine(" ")
 		AddTooltipLine(tooltip, self:Text("OPTIONAL_REAGENTS"), TOOLTIP_SECTION_COLOR)
 		AddTooltipLine(tooltip, optionalText, TOOLTIP_COMMENT_COLOR, true)
-		if entry.optionalReagents and self:AddReagentLines(tooltip, entry.optionalReagents, TOOLTIP_COMMENT_COLOR[1], TOOLTIP_COMMENT_COLOR[2], TOOLTIP_COMMENT_COLOR[3], { slotLabels = true, compactQualityLabels = true }) then
+		if entry.optionalReagents and self:AddReagentLines(tooltip, entry.optionalReagents, TOOLTIP_OPTIONAL_COMMENT_COLOR[1], TOOLTIP_OPTIONAL_COMMENT_COLOR[2], TOOLTIP_OPTIONAL_COMMENT_COLOR[3], { slotLabels = true, compactQualityLabels = true }) then
 			-- Reagent lines added above.
 		elseif tonumber(entry.optionalSlotCount) and tonumber(entry.optionalSlotCount) > 0 then
-			AddTooltipLine(tooltip, self:Text("OPTIONAL_REAGENTS_SLOT_COUNT", entry.optionalSlotCount), TOOLTIP_COMMENT_COLOR, true)
+			AddTooltipLine(tooltip, self:Text("OPTIONAL_REAGENTS_SLOT_COUNT", entry.optionalSlotCount), TOOLTIP_OPTIONAL_COMMENT_COLOR, true)
 		end
 		if entry.optionalBestReagents and self:HasDisplayableReagentLines(entry.optionalBestReagents, { hideNoQuality = true }) then
 			tooltip:AddLine(" ")
 			AddTooltipLine(tooltip, self:Text("OPTIONAL_REAGENTS_SUGGESTED_REAGENTS"), TOOLTIP_SECTION_COLOR)
-			self:AddReagentLines(tooltip, entry.optionalBestReagents, TOOLTIP_COMMENT_COLOR[1], TOOLTIP_COMMENT_COLOR[2], TOOLTIP_COMMENT_COLOR[3], { slotLabels = true, compactQualityLabels = true, hideNoQuality = true })
+			self:AddReagentLines(tooltip, entry.optionalBestReagents, TOOLTIP_OPTIONAL_COMMENT_COLOR[1], TOOLTIP_OPTIONAL_COMMENT_COLOR[2], TOOLTIP_OPTIONAL_COMMENT_COLOR[3], { slotLabels = true, compactQualityLabels = true, hideNoQuality = true })
 		end
 	end
 
@@ -568,19 +573,33 @@ function AF:AddReagentLines(tooltip, reagents, r, g, b, options)
 				if itemID then
 					local quality, qualityAtlas = GetReagentDisplayQualityInfo(itemID, reagent)
 					local qualityText = self:GetQualityIconMarkup(quality, qualityAtlas, 16) or ""
-					if options.compactQualityLabels and slotText ~= "" and qualityText ~= "" then
+					local itemName = self:GetItemName(itemID)
+					if options.showItemNames and itemName and itemName ~= "" then
+						local itemIcon = self:GetItemIconMarkup(itemID, 16) or ""
+						local rarityColorCode = GetTooltipColorCode(GetTooltipItemQualityColor(itemID))
+						local lineText = ""
+						if slotText ~= "" then
+							lineText = "|cffffffff" .. slotText .. "|r"
+						end
+						if itemIcon ~= "" then
+							lineText = lineText .. (lineText ~= "" and " " or "") .. itemIcon .. " "
+						end
+						lineText = lineText .. rarityColorCode .. itemName .. " x" .. quantity .. "|r"
+						if qualityText ~= "" then
+							lineText = lineText .. " " .. qualityText
+						end
+						tooltip:AddLine(lineText, 1, 1, 1, true)
+						added = true
+					elseif options.compactQualityLabels and slotText ~= "" and qualityText ~= "" then
 						tooltip:AddLine(slotText .. qualityText, r or TOOLTIP_COMMENT_COLOR[1], g or TOOLTIP_COMMENT_COLOR[2], b or TOOLTIP_COMMENT_COLOR[3], true)
 						added = true
+					elseif itemName and itemName ~= "" then
+						local itemIcon = self:GetItemIconMarkup(itemID, 16) or ""
+						AddItemTooltipLine(self, tooltip, itemID, string.format("%s%s x%d%s", itemIcon ~= "" and (itemIcon .. " ") or "", itemName, quantity, qualityText ~= "" and (" " .. qualityText) or ""), r or 1, g or 1, b or 1)
+						added = true
 					else
-						local itemName = self:GetItemName(itemID)
-						if itemName and itemName ~= "" then
-							local itemIcon = self:GetItemIconMarkup(itemID, 16) or ""
-							AddItemTooltipLine(self, tooltip, itemID, string.format("%s%s x%d%s", itemIcon ~= "" and (itemIcon .. " ") or "", itemName, quantity, qualityText ~= "" and (" " .. qualityText) or ""), r or 1, g or 1, b or 1)
-							added = true
-						else
-							requestedItemData = true
-							table.insert(missing, tostring(itemID))
-						end
+						requestedItemData = true
+						table.insert(missing, tostring(itemID))
 					end
 				end
 			end
@@ -655,15 +674,10 @@ function AF:StyleCustomerTooltip(tooltip)
 		return
 	end
 	local name = tooltip:GetName()
-	for i = 1, tooltip:NumLines() do
-		local left = _G[name .. "TextLeft" .. i]
-		local right = _G[name .. "TextRight" .. i]
-		if left and left.SetFontObject then
-			left:SetFontObject(i == 1 and GameFontNormalLarge or GameFontHighlight)
-		end
-		if right and right.SetFontObject then
-			right:SetFontObject(GameFontHighlight)
-		end
+	local left = _G[name .. "TextLeft1"]
+	if left and left.SetFontObject then
+		left:SetFontObject(GameFontNormalLarge)
+		left:SetTextColor(1, 0.82, 0)
 	end
 end
 
