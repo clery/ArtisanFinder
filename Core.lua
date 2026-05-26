@@ -125,6 +125,9 @@ function AF:SetAvailabilityMode(mode, silent)
 	if self.RefreshMinimap then
 		self:RefreshMinimap()
 	end
+	if self.RefreshCustomerResults then
+		self:RefreshCustomerResults()
+	end
 	if oldMode ~= mode then
 		self:DebugLog("state", string.format("availabilityMode=%s silent=%s", tostring(mode), tostring(silent == true)))
 	end

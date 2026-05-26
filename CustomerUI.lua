@@ -1133,7 +1133,9 @@ function AF:ShowCustomerMenu(entry, owner)
 		menu.link:Disable()
 		self:SetProfessionButtonTooltip(self:Text("PROFESSION_LINK_UNAVAILABLE_TOOLTIP"))
 	end
-	if not entry.tutorialFake then
+	if entry.ownSelf then
+		menu.personal:Disable()
+	elseif not entry.tutorialFake then
 		menu.personal:Enable()
 	end
 	menu:ClearAllPoints()

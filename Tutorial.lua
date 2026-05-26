@@ -413,18 +413,23 @@ end
 
 function AF:BuildCrafterHelpPlateInfo()
 	local defaults = self.crafterDefaultsFrame
-	if not defaults then
+	local frame = self.crafterFrame
+	local parent = UIParent
+	if not defaults or not parent then
 		return nil
 	end
 	local info = {
 		FramePos = { x = 0, y = 0 },
-		FrameSize = { width = defaults:GetWidth() or 356, height = defaults:GetHeight() or 276 },
+		FrameSize = { width = parent:GetWidth() or 700, height = parent:GetHeight() or 568 },
 	}
-	local leftX = select(1, GetFrameRectRelativeTo(defaults.defaultsHeader, defaults)) or 0
+	local leftX = select(1, GetFrameRectRelativeTo(defaults.defaultsHeader, parent)) or 0
 	leftX = math.max(0, leftX - HELP_PLATE_HIGHLIGHT_PADDING)
-	AddHelpPlateTile(info, defaults, self:Text("TUTORIAL_CRAFTER_DEFAULTS"), { leftX = leftX }, defaults.defaultsHeader, defaults.priceField, defaults.noteField, defaults.save)
-	AddHelpPlateTile(info, defaults, self:Text("TUTORIAL_CRAFTER_SCAN"), { leftX = leftX }, defaults.scanHeader, defaults.fastScanButton, defaults.forceRescanButton)
-	AddHelpPlateTile(info, defaults, self:Text("TUTORIAL_CRAFTER_ADVERTISE"), { leftX = leftX }, defaults.advertisingHeader, defaults.advertiseCheck, defaults.advertiseCheck.Text)
+	if frame and frame.customerPreview and frame.customerPreview:IsShown() then
+		AddHelpPlateTile(info, parent, self:Text("TUTORIAL_CRAFTER_PREVIEW"), nil, frame.customerPreview)
+	end
+	AddHelpPlateTile(info, parent, self:Text("TUTORIAL_CRAFTER_DEFAULTS"), { leftX = leftX }, defaults.defaultsHeader, defaults.priceField, defaults.noteField, defaults.save)
+	AddHelpPlateTile(info, parent, self:Text("TUTORIAL_CRAFTER_SCAN"), { leftX = leftX }, defaults.scanHeader, defaults.fastScanButton, defaults.forceRescanButton)
+	AddHelpPlateTile(info, parent, self:Text("TUTORIAL_CRAFTER_ADVERTISE"), { leftX = leftX }, defaults.advertisingHeader, defaults.advertiseCheck, defaults.advertiseCheck.Text)
 	return #info > 0 and info or nil
 end
 
@@ -453,7 +458,7 @@ function AF:ShowCrafterTutorial(initial)
 	self.crafterTutorialShowing = true
 	self.activeTutorialHelpPlateInfo = info
 	self.activeTutorialKind = "crafter"
-	HelpPlate.Show(info, self.crafterDefaultsFrame, self.crafterTutorialButton)
+	HelpPlate.Show(info, UIParent, self.crafterTutorialButton)
 	MakeHelpPlateClickThrough(info)
 	WatchHelpPlateClosed(info, function()
 		AF.crafterTutorialShowing = nil

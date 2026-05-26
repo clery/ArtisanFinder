@@ -216,7 +216,7 @@ function AF:BuildCustomerRowViewModel(entry)
 		detail = self:FormatMoney(entry.priceCopper, entry.freeCommission)
 		capability = self:FormatCapability(entry)
 		if entry.ownAlt then
-			capability = "|cff33ff99" .. self:Text("YOUR_ALT") .. "|r" .. (capability ~= "" and ("\n" .. capability) or "")
+			capability = "|cff33ff99" .. self:Text(entry.ownSelf and "YOUR_CHARACTER" or "YOUR_ALT") .. "|r" .. (capability ~= "" and ("\n" .. capability) or "")
 		end
 		if entry.guildMember then
 			capability = "|cff33ff99" .. self:Text("GUILD_MEMBER") .. "|r" .. (capability ~= "" and ("\n" .. capability) or "")

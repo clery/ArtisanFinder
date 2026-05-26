@@ -524,6 +524,9 @@ function ApplyDBDefaults(db)
 	if db.defaultSort == nil then
 		db.defaultSort = "best"
 	end
+	if db.showOwnCharacterRows == nil then
+		db.showOwnCharacterRows = false
+	end
 	if db.cacheCleanupDays == nil then
 		db.cacheCleanupDays = 7
 	end

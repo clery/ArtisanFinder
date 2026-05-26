@@ -196,7 +196,14 @@ function AF:GetOwnAltRows(itemID, professionID, filterText, seenNames, recipeID)
 
 	self:ForEachArtisanProfile(function(characterName, profile)
 		characterName = self:NormalizeName(characterName)
-		if not characterName or characterName == currentName then
+		if not characterName then
+			return
+		end
+		local isCurrentCharacter = characterName == currentName
+		if isCurrentCharacter and not (self.db and self.db.showOwnCharacterRows == true) then
+			return
+		end
+		if isCurrentCharacter and not self:IsAvailable() then
 			return
 		end
 		local item = profile.items and profile.items[itemKey]
@@ -268,6 +275,7 @@ function AF:GetOwnAltRows(itemID, professionID, filterText, seenNames, recipeID)
 			certified = true,
 			tradeLead = false,
 			ownAlt = true,
+			ownSelf = isCurrentCharacter,
 		}
 		if EntryMatchesCustomerFilter(self, entry, filterText) then
 			local seenKey = GetSeenKey(self, entry)

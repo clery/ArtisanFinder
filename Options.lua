@@ -384,6 +384,23 @@ function AF:InitializeOptions()
 	)
 	Settings.CreateDropdown(category, defaultSort, CreateSortOptions, self:Text("OPTIONS_DEFAULT_SORT_DESC"))
 
+	local showOwnCharacterRows = RegisterProxySetting(
+		"ArtisanFinder_ShowOwnCharacterRows",
+		Settings.VarType.Boolean,
+		"OPTIONS_SHOW_OWN_CHARACTER_ROWS",
+		true,
+		function()
+			return AF.db.showOwnCharacterRows == true
+		end,
+		function(value)
+			AF.db.showOwnCharacterRows = value == true
+			if AF.RefreshCustomerResults then
+				AF:RefreshCustomerResults()
+			end
+		end
+	)
+	Settings.CreateCheckbox(category, showOwnCharacterRows, self:Text("OPTIONS_SHOW_OWN_CHARACTER_ROWS_DESC"))
+
 	AddSection("OPTIONS_SECTION_CACHE")
 	local cleanupFrequency = RegisterProxySetting(
 		"ArtisanFinder_CacheCleanupDays",
