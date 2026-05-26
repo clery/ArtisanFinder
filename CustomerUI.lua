@@ -456,21 +456,9 @@ local function ConfigureCustomerRow(row)
 				GameTooltip:Show()
 				return
 			end
-			GameTooltip:SetText(AF:GetDisplayPlayerName(buttonFrame.entry.name or "?"), 1, 0.82, 0)
-			local professionName = buttonFrame.entry.professionID and AF:GetProfessionName(buttonFrame.entry.professionID) or buttonFrame.entry.professionName
-			if professionName then
-				GameTooltip:AddLine(professionName, 1, 1, 1)
-			end
-			if buttonFrame.entry.guildMember then
-				GameTooltip:AddLine(AF:Text("GUILD_MEMBER_TOOLTIP"), 0.35, 1, 0.35, true)
-			else
-				GameTooltip:AddLine(buttonFrame.entry.tradeLead and AF:Text("MISSING_ADDON_DATA") or AF:Text("CERTIFIED_ADDON_DATA"), buttonFrame.entry.tradeLead and 0.75 or 0.35, buttonFrame.entry.tradeLead and 0.75 or 1, buttonFrame.entry.tradeLead and 0.75 or 0.35, true)
-			end
-			if not buttonFrame.entry.tradeLead then
-				AF:RequestReagentDetail(buttonFrame.entry)
-				AF:AddCapabilityTooltipLines(GameTooltip, buttonFrame.entry)
-			end
+			AF:AddCustomerEntryTooltipLines(GameTooltip, buttonFrame.entry, { requestReagentDetails = true })
 			AF:StyleCustomerTooltip(GameTooltip)
+			AF:FitTooltipWidthToContent(GameTooltip)
 			GameTooltip:Show()
 			buttonFrame:SetScript("OnUpdate", UpdateCustomerTextTooltip)
 		end

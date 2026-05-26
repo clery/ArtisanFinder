@@ -320,22 +320,32 @@ function AF:GetAdvertisedItemMatches(itemID, professionID, requesterName, channe
 	local matches = {}
 	local currentOnly = self:IsCurrentCharacterOnlyAvailable()
 	local playerName = self:NormalizeName(self.playerName or self:GetPlayerFullName())
-	self:ForEachArtisanProfile(function(characterName, profile)
-		if currentOnly and self:NormalizeName(characterName) ~= playerName then
-			return
+	local function addMatches(onlyCurrentCharacter)
+		self:ForEachArtisanProfile(function(characterName, profile)
+			if onlyCurrentCharacter and self:NormalizeName(characterName) ~= playerName then
+				return
+			end
+			local item = profile.items and profile.items[tostring(itemID)]
+			if CanRespondForCrafter(self, characterName, requesterName, channel)
+				and ItemMatchesQuery(item, itemID, professionID)
+				and self:IsProfessionAdvertised(characterName, item.professionID)
+			then
+				table.insert(matches, {
+					characterName = characterName,
+					profile = profile,
+					item = item,
+				})
+			end
+		end)
+	end
+
+	addMatches(currentOnly)
+	if #matches == 0 and currentOnly then
+		local currentProfile = self.db and self.db.artisanCharacters and self.db.artisanCharacters[playerName]
+		if not (currentProfile and currentProfile.items and next(currentProfile.items)) then
+			addMatches(false)
 		end
-		local item = profile.items and profile.items[tostring(itemID)]
-		if CanRespondForCrafter(self, characterName, requesterName, channel)
-			and ItemMatchesQuery(item, itemID, professionID)
-			and self:IsProfessionAdvertised(characterName, item.professionID)
-		then
-			table.insert(matches, {
-				characterName = characterName,
-				profile = profile,
-				item = item,
-			})
-		end
-	end)
+	end
 	return matches
 end
 
@@ -425,6 +435,8 @@ function AF:HandleQuery(parts, sender, channel)
 				channel == "GUILD" and self:EncodeField(requesterName, 48) or "",
 				encodedReagents,
 				UnitIsAFK and UnitIsAFK("player") and 1 or 0,
+				tonumber(item.bestOutputItemLevel) or "",
+				tonumber(item.optionalOutputItemLevel) or "",
 			}
 			local payload = table.concat(payloadParts, "|")
 			if #payload > 255 then
@@ -489,7 +501,8 @@ function AF:SendReagentDetail(item, target, queryToken, crafterName)
 		return false
 	end
 
-	local detailText = "R3:" .. details
+	local optionalDetails = self:EncodeReagentEntries(item and item.optionalBestReagents)
+	local detailText = optionalDetails and optionalDetails ~= "" and ("R4:" .. details .. "\nO4:" .. optionalDetails) or ("R3:" .. details)
 	local encodedSummary = self:EncodeReagentSummary(detailText, 1050)
 	local chunks = {}
 	local maxChunkBytes = 150
@@ -617,6 +630,8 @@ function AF:HandleResponse(parts, sender)
 	local responseSupportsReagentDetails = parts[31] ~= nil
 	local responseReagents = self:DecodeReagentEntries(self:DecodeField(parts[31]))
 	local afk = tonumber(parts[32]) == 1
+	local bestOutputItemLevel = tonumber(parts[33])
+	local optionalOutputItemLevel = tonumber(parts[34])
 	local cacheKey = crafterName
 
 	if not itemID then
@@ -638,6 +653,7 @@ function AF:HandleResponse(parts, sender)
 	local previous = self.db.customerCache[itemKey][cacheKey]
 	local previousRecipeID = tonumber(previous and previous.recipeID) or 0
 	local savedReagents = responseReagents or (previousRecipeID == recipeID and previous and previous.bestReagents) or nil
+	local savedOptionalBestReagents = previousRecipeID == recipeID and previous and previous.optionalBestReagents or nil
 	hasReagentSummary = hasReagentSummary and (responseSupportsReagentDetails or savedReagents ~= nil)
 	if professionLink ~= "" then
 		self:RememberProfessionLink(crafterName, professionID, professionLink)
@@ -670,14 +686,19 @@ function AF:HandleResponse(parts, sender)
 		bestConcentrationQuality = bestConcentrationQuality,
 		bestTotalSkill = bestTotalSkill,
 		bestConcentrationCost = bestConcentrationCost,
+		bestOutputItemLevel = bestOutputItemLevel,
 		bestReagentTruncated = bestReagentTruncated,
 		bestReagents = savedReagents,
 		bestReagentSummaryUpdatedAt = previousRecipeID == recipeID and previous and previous.bestReagentSummaryUpdatedAt or nil,
 		hasReagentSummary = hasReagentSummary,
 		optionalDifficultyDelta = optionalDifficultyDelta,
 		optionalQuality = optionalQuality,
+		optionalOutputItemLevel = optionalOutputItemLevel,
 		optionalConcentrationQuality = optionalConcentrationQuality,
 		optionalSlotCount = optionalSlotCount,
+		optionalBestReagents = savedOptionalBestReagents,
+		optionalBestReagentSummaryUpdatedAt = previousRecipeID == recipeID and previous and previous.optionalBestReagentSummaryUpdatedAt or nil,
+		optionalBestReagentTruncated = previousRecipeID == recipeID and previous and previous.optionalBestReagentTruncated or nil,
 		professionLink = professionLink ~= "" and professionLink or nil,
 		updatedAt = timestamp,
 		verifiedAt = verifiedForCurrentQuery and self:Now() or nil,
@@ -788,6 +809,8 @@ function AF:ApplyPendingReagentDetail(sender, itemID, recipeID, queryToken, craf
 		end
 		entry.bestReagents = pending.reagents or entry.bestReagents
 		entry.bestReagentSummaryUpdatedAt = self:Now()
+		entry.optionalBestReagents = pending.optionalBestReagents or entry.optionalBestReagents
+		entry.optionalBestReagentSummaryUpdatedAt = pending.optionalBestReagents and self:Now() or entry.optionalBestReagentSummaryUpdatedAt
 		entry.reagentDetailRequested = nil
 		self.pendingReagentDetails[key] = nil
 	end
@@ -826,7 +849,15 @@ function AF:HandleReagentDetail(parts, sender)
 	if pending.received == pending.total then
 		local combined = table.concat(pending.chunks, "")
 		local decoded = self:DecodeField(combined)
-		if decoded:sub(1, 3) == "R3:" then
+		if decoded:sub(1, 3) == "R4:" then
+			local body = decoded:sub(4)
+			local reagentText, optionalText = body:match("^(.-)%s*;%s*O4:(.*)$")
+			if not reagentText then
+				reagentText, optionalText = body:match("^(.-)\nO4:(.*)$")
+			end
+			pending.reagents = self:DecodeReagentEntries(reagentText or body)
+			pending.optionalBestReagents = optionalText and self:DecodeReagentEntries(optionalText) or nil
+		elseif decoded:sub(1, 3) == "R3:" then
 			pending.reagents = self:DecodeReagentEntries(decoded:sub(4))
 		elseif decoded:sub(1, 3) == "R2:" then
 			pending.reagents = self:DecodeReagentEntries(decoded:sub(4))

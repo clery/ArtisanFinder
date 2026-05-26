@@ -22,7 +22,11 @@ local ORDER_SOUND_OPTIONS = {
 	{ key = "UI_IG_STORE_WINDOW_OPEN_BUTTON", labelKey = "OPTIONS_ORDER_SOUND_STORE_OPEN" },
 	{ key = "UI_BNET_TOAST", labelKey = "OPTIONS_ORDER_SOUND_BNET_TOAST" },
 	{ key = "UI_PROFESSIONS_NEW_RECIPE_LEARNED_TOAST", labelKey = "OPTIONS_ORDER_SOUND_PROFESSION_TOAST" },
-	{ key = "READY_CHECK", labelKey = "OPTIONS_ORDER_SOUND_READY_CHECK" },
+	{ key = "UI_EVENT_SCHEDULER_CHIME", labelKey = "OPTIONS_ORDER_SOUND_EVENT_SCHEDULER_CHIME" },
+	{ key = "UI_GARRISON_START_WORK_ORDER", labelKey = "OPTIONS_ORDER_SOUND_GARRISON_WORK_ORDER" },
+	{ key = "IG_BACKPACK_COIN_SELECT", labelKey = "OPTIONS_ORDER_SOUND_BACKPACK_COIN" },
+	{ key = "SOULBINDS_ACTIVATE_SOULBIND", labelKey = "OPTIONS_ORDER_SOUND_SOULBIND" },
+	{ key = "GM_CHAT_WARNING", labelKey = "OPTIONS_ORDER_SOUND_GM_CHAT_WARNING" },
 	{ key = "AUCTION_WINDOW_OPEN", labelKey = "OPTIONS_ORDER_SOUND_AUCTION" },
 }
 
@@ -276,6 +280,36 @@ function AF:InitializeOptions()
 	Settings.CreateCheckbox(category, freezeTradeLeadRows, self:Text("OPTIONS_FREEZE_TRADE_LEAD_ROWS_DESC"))
 
 	AddSection("OPTIONS_SECTION_SOUND")
+	local orderNotificationSoundEnabled = RegisterProxySetting(
+		"ArtisanFinder_OrderNotificationSoundEnabled",
+		Settings.VarType.Boolean,
+		"OPTIONS_ORDER_NOTIFICATION_SOUND_ENABLED",
+		true,
+		function()
+			return AF.db.orderNotificationsEnabled ~= false and AF.db.orderNotificationSoundEnabled ~= false
+		end,
+		function(value)
+			AF.db.orderNotificationsEnabled = nil
+			AF.db.orderNotificationSoundEnabled = value ~= false
+		end
+	)
+	Settings.CreateCheckbox(category, orderNotificationSoundEnabled, self:Text("OPTIONS_ORDER_NOTIFICATION_SOUND_ENABLED_DESC"))
+
+	local orderNotificationBannerEnabled = RegisterProxySetting(
+		"ArtisanFinder_OrderNotificationBannerEnabled",
+		Settings.VarType.Boolean,
+		"OPTIONS_ORDER_NOTIFICATION_BANNER_ENABLED",
+		true,
+		function()
+			return AF.db.orderNotificationsEnabled ~= false and AF.db.orderNotificationBannerEnabled ~= false
+		end,
+		function(value)
+			AF.db.orderNotificationsEnabled = nil
+			AF.db.orderNotificationBannerEnabled = value ~= false
+		end
+	)
+	Settings.CreateCheckbox(category, orderNotificationBannerEnabled, self:Text("OPTIONS_ORDER_NOTIFICATION_BANNER_ENABLED_DESC"))
+
 	local orderSound = RegisterProxySetting(
 		"ArtisanFinder_OrderNotificationSound",
 		Settings.VarType.String,
@@ -287,7 +321,7 @@ function AF:InitializeOptions()
 		function(value)
 			AF.db.orderNotificationSound = value or "CATALOG_SHOP_OPEN_LOADING_SCREEN"
 			if AF.PlayOrderNotificationSound then
-				AF:PlayOrderNotificationSound()
+				AF:PlayOrderNotificationSound(true)
 			end
 		end
 	)
@@ -316,7 +350,7 @@ function AF:InitializeOptions()
 		self:Text("OPTIONS_PLAY_ORDER_SOUND"),
 		function()
 			if AF.PlayOrderNotificationSound then
-				AF:PlayOrderNotificationSound()
+				AF:PlayOrderNotificationSound(true)
 			end
 		end,
 		self:Text("OPTIONS_PLAY_ORDER_SOUND_DESC"),

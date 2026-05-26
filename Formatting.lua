@@ -350,7 +350,8 @@ function AF:FormatCapability(entry)
 	end
 
 	if bestQuality and bestQuality > 0 then
-		table.insert(parts, self:Text("RECOMMENDED_REAGENTS_QUALITY", self:GetQualityIconMarkup(bestQuality, entry.bestQualityAtlas, 16) or ("Q" .. bestQuality)))
+		local qualityText = self:GetQualityIconMarkup(bestQuality, entry.bestQualityAtlas, 16) or ("Q" .. bestQuality)
+		table.insert(parts, self:Text("RECOMMENDED_REAGENTS_QUALITY", qualityText))
 	end
 
 	local optionalText = self:FormatOptionalReagentImpact(entry, true)
@@ -376,27 +377,54 @@ function AF:FormatOptionalReagentImpact(entry, compact)
 		return ""
 	end
 	local quality = tonumber(entry.optionalQuality)
-	local concentrationQuality = tonumber(entry.optionalConcentrationQuality)
 	local qualityText = quality and quality > 0 and (self:GetQualityIconMarkup(quality, entry.optionalQualityAtlas, 16) or ("Q" .. quality)) or nil
-	local concentrationText = concentrationQuality and concentrationQuality > (quality or 0)
-		and (self:GetQualityIconMarkup(concentrationQuality, entry.optionalConcentrationQualityAtlas, 16) or ("Q" .. concentrationQuality))
-		or nil
 	if compact then
-		if concentrationText then
-			return self:Text("OPTIONAL_REAGENTS_ROW_CONCENTRATION", delta, qualityText or "?", concentrationText)
-		end
 		if qualityText then
 			return self:Text("OPTIONAL_REAGENTS_ROW", delta, qualityText)
 		end
 		return self:Text("OPTIONAL_REAGENTS_ROW_DIFFICULTY", delta)
 	end
-	if concentrationText then
-		return self:Text("OPTIONAL_REAGENTS_TOOLTIP_CONCENTRATION", delta, qualityText or "?", concentrationText)
-	end
 	if qualityText then
 		return self:Text("OPTIONAL_REAGENTS_TOOLTIP", delta, qualityText)
 	end
 	return self:Text("OPTIONAL_REAGENTS_TOOLTIP_DIFFICULTY", delta)
+end
+
+local TOOLTIP_COMMENT_COLOR = { 0.65, 0.65, 0.65 }
+local TOOLTIP_PROFESSION_COLOR = { 0.35, 1, 0.35 }
+local TOOLTIP_SECTION_COLOR = { 1, 0.82, 0 }
+
+local function AddTooltipLine(tooltip, text, color, wrap)
+	color = color or TOOLTIP_COMMENT_COLOR
+	tooltip:AddLine(text, color[1], color[2], color[3], wrap)
+end
+
+local function GetTooltipItemQualityColor(itemID)
+	itemID = tonumber(itemID)
+	if not itemID then
+		return 1, 1, 1
+	end
+	local _, _, quality = C_Item.GetItemInfo(itemID)
+	quality = tonumber(quality)
+	if quality and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[quality] then
+		local color = ITEM_QUALITY_COLORS[quality]
+		return color.r or 1, color.g or 1, color.b or 1
+	end
+	if quality and _G.GetItemQualityColor then
+		local r, g, b = _G.GetItemQualityColor(quality)
+		if r then
+			return r, g, b
+		end
+	end
+	return 1, 1, 1
+end
+
+local function AddItemTooltipLine(AF, tooltip, itemID, text, fallbackR, fallbackG, fallbackB)
+	local r, g, b = GetTooltipItemQualityColor(itemID)
+	if not C_Item.GetItemInfo(itemID) then
+		r, g, b = fallbackR or r, fallbackG or g, fallbackB or b
+	end
+	tooltip:AddLine(text, r, g, b, true)
 end
 
 function AF:AddCapabilityTooltipLines(tooltip, entry)
@@ -408,22 +436,27 @@ function AF:AddCapabilityTooltipLines(tooltip, entry)
 	local optionalText = self:FormatOptionalReagentImpact(entry, false)
 	if optionalText ~= "" then
 		tooltip:AddLine(" ")
-		tooltip:AddLine(self:Text("OPTIONAL_REAGENTS"), 1, 0.82, 0)
-		tooltip:AddLine(optionalText, 1, 1, 1, true)
-		if entry.optionalReagents and self:AddReagentLines(tooltip, entry.optionalReagents, 0.75, 0.75, 0.75) then
+		AddTooltipLine(tooltip, self:Text("OPTIONAL_REAGENTS"), TOOLTIP_SECTION_COLOR)
+		AddTooltipLine(tooltip, optionalText, TOOLTIP_COMMENT_COLOR, true)
+		if entry.optionalReagents and self:AddReagentLines(tooltip, entry.optionalReagents, TOOLTIP_COMMENT_COLOR[1], TOOLTIP_COMMENT_COLOR[2], TOOLTIP_COMMENT_COLOR[3], { slotLabels = true, compactQualityLabels = true }) then
 			-- Reagent lines added above.
 		elseif tonumber(entry.optionalSlotCount) and tonumber(entry.optionalSlotCount) > 0 then
-			tooltip:AddLine(self:Text("OPTIONAL_REAGENTS_SLOT_COUNT", entry.optionalSlotCount), 0.75, 0.75, 0.75, true)
+			AddTooltipLine(tooltip, self:Text("OPTIONAL_REAGENTS_SLOT_COUNT", entry.optionalSlotCount), TOOLTIP_COMMENT_COLOR, true)
+		end
+		if entry.optionalBestReagents and self:HasDisplayableReagentLines(entry.optionalBestReagents, { hideNoQuality = true }) then
+			tooltip:AddLine(" ")
+			AddTooltipLine(tooltip, self:Text("OPTIONAL_REAGENTS_SUGGESTED_REAGENTS"), TOOLTIP_SECTION_COLOR)
+			self:AddReagentLines(tooltip, entry.optionalBestReagents, TOOLTIP_COMMENT_COLOR[1], TOOLTIP_COMMENT_COLOR[2], TOOLTIP_COMMENT_COLOR[3], { slotLabels = true, compactQualityLabels = true, hideNoQuality = true })
 		end
 	end
 
-	if entry.bestReagents
+	if self:HasDisplayableReagentLines(entry.bestReagents, { hideNoQuality = true })
 		or (legacyReagentDisplay and ((legacyReagentDisplay.details and legacyReagentDisplay.details ~= "") or (legacyReagentDisplay.summary and legacyReagentDisplay.summary ~= "")))
 		or (entry.bestReagentDetails and entry.bestReagentDetails ~= "") then
 		tooltip:AddLine(" ")
-		tooltip:AddLine(self:Text("SUGGESTED_REAGENTS"), 1, 0.82, 0)
-		if entry.bestReagents then
-			self:AddReagentLines(tooltip, entry.bestReagents, 1, 1, 1)
+		AddTooltipLine(tooltip, self:Text("SUGGESTED_REAGENTS"), TOOLTIP_SECTION_COLOR)
+		if self:HasDisplayableReagentLines(entry.bestReagents, { hideNoQuality = true }) then
+			self:AddReagentLines(tooltip, entry.bestReagents, 1, 1, 1, { hideNoQuality = true })
 		elseif legacyReagentDisplay and legacyReagentDisplay.details and legacyReagentDisplay.details ~= "" then
 			self:AddReagentDetailTooltipLines(tooltip, legacyReagentDisplay.details)
 		elseif legacyReagentDisplay and legacyReagentDisplay.summary and legacyReagentDisplay.summary ~= "" then
@@ -433,48 +466,128 @@ function AF:AddCapabilityTooltipLines(tooltip, entry)
 		end
 	elseif entry.bestReagentPendingNames or entry.reagentDetailRequested then
 		tooltip:AddLine(" ")
-		tooltip:AddLine(self:Text("SUGGESTED_REAGENTS"), 1, 0.82, 0)
-		tooltip:AddLine(self:Text("LOADING_REAGENT_NAMES"), 0.75, 0.75, 0.75, true)
+		AddTooltipLine(tooltip, self:Text("SUGGESTED_REAGENTS"), TOOLTIP_SECTION_COLOR)
+		AddTooltipLine(tooltip, self:Text("LOADING_REAGENT_NAMES"), TOOLTIP_COMMENT_COLOR, true)
 	else
 		tooltip:AddLine(" ")
-		tooltip:AddLine(self:Text("NO_REAGENT_RECOMMENDATION"), 0.75, 0.75, 0.75, true)
+		AddTooltipLine(tooltip, self:Text("NO_REAGENT_RECOMMENDATION"), TOOLTIP_COMMENT_COLOR, true)
 	end
 
 end
 
-function AF:AddReagentLines(tooltip, reagents, r, g, b)
+function AF:AddCustomerEntryTooltipLines(tooltip, entry, options)
+	if not tooltip or not entry then
+		return
+	end
+	options = options or {}
+
+	if options.title ~= false then
+		tooltip:SetText(options.titleText or self:GetDisplayPlayerName(entry.name or "?"), 1, 0.82, 0)
+	end
+	if options.profession ~= false then
+		local professionName = entry.professionID and self:GetProfessionName(entry.professionID) or entry.professionName
+		if professionName then
+			AddTooltipLine(tooltip, professionName, TOOLTIP_PROFESSION_COLOR)
+		end
+	end
+	if options.source ~= false then
+		if entry.guildMember then
+			AddTooltipLine(tooltip, self:Text("GUILD_MEMBER_TOOLTIP"), TOOLTIP_COMMENT_COLOR, true)
+		else
+			AddTooltipLine(tooltip, entry.tradeLead and self:Text("MISSING_ADDON_DATA") or self:Text("CERTIFIED_ADDON_DATA"), TOOLTIP_COMMENT_COLOR, true)
+		end
+	end
+	if options.pricing then
+		tooltip:AddLine(self:FormatMoney(entry.priceCopper or 0, entry.freeCommission), 1, 1, 1, true)
+		local note = self:GetEntryNote(entry)
+		if note and note ~= "" then
+			tooltip:AddLine(note, 1, 1, 1, true)
+		end
+	end
+	if not entry.tradeLead then
+		if options.requestReagentDetails and self.RequestReagentDetail then
+			self:RequestReagentDetail(entry)
+		end
+		local capability = self:FormatCapability(entry)
+		if capability and capability ~= "" then
+			AddTooltipLine(tooltip, capability, TOOLTIP_COMMENT_COLOR, true)
+		end
+		self:AddCapabilityTooltipLines(tooltip, entry)
+	end
+end
+
+local function ReagentHasDisplayQuality(AF, reagent)
+	local itemID = tonumber(reagent and (reagent.itemID or reagent.id))
+	if itemID then
+		local quality = GetReagentDisplayQualityInfo(itemID, reagent)
+		return tonumber(quality) and tonumber(quality) > 0
+	end
+	return tonumber(reagent and reagent.quality) and tonumber(reagent.quality) > 0
+end
+
+local function ReagentChangesDifficulty(reagent)
+	return (tonumber(reagent and (reagent.difficultyAdjustment or reagent.bonusDifficulty or reagent.difficultyDelta)) or 0) > 0
+end
+
+local function ReagentIsSuggestedDisplayable(AF, reagent)
+	return ReagentHasDisplayQuality(AF, reagent) or ReagentChangesDifficulty(reagent)
+end
+
+function AF:HasDisplayableReagentLines(reagents, options)
+	options = options or {}
+	for _, reagent in ipairs(reagents or {}) do
+		if not options.hideNoQuality or ReagentIsSuggestedDisplayable(self, reagent) then
+			return true
+		end
+	end
+	return false
+end
+
+function AF:AddReagentLines(tooltip, reagents, r, g, b, options)
+	options = options or {}
 	local added = false
 	local requestedItemData = false
 	local missing = {}
+	local skipped = 0
 	for _, reagent in ipairs(reagents or {}) do
-		local quantity = tonumber(reagent.quantity) or 1
-		if reagent.kind == "currency" and reagent.currencyID and C_CurrencyInfo and C_CurrencyInfo.GetCurrencyInfo then
-			local currencyInfo = C_CurrencyInfo.GetCurrencyInfo(reagent.currencyID)
-			local currencyName = currencyInfo and currencyInfo.name
-			if currencyName and currencyName ~= "" then
-				local icon = currencyInfo.iconFileID and CreateTextureMarkup and CreateTextureMarkup(currencyInfo.iconFileID, 16, 16, 16, 16, 0, 1, 0, 1) or ""
-				tooltip:AddLine(string.format("%s%s x%d", icon ~= "" and (icon .. " ") or "", currencyName, quantity), r or 1, g or 1, b or 1, true)
-				added = true
-			end
+		if options.hideNoQuality and not ReagentIsSuggestedDisplayable(self, reagent) then
+			skipped = skipped + 1
 		else
-			local itemID = tonumber(reagent.itemID or reagent.id)
-			if itemID then
-				local itemName = self:GetItemName(itemID)
-				if itemName and itemName ~= "" then
-					local itemIcon = self:GetItemIconMarkup(itemID, 16) or ""
+			local quantity = tonumber(reagent.quantity) or 1
+			local slotText = options.slotLabels and reagent.slotText and reagent.slotText ~= "" and (reagent.slotText .. ": ") or ""
+			if reagent.kind == "currency" and reagent.currencyID and C_CurrencyInfo and C_CurrencyInfo.GetCurrencyInfo then
+				local currencyInfo = C_CurrencyInfo.GetCurrencyInfo(reagent.currencyID)
+				local currencyName = currencyInfo and currencyInfo.name
+				if currencyName and currencyName ~= "" then
+					local icon = currencyInfo.iconFileID and CreateTextureMarkup and CreateTextureMarkup(currencyInfo.iconFileID, 16, 16, 16, 16, 0, 1, 0, 1) or ""
+					tooltip:AddLine(string.format("%s%s x%d", icon ~= "" and (icon .. " ") or "", currencyName, quantity), r or 1, g or 1, b or 1, true)
+					added = true
+				end
+			else
+				local itemID = tonumber(reagent.itemID or reagent.id)
+				if itemID then
 					local quality, qualityAtlas = GetReagentDisplayQualityInfo(itemID, reagent)
 					local qualityText = self:GetQualityIconMarkup(quality, qualityAtlas, 16) or ""
-					tooltip:AddLine(string.format("%s%s x%d%s", itemIcon ~= "" and (itemIcon .. " ") or "", itemName, quantity, qualityText ~= "" and (" " .. qualityText) or ""), r or 1, g or 1, b or 1, true)
-					added = true
-				else
-					requestedItemData = true
-					table.insert(missing, tostring(itemID))
+					if options.compactQualityLabels and slotText ~= "" and qualityText ~= "" then
+						tooltip:AddLine(slotText .. qualityText, r or TOOLTIP_COMMENT_COLOR[1], g or TOOLTIP_COMMENT_COLOR[2], b or TOOLTIP_COMMENT_COLOR[3], true)
+						added = true
+					else
+						local itemName = self:GetItemName(itemID)
+						if itemName and itemName ~= "" then
+							local itemIcon = self:GetItemIconMarkup(itemID, 16) or ""
+							AddItemTooltipLine(self, tooltip, itemID, string.format("%s%s x%d%s", itemIcon ~= "" and (itemIcon .. " ") or "", itemName, quantity, qualityText ~= "" and (" " .. qualityText) or ""), r or 1, g or 1, b or 1)
+							added = true
+						else
+							requestedItemData = true
+							table.insert(missing, tostring(itemID))
+						end
+					end
 				end
 			end
 		end
 	end
-	if not added and type(reagents) == "table" and #reagents > 0 then
-		tooltip:AddLine(self:Text("LOADING_REAGENT_NAMES"), 0.75, 0.75, 0.75, true)
+	if not added and type(reagents) == "table" and #reagents > skipped then
+		AddTooltipLine(tooltip, self:Text("LOADING_REAGENT_NAMES"), TOOLTIP_COMMENT_COLOR, true)
 	end
 	if requestedItemData then
 		self.pendingReagentItemData = true
@@ -505,7 +618,7 @@ function AF:AddReagentDetailTooltipLines(tooltip, details)
 			local itemName = self:GetItemName(id) or self:Text("ITEM_FALLBACK")
 			local itemIcon = self:GetItemIconMarkup(id, 16) or ""
 			local qualityText = GetLocalReagentQualityMarkup(id)
-			tooltip:AddLine(string.format("%s%s x%d%s", itemIcon ~= "" and (itemIcon .. " ") or "", itemName, quantity, qualityText ~= "" and (" " .. qualityText) or ""), 1, 1, 1, true)
+			AddItemTooltipLine(self, tooltip, id, string.format("%s%s x%d%s", itemIcon ~= "" and (itemIcon .. " ") or "", itemName, quantity, qualityText ~= "" and (" " .. qualityText) or ""), 1, 1, 1)
 			added = true
 		elseif kind == "c" and id and C_CurrencyInfo and C_CurrencyInfo.GetCurrencyInfo then
 			local currencyInfo = C_CurrencyInfo.GetCurrencyInfo(id)
@@ -518,7 +631,7 @@ function AF:AddReagentDetailTooltipLines(tooltip, details)
 		end
 	end
 	if not added then
-		tooltip:AddLine(self:Text("LOADING_REAGENT_NAMES"), 0.75, 0.75, 0.75, true)
+		AddTooltipLine(tooltip, self:Text("LOADING_REAGENT_NAMES"), TOOLTIP_COMMENT_COLOR, true)
 	end
 end
 
@@ -533,7 +646,7 @@ function AF:AddReagentSummaryTooltipLines(tooltip, summary, truncated)
 		end
 	end
 	if not added then
-		tooltip:AddLine(self:Text("LOADING_REAGENT_NAMES"), 0.75, 0.75, 0.75, true)
+		AddTooltipLine(tooltip, self:Text("LOADING_REAGENT_NAMES"), TOOLTIP_COMMENT_COLOR, true)
 	end
 end
 
@@ -552,6 +665,25 @@ function AF:StyleCustomerTooltip(tooltip)
 			right:SetFontObject(GameFontHighlight)
 		end
 	end
+end
+
+function AF:FitTooltipWidthToContent(tooltip)
+	if not tooltip or not tooltip.GetName or not tooltip.NumLines or not tooltip.SetMinimumWidth then
+		return
+	end
+	local name = tooltip:GetName()
+	local width = 160
+	for i = 1, tooltip:NumLines() do
+		local left = _G[name .. "TextLeft" .. i]
+		local right = _G[name .. "TextRight" .. i]
+		if left and left.GetStringWidth then
+			width = math.max(width, left:GetStringWidth() + 32)
+		end
+		if right and right.GetStringWidth then
+			width = math.max(width, right:GetStringWidth() + 48)
+		end
+	end
+	tooltip:SetMinimumWidth(math.min(width, 420))
 end
 
 function AF:GetItemIconMarkup(itemID, size)

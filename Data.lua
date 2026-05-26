@@ -205,6 +205,7 @@ local function ClearLocalizedCraftFields(item)
 	item.hasReagentSummary = nil
 	item.reagentDetailRequested = nil
 	item.optionalReagentSummary = nil
+	item.optionalBestReagentSummaryUpdatedAt = nil
 	item.debugBestCandidateSummary = nil
 end
 
@@ -558,6 +559,21 @@ function ApplyDBDefaults(db)
 	end
 	if db.orderNotificationSound == nil or db.orderNotificationSound == "ACCOUNT_STORE_OPEN" then
 		db.orderNotificationSound = "CATALOG_SHOP_OPEN_LOADING_SCREEN"
+	end
+	if db.orderNotificationsEnabled == false then
+		if db.orderNotificationSoundEnabled == nil then
+			db.orderNotificationSoundEnabled = false
+		end
+		if db.orderNotificationBannerEnabled == nil then
+			db.orderNotificationBannerEnabled = false
+		end
+		db.orderNotificationsEnabled = nil
+	end
+	if db.orderNotificationSoundEnabled == nil then
+		db.orderNotificationSoundEnabled = true
+	end
+	if db.orderNotificationBannerEnabled == nil then
+		db.orderNotificationBannerEnabled = true
 	end
 	if db.orderNotificationChannel == nil then
 		db.orderNotificationChannel = "default"

@@ -51,7 +51,10 @@ local function GetOrderTotals(AF)
 	return currentTotal, altTotal
 end
 
-function AF:PlayOrderNotificationSound()
+function AF:PlayOrderNotificationSound(force)
+	if not force and self.db and (self.db.orderNotificationsEnabled == false or self.db.orderNotificationSoundEnabled == false) then
+		return
+	end
 	local sound = GetOrderSound()
 	if sound then
 		PlaySound(sound, GetOrderSoundChannel())
@@ -59,6 +62,9 @@ function AF:PlayOrderNotificationSound()
 end
 
 function AF:ShowOrderNotification(characterName, count)
+	if self.db and (self.db.orderNotificationsEnabled == false or self.db.orderNotificationBannerEnabled == false) then
+		return
+	end
 	local text = self:Text("ORDER_NOTIFICATION_MESSAGE", self:GetDisplayPlayerName(characterName), tonumber(count) or 1)
 	if RaidNotice_AddMessage and RaidWarningFrame and ChatTypeInfo and ChatTypeInfo.RAID_WARNING then
 		RaidNotice_AddMessage(RaidWarningFrame, text, ChatTypeInfo.RAID_WARNING)
@@ -275,15 +281,21 @@ function AF:InitializeCraftingOrderIndicator()
 		return
 	end
 	self.craftingOrderIndicatorInitialized = true
-	hooksecurefunc(frame, "OnEnter", function(owner)
-		AF:AddCraftingOrderIndicatorTooltip(owner)
+	frame:HookScript("OnEnter", function(owner)
+		C_Timer.After(0, function()
+			AF:AddCraftingOrderIndicatorTooltip(owner or frame)
+		end)
 	end)
 end
 
 function AF:AddCraftingOrderIndicatorTooltip(owner)
 	local rows = self:GetKnownOrderRows()
-	if #rows == 0 or not GameTooltip or not GameTooltip:IsShown() then
+	if #rows == 0 or not GameTooltip then
 		return
+	end
+	if not GameTooltip:IsShown() then
+		GameTooltip:SetOwner(owner or GetCraftingOrderFrame() or UIParent, "ANCHOR_LEFT")
+		GameTooltip:SetText(PROFESSIONS_CRAFTING_ORDERS or "Crafting Orders", 1, 0.82, 0)
 	end
 	GameTooltip_AddBlankLineToTooltip(GameTooltip)
 	GameTooltip_AddNormalLine(GameTooltip, "ArtisanFinder", false)

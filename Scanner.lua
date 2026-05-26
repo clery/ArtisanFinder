@@ -27,12 +27,16 @@ local function GetRecommendationSnapshot(item)
 		tostring(item.bestReagentSignature or ""),
 		tostring(item.bestQuality or ""),
 		tostring(item.bestQualityAtlas or ""),
+		tostring(item.bestOutputItemLevel or ""),
 		tostring(item.rawBestQuality or ""),
 		tostring(item.bestReagentTruncated == true),
 		tostring(item.bestReagentPendingNames == true),
 		tostring(item.optionalDifficultyDelta or ""),
 		tostring(item.optionalQuality or ""),
+		tostring(item.optionalOutputItemLevel or ""),
 		tostring(item.optionalConcentrationQuality or ""),
+		tostring(item.optionalBestReagentSignature or ""),
+		tostring(item.optionalBestReagentTruncated == true),
 	}, "|")
 end
 

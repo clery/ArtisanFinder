@@ -7,7 +7,7 @@ local COMMISSION_PRICE_FIELD_WIDTH = 150
 local COMMISSION_FIELD_HEIGHT = 36
 local COMMISSION_PRICE_MAX_LETTERS = 9
 local CRAFTER_REOPEN_ICON = 7548932 -- inv-12-profession-blacksmithing-repairhammer-purple
-local CUSTOMER_PREVIEW_ATLAS = "UI-HUD-Minimap-CraftingOrder-Up"
+local CUSTOMER_PREVIEW_TEXTURE = 4675733
 
 local function UpdatePlaceholder(box)
 	box.Placeholder:SetShown((box:GetText() or "") == "")
@@ -201,39 +201,32 @@ end
 local function CreateCustomerPreviewButton(parent)
 	local button = CreateFrame("Button", nil, parent)
 	button:SetSize(18, 18)
-	button:SetNormalAtlas(CUSTOMER_PREVIEW_ATLAS)
-	button:SetPushedAtlas(CUSTOMER_PREVIEW_ATLAS)
+	button:SetNormalTexture(CUSTOMER_PREVIEW_TEXTURE)
+	button:SetPushedTexture(CUSTOMER_PREVIEW_TEXTURE)
 	return button
 end
 
 local function ConfigureCustomerPreviewButton(button, getEntry)
 	button:SetScript("OnEnter", function(self)
-		local entry, defaultEntry = getEntry()
+		local entry, defaultEntry, disabledText = getEntry()
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 		GameTooltip:SetText(AF:Text("CUSTOMER_SIDE_PREVIEW"), 1, 0.82, 0)
-		if entry or defaultEntry then
-			local priceCopper, freeCommission = AF:GetEntryCommission(entry)
-			if not priceCopper then
-				priceCopper, freeCommission = AF:GetEntryCommission(defaultEntry)
+		if disabledText then
+			GameTooltip:AddLine(disabledText, 0.75, 0.75, 0.75, true)
+		elseif entry or defaultEntry then
+			local previewEntry = {}
+			for key, value in pairs(defaultEntry or {}) do
+				previewEntry[key] = value
 			end
-			GameTooltip:AddLine(AF:FormatMoney(priceCopper or 0, freeCommission), 1, 1, 1, true)
-			local note = AF:GetEntryNote(entry)
-			if not note then
-				note = AF:GetEntryNote(defaultEntry)
+			for key, value in pairs(entry or {}) do
+				previewEntry[key] = value
 			end
-			if note and note ~= "" then
-				GameTooltip:AddLine(note, 0.85, 0.85, 0.85, true)
-			end
-			local capability = AF:FormatCapability(entry)
-			if capability and capability ~= "" then
-				GameTooltip:AddLine(capability, 0.65, 0.65, 0.65, true)
-			end
-			if entry then
-				AF:AddCapabilityTooltipLines(GameTooltip, entry)
-			end
+			AF:AddCustomerEntryTooltipLines(GameTooltip, previewEntry, { title = false, source = false, pricing = true })
 		else
 			GameTooltip:AddLine(AF:Text("CUSTOMER_SIDE_PREVIEW_EMPTY"), 0.65, 0.65, 0.65, true)
 		end
+		AF:StyleCustomerTooltip(GameTooltip)
+		AF:FitTooltipWidthToContent(GameTooltip)
 		GameTooltip:Show()
 	end)
 	button:SetScript("OnLeave", function()
@@ -566,13 +559,14 @@ function AF:GetCurrentSupportedProfessionID()
 	return self:GetSupportedProfessionID(profession and profession.id, profession), profession
 end
 
-function AF:EnsureCurrentRecipeEntry(context)
+function AF:EnsureCurrentRecipeEntry(context, options)
 	if not context or not context.itemID then
 		return nil
 	end
 	if self.IsOwnProfessionWindowOpen and not self:IsOwnProfessionWindowOpen() then
 		return nil
 	end
+	options = options or {}
 
 	local itemKey = tostring(context.itemID)
 	local item = self.db.artisanProfile.items[itemKey] or {}
@@ -584,7 +578,15 @@ function AF:EnsureCurrentRecipeEntry(context)
 	item.itemName = nil
 	item.professionName = nil
 	item.professionIcon = context.professionIcon or item.professionIcon
-	self:ApplyRecipeCapability(item, context.recipeID)
+	if options.fullCapability then
+		self:ApplyRecipeCapability(item, context.recipeID)
+	else
+		local probe = self:GetRecipeSkillProbe(context.recipeID)
+		if probe then
+			self:ApplyRecipeSkillProbe(item, context.recipeID, probe)
+		end
+		item.professionLink = self:CaptureCurrentProfessionLink() or item.professionLink
+	end
 	item.updatedAt = self:Now()
 
 	if context.professionID then
@@ -605,6 +607,36 @@ function AF:EnsureCurrentRecipeEntry(context)
 	return item
 end
 
+function AF:IsRecipeEntryScanComplete(context, item)
+	if not context or not item then
+		return false
+	end
+	if not item.bestReagents or item.bestReagentPendingNames == true then
+		return false
+	end
+	local active = self.activeScan
+	if not active or tonumber(active.professionID) ~= tonumber(context.professionID) then
+		return true
+	end
+	local professionEntry = self.db
+		and self.db.artisanProfile
+		and self.db.artisanProfile.professions
+		and self.db.artisanProfile.professions[tostring(active.professionID)]
+	local progress = professionEntry and professionEntry.scanProgress
+	if not progress or progress.signature ~= active.signature then
+		return true
+	end
+	local recipeID = tonumber(context.recipeID) or 0
+	local itemID = tonumber(context.itemID) or 0
+	for index = math.max(1, tonumber(progress.pendingIndex) or 1), #(progress.pending or {}) do
+		local job = progress.pending[index]
+		if tonumber(job and job.recipeID) == recipeID and tonumber(job and job.itemID) == itemID then
+			return false
+		end
+	end
+	return progress.completed and (progress.completed["full:" .. recipeID .. ":" .. itemID] or progress.completed["probe:" .. recipeID .. ":" .. itemID]) == true
+end
+
 function AF:AttachCrafterUI()
 	local form = self:GetCraftingSchematicForm()
 	if self.crafterFrame or not form then
@@ -617,6 +649,9 @@ function AF:AttachCrafterUI()
 		local context = AF:GetCurrentCraftingRecipeContext()
 		local item = context and AF.db.artisanProfile.items[tostring(context.itemID or "")]
 		local defaultEntry = context and context.professionID and AF:GetProfessionPriceEntry(AF.db.artisanProfile, context.professionID)
+		if context and item and not AF:IsRecipeEntryScanComplete(context, item) then
+			return item, defaultEntry, AF:Text("CUSTOMER_SIDE_PREVIEW_SCANNING")
+		end
 		return item, defaultEntry
 	end)
 	frame.customerPreview:SetPoint("RIGHT", frame.info, "LEFT", -2, 0)
@@ -1037,6 +1072,15 @@ function AF:RefreshCrafterUI()
 		local item = self:EnsureCurrentRecipeEntry(context)
 		if item then
 			frame:Show()
+			if frame.customerPreview then
+				if self:IsRecipeEntryScanComplete(context, item) then
+					frame.customerPreview:Enable()
+					frame.customerPreview:SetAlpha(1)
+				else
+					frame.customerPreview:Disable()
+					frame.customerPreview:SetAlpha(0.45)
+				end
+			end
 			local sourceKey = table.concat({ "item", tostring(context.itemID or ""), tostring(context.recipeID or ""), tostring(context.professionID or "") }, ":")
 			if frame.artisanFinderErrorSource ~= sourceKey then
 				frame.artisanFinderErrorSource = sourceKey
