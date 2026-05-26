@@ -158,6 +158,60 @@ local function CopyOrderDetails(details)
 	}
 end
 
+local function StripOrderDisplayText(text)
+	text = tostring(text or "")
+	text = text:gsub("|c%x%x%x%x%x%x%x%x", "")
+	text = text:gsub("|r", "")
+	text = text:gsub("|A.-|a", "")
+	text = text:gsub("|T.-|t", "")
+	text = text:gsub("%s+", " "):match("^%s*(.-)%s*$")
+	return text ~= "" and text or nil
+end
+
+local function GetFallbackOrderIcon(form)
+	local outputIcon = form and form.OutputIcon
+	local iconTexture = outputIcon and outputIcon.Icon
+	local texture = iconTexture and iconTexture.GetTexture and iconTexture:GetTexture()
+	return tonumber(texture)
+end
+
+local function GetFallbackOrderName(form, recipeSchematic)
+	local text = form and form.order and form.order.isRecraft
+		and form.RecraftRecipeName and form.RecraftRecipeName.GetText and form.RecraftRecipeName:GetText()
+		or form and form.RecipeName and form.RecipeName.GetText and form.RecipeName:GetText()
+	return StripOrderDisplayText(text) or StripOrderDisplayText(recipeSchematic and recipeSchematic.name)
+end
+
+local function FillOrderDetailsFromItemInfo(details)
+	local itemID, itemName, itemLink, itemQuality, itemIcon = GetOrderNotificationItemInfo(details)
+	details.itemID = details.itemID or itemID
+	details.itemName = details.itemName or itemName
+	details.itemLink = details.itemLink or itemLink
+	details.itemQuality = details.itemQuality or itemQuality
+	details.itemIcon = details.itemIcon or itemIcon
+	return details
+end
+
+local function FillOrderDetailsFallback(details, form, recipeSchematic)
+	details.itemName = details.itemName or GetFallbackOrderName(form, recipeSchematic)
+	details.itemIcon = details.itemIcon or GetFallbackOrderIcon(form)
+	return details
+end
+
+local function ResetOrderNotificationToast(_, toast)
+	toast:Hide()
+	toast:ClearAllPoints()
+	toast.itemID = nil
+	toast.itemLink = nil
+	toast.elapsed = nil
+	toast.paused = false
+	toast:SetAlpha(1)
+	toast:SetScale(1)
+	if toast.IconBorder then
+		toast.IconBorder:Hide()
+	end
+end
+
 local function GetOrderTotals(AF)
 	local currentTotal = 0
 	local altTotal = 0
@@ -209,7 +263,9 @@ function AF:NotifyPersonalOrder(characterName, count, sender, details)
 	if not details.customerName or details.customerName == "" then
 		details.customerName = sender and sender ~= "dev" and sender or nil
 	end
-	self.altOrderNotifications = self.altOrderNotifications or {}
+	FillOrderDetailsFromItemInfo(details)
+	self.db.orderNotifications = self.db.orderNotifications or {}
+	self.altOrderNotifications = self.db.orderNotifications
 	self.altOrderNotifications[characterName] = {
 		characterName = characterName,
 		count = count,
@@ -281,11 +337,7 @@ function AF:SendOrderNotification(characterName, count, details)
 		return false
 	end
 	details = CopyOrderDetails(details)
-	local itemID, itemName, _, itemQuality, itemIcon = GetOrderNotificationItemInfo(details)
-	details.itemID = details.itemID or itemID
-	details.itemName = details.itemName or itemName
-	details.itemQuality = details.itemQuality or itemQuality
-	details.itemIcon = details.itemIcon or itemIcon
+	FillOrderDetailsFromItemInfo(details)
 	local messageTarget = self:GetRememberedArtisanContact(characterName) or characterName
 	local payload = table.concat({
 		"O",
@@ -310,6 +362,10 @@ function AF:OnPersonalOrderCountsUpdated()
 	self.currentPersonalOrderRows = rows
 	local previous = self.currentPersonalOrderCount
 	self.currentPersonalOrderCount = total
+	local playerName = self:NormalizeName(self.playerName or self:GetPlayerFullName())
+	if playerName and total <= 0 and self.altOrderNotifications and self.altOrderNotifications[playerName] then
+		self.altOrderNotifications[playerName] = nil
+	end
 	self:DebugLog("orders", string.format("count previous=%s current=%s", tostring(previous), tostring(total)))
 	if previous ~= nil and total > previous then
 		self:PlayOrderNotificationSound()
@@ -330,6 +386,9 @@ function AF:OnOrderPlacementResponse(result)
 	self.pendingPersonalOrderTarget = nil
 	self.pendingPersonalOrderDetails = nil
 	if target then
+		if self:IsOwnArtisanCharacter(target) then
+			self:NotifyPersonalOrder(target, 1, nil, details)
+		end
 		self:SendOrderNotification(target, 1, details)
 	end
 end
@@ -350,6 +409,7 @@ function AF:CapturePersonalOrderDetails(orderInfo, form)
 		details.professionName = C_TradeSkillUI.GetProfessionNameForSkillLineAbility(form.order.skillLineAbilityID)
 		local recipeID = form.order.spellID
 		local transaction = form.transaction
+		local recipeSchematic = transaction and transaction.GetRecipeSchematic and transaction:GetRecipeSchematic()
 		if form.order.isRecraft and form.order.recraftItemHyperlink then
 			details.itemLink = form.order.recraftItemHyperlink
 			details.itemID = self:GetItemIDFromLink(details.itemLink)
@@ -361,12 +421,14 @@ function AF:CapturePersonalOrderDetails(orderInfo, form)
 			local outputItemInfo = C_TradeSkillUI.GetRecipeOutputItemData(recipeID, optionalReagents, nil, minimumQuality)
 			if outputItemInfo then
 				details.itemLink = outputItemInfo.hyperlink
-				details.itemID = self:GetItemIDFromLink(outputItemInfo.hyperlink)
+				details.itemID = tonumber(outputItemInfo.itemID) or self:GetItemIDFromLink(outputItemInfo.hyperlink)
 				details.itemName = details.itemID and self:GetItemName(details.itemID) or outputItemInfo.itemName
 				details.itemIcon = outputItemInfo.icon or (details.itemID and C_Item.GetItemIconByID(details.itemID))
 			end
 		end
+		FillOrderDetailsFallback(details, form, recipeSchematic)
 	end
+	FillOrderDetailsFromItemInfo(details)
 	return details
 end
 
@@ -417,16 +479,19 @@ function AF:InitializeOrderNotifications()
 	end
 	self:InitializeCustomerOrderFormHook()
 	self:InitializeCraftingOrderIndicator()
+	self.db.orderNotifications = self.db.orderNotifications or {}
+	self.altOrderNotifications = self.db.orderNotifications
 	self:OnPersonalOrderCountsUpdated()
 end
 
 function AF:GetKnownOrderRows()
 	local rows = {}
+	local playerName = self:NormalizeName(self.playerName or self:GetPlayerFullName())
 	for _, row in ipairs(self.currentPersonalOrderRows or {}) do
 		table.insert(rows, row)
 	end
 	for characterName, entry in pairs(self.altOrderNotifications or {}) do
-		if tonumber(entry.count) and tonumber(entry.count) > 0 then
+		if characterName ~= playerName and tonumber(entry.count) and tonumber(entry.count) > 0 then
 			table.insert(rows, {
 				characterName = characterName,
 				count = tonumber(entry.count) or 1,
@@ -497,7 +562,8 @@ function AF:DevSetAltOrders(characterName, professionName, count)
 	count = tonumber(count) or 1
 	self.db.debugEnabled = true
 	self.db.devEnabled = true
-	self.altOrderNotifications = self.altOrderNotifications or {}
+	self.db.orderNotifications = self.db.orderNotifications or {}
+	self.altOrderNotifications = self.db.orderNotifications
 	self.altOrderNotifications[characterName] = {
 		characterName = characterName,
 		professionName = professionName and professionName ~= "" and professionName or self:Text("DEBUG_ORDER_PROFESSION"),
@@ -522,6 +588,32 @@ function AF:DevClearOrders()
 	self:RefreshCraftingOrderIndicator()
 end
 
+function AF:ClearOrderNotifications(silent)
+	self.db.orderNotifications = {}
+	self.altOrderNotifications = self.db.orderNotifications
+	local toastPool = self.orderNotificationToastPool
+	for _, toast in ipairs(self.orderNotificationActiveToasts or {}) do
+		if toastPool and toastPool:IsActive(toast) then
+			toastPool:Release(toast)
+		else
+			ResetOrderNotificationToast(nil, toast)
+		end
+	end
+	self.orderNotificationActiveToasts = {}
+	if GameTooltip then
+		GameTooltip:Hide()
+	end
+	if self.RefreshCraftingOrderIndicator then
+		self:RefreshCraftingOrderIndicator()
+	end
+	if self.RefreshOpenMinimapTooltip then
+		self:RefreshOpenMinimapTooltip()
+	end
+	if not silent then
+		self:Print(self:Text("ORDER_NOTIFICATIONS_CLEARED"))
+	end
+end
+
 function AF:PrintOrderDebugState()
 	self:Print(self:Text("DEBUG_ORDERS_STATE", tostring(self.currentPersonalOrderCount or 0), tostring(self.lastOrderNotificationSender or "")))
 	for _, row in ipairs(self:GetKnownOrderRows()) do
@@ -535,13 +627,12 @@ function AF:PrintOrderDebugState()
 	end
 end
 
-function AF:CreateOrderNotificationToast()
-	local frame = CreateFrame("Button", nil, UIParent, "BackdropTemplate")
+function AF:InitializeOrderNotificationToast(frame)
 	frame:SetSize(TOAST_WIDTH, TOAST_HEIGHT)
 	frame:SetFrameStrata("DIALOG")
 	frame:SetFrameLevel(80)
 	frame:EnableMouse(true)
-	frame:RegisterForClicks("LeftButtonUp")
+	frame:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 	frame:SetClampedToScreen(true)
 	frame:SetBackdrop({
 		bgFile = "Interface\\Buttons\\WHITE8x8",
@@ -610,7 +701,12 @@ function AF:CreateOrderNotificationToast()
 		toast.paused = false
 		GameTooltip:Hide()
 	end)
-	frame:SetScript("OnClick", function(toast)
+	frame:SetScript("OnClick", function(toast, button)
+		if button == "RightButton" then
+			GameTooltip:Hide()
+			AF:ReleaseOrderNotificationToast(toast)
+			return
+		end
 		if toast.itemLink and HandleModifiedItemClick then
 			HandleModifiedItemClick(toast.itemLink)
 		end
@@ -633,6 +729,15 @@ function AF:CreateOrderNotificationToast()
 	end)
 
 	return frame
+end
+
+function AF:GetOrderNotificationToastPool()
+	if not self.orderNotificationToastPool then
+		self.orderNotificationToastPool = CreateFramePool("Button", UIParent, "BackdropTemplate", ResetOrderNotificationToast, nil, function(frame)
+			AF:InitializeOrderNotificationToast(frame)
+		end)
+	end
+	return self.orderNotificationToastPool
 end
 
 function AF:GetOrderNotificationAnchor()
@@ -667,6 +772,12 @@ function AF:SetOrderNotificationAnchorPosition(point, x, y)
 	self:PositionOrderNotificationAnchor()
 end
 
+function AF:RefreshOrderNotificationAnchor()
+	local anchor = self:GetOrderNotificationAnchor()
+	anchor:SetScale(self:GetOrderNotificationScale())
+	anchor:SetSize(TOAST_WIDTH, TOAST_HEIGHT)
+end
+
 function AF:SetupOrderNotificationToast(frame, characterName, count, details)
 	details = CopyOrderDetails(details)
 	local itemID, itemName, itemLink, itemQuality, itemIcon = GetOrderNotificationItemInfo(details)
@@ -693,14 +804,10 @@ function AF:SetupOrderNotificationToast(frame, characterName, count, details)
 end
 
 function AF:RefreshOrderNotificationToasts()
-	local activeToasts = self.orderNotificationActiveToasts
-	if not activeToasts then
-		return
-	end
-	local anchor = self:GetOrderNotificationAnchor()
+	self:RefreshOrderNotificationAnchor()
 	local scale = self:GetOrderNotificationScale()
-	anchor:SetScale(scale)
-	anchor:SetSize(TOAST_WIDTH, TOAST_HEIGHT)
+	local anchor = self:GetOrderNotificationAnchor()
+	local activeToasts = self.orderNotificationActiveToasts or {}
 	local growUp = self:GetOrderNotificationGrowDirection() == "UP"
 	local offsetStep = (TOAST_HEIGHT + TOAST_SPACING) * scale
 	for index, toast in ipairs(activeToasts) do
@@ -718,10 +825,6 @@ function AF:ReleaseOrderNotificationToast(toast)
 	if not toast then
 		return
 	end
-	toast:Hide()
-	toast:ClearAllPoints()
-	toast.itemID = nil
-	toast.itemLink = nil
 	local activeToasts = self.orderNotificationActiveToasts or {}
 	for index, activeToast in ipairs(activeToasts) do
 		if activeToast == toast then
@@ -729,18 +832,17 @@ function AF:ReleaseOrderNotificationToast(toast)
 			break
 		end
 	end
-	self.orderNotificationToastPool = self.orderNotificationToastPool or {}
-	table.insert(self.orderNotificationToastPool, toast)
+	local toastPool = self:GetOrderNotificationToastPool()
+	if toastPool:IsActive(toast) then
+		toastPool:Release(toast)
+	else
+		ResetOrderNotificationToast(nil, toast)
+	end
 	self:RefreshOrderNotificationToasts()
 end
 
 function AF:AcquireOrderNotificationToast()
-	self.orderNotificationToastPool = self.orderNotificationToastPool or {}
-	local frame = table.remove(self.orderNotificationToastPool)
-	if not frame then
-		frame = self:CreateOrderNotificationToast()
-	end
-	return frame
+	return self:GetOrderNotificationToastPool():Acquire()
 end
 
 function AF:ShowOrderNotificationToast(characterName, count, details)
@@ -761,10 +863,18 @@ function AF:InitializeCraftingOrderIndicator()
 		return
 	end
 	self.craftingOrderIndicatorInitialized = true
+	frame:HookScript("OnEvent", function()
+		C_Timer.After(0, function()
+			AF:RefreshCraftingOrderIndicator()
+		end)
+	end)
 	frame:HookScript("OnEnter", function(owner)
 		C_Timer.After(0, function()
 			AF:AddCraftingOrderIndicatorTooltip(owner or frame)
 		end)
+	end)
+	C_Timer.After(0, function()
+		AF:RefreshCraftingOrderIndicator()
 	end)
 end
 

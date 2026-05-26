@@ -593,12 +593,7 @@ function ApplyDBDefaults(db)
 	if db.orderNotificationGrowDirection == nil then
 		db.orderNotificationGrowDirection = "DOWN"
 	end
-	if db.editModeShowOrderToast == nil then
-		db.editModeShowOrderToast = true
-	end
-	if db.editModeShowStandaloneButton == nil then
-		db.editModeShowStandaloneButton = true
-	end
+	db.orderNotifications = db.orderNotifications or {}
 	if db.offlineFallbackResults == nil then
 		db.offlineFallbackResults = 10
 	end

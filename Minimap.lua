@@ -4,6 +4,20 @@ local ICON = 7548932 -- inv-12-profession-blacksmithing-repairhammer-purple
 local ICON_COORDS = { 0, 1, 0, 1 }
 local OUTDATED_BADGE_TEXTURE = "Interface\\DialogFrame\\UI-Dialog-Icon-AlertNew"
 
+local function GetOutdatedBadgeMarkup(size)
+	size = tonumber(size) or 14
+	return "|T" .. OUTDATED_BADGE_TEXTURE .. ":" .. size .. ":" .. size .. ":0:0|t"
+end
+
+local function HasOutdatedProfessionRows(rows)
+	for _, row in ipairs(rows or {}) do
+		if row.outdated then
+			return true
+		end
+	end
+	return false
+end
+
 local function GetMinimapButton()
 	return _G.LibDBIcon10_ArtisanFinder
 end
@@ -15,7 +29,9 @@ local function HandleMinimapClick(owner, button)
 	if AF.CloseMinimapTutorial then
 		AF:CloseMinimapTutorial(true)
 	end
-	if IsShiftKeyDown() then
+	if button == "RightButton" and IsShiftKeyDown() then
+		AF:ClearOrderNotifications()
+	elseif IsShiftKeyDown() then
 		AF:SetMinimapHidden(true)
 	elseif button == "LeftButton" and IsAltKeyDown() then
 		AF:ShowMinimapAdvertisingMenu(owner or GetMinimapButton())
@@ -101,6 +117,9 @@ function AF:PopulateMinimapTooltip(tooltip)
 		tooltip:AddLine(AF:Text("MINIMAP_AUTO_HINT"), 0.65, 0.65, 0.65, true)
 	end
 	local professionRows = AF:GetAdvertisingProfessionRows()
+	if HasOutdatedProfessionRows(professionRows) then
+		tooltip:AddLine(GetOutdatedBadgeMarkup(14) .. " " .. AF:Text("MINIMAP_OUTDATED_SCANS"), 1, 0.82, 0.1, true)
+	end
 	if #professionRows > 0 then
 		local currentCharacter
 		for _, row in ipairs(professionRows) do
@@ -130,6 +149,7 @@ function AF:PopulateMinimapTooltip(tooltip)
 	tooltip:AddLine(AF:Text("MINIMAP_ALT_LEFT_CLICK"), 0.65, 0.65, 0.65)
 	tooltip:AddLine(AF:Text("MINIMAP_MIDDLE_CLICK"), 0.65, 0.65, 0.65)
 	tooltip:AddLine(AF:Text("MINIMAP_RIGHT_CLICK"), 0.65, 0.65, 0.65)
+	tooltip:AddLine(AF:Text("MINIMAP_SHIFT_RIGHT_CLICK"), 0.65, 0.65, 0.65)
 	tooltip:AddLine(AF:Text("MINIMAP_SHIFT_CLICK"), 0.65, 0.65, 0.65)
 end
 
@@ -299,12 +319,7 @@ function AF:StyleMinimapButton()
 end
 
 function AF:HasOutdatedScannedRows()
-	for _, row in ipairs(self:GetAdvertisingProfessionRows()) do
-		if row.outdated then
-			return true
-		end
-	end
-	return false
+	return HasOutdatedProfessionRows(self:GetAdvertisingProfessionRows())
 end
 
 function AF:RefreshMinimapBadge()

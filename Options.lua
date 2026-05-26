@@ -357,6 +357,18 @@ function AF:InitializeOptions()
 		true
 	))
 
+	Settings.RegisterInitializer(category, CreateSettingsButtonInitializer(
+		"",
+		self:Text("OPTIONS_CLEAR_ORDER_NOTIFICATIONS"),
+		function()
+			if AF.ClearOrderNotifications then
+				AF:ClearOrderNotifications()
+			end
+		end,
+		self:Text("OPTIONS_CLEAR_ORDER_NOTIFICATIONS_DESC"),
+		true
+	))
+
 	AddSection("OPTIONS_SECTION_CUSTOMER")
 	local defaultSort = RegisterProxySetting(
 		"ArtisanFinder_DefaultSort",
