@@ -333,7 +333,8 @@ function AF:NotifyPersonalOrder(characterName, count, sender, details)
 		return
 	end
 	local playerName = self:NormalizeName(self.playerName or self:GetPlayerFullName())
-	if characterName == playerName and sender then
+	local senderName = self:NormalizeName(sender)
+	if characterName == playerName and senderName == playerName then
 		return
 	end
 	count = tonumber(count) or 1

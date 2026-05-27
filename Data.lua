@@ -595,8 +595,8 @@ function ApplyDBDefaults(db)
 	end
 	if db.orderNotificationChannel == nil then
 		db.orderNotificationChannel = "default"
-	elseif db.orderNotificationChannel == "Master" then
-		db.orderNotificationChannel = "default"
+	elseif db.orderNotificationChannel == "default" then
+		db.orderNotificationChannel = "Master"
 	end
 	if db.orderNotificationPoint == nil then
 		db.orderNotificationPoint = "TOP"

@@ -31,7 +31,7 @@ local ORDER_SOUND_OPTIONS = {
 }
 
 local ORDER_SOUND_CHANNEL_OPTIONS = {
-	{ key = "default", labelKey = "OPTIONS_SOUND_CHANNEL_DEFAULT" },
+	{ key = "Master", labelKey = "OPTIONS_SOUND_CHANNEL_DEFAULT" },
 	{ key = "SFX", labelKey = "OPTIONS_SOUND_CHANNEL_SFX" },
 	{ key = "Music", labelKey = "OPTIONS_SOUND_CHANNEL_MUSIC" },
 	{ key = "Ambience", labelKey = "OPTIONS_SOUND_CHANNEL_AMBIENCE" },
