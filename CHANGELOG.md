@@ -1,17 +1,17 @@
 # ArtisanFinder
 
-## [v1.3.0](https://github.com/clery/ArtisanFinder/releases/tag/v1.3.0) (2026-05-26)
+## [v2.0.0](https://github.com/clery/ArtisanFinder/releases/tag/v2.0.0) (2026-05-26)
 
-[Full Changelog](https://github.com/clery/ArtisanFinder/compare/v1.2.6b...v1.3.0) | [Previous Releases](https://github.com/clery/ArtisanFinder/releases)
+[Full Changelog](https://github.com/clery/ArtisanFinder/compare/v1.2.6b...v2.0.0) | [Previous Releases](https://github.com/clery/ArtisanFinder/releases)
 
 ### Added
 
+* Cross-character personal order notification system.
 * Availability can now be cycled between unavailable, current character only, and account-wide.
 * The Professions UI now has a customer preview tooltip.
 * The minimap button now shows availability color, outdated scan warnings, an Alt-left-click profession advertising menu, and Shift-right-click notification clearing.
 * Automatic availability now has per-activity disable options for dungeons, raids, PvP, arenas, and delves.
 * A movable ArtisanFinder button mode is available as an alternative to the minimap-ring button.
-* Addon-enabled personal order notifications now show loot-style toasts with item, customer, character, and commission details.
 * Personal order notification toasts can be positioned, scaled, and stacked from Blizzard Edit Mode.
 * Personal order notification sound and sound channel can now be chosen in Options, with a play-test button.
 * The customer view now has an option to include your current character in results while you are available.
