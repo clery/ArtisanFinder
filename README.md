@@ -10,7 +10,7 @@ ArtisanFinder helps players find available crafters directly from the Crafting O
 *   Guild and trade-chat crafter discovery.
 *   Favorites, search, sorting, online checks, and personal order helpers.
 *   Personal order notifications for addon-enabled customers and artisans.
-*   Background recipe scanning for supported crafting professions.
+*   Manual recipe scanning for supported crafting professions, with optional automatic rescans.
 *   Minimap, movable button, Options -> AddOns, and Blizzard Edit Mode controls.
 *   Localization for English, French, German, Spanish, Russian, and Chinese.
 
@@ -28,9 +28,9 @@ ArtisanFinder does not place orders for you. It only helps fill or open the righ
 
 ### Quality, commissions and availability
 
-ArtisanFinder adds lightweight controls to the Professions UI for item-specific and profession-default commissions, notes, and availability. It scans crafting professions in the background and can advertise scanned professions from your other characters while you are online. The crafter panel also includes a customer preview tooltip so you can check what customers will see.
+ArtisanFinder adds lightweight controls to the Professions UI for item-specific and profession-default commissions, notes, and availability. It stores scanned profession data and can advertise scanned professions from your other characters while you are online. The crafter panel also includes a customer preview tooltip so you can check what customers will see.
 
-Availability is session-based and resets after login or reload. You can cycle between unavailable, current-character availability, and account-wide availability from the minimap button, or let automatic availability enable it in trade-chat areas and disable it in selected instance types.
+Availability is session-based and resets after login or reload. You can cycle between unavailable, current-character availability, and account-wide availability from the minimap button, or let automatic availability enable it in trade-chat areas and disable it in selected instance types. Profession scans can refresh automatically by default, or you can disable automatic scans in options and press Rescan in the Professions UI when you want to refresh stored craft data.
 
 ![ArtisanFinder crafter view](Images/CrafterView.png)
 
@@ -56,7 +56,7 @@ An item-specific commission takes priority over a profession default. If an item
 
 ## Options
 
-ArtisanFinder has an Options -> AddOns panel ordered around common controls first: minimap/button behavior, availability, trade-chat leads, order notifications, result sorting, cache behavior and advertised character professions. Blizzard Edit Mode controls the order notification toast and movable ArtisanFinder button placement.
+ArtisanFinder has an Options -> AddOns panel ordered around common controls first: minimap/button behavior, availability, scanning, trade-chat leads, order notifications, result sorting, cache behavior and advertised character professions. Blizzard Edit Mode controls the order notification toast and movable ArtisanFinder button placement.
 
 ![ArtisanFinder options](Images/Options1.png)
 ![ArtisanFinder options](Images/Options2.png)

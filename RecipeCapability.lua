@@ -1,18 +1,25 @@
 local _, AF = ...
 
 local MAX_REAGENT_COMBINATIONS = 72
-local MAX_OPTIONAL_REAGENT_TESTS_PER_SLOT = 8
 local MAX_OPTIONAL_REAGENT_COMBINATIONS = 96
 local HEAVY_JOB_QUALITY_TIER_THRESHOLD = 12
-local SCAN_SIGNATURE_VERSION = 33
+local SCAN_SIGNATURE_VERSION = 34
 local SKILL_PROBE_SIGNATURE_VERSION = 1
-local FULL_SCAN_SIGNATURE_VERSION = 3
+local FULL_SCAN_SIGNATURE_VERSION = 4
 local GetOperationQuality
 local GetRecipeDisplayQuality
 local GetRecipeDisplayQualityInfo
+local GetRecipeCapabilityTimeMS
 
 local function SortNumbers(left, right)
 	return tonumber(left) < tonumber(right)
+end
+
+GetRecipeCapabilityTimeMS = function()
+	if debugprofilestop then
+		return debugprofilestop()
+	end
+	return GetTime() * 1000
 end
 
 local function AddOutput(outputs, itemID)
@@ -269,6 +276,7 @@ local function BuildBestReagentCapability(recipeID, best)
 		bestReagentTruncated = best.truncated == true,
 		reagentQualityScore = best.reagentQualityScore,
 		debugScanStats = CopyRecipeScanStats(best.debugScanStats),
+		optionalImpact = best.optionalImpact,
 	}
 end
 
@@ -509,6 +517,21 @@ GetRecipeDisplayQualityInfo = function(recipeID, operationInfo, reagentInfo)
 	end
 
 	local recipeInfo = C_TradeSkillUI.GetRecipeInfo(recipeID)
+	local maxQuality = tonumber(recipeInfo and recipeInfo.maxQuality)
+	local qualityCount = recipeInfo and recipeInfo.qualityIDs and #recipeInfo.qualityIDs or nil
+	if maxQuality and qualityCount and qualityCount > 0 and qualityCount < maxQuality and quality <= qualityCount then
+		quality = quality + (maxQuality - qualityCount)
+	end
+
+	local ok, qualityInfo = pcall(C_TradeSkillUI.GetRecipeItemQualityInfo, recipeID, quality)
+	if ok and qualityInfo then
+		return GetQualityTierFromAtlas(qualityInfo.iconSmall)
+			or GetQualityTierFromAtlas(qualityInfo.icon)
+			or tonumber(qualityInfo.quality)
+			or quality,
+			qualityInfo.iconSmall or qualityInfo.icon
+	end
+
 	local qualityItemID = recipeInfo and recipeInfo.qualityItemIDs and recipeInfo.qualityItemIDs[quality]
 	local reagentQuality, reagentQualityAtlas = GetReagentQualityInfoFromItemID(qualityItemID)
 	if reagentQuality then
@@ -531,20 +554,6 @@ GetRecipeDisplayQualityInfo = function(recipeID, operationInfo, reagentInfo)
 		end
 	end
 
-	local maxQuality = tonumber(recipeInfo and recipeInfo.maxQuality)
-	local qualityCount = recipeInfo and recipeInfo.qualityIDs and #recipeInfo.qualityIDs or nil
-	if maxQuality and qualityCount and qualityCount > 0 and qualityCount < maxQuality and quality <= qualityCount then
-		return quality + (maxQuality - qualityCount), nil
-	end
-
-	local ok, qualityInfo = pcall(C_TradeSkillUI.GetRecipeItemQualityInfo, recipeID, quality)
-	if ok and qualityInfo then
-		return GetQualityTierFromAtlas(qualityInfo.iconSmall)
-			or GetQualityTierFromAtlas(qualityInfo.icon)
-			or tonumber(qualityInfo.quality)
-			or quality,
-			qualityInfo.iconSmall or qualityInfo.icon
-	end
 	return quality, nil
 end
 
@@ -553,12 +562,13 @@ GetRecipeDisplayQuality = function(recipeID, operationInfo, reagentInfo)
 	return quality
 end
 
-function AF:GetOptionalReagentImpact(recipeID, baseReagentInfo, baseOperationInfo)
+function AF:GetOptionalReagentImpact(recipeID, baseReagentInfo, baseOperationInfo, yieldIfNeeded)
 	local baseDifficulty = GetOperationDifficulty(baseOperationInfo)
 	if not baseDifficulty then
 		return nil
 	end
 	local baseQuality = GetRecipeDisplayQuality(recipeID, baseOperationInfo, baseReagentInfo) or 0
+	local baseOutputItemLevel = GetRecipeOutputItemLevel(recipeID, baseOperationInfo, baseReagentInfo)
 
 	local recipeInfo = C_TradeSkillUI.GetRecipeInfo(recipeID)
 	local recipeLevel = recipeInfo and recipeInfo.unlockedRecipeLevel
@@ -571,10 +581,7 @@ function AF:GetOptionalReagentImpact(recipeID, baseReagentInfo, baseOperationInf
 	for _, slot in ipairs(schematic.reagentSlotSchematics) do
 		if IsOptionalDifficultySlot(slot) then
 			local reagents = {}
-			for reagentIndex, reagent in ipairs(slot.reagents) do
-				if reagentIndex > MAX_OPTIONAL_REAGENT_TESTS_PER_SLOT then
-					break
-				end
+			for _, reagent in ipairs(slot.reagents) do
 				reagents[#reagents + 1] = reagent
 			end
 			if #reagents > 0 then
@@ -611,20 +618,27 @@ function AF:GetOptionalReagentImpact(recipeID, baseReagentInfo, baseOperationInf
 			return
 		end
 
-		local best = self:GetBestReagentCapability(recipeID, forcedReagents, true)
+		local best = self:GetBestReagentCapability(recipeID, forcedReagents, true, yieldIfNeeded)
 		local normalInfo = best and best.normalInfo
 		local reagentInfo = best and best.reagentInfo
 		local outputItemLevel = best and best.bestOutputItemLevel
 		local optionalDifficulty = GetOperationDifficulty(normalInfo)
-		if not optionalDifficulty or optionalDifficulty <= baseDifficulty then
+		if not optionalDifficulty then
 			return
 		end
 		local optionalQuality, optionalQualityAtlas = GetRecipeDisplayQualityInfo(recipeID, normalInfo, reagentInfo)
-		if not optionalQuality or optionalQuality < baseQuality then
+		if not optionalQuality then
 			return
 		end
 
 		local difficultyDelta = optionalDifficulty - baseDifficulty
+		local outputItemLevelDelta = tonumber(baseOutputItemLevel) and tonumber(outputItemLevel) and (tonumber(outputItemLevel) - tonumber(baseOutputItemLevel)) or 0
+		if difficultyDelta <= 0 and outputItemLevelDelta <= 0 and optionalQuality <= baseQuality then
+			return
+		end
+		if outputItemLevelDelta <= 0 and optionalQuality < baseQuality then
+			return
+		end
 		local reagentScore = best.reagentQualityScore or 0
 		local better = not bestImpact
 			or (tonumber(outputItemLevel) or 0) > (tonumber(bestImpact.outputItemLevel) or 0)
@@ -640,6 +654,7 @@ function AF:GetOptionalReagentImpact(recipeID, baseReagentInfo, baseOperationInf
 			quality = optionalQuality,
 			qualityAtlas = optionalQualityAtlas,
 			outputItemLevel = outputItemLevel,
+			outputItemLevelDelta = outputItemLevelDelta > 0 and outputItemLevelDelta or nil,
 			reagents = optionalReagents,
 			slotCount = #forcedReagents,
 			bestReagents = best.bestReagents,
@@ -647,6 +662,9 @@ function AF:GetOptionalReagentImpact(recipeID, baseReagentInfo, baseOperationInf
 			bestReagentTruncated = best.bestReagentTruncated,
 			reagentQualityScore = reagentScore,
 		}
+		if yieldIfNeeded then
+			yieldIfNeeded()
+		end
 	end
 
 	if combinations > MAX_OPTIONAL_REAGENT_COMBINATIONS then
@@ -765,12 +783,13 @@ function AF:GetRecipeCapability(recipeID, best)
 		capability.bestReagentPendingNames = false
 	end
 
-	local optionalImpact = self:GetOptionalReagentImpact(recipeID, best and best.reagentInfo, best and best.normalInfo or operationInfo)
+	local optionalImpact = best and best.optionalImpact or self:GetOptionalReagentImpact(recipeID, best and best.reagentInfo, best and best.normalInfo or operationInfo)
 	if optionalImpact then
 		capability.optionalDifficultyDelta = optionalImpact.difficultyDelta
 		capability.optionalQuality = optionalImpact.quality
 		capability.optionalQualityAtlas = optionalImpact.qualityAtlas
 		capability.optionalOutputItemLevel = optionalImpact.outputItemLevel
+		capability.optionalOutputItemLevelDelta = optionalImpact.outputItemLevelDelta
 		capability.optionalConcentrationQuality = optionalImpact.concentrationQuality
 		capability.optionalConcentrationQualityAtlas = optionalImpact.concentrationQualityAtlas
 		capability.optionalReagents = optionalImpact.reagents
@@ -1026,6 +1045,9 @@ function AF:GetCurrentProfessionRecipeIDs(profession)
 		if self:RecipeBelongsToProfession(profession, recipeInfo, categoryIDs, recipeID) then
 			table.insert(filtered, recipeID)
 		end
+		if self.YieldScanBuildIfNeeded then
+			self:YieldScanBuildIfNeeded()
+		end
 	end
 
 	return filtered
@@ -1076,12 +1098,9 @@ function AF:GetCurrentProfessionScanSignature(profession)
 		return nil
 	end
 
-	local recipeSignature = self:GetProfessionRecipeSignature()
-	if not recipeSignature then
-		return nil
-	end
-
-	return table.concat({ SCAN_SIGNATURE_VERSION, self:GetOrderableRecipeDataVersion(), recipeSignature }, "|")
+	local recipeIDs = C_TradeSkillUI.GetAllRecipeIDs()
+	local recipeCount = type(recipeIDs) == "table" and #recipeIDs or 0
+	return table.concat({ SCAN_SIGNATURE_VERSION, self:GetOrderableRecipeDataVersion(), tonumber(profession.id) or 0, recipeCount }, "|")
 end
 
 function AF:GetCurrentProfessionScanSignatureVersion()
@@ -1117,13 +1136,6 @@ function AF:EstimateRecipeQualityTierCombinations(recipeID)
 		end
 	end
 	return combinations
-end
-
-local function GetRecipeCapabilityTimeMS()
-	if debugprofilestop then
-		return debugprofilestop()
-	end
-	return GetTime() * 1000
 end
 
 function AF:CreateBestReagentCapabilityCoroutine(recipeID, forcedReagents, normalOnly)
@@ -1355,6 +1367,21 @@ function AF:CreateBestReagentCapabilityCoroutine(recipeID, forcedReagents, norma
 		return false
 	end
 
+	local function YieldIfNeeded()
+		if state.startTime and state.budget and GetRecipeCapabilityTimeMS() - state.startTime >= state.budget then
+			coroutine.yield()
+			state.startTime = GetRecipeCapabilityTimeMS()
+		end
+	end
+
+	local function FinishBest()
+		state.best = BuildBestReagentCapability(recipeID, state.best)
+		if state.best and state.best.normalInfo and not state.best.optionalImpact then
+			state.best.optionalImpact = self:GetOptionalReagentImpact(recipeID, state.best.reagentInfo, state.best.normalInfo, YieldIfNeeded)
+		end
+		return state.best
+	end
+
 	state.co = coroutine.create(function()
 		if state.stats.qualityTierCombinations > HEAVY_JOB_QUALITY_TIER_THRESHOLD then
 			local _, highBest = Evaluate(SelectEndpointReagents(state.candidateSlots, true), false)
@@ -1362,11 +1389,11 @@ function AF:CreateBestReagentCapabilityCoroutine(recipeID, forcedReagents, norma
 			if HasSamePrimaryOutcome(highBest, lowBest, normalOnly) then
 				state.stats.endpointShortcut = true
 				state.stats.endpointShortcutSaved = math.max(0, (tonumber(state.stats.qualityTierCombinations) or 0) - (tonumber(state.stats.evaluated) or 0))
-				return state.best
+				return FinishBest()
 			end
 		end
 		VisitByQuality(1)
-		return state.best
+		return FinishBest()
 	end)
 	return state
 end
@@ -1392,7 +1419,7 @@ function AF:ResumeBestReagentCapabilityState(state, workBudgetMS)
 	return nil
 end
 
-function AF:GetBestReagentCapability(recipeID, forcedReagents, normalOnly)
+function AF:GetBestReagentCapability(recipeID, forcedReagents, normalOnly, yieldIfNeeded)
 	local recipeInfo = C_TradeSkillUI.GetRecipeInfo(recipeID)
 	local recipeLevel = recipeInfo and recipeInfo.unlockedRecipeLevel
 	local okSchematic, schematic = pcall(C_TradeSkillUI.GetRecipeSchematic, recipeID, false, recipeLevel)
@@ -1541,9 +1568,15 @@ function AF:GetBestReagentCapability(recipeID, forcedReagents, normalOnly)
 			if belowBest then
 				stats.prunedBelowBest = stats.prunedBelowBest + 1
 			end
+			if yieldIfNeeded then
+				yieldIfNeeded()
+			end
 			return belowBest, candidateBest
 		end
 		stats.noNormalInfo = stats.noNormalInfo + 1
+		if yieldIfNeeded then
+			yieldIfNeeded()
+		end
 		return false
 	end
 
@@ -1574,6 +1607,9 @@ function AF:GetBestReagentCapability(recipeID, forcedReagents, normalOnly)
 			if VisitByQuality(slotIndex + 1) then
 				return false
 			end
+			if yieldIfNeeded then
+				yieldIfNeeded()
+			end
 		end
 		for _, targetQuality in ipairs(slotQualityTiers[slotIndex]) do
 			local bestReagent = nil
@@ -1589,6 +1625,9 @@ function AF:GetBestReagentCapability(recipeID, forcedReagents, normalOnly)
 				if VisitByQuality(slotIndex + 1) then
 					selected[slotIndex] = nil
 					break
+				end
+				if yieldIfNeeded then
+					yieldIfNeeded()
 				end
 			end
 		end
@@ -1641,6 +1680,7 @@ function AF:ApplyRecipeCapability(item, recipeID, best)
 	item.optionalQuality = capability.optionalQuality
 	item.optionalQualityAtlas = capability.optionalQualityAtlas
 	item.optionalOutputItemLevel = capability.optionalOutputItemLevel
+	item.optionalOutputItemLevelDelta = capability.optionalOutputItemLevelDelta
 	item.optionalConcentrationQuality = capability.optionalConcentrationQuality
 	item.optionalConcentrationQualityAtlas = capability.optionalConcentrationQualityAtlas
 	item.optionalReagents = capability.optionalReagents

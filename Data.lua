@@ -544,6 +544,10 @@ function ApplyDBDefaults(db)
 	if db.cacheCleanupDays == nil then
 		db.cacheCleanupDays = 7
 	end
+	if db.disableAutomaticScans == nil then
+		db.disableAutomaticScans = db.enableAutomaticScans == false
+	end
+	db.enableAutomaticScans = nil
 	if db.autoAvailability == nil then
 		db.autoAvailability = false
 	end

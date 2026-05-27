@@ -116,6 +116,19 @@ function AF:GetQualityIconMarkup(quality, atlas, size)
 	return "Q" .. quality
 end
 
+function AF:GetRecipeQualityIconMarkup(recipeID, quality, size)
+	recipeID = tonumber(recipeID)
+	quality = tonumber(quality)
+	if not recipeID or not quality or quality <= 0 then
+		return nil
+	end
+	local ok, qualityInfo = pcall(C_TradeSkillUI.GetRecipeItemQualityInfo, recipeID, quality)
+	if ok and qualityInfo then
+		return self:GetQualityIconMarkup(tonumber(qualityInfo.quality) or quality, qualityInfo.iconSmall or qualityInfo.icon, size)
+	end
+	return nil
+end
+
 local PROFESSION_ICON_FALLBACKS = {
 	[5] = "Interface\\Icons\\INV_Misc_Food_15",
 	[6] = "Interface\\Icons\\Trade_Mining",
@@ -336,14 +349,12 @@ function AF:FormatCapability(entry)
 	local bestConcentrationQuality = tonumber(entry.bestConcentrationQuality)
 	local baseConcentrationQuality = tonumber(entry.concentrationQuality)
 	local concentrationQuality = bestConcentrationQuality
-	local concentrationAtlas = entry.bestConcentrationQualityAtlas
 	if baseConcentrationQuality and baseConcentrationQuality > (concentrationQuality or 0) then
 		concentrationQuality = baseConcentrationQuality
-		concentrationAtlas = entry.concentrationQualityAtlas
 	end
 
 	if bestQuality and bestQuality > 0 then
-		local qualityText = self:GetQualityIconMarkup(bestQuality, entry.bestQualityAtlas, 16) or ("Q" .. bestQuality)
+		local qualityText = self:GetRecipeQualityIconMarkup(entry.recipeID, bestQuality, 16) or ("Q" .. bestQuality)
 		table.insert(parts, self:Text("RECOMMENDED_REAGENTS_QUALITY", qualityText))
 	end
 
@@ -354,7 +365,7 @@ function AF:FormatCapability(entry)
 
 	local line = table.concat(parts, " - ")
 	if concentrationQuality and concentrationQuality > (bestQuality or normalQuality or 0) then
-		local concentrationText = self:Text("CONCENTRATION_QUALITY", self:GetQualityIconMarkup(concentrationQuality, concentrationAtlas, 16) or ("Q" .. concentrationQuality))
+		local concentrationText = self:Text("CONCENTRATION_QUALITY", self:GetRecipeQualityIconMarkup(entry.recipeID, concentrationQuality, 16) or ("Q" .. concentrationQuality))
 		if line == "" then
 			return concentrationText
 		end
@@ -366,11 +377,17 @@ end
 
 function AF:FormatOptionalReagentImpact(entry, compact)
 	local delta = tonumber(entry and entry.optionalDifficultyDelta)
-	if not delta or delta <= 0 then
+	local itemLevelDelta = tonumber(entry and entry.optionalOutputItemLevelDelta)
+	if (not itemLevelDelta or itemLevelDelta <= 0) and entry then
+		local optionalOutputItemLevel = tonumber(entry.optionalOutputItemLevel)
+		local baseOutputItemLevel = tonumber(entry.bestOutputItemLevel or entry.outputItemLevel)
+		itemLevelDelta = optionalOutputItemLevel and baseOutputItemLevel and (optionalOutputItemLevel - baseOutputItemLevel) or nil
+	end
+	if (not delta or delta <= 0) and (not itemLevelDelta or itemLevelDelta <= 0) then
 		return ""
 	end
 	local quality = tonumber(entry.optionalQuality)
-	local qualityText = quality and quality > 0 and (self:GetQualityIconMarkup(quality, entry.optionalQualityAtlas, 16) or ("Q" .. quality)) or nil
+	local qualityText = quality and quality > 0 and (self:GetRecipeQualityIconMarkup(entry.recipeID, quality, 16) or ("Q" .. quality)) or nil
 	if compact then
 		if qualityText then
 			return self:Text("OPTIONAL_REAGENTS_ROW", qualityText)
@@ -378,9 +395,9 @@ function AF:FormatOptionalReagentImpact(entry, compact)
 		return self:Text("OPTIONAL_REAGENTS_ROW_DIFFICULTY")
 	end
 	if qualityText then
-		return self:Text("OPTIONAL_REAGENTS_TOOLTIP", delta, qualityText)
+		return delta and delta > 0 and self:Text("OPTIONAL_REAGENTS_TOOLTIP", delta, qualityText) or self:Text("OPTIONAL_REAGENTS_ROW", qualityText)
 	end
-	return self:Text("OPTIONAL_REAGENTS_TOOLTIP_DIFFICULTY", delta)
+	return delta and delta > 0 and self:Text("OPTIONAL_REAGENTS_TOOLTIP_DIFFICULTY", delta) or self:Text("OPTIONAL_REAGENTS_ROW_DIFFICULTY")
 end
 
 local TOOLTIP_COMMENT_COLOR = { 0.65, 0.65, 0.65 }
@@ -758,12 +775,13 @@ function AF:GetDisplayItemName(itemID, fallback)
 	return self:GetItemName(itemID) or fallback or self:Text("ITEM_FALLBACK")
 end
 
-function AF:OnItemDataLoaded()
-	if not self.pendingReagentItemData then
-		return
-	end
+function AF:OnItemDataLoaded(...)
+	local refreshCustomerResults = self.pendingReagentItemData
 	self.pendingReagentItemData = nil
-	if self.RefreshCustomerResults then
+	if self.OnOrderNotificationItemDataLoaded then
+		self:OnOrderNotificationItemDataLoaded(...)
+	end
+	if refreshCustomerResults and self.RefreshCustomerResults then
 		self:RefreshCustomerResults()
 	end
 end

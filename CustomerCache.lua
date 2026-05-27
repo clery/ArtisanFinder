@@ -313,6 +313,7 @@ function AF:GetOwnAltRows(itemID, professionID, filterText, seenNames, recipeID)
 			optionalQuality = item.optionalQuality,
 			optionalQualityAtlas = item.optionalQualityAtlas,
 			optionalOutputItemLevel = item.optionalOutputItemLevel,
+			optionalOutputItemLevelDelta = item.optionalOutputItemLevelDelta,
 			optionalConcentrationQuality = item.optionalConcentrationQuality,
 			optionalConcentrationQualityAtlas = item.optionalConcentrationQualityAtlas,
 			optionalReagents = item.optionalReagents,

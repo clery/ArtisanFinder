@@ -155,6 +155,7 @@ end
 function AF:ClearOptionsData()
 	self.db.defaultSort = "best"
 	self.db.cacheCleanupDays = 7
+	self.db.disableAutomaticScans = false
 	self.db.autoAvailability = false
 	self.db.autoAvailabilityDisable = { party = true, raid = true, pvp = true, arena = true, delve = true }
 	self.db.tradeLeadMinutes = 15

@@ -238,6 +238,33 @@ function AF:InitializeOptions()
 		Settings.CreateCheckbox(category, setting, self:Text(descKey))
 	end
 
+	AddSection("OPTIONS_SECTION_SCANNING")
+	local disableAutomaticScans = RegisterProxySetting(
+		"ArtisanFinder_DisableAutomaticScans",
+		Settings.VarType.Boolean,
+		"OPTIONS_DISABLE_AUTOMATIC_SCANS",
+		false,
+		function()
+			return AF.db.disableAutomaticScans == true
+		end,
+		function(value)
+			AF.db.disableAutomaticScans = value == true
+			if value == true then
+				if AF.StopProfessionEquipmentWatch then
+					AF:StopProfessionEquipmentWatch()
+				end
+			elseif AF.IsOwnProfessionWindowOpen and AF:IsOwnProfessionWindowOpen() then
+				if AF.StartProfessionEquipmentWatch then
+					AF:StartProfessionEquipmentWatch()
+				end
+				if AF.ResumeCurrentProfessionScanIfNeeded then
+					AF:ResumeCurrentProfessionScanIfNeeded()
+				end
+			end
+		end
+	)
+	Settings.CreateCheckbox(category, disableAutomaticScans, self:Text("OPTIONS_DISABLE_AUTOMATIC_SCANS_DESC"))
+
 	AddSection("OPTIONS_SECTION_TRADE_LEADS")
 	local tradeLeadLifetime = RegisterProxySetting(
 		"ArtisanFinder_TradeLeadMinutes",

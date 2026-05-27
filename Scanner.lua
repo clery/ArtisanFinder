@@ -2,19 +2,36 @@ local _, AF = ...
 
 local SCAN_PROBE_JOB_DELAY = 0.01
 local SCAN_FULL_JOB_DELAY = 0.01
-local SCAN_PROBE_JOBS_PER_TICK = 25
-local SCAN_FULL_JOBS_PER_TICK = 4
-local SCAN_TICK_BUDGET_MS = 8
-local SCAN_FULL_JOB_CHUNK_MS = 4
+local SCAN_PROBE_JOBS_PER_TICK = 8
+local SCAN_FULL_JOBS_PER_TICK = 1
+local SCAN_TICK_BUDGET_MS = 6
+local SCAN_FULL_JOB_CHUNK_MS = 3
+local SCAN_BUILD_PROGRESS_BUDGET_MS = 6
+local SCAN_BUILD_PROGRESS_DELAY = 0.01
 local SCAN_TICK_WARNING_MS = 1000
 local SCAN_GC_STEP_SIZE = 32
 local HEAVY_JOB_QUALITY_TIER_THRESHOLD = 12
+local scanBuildYieldState
 
 local function GetScanTimeMS()
 	if debugprofilestop then
 		return debugprofilestop()
 	end
 	return GetTime() * 1000
+end
+
+local function YieldScanBuildIfNeeded()
+	if not scanBuildYieldState then
+		return
+	end
+	if GetScanTimeMS() - scanBuildYieldState.startedMS >= scanBuildYieldState.budgetMS then
+		coroutine.yield("yield")
+		scanBuildYieldState.startedMS = GetScanTimeMS()
+	end
+end
+
+function AF:YieldScanBuildIfNeeded()
+	YieldScanBuildIfNeeded()
 end
 
 local function GetScanJobKey(recipeID, itemID)
@@ -72,6 +89,7 @@ local function GetRecommendationSnapshot(item)
 		tostring(item.optionalDifficultyDelta or ""),
 		tostring(item.optionalQuality or ""),
 		tostring(item.optionalOutputItemLevel or ""),
+		tostring(item.optionalOutputItemLevelDelta or ""),
 		tostring(item.optionalConcentrationQuality or ""),
 		tostring(item.optionalBestReagentSignature or ""),
 		tostring(item.optionalBestReagentTruncated == true),
@@ -186,6 +204,9 @@ function AF:ShouldQueueProfessionEquipmentScan(profession)
 end
 
 function AF:RestartActiveScanForEquipmentUpgrade(profession)
+	if self.db and self.db.disableAutomaticScans == true then
+		return false
+	end
 	if not self:IsOwnProfessionWindowOpen() then
 		return false
 	end
@@ -377,6 +398,7 @@ function AF:BuildScanProgress(profession, professionEntry, signature, force, mod
 				end
 			end
 		end
+		YieldScanBuildIfNeeded()
 	end
 
 	professionEntry.scanProgress = {
@@ -406,6 +428,51 @@ function AF:BuildScanProgress(profession, professionEntry, signature, force, mod
 		))
 	end
 	return professionEntry.scanProgress
+end
+
+function AF:BuildScanProgressAsync(profession, professionEntry, signature, force, mode, reason, onDone)
+	self.scanProgressBuildToken = (self.scanProgressBuildToken or 0) + 1
+	local token = self.scanProgressBuildToken
+	local co = coroutine.create(function()
+		return self:BuildScanProgress(profession, professionEntry, signature, force, mode, reason)
+	end)
+	local function Resume()
+		if token ~= AF.scanProgressBuildToken then
+			return
+		end
+		if AF:IsInCombatLocked() or not AF:IsOwnProfessionWindowOpen() then
+			AF.scanProgressBuildPending = nil
+			return
+		end
+		scanBuildYieldState = {
+			startedMS = GetScanTimeMS(),
+			budgetMS = SCAN_BUILD_PROGRESS_BUDGET_MS,
+		}
+		local ok, progress, message = coroutine.resume(co)
+		scanBuildYieldState = nil
+		if not ok then
+			AF.scanProgressBuildPending = nil
+			AF:DebugLog("scan", "build failed: " .. tostring(progress))
+			if onDone then
+				onDone(nil, progress)
+			end
+			return
+		end
+		if coroutine.status(co) == "dead" then
+			AF.scanProgressBuildPending = nil
+			if onDone then
+				onDone(progress, message)
+			end
+			return
+		end
+		C_Timer.After(SCAN_BUILD_PROGRESS_DELAY, Resume)
+	end
+	self.scanProgressBuildPending = {
+		token = token,
+		professionID = profession and profession.id,
+		signature = signature,
+	}
+	C_Timer.After(0, Resume)
 end
 
 local function GetPendingIndex(progress)
@@ -953,6 +1020,45 @@ function AF:PauseActiveProfessionScan(silent)
 	end
 end
 
+function AF:StartBuiltProfessionScan(profession, professionEntry, currentSignature, mode, force, silent, reason, progress)
+	if not progress then
+		self:DebugLog("scan", string.format("start skipped: no recipes profession=%s mode=%s", tostring(profession and profession.id or ""), tostring(mode)))
+		if not silent then
+			self:Print(self:Text("SCAN_NO_RECIPES"))
+		end
+		return 0
+	end
+	if GetPendingCount(progress) == 0 then
+		self:DebugLog("scan", string.format("start skipped: no pending jobs profession=%s mode=%s", tostring(profession and profession.id or ""), tostring(mode)))
+		professionEntry.scanSignature = currentSignature
+		professionEntry.scanMode = mode
+		professionEntry.scannedAt = self:Now()
+		professionEntry.scanProgress = nil
+		return 0
+	end
+
+	self.activeScan = {
+		professionID = profession.id,
+		signature = progress.signature,
+	}
+	self:DebugLog("scan", string.format(
+		"started profession=%s mode=%s pending=%d force=%s reason=%s orderableSkipped=%d",
+		tostring(profession.id),
+		tostring(mode),
+		GetPendingCount(progress),
+		tostring(force == true),
+		tostring(reason or ""),
+		tonumber(progress.skippedOrderable) or 0
+	))
+	professionEntry.scanSignature = nil
+	self:RefreshScanProgressUI(true)
+	if reason ~= "PROFESSION_EQUIPMENT_CHANGED" then
+		self:Print(self:Text(progress.scanned and progress.scanned > 0 and "SCAN_RESUMED" or "SCAN_STARTED", profession.name))
+	end
+	self:ProcessScanQueue()
+	return GetPendingCount(progress)
+end
+
 function AF:StartOrResumeCurrentProfessionScan(force, silent, mode, forceProbe, reason)
 	if self:IsInCombatLocked() then
 		self:DebugLog("scan", "deferred start: combat")
@@ -1026,44 +1132,27 @@ function AF:StartOrResumeCurrentProfessionScan(force, silent, mode, forceProbe, 
 	if not force and professionEntry.scanProgress and professionEntry.scanProgress.signature == progressSignature then
 		progress = professionEntry.scanProgress
 	else
-		progress = self:BuildScanProgress(profession, professionEntry, currentSignature, force, mode, reason)
-	end
-	if not progress then
-		self:DebugLog("scan", string.format("start skipped: no recipes profession=%s mode=%s", tostring(profession.id), tostring(mode)))
-		if not silent then
-			self:Print(self:Text("SCAN_NO_RECIPES"))
+		if self.scanProgressBuildPending
+			and tonumber(self.scanProgressBuildPending.professionID) == tonumber(profession.id)
+			and self.scanProgressBuildPending.signature == currentSignature
+		then
+			return 0
 		end
-		return 0
-	end
-	if GetPendingCount(progress) == 0 then
-		self:DebugLog("scan", string.format("start skipped: no pending jobs profession=%s mode=%s", tostring(profession.id), tostring(mode)))
-		professionEntry.scanSignature = currentSignature
-		professionEntry.scanMode = mode
-		professionEntry.scannedAt = self:Now()
-		professionEntry.scanProgress = nil
+		self:DebugLog("scan", string.format("build queued profession=%s mode=%s force=%s reason=%s", tostring(profession.id), tostring(mode), tostring(force == true), tostring(reason or "")))
+		self:BuildScanProgressAsync(profession, professionEntry, currentSignature, force, mode, reason, function(builtProgress)
+			if not AF:IsOwnProfessionWindowOpen() then
+				return
+			end
+			local currentProfession = AF:GetCurrentProfessionInfo()
+			if not currentProfession or tonumber(AF:GetSupportedProfessionID(currentProfession.id, currentProfession)) ~= tonumber(profession.id) then
+				return
+			end
+			AF:StartBuiltProfessionScan(profession, professionEntry, currentSignature, mode, force, silent, reason, builtProgress)
+		end)
 		return 0
 	end
 
-	self.activeScan = {
-		professionID = profession.id,
-		signature = progress.signature,
-	}
-	self:DebugLog("scan", string.format(
-		"started profession=%s mode=%s pending=%d force=%s reason=%s orderableSkipped=%d",
-		tostring(profession.id),
-		tostring(mode),
-		GetPendingCount(progress),
-		tostring(force == true),
-		tostring(reason or ""),
-		tonumber(progress.skippedOrderable) or 0
-	))
-	professionEntry.scanSignature = nil
-	self:RefreshScanProgressUI(true)
-	if reason ~= "PROFESSION_EQUIPMENT_CHANGED" then
-		self:Print(self:Text(progress.scanned and progress.scanned > 0 and "SCAN_RESUMED" or "SCAN_STARTED", profession.name))
-	end
-	self:ProcessScanQueue()
-	return GetPendingCount(progress)
+	return self:StartBuiltProfessionScan(profession, professionEntry, currentSignature, mode, force, silent, reason, progress)
 end
 
 function AF:ProfessionHasPendingReagentNameWork(professionID)
@@ -1112,6 +1201,9 @@ function AF:QueueAutoScan(force)
 end
 
 function AF:QueueProfessionDataSourceProbe()
+	if self.db and self.db.disableAutomaticScans == true then
+		return
+	end
 	if self:IsInCombatLocked() or not self:IsOwnProfessionWindowOpen() then
 		return
 	end
@@ -1142,6 +1234,9 @@ function AF:QueueProfessionDataSourceProbe()
 end
 
 function AF:StartProfessionEquipmentWatch()
+	if self.db and self.db.disableAutomaticScans == true then
+		return
+	end
 	self.professionEquipmentWatchToken = (self.professionEquipmentWatchToken or 0) + 1
 	local token = self.professionEquipmentWatchToken
 	local function Tick()
@@ -1177,6 +1272,16 @@ function AF:StopProfessionEquipmentWatch()
 end
 
 function AF:QueueAutoScanForChange(reason)
+	if self.db and self.db.disableAutomaticScans == true and reason ~= "FORCE" then
+		self.pendingAutoScanReason = nil
+		self.deferredAutoScanReason = nil
+		if reason == "PROFESSION_EQUIPMENT_CHANGED" then
+			self.pendingProfessionEquipmentScan = nil
+			self.pendingProfessionEquipmentSkillLineID = nil
+			self.deferredProfessionEquipmentSkillLineID = nil
+		end
+		return
+	end
 	if self:IsInCombatLocked() then
 		self.deferredAutoScanReason = reason or self.deferredAutoScanReason
 		if reason == "PROFESSION_EQUIPMENT_CHANGED" then
@@ -1264,6 +1369,9 @@ function AF:QueueAutoScanForChange(reason)
 end
 
 function AF:ResumeCurrentProfessionScanIfNeeded()
+	if self.db and self.db.disableAutomaticScans == true then
+		return 0
+	end
 	if not self:IsOwnProfessionWindowOpen() then
 		self.activeScan = nil
 		return 0

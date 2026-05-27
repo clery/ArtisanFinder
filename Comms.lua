@@ -424,8 +424,6 @@ function AF:HandleQuery(parts, sender, channel)
 				tonumber(item.bestTotalSkill) or "",
 				tonumber(item.bestConcentrationCost) or "",
 				item.bestReagentTruncated and 1 or 0,
-				self:EncodeField(item.qualityAtlas, 48),
-				self:EncodeField(item.bestQualityAtlas, 48),
 				item.bestReagents and 1 or 0,
 				self:EncodeField(crafterName, 48),
 				tonumber(item.optionalDifficultyDelta) or "",
@@ -440,7 +438,8 @@ function AF:HandleQuery(parts, sender, channel)
 			}
 			local payload = table.concat(payloadParts, "|")
 			if #payload > 255 then
-				payloadParts[31] = ""
+				payloadParts[29] = ""
+				payloadParts[22] = 0
 				payload = table.concat(payloadParts, "|")
 			end
 			if #payload > 255 then
@@ -457,14 +456,12 @@ function AF:HandleQuery(parts, sender, channel)
 				payloadParts[19] = ""
 				payloadParts[20] = ""
 				payloadParts[21] = 0
-				payloadParts[22] = ""
-				payloadParts[23] = ""
-				payloadParts[24] = 0
+				payloadParts[22] = 0
+				payloadParts[24] = ""
+				payloadParts[25] = ""
 				payloadParts[26] = ""
 				payloadParts[27] = ""
-				payloadParts[28] = ""
 				payloadParts[29] = ""
-				payloadParts[31] = ""
 				payload = table.concat(payloadParts, "|")
 			end
 
@@ -625,20 +622,18 @@ function AF:HandleResponse(parts, sender)
 	local bestTotalSkill = tonumber(parts[19])
 	local bestConcentrationCost = tonumber(parts[20])
 	local bestReagentTruncated = tonumber(parts[21]) == 1
-	local qualityAtlas = self:DecodeField(parts[22])
-	local bestQualityAtlas = self:DecodeField(parts[23])
-	local hasReagentSummary = tonumber(parts[24]) == 1
-	local crafterName = self:NormalizeName(self:DecodeField(parts[25])) or sender
-	local optionalDifficultyDelta = tonumber(parts[26])
-	local optionalQuality = tonumber(parts[27])
-	local optionalConcentrationQuality = tonumber(parts[28])
-	local optionalSlotCount = tonumber(parts[29])
-	local responseTarget = self:NormalizeName(self:DecodeField(parts[30]))
-	local responseSupportsReagentDetails = parts[31] ~= nil
-	local responseReagents = self:DecodeReagentEntries(self:DecodeField(parts[31]))
-	local afk = tonumber(parts[32]) == 1
-	local bestOutputItemLevel = tonumber(parts[33])
-	local optionalOutputItemLevel = tonumber(parts[34])
+	local hasReagentSummary = tonumber(parts[22]) == 1
+	local crafterName = self:NormalizeName(self:DecodeField(parts[23])) or sender
+	local optionalDifficultyDelta = tonumber(parts[24])
+	local optionalQuality = tonumber(parts[25])
+	local optionalConcentrationQuality = tonumber(parts[26])
+	local optionalSlotCount = tonumber(parts[27])
+	local responseTarget = self:NormalizeName(self:DecodeField(parts[28]))
+	local responseSupportsReagentDetails = parts[29] ~= nil
+	local responseReagents = self:DecodeReagentEntries(self:DecodeField(parts[29]))
+	local afk = tonumber(parts[30]) == 1
+	local bestOutputItemLevel = tonumber(parts[31])
+	local optionalOutputItemLevel = tonumber(parts[32])
 	local cacheKey = crafterName
 
 	if not itemID then
@@ -685,11 +680,9 @@ function AF:HandleResponse(parts, sender)
 		recipeDifficulty = recipeDifficulty,
 		totalSkill = totalSkill,
 		quality = quality,
-		qualityAtlas = qualityAtlas ~= "" and qualityAtlas or nil,
 		concentrationQuality = concentrationQuality,
 		concentrationCost = concentrationCost,
 		bestQuality = bestQuality,
-		bestQualityAtlas = bestQualityAtlas ~= "" and bestQualityAtlas or nil,
 		bestConcentrationQuality = bestConcentrationQuality,
 		bestTotalSkill = bestTotalSkill,
 		bestConcentrationCost = bestConcentrationCost,

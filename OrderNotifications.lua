@@ -97,6 +97,19 @@ local function GetOrderNotificationItemInfo(details)
 	return itemID, itemName, itemLink, itemQuality, itemIcon
 end
 
+local function IsOrderNotificationItemDataLoaded(details)
+	local itemID = tonumber(details and details.itemID) or AF:GetItemIDFromLink(details and details.itemLink)
+	if not itemID then
+		return true
+	end
+	local name, link = C_Item.GetItemInfo(itemID)
+	if name and link then
+		return true
+	end
+	pcall(C_Item.RequestLoadItemDataByID, itemID)
+	return false
+end
+
 local function SetItemTextColor(fontString, quality)
 	quality = tonumber(quality)
 	if quality and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[quality] then
@@ -146,16 +159,36 @@ local function CopyOrderDetails(details)
 	if type(details) ~= "table" then
 		return {}
 	end
+	local itemLink = details.itemLink and details.itemLink ~= "" and details.itemLink or nil
+	local itemName = details.itemName and details.itemName ~= "" and details.itemName or nil
+	local customerName = details.customerName and details.customerName ~= "" and details.customerName or nil
+	local professionName = details.professionName and details.professionName ~= "" and details.professionName or nil
 	return {
 		itemID = tonumber(details.itemID),
-		itemLink = details.itemLink,
-		itemName = details.itemName,
+		itemLink = itemLink,
+		itemName = itemName,
 		itemQuality = tonumber(details.itemQuality),
 		itemIcon = tonumber(details.itemIcon),
 		commissionCopper = tonumber(details.commissionCopper),
-		customerName = details.customerName,
-		professionName = details.professionName,
+		customerName = customerName,
+		professionName = professionName,
 	}
+end
+
+local function HasOrderItemDetails(details)
+	return type(details) == "table"
+		and (tonumber(details.itemID) or (details.itemLink and details.itemLink ~= "") or (details.itemName and details.itemName ~= "") or tonumber(details.itemIcon)) ~= nil
+end
+
+local function MergeOrderDetails(primary, fallback)
+	local details = CopyOrderDetails(primary)
+	fallback = CopyOrderDetails(fallback)
+	for key, value in pairs(fallback) do
+		if details[key] == nil then
+			details[key] = value
+		end
+	end
+	return details
 end
 
 local function StripOrderDisplayText(text)
@@ -196,6 +229,17 @@ local function FillOrderDetailsFallback(details, form, recipeSchematic)
 	details.itemName = details.itemName or GetFallbackOrderName(form, recipeSchematic)
 	details.itemIcon = details.itemIcon or GetFallbackOrderIcon(form)
 	return details
+end
+
+local function FillOrderDetailsFromRecipeInfo(details, recipeInfo)
+	if type(recipeInfo) ~= "table" then
+		return details
+	end
+	details.itemID = details.itemID or tonumber(recipeInfo.itemID)
+	details.itemLink = details.itemLink or recipeInfo.hyperlink
+	details.itemName = details.itemName or recipeInfo.name
+	details.itemIcon = details.itemIcon or recipeInfo.icon
+	return FillOrderDetailsFromItemInfo(details)
 end
 
 local function ResetOrderNotificationToast(_, toast)
@@ -246,6 +290,9 @@ function AF:ShowOrderNotification(characterName, count, details)
 	-- if not CanShowOrderNotification(self) then
 	-- 	return
 	-- end
+	if self:QueueOrderNotificationToastUntilItemLoaded(characterName, count, details) then
+		return
+	end
 	self:ShowOrderNotificationToast(characterName, count, details)
 end
 
@@ -285,6 +332,48 @@ function AF:NotifyPersonalOrder(characterName, count, sender, details)
 	self:DebugLog("orders", string.format("notify character=%s count=%s sender=%s item=%s commission=%s customer=%s", tostring(characterName), tostring(count), tostring(sender or ""), tostring(details.itemID or ""), tostring(details.commissionCopper or ""), tostring(details.customerName or "")))
 	self:PlayOrderNotificationSound()
 	self:ShowOrderNotification(characterName, count, details)
+	if self.RefreshCraftingOrderIndicator then
+		self:RefreshCraftingOrderIndicator()
+	end
+end
+
+function AF:QueueOrderNotificationToastUntilItemLoaded(characterName, count, details)
+	details = CopyOrderDetails(details)
+	local itemID = tonumber(details.itemID) or self:GetItemIDFromLink(details.itemLink)
+	if not itemID or IsOrderNotificationItemDataLoaded(details) then
+		return false
+	end
+	self.pendingOrderNotificationToasts = self.pendingOrderNotificationToasts or {}
+	table.insert(self.pendingOrderNotificationToasts, {
+		characterName = characterName,
+		count = count,
+		details = details,
+	})
+	return true
+end
+
+function AF:OnOrderNotificationItemDataLoaded(itemID)
+	local pending = self.pendingOrderNotificationToasts
+	if not pending or #pending == 0 then
+		return
+	end
+	itemID = tonumber(itemID)
+	local remaining = {}
+	for _, pendingToast in ipairs(pending) do
+		local details = CopyOrderDetails(pendingToast.details)
+		local pendingItemID = tonumber(details.itemID) or self:GetItemIDFromLink(details.itemLink)
+		if (not itemID or itemID == pendingItemID) and IsOrderNotificationItemDataLoaded(details) then
+			FillOrderDetailsFromItemInfo(details)
+			local entry = self.altOrderNotifications and self.altOrderNotifications[pendingToast.characterName]
+			if entry and (not pendingItemID or tonumber(entry.itemID) == pendingItemID) then
+				FillOrderDetailsFromItemInfo(entry)
+			end
+			self:ShowOrderNotificationToast(pendingToast.characterName, pendingToast.count, details)
+		else
+			table.insert(remaining, pendingToast)
+		end
+	end
+	self.pendingOrderNotificationToasts = remaining
 	if self.RefreshCraftingOrderIndicator then
 		self:RefreshCraftingOrderIndicator()
 	end
@@ -427,6 +516,22 @@ function AF:CapturePersonalOrderDetails(orderInfo, form)
 			end
 		end
 		FillOrderDetailsFallback(details, form, recipeSchematic)
+	elseif orderInfo.skillLineAbilityID then
+		details.professionName = C_TradeSkillUI.GetProfessionNameForSkillLineAbility(orderInfo.skillLineAbilityID)
+		local okRecipeInfo, recipeInfo = pcall(C_TradeSkillUI.GetRecipeInfoForSkillLineAbility, orderInfo.skillLineAbilityID)
+		if okRecipeInfo then
+			local recipeID = tonumber(recipeInfo and recipeInfo.recipeID)
+			if recipeID then
+				local okOutput, outputItemInfo = pcall(C_TradeSkillUI.GetRecipeOutputItemData, recipeID, orderInfo.craftingReagentItems, orderInfo.recraftItem, orderInfo.minCraftingQualityID)
+				if okOutput and type(outputItemInfo) == "table" then
+					details.itemLink = details.itemLink or outputItemInfo.hyperlink
+					details.itemID = details.itemID or tonumber(outputItemInfo.itemID) or self:GetItemIDFromLink(outputItemInfo.hyperlink)
+					details.itemName = details.itemName or outputItemInfo.itemName
+					details.itemIcon = details.itemIcon or outputItemInfo.icon
+				end
+			end
+			FillOrderDetailsFromRecipeInfo(details, recipeInfo)
+		end
 	end
 	FillOrderDetailsFromItemInfo(details)
 	return details
@@ -467,8 +572,14 @@ function AF:InitializeOrderNotifications()
 			and orderInfo.orderTarget
 			and orderInfo.orderTarget ~= ""
 		then
-			AF.pendingPersonalOrderTarget = AF:NormalizeName(orderInfo.orderTarget)
-			AF.pendingPersonalOrderDetails = AF:CapturePersonalOrderDetails(orderInfo)
+			local target = AF:NormalizeName(orderInfo.orderTarget)
+			local capturedDetails = AF:CapturePersonalOrderDetails(orderInfo)
+			if target == AF.pendingPersonalOrderTarget and HasOrderItemDetails(AF.pendingPersonalOrderDetails) and not HasOrderItemDetails(capturedDetails) then
+				AF.pendingPersonalOrderDetails = MergeOrderDetails(AF.pendingPersonalOrderDetails, capturedDetails)
+			else
+				AF.pendingPersonalOrderDetails = MergeOrderDetails(capturedDetails, target == AF.pendingPersonalOrderTarget and AF.pendingPersonalOrderDetails or nil)
+			end
+			AF.pendingPersonalOrderTarget = target
 			AF:DebugLog("orders", "pending target=" .. tostring(AF.pendingPersonalOrderTarget))
 		else
 			AF.pendingPersonalOrderTarget = nil
