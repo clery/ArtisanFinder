@@ -311,16 +311,10 @@
 			<Button parentKey="save" inherits="UIPanelButtonTemplate">
 				<Size x="54" y="22"/>
 			</Button>
-			<Button parentKey="fastScanButton" inherits="UIPanelButtonTemplate">
-				<Size x="96" y="22"/>
-				<Anchors>
-					<Anchor point="TOPLEFT" x="92" y="-190"/>
-				</Anchors>
-			</Button>
 			<Button parentKey="forceRescanButton" inherits="UIPanelButtonTemplate">
 				<Size x="76" y="22"/>
 				<Anchors>
-					<Anchor point="TOPLEFT" x="194" y="-190"/>
+					<Anchor point="TOPLEFT" x="92" y="-190"/>
 				</Anchors>
 			</Button>
 			<CheckButton parentKey="advertiseCheck" inherits="UICheckButtonTemplate">

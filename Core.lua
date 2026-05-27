@@ -244,23 +244,6 @@ function AF:ToggleAutoAvailability()
 	self:SetAutoAvailability(not self.db.autoAvailability)
 end
 
-function AF:SetFastScan(enabled)
-	self.db.fastScan = enabled == true
-	if self.activeScan and self.ProcessScanQueue then
-		self.scanProcessing = false
-		self.scanQueueToken = (self.scanQueueToken or 0) + 1
-		self:ProcessScanQueue()
-	end
-	if self.RefreshCrafterUIScanSafe then
-		self:RefreshCrafterUIScanSafe()
-	elseif self.RefreshCrafterUI then
-		self:RefreshCrafterUI()
-	end
-	if self.RefreshOptionsPanel then
-		self:RefreshOptionsPanel()
-	end
-end
-
 function AF:TryAttachProfessionUIs()
 	if self.AttachCustomerUI then
 		self:AttachCustomerUI()

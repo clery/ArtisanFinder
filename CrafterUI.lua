@@ -365,7 +365,7 @@ function AF:RefreshCrafterLocale()
 		if defaults.errorText and defaults.errorText:IsShown() then
 			defaults.errorText:SetText(self:Text("COMMISSION_INVALID"))
 		end
-		self:UpdateFastScanButton()
+		self:UpdateScanControls()
 	end
 end
 
@@ -766,21 +766,6 @@ function AF:AttachCrafterUI()
 		AF:RefreshCrafterUI()
 	end)
 
-	local fastScanButton = defaults.fastScanButton
-	fastScanButton:SetScript("OnClick", function()
-		AF:SetFastScan(not (AF.db and AF.db.fastScan == true))
-	end)
-	fastScanButton:SetScript("OnEnter", function(self)
-		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		GameTooltip:SetText(AF:Text("FAST_SCAN_BUTTON"), 1, 0.82, 0)
-		GameTooltip:AddLine(AF:Text("FAST_SCAN_STATE", AF.db and AF.db.fastScan and AF:Text("ENABLED") or AF:Text("DISABLED")), 0.85, 0.85, 0.85, true)
-		GameTooltip:AddLine(AF:Text("FAST_SCAN_TOOLTIP"), 1, 1, 1, true)
-		GameTooltip:Show()
-	end)
-	fastScanButton:SetScript("OnLeave", function()
-		GameTooltip:Hide()
-	end)
-
 	local forceRescanButton = defaults.forceRescanButton
 	forceRescanButton:SetScript("OnClick", function()
 		AF:StartOrResumeCurrentProfessionScan(true, false)
@@ -829,7 +814,6 @@ function AF:AttachCrafterUI()
 	self.crafterFrame = frame
 	self.crafterDefaultsFrame = defaults
 	self.crafterDefaultsCollapseButton = collapseButton
-	self.crafterFastScanButton = fastScanButton
 	self.crafterForceRescanButton = forceRescanButton
 	self.crafterScanProgressText = defaults.scanProgressText
 	defaults.collapsibleRegions = {
@@ -845,7 +829,6 @@ function AF:AttachCrafterUI()
 		defaults.priceField,
 		defaults.noteField,
 		defaults.save,
-		defaults.fastScanButton,
 		defaults.forceRescanButton,
 		defaults.scanProgressText,
 		defaults.errorText,
@@ -958,31 +941,19 @@ function AF:RefreshCrafterUIScanSafe()
 	end
 end
 
-function AF:UpdateFastScanButton()
-	local button = self.crafterFastScanButton
+function AF:UpdateScanControls()
 	local forceRescanButton = self.crafterForceRescanButton
 	local scanProgressText = self.crafterScanProgressText
 	local defaults = self.crafterDefaultsFrame
-	if not button or not defaults then
+	if not defaults then
 		return
 	end
 	local active = self.activeScan
 	local currentProfessionID = self:GetCurrentSupportedProfessionID()
-	local fastScanText = self:Text("FAST_SCAN_BUTTON")
-	if self.db and self.db.fastScan == true then
-		fastScanText = "|TInterface\\Buttons\\UI-CheckBox-Check:14:14:0:0|t " .. fastScanText
-	end
-	SizeButtonForText(button, fastScanText, 108, 140)
-	if currentProfessionID then
-		button:Enable()
-	else
-		button:Disable()
-	end
-	button:SetShown(defaults:IsShown() and not self.crafterDefaultsCollapsed)
 	if forceRescanButton then
 		SizeButtonForText(forceRescanButton, self:Text("FORCE_RESCAN_BUTTON"), 76, 120)
 		forceRescanButton:ClearAllPoints()
-		forceRescanButton:SetPoint("LEFT", button, "RIGHT", 6, 0)
+		forceRescanButton:SetPoint("TOPLEFT", defaults, "TOPLEFT", 92, -190)
 		if currentProfessionID and not active then
 			forceRescanButton:Enable()
 		else
@@ -995,7 +966,7 @@ function AF:UpdateFastScanButton()
 		if forceRescanButton then
 			scanProgressText:SetPoint("LEFT", forceRescanButton, "RIGHT", 8, 0)
 		else
-			scanProgressText:SetPoint("LEFT", button, "RIGHT", 8, 0)
+			scanProgressText:SetPoint("TOPLEFT", defaults, "TOPLEFT", 92, -190)
 		end
 		self:UpdateCrafterScanProgressText()
 	end
@@ -1060,7 +1031,7 @@ function AF:RefreshCrafterUI()
 		end
 		return
 	end
-	self:UpdateFastScanButton()
+	self:UpdateScanControls()
 
 	local itemProfessionID = context and context.professionID or currentProfessionID
 	if itemProfessionID then
@@ -1115,7 +1086,7 @@ function AF:RefreshCrafterUI()
 		end
 	end
 
-	self:UpdateFastScanButton()
+	self:UpdateScanControls()
 	self:UpdateCrafterDirtyState()
 end
 

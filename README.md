@@ -30,9 +30,11 @@ ArtisanFinder adds lightweight controls to the Professions UI for item-specific 
 
 Availability is session-based and resets after login or reload. You can cycle between unavailable, current-character availability, and account-wide availability from the minimap button, or let automatic availability enable it in trade-chat areas and disable it in selected instance types.
 
+![ArtisanFinder crafter view](Images/CrafterView.png)
+
 If an addon-enabled customer places a personal order for one of your characters while you are on another character, ArtisanFinder can play your selected notification sound and show a loot-style notification with the item, customer, character, and commission. Notifications are remembered until cleared or completed, and the Blizzard crafting order minimap icon can also show known alt orders.
 
-![ArtisanFinder crafter view](Images/CrafterView.png)
+![ArtisanFinder crafter view](Images/PersonalOrderToast.png)
 
 ## Reagent Guidance
 
@@ -50,7 +52,7 @@ An item-specific commission takes priority over a profession default. If an item
 
 ## Options
 
-ArtisanFinder has an Options -> AddOns panel ordered around common controls first: minimap/button behavior, availability, trade-chat leads, order notifications, result sorting, cache behavior, scanning, and advertised character professions. Blizzard Edit Mode controls the order notification toast and movable ArtisanFinder button placement.
+ArtisanFinder has an Options -> AddOns panel ordered around common controls first: minimap/button behavior, availability, trade-chat leads, order notifications, result sorting, cache behavior and advertised character professions. Blizzard Edit Mode controls the order notification toast and movable ArtisanFinder button placement.
 
 ![ArtisanFinder options](Images/Options1.png)
 ![ArtisanFinder options](Images/Options2.png)

@@ -456,21 +456,6 @@ function AF:InitializeOptions()
 		return CreateRadioOptions(OFFLINE_FALLBACK_MAX_OPTIONS, "count")
 	end, self:Text("OPTIONS_OFFLINE_FALLBACK_MAX_DESC"))
 
-	AddSection("OPTIONS_SECTION_SCANNING")
-	local fastScan = RegisterProxySetting(
-		"ArtisanFinder_FastScan",
-		Settings.VarType.Boolean,
-		"OPTIONS_FAST_SCAN",
-		false,
-		function()
-			return AF.db.fastScan == true
-		end,
-		function(value)
-			AF:SetFastScan(value == true)
-		end
-	)
-	Settings.CreateCheckbox(category, fastScan, self:Text("OPTIONS_FAST_SCAN_DESC"))
-
 	RegisterAdvertisingOptions(self, category)
 
 	Settings.RegisterAddOnCategory(category)

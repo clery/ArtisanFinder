@@ -1,16 +1,12 @@
 local _, AF = ...
 
-local SCAN_PROBE_JOB_DELAY = 0.05
-local SCAN_FULL_JOB_DELAY = 0.25
-local FAST_SCAN_PROBE_JOB_DELAY = 0.01
-local FAST_SCAN_FULL_JOB_DELAY = 0.01
-local FAST_SCAN_PROBE_JOBS_PER_TICK = 25
-local FAST_SCAN_FULL_JOBS_PER_TICK = 4
-local FAST_SCAN_TICK_BUDGET_MS = 8
-local SCAN_TICK_BUDGET_MS = 12
-local FAST_SCAN_FULL_JOB_CHUNK_MS = 4
-local SCAN_FULL_JOB_CHUNK_MS = 12
-local SLOW_SCAN_TICK_WARNING_MS = 1000
+local SCAN_PROBE_JOB_DELAY = 0.01
+local SCAN_FULL_JOB_DELAY = 0.01
+local SCAN_PROBE_JOBS_PER_TICK = 25
+local SCAN_FULL_JOBS_PER_TICK = 4
+local SCAN_TICK_BUDGET_MS = 8
+local SCAN_FULL_JOB_CHUNK_MS = 4
+local SCAN_TICK_WARNING_MS = 1000
 local SCAN_GC_STEP_SIZE = 32
 local HEAVY_JOB_QUALITY_TIER_THRESHOLD = 12
 
@@ -592,7 +588,7 @@ function AF:ScanJob(profession, professionEntry, job)
 			))
 		end
 		job.scanResumeCount = (tonumber(job.scanResumeCount) or 0) + 1
-		local budget = self.db and self.db.fastScan == true and FAST_SCAN_FULL_JOB_CHUNK_MS or SCAN_FULL_JOB_CHUNK_MS
+		local budget = SCAN_FULL_JOB_CHUNK_MS
 		local best, err = self:ResumeBestReagentCapabilityState(jobState, budget)
 		if not best and err then
 			self:DebugLog("scan", string.format(
@@ -722,12 +718,6 @@ function AF:RefreshScanProgressUI(force)
 end
 
 function AF:GetScanJobDelay(job)
-	if self.db and self.db.fastScan == true then
-		if job and job.kind == "full" then
-			return FAST_SCAN_FULL_JOB_DELAY
-		end
-		return FAST_SCAN_PROBE_JOB_DELAY
-	end
 	if job and job.kind == "full" then
 		return SCAN_FULL_JOB_DELAY
 	end
@@ -735,16 +725,13 @@ function AF:GetScanJobDelay(job)
 end
 
 function AF:GetScanJobsPerTick(job)
-	if not self.db or self.db.fastScan ~= true then
-		return 1
-	end
 	if job and job.kind == "full" then
 		if job.qualityTierCombinations and job.qualityTierCombinations > HEAVY_JOB_QUALITY_TIER_THRESHOLD then
 			return 1
 		end
-		return FAST_SCAN_FULL_JOBS_PER_TICK
+		return SCAN_FULL_JOBS_PER_TICK
 	end
-	return FAST_SCAN_PROBE_JOBS_PER_TICK
+	return SCAN_PROBE_JOBS_PER_TICK
 end
 
 function AF:ReleaseScanRuntimeMemory(reason)
@@ -894,7 +881,7 @@ function AF:ProcessScanQueue()
 				progress.scanned = (tonumber(progress.scanned) or 0) + 1
 			end
 			progress.updatedAt = AF:Now()
-			local tickBudget = AF.db and AF.db.fastScan == true and FAST_SCAN_TICK_BUDGET_MS or SCAN_TICK_BUDGET_MS
+			local tickBudget = SCAN_TICK_BUDGET_MS
 			if processed > 0 and GetScanTimeMS() - tickStarted >= tickBudget then
 				break
 			end
@@ -903,13 +890,12 @@ function AF:ProcessScanQueue()
 			collectgarbage("step", SCAN_GC_STEP_SIZE)
 		end
 		local tickMS = GetScanTimeMS() - tickStarted
-		if tickMS >= SLOW_SCAN_TICK_WARNING_MS then
+		if tickMS >= SCAN_TICK_WARNING_MS then
 			AF:DebugLog("scan", string.format(
-				"slow tick ms=%.1f processed=%d budget=%d fast=%s profession=%s mode=%s pending=%d/%d scanned=%d completed=%d total=%d last=%s:%s:%s slowest=%.1fms:%s:%s:%s",
+				"slow tick ms=%.1f processed=%d budget=%d profession=%s mode=%s pending=%d/%d scanned=%d completed=%d total=%d last=%s:%s:%s slowest=%.1fms:%s:%s:%s",
 				tickMS,
 				processedCount,
 				jobsToProcess,
-				tostring(AF.db and AF.db.fastScan == true),
 				tostring(active.professionID),
 				tostring(progress.mode),
 				GetPendingCount(progress),

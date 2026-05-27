@@ -157,7 +157,6 @@ function AF:ClearOptionsData()
 	self.db.cacheCleanupDays = 7
 	self.db.autoAvailability = false
 	self.db.autoAvailabilityDisable = { party = true, raid = true, pvp = true, arena = true, delve = true }
-	self.db.fastScan = false
 	self.db.tradeLeadMinutes = 15
 	self.db.freezeTradeLeadRows = false
 	self.db.orderNotificationSound = "CATALOG_SHOP_OPEN_LOADING_SCREEN"

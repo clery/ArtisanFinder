@@ -565,9 +565,6 @@ function ApplyDBDefaults(db)
 	if db.autoAvailabilityDisable.delve == nil then
 		db.autoAvailabilityDisable.delve = true
 	end
-	if db.fastScan == nil then
-		db.fastScan = false
-	end
 	if db.tradeLeadMinutes == nil then
 		db.tradeLeadMinutes = 15
 	end
@@ -677,9 +674,6 @@ MIGRATIONS[6] = function(db)
 end
 
 MIGRATIONS[7] = function(db)
-	if db.fastScan == nil then
-		db.fastScan = false
-	end
 end
 
 MIGRATIONS[8] = function(db)
