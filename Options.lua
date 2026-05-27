@@ -110,7 +110,6 @@ local function RegisterAdvertisingOptions(self, category)
 	for _, row in ipairs(advertisingRows) do
 		local characterName = row.characterName
 		local professionID = row.professionID
-		local preservedSetting = row.preservedSetting == true
 		local key = tostring(characterName) .. ":" .. tostring(professionID)
 		if not self.advertisingOptionRegistered[key] then
 			local label = self:GetDisplayPlayerName(characterName) .. " - " .. tostring(row.professionName)
@@ -132,7 +131,7 @@ local function RegisterAdvertisingOptions(self, category)
 			local initializer = Settings.CreateCheckbox(category, advertiseProfession, self:Text("OPTIONS_ADVERTISE_PROFESSION_DESC"))
 			if initializer and initializer.AddShownPredicate then
 				initializer:AddShownPredicate(function()
-					return AF:HasScannedProfession(characterName, professionID) or preservedSetting
+					return AF:HasScannedProfession(characterName, professionID) or AF:HasAdvertisingProfessionSetting(characterName, professionID)
 				end)
 			end
 			self.advertisingOptionRegistered[key] = true

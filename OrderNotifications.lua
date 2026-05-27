@@ -123,6 +123,37 @@ local function SetItemTextColor(fontString, quality)
 	end
 end
 
+local function GetItemQualityColorCode(quality)
+	quality = tonumber(quality)
+	local r, g, b = 1, 1, 1
+	if quality and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[quality] then
+		local color = ITEM_QUALITY_COLORS[quality]
+		r, g, b = color.r or r, color.g or g, color.b or b
+	elseif quality and GetItemQualityColor then
+		r, g, b = GetItemQualityColor(quality)
+	end
+	return string.format("|cff%02x%02x%02x", math.floor((r or 1) * 255 + 0.5), math.floor((g or 1) * 255 + 0.5), math.floor((b or 1) * 255 + 0.5))
+end
+
+local function GetOrderTooltipItemLine(AF, row)
+	local itemID, itemName, itemLink, itemQuality, itemIcon = GetOrderNotificationItemInfo(row)
+	row.itemID = row.itemID or itemID
+	row.itemName = row.itemName or itemName
+	row.itemLink = row.itemLink or itemLink
+	row.itemQuality = row.itemQuality or itemQuality
+	row.itemIcon = row.itemIcon or itemIcon
+	if not itemName or itemName == "" or not itemIcon or (itemID and not itemQuality) then
+		if itemID then
+			pcall(C_Item.RequestLoadItemDataByID, itemID)
+			AF.pendingOrderTooltipItemData = true
+		end
+		return nil
+	end
+	local icon = CreateTextureMarkup and CreateTextureMarkup(itemIcon, 16, 16, 16, 16, 0, 1, 0, 1) or ""
+	local color = GetItemQualityColorCode(itemQuality)
+	return string.format("%s%s%s|r", icon ~= "" and (icon .. " ") or "", color, itemName)
+end
+
 local function SetToastIconQuality(frame, quality, itemIDOrLink)
 	if SetItemButtonQuality then
 		SetItemButtonQuality(frame, quality, itemIDOrLink, true)
@@ -354,12 +385,14 @@ end
 
 function AF:OnOrderNotificationItemDataLoaded(itemID)
 	local pending = self.pendingOrderNotificationToasts
-	if not pending or #pending == 0 then
+	local refreshTooltip = self.pendingOrderTooltipItemData == true
+	self.pendingOrderTooltipItemData = nil
+	if (not pending or #pending == 0) and not refreshTooltip then
 		return
 	end
 	itemID = tonumber(itemID)
 	local remaining = {}
-	for _, pendingToast in ipairs(pending) do
+	for _, pendingToast in ipairs(pending or {}) do
 		local details = CopyOrderDetails(pendingToast.details)
 		local pendingItemID = tonumber(details.itemID) or self:GetItemIDFromLink(details.itemLink)
 		if (not itemID or itemID == pendingItemID) and IsOrderNotificationItemDataLoaded(details) then
@@ -376,6 +409,9 @@ function AF:OnOrderNotificationItemDataLoaded(itemID)
 	self.pendingOrderNotificationToasts = remaining
 	if self.RefreshCraftingOrderIndicator then
 		self:RefreshCraftingOrderIndicator()
+	end
+	if refreshTooltip and self.RefreshOpenCraftingOrderIndicatorTooltip then
+		self:RefreshOpenCraftingOrderIndicatorTooltip()
 	end
 end
 
@@ -992,8 +1028,9 @@ function AF:AddCraftingOrderIndicatorTooltip(owner)
 	if #rows == 0 or not GameTooltip then
 		return
 	end
+	self.craftingOrderTooltipOwner = owner or GetCraftingOrderFrame() or UIParent
 	if not GameTooltip:IsShown() then
-		GameTooltip:SetOwner(owner or GetCraftingOrderFrame() or UIParent, "ANCHOR_LEFT")
+		GameTooltip:SetOwner(self.craftingOrderTooltipOwner, "ANCHOR_LEFT")
 		GameTooltip:SetText(PROFESSIONS_CRAFTING_ORDERS or "Crafting Orders", 1, 0.82, 0)
 	end
 	GameTooltip_AddBlankLineToTooltip(GameTooltip)
@@ -1004,12 +1041,25 @@ function AF:AddCraftingOrderIndicatorTooltip(owner)
 			local name = row.alt and self:GetFullDisplayPlayerName(row.characterName) or self:GetDisplayPlayerName(row.characterName)
 			local profession = row.professionName and row.professionName ~= "" and (" - " .. row.professionName) or ""
 			GameTooltip_AddNormalLine(GameTooltip, self:Text("ORDER_TOOLTIP_ROW", name, profession, count), false)
-			if row.itemName and row.itemName ~= "" then
-				GameTooltip_AddHighlightLine(GameTooltip, row.itemName, false)
+			local itemLine = GetOrderTooltipItemLine(self, row)
+			if itemLine then
+				GameTooltip:AddLine("  " .. itemLine, 1, 1, 1, true)
+			elseif HasOrderItemDetails(row) then
+				GameTooltip:AddLine("  " .. self:Text("ITEM_FALLBACK"), 0.65, 0.65, 0.65, true)
 			end
 		end
 	end
 	GameTooltip:Show()
+end
+
+function AF:RefreshOpenCraftingOrderIndicatorTooltip()
+	if not GameTooltip or not GameTooltip:IsShown() or not self.craftingOrderTooltipOwner then
+		return
+	end
+	GameTooltip:ClearLines()
+	GameTooltip:SetOwner(self.craftingOrderTooltipOwner, "ANCHOR_LEFT")
+	GameTooltip:SetText(PROFESSIONS_CRAFTING_ORDERS or "Crafting Orders", 1, 0.82, 0)
+	self:AddCraftingOrderIndicatorTooltip(self.craftingOrderTooltipOwner)
 end
 
 function AF:RefreshCraftingOrderIndicator()

@@ -201,6 +201,12 @@ function AF:ClearCharacterScans(characterName)
 	profile.professions = {}
 	profile.items = {}
 	self.db.artisanCharacters[characterName] = profile
+	if self.db.advertising then
+		self.db.advertising[characterName] = nil
+	end
+	if self.db.advertisingKnown then
+		self.db.advertisingKnown[characterName] = nil
+	end
 	
 	if self.activeArtisanCharacter == characterName then
 		self.db.artisanProfile = profile

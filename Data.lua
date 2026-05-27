@@ -911,6 +911,18 @@ function AF:IsProfessionAdvertised(characterName, professionID)
 	return self:IsProfessionAdvertisedByDefault(defaultID)
 end
 
+function AF:HasAdvertisingProfessionSetting(characterName, professionID)
+	characterName = self:NormalizeName(characterName)
+	local professionKey = GetProfessionKey(professionID)
+	if not characterName or not professionKey then
+		return false
+	end
+	local explicitSettings = self.db and self.db.advertising and self.db.advertising[characterName]
+	local knownSettings = self.db and self.db.advertisingKnown and self.db.advertisingKnown[characterName]
+	return type(explicitSettings) == "table" and explicitSettings[professionKey] ~= nil
+		or type(knownSettings) == "table" and knownSettings[professionKey] ~= nil
+end
+
 function AF:SetProfessionAdvertised(characterName, professionID, enabled)
 	characterName = self:NormalizeName(characterName)
 	local professionKey = GetProfessionKey(professionID)
