@@ -345,8 +345,10 @@ AF.frame:SetScript("OnEvent", function(_, event, ...)
 				return
 			end
 			AF:TryAttachProfessionUIs()
-			if AF.RefreshCustomerQuery then
-				AF:RefreshCustomerQuery()
+			if AF.RefreshCustomerQueryOnOpen then
+				AF:RefreshCustomerQueryOnOpen()
+			elseif AF.RefreshCustomerQuery then
+				AF:RefreshCustomerQuery(true)
 			end
 		end)
 	elseif event == "CRAFTINGORDERS_ORDER_PLACEMENT_RESPONSE" then

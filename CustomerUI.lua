@@ -17,6 +17,7 @@ local CUSTOMER_REFRESH_COOLDOWN = 5
 local CUSTOMER_QUERY_POLL_INTERVAL = 1.5
 local CUSTOMER_DEBUG_QUERY_POLL_INTERVAL = 5
 local CUSTOMER_ROW_AGE_TICK_INTERVAL = 30
+local CUSTOMER_OPEN_REFRESH_DEDUPE_SECONDS = 0.25
 
 local function GetSortMode(index)
 	return SORT_MODES[index or 1] or SORT_MODES[1]
@@ -938,7 +939,7 @@ function AF:AttachCustomerUI()
 		AF:SetCustomerPanelCollapsed(frame.collapsed, true)
 		AF:QueueCustomerSidePanelLayout()
 		if not frame.collapsed then
-			AF:RefreshCustomerQuery()
+			AF:RefreshCustomerQueryOnOpen()
 			if AF.MaybeShowCustomerTutorial then
 				AF:MaybeShowCustomerTutorial()
 			end
@@ -974,7 +975,7 @@ function AF:AttachCustomerUI()
 		AF.customerFrame:Show()
 		AF:QueueCustomerSidePanelLayout()
 		if not AF.customerFrame.collapsed then
-			AF:RefreshCustomerQuery()
+			AF:RefreshCustomerQueryOnOpen()
 			if AF.MaybeShowCustomerTutorial then
 				AF:MaybeShowCustomerTutorial()
 			end
@@ -997,7 +998,7 @@ function AF:AttachCustomerUI()
 		frame:Show()
 		self:QueueCustomerSidePanelLayout()
 		if not frame.collapsed then
-			self:RefreshCustomerQuery()
+			self:RefreshCustomerQueryOnOpen()
 			if self.MaybeShowCustomerTutorial then
 				self:MaybeShowCustomerTutorial()
 			end
@@ -1298,6 +1299,23 @@ function AF:RefreshCustomerQuery(force)
 
 	self:RefreshCustomerResults()
 	self:DebugLog("query", string.format("refresh item=%s profession=%s changed=%s force=%s", tostring(context.itemID), tostring(context.professionID), tostring(changed == true), tostring(force == true)))
+end
+
+function AF:RefreshCustomerQueryOnOpen()
+	local context = self:GetCustomerOrderItemContext()
+	if context then
+		local now = GetTime and GetTime() or self:Now()
+		local key = table.concat({ context.itemID or 0, context.professionID or 0, context.recipeID or 0 }, ":")
+		if self.lastCustomerOpenRefreshKey == key
+			and self.lastCustomerOpenRefreshAt
+			and now - self.lastCustomerOpenRefreshAt < CUSTOMER_OPEN_REFRESH_DEDUPE_SECONDS
+		then
+			return
+		end
+		self.lastCustomerOpenRefreshKey = key
+		self.lastCustomerOpenRefreshAt = now
+	end
+	self:RefreshCustomerQuery(true)
 end
 
 function AF:AcquireCustomerRows(count)

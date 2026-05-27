@@ -7,6 +7,7 @@ local TOAST_SPACING = 6
 local TOAST_FADE_IN_SECONDS = 0.18
 local TOAST_HOLD_SECONDS = 4.4
 local TOAST_FADE_OUT_SECONDS = 0.7
+local ORDER_NOTIFICATION_FALLBACK_DELAY_SECONDS = 1
 local DEV_ORDER_ITEM_ID = 240949
 local DEV_CUSTOMER_NAMES = {
 	"Aelindra",
@@ -56,6 +57,18 @@ local function CountPersonalOrders()
 		end
 	end
 	return total, rows
+end
+
+local function GetCurrentOrderFallbackDetails(rows)
+	local details = {}
+	for _, row in ipairs(rows or {}) do
+		if row.current and row.professionName and row.professionName ~= "" then
+			details.professionName = row.professionName
+			details.itemName = row.professionName
+			return details
+		end
+	end
+	return details
 end
 
 local function GetCraftingOrderFrame()
@@ -361,6 +374,10 @@ function AF:NotifyPersonalOrder(characterName, count, sender, details)
 		customerName = details.customerName,
 	}
 	self.lastOrderNotificationSender = sender
+	if senderName and senderName ~= playerName then
+		self.lastOrderNotificationWhisperAt = GetTime and GetTime() or self:Now()
+		self.lastOrderNotificationWhisperCharacter = characterName
+	end
 	self:DebugLog("orders", string.format("notify character=%s count=%s sender=%s item=%s commission=%s customer=%s", tostring(characterName), tostring(count), tostring(sender or ""), tostring(details.itemID or ""), tostring(details.commissionCopper or ""), tostring(details.customerName or "")))
 	self:PlayOrderNotificationSound()
 	self:ShowOrderNotification(characterName, count, details)
@@ -495,10 +512,35 @@ function AF:OnPersonalOrderCountsUpdated()
 	self:DebugLog("orders", string.format("count previous=%s current=%s", tostring(previous), tostring(total)))
 	if previous ~= nil and total > previous then
 		self:PlayOrderNotificationSound()
+		self:QueueCurrentOrderNotificationFallback(total - previous, rows)
 	end
 	if self.RefreshCraftingOrderIndicator then
 		self:RefreshCraftingOrderIndicator()
 	end
+end
+
+function AF:QueueCurrentOrderNotificationFallback(count, rows)
+	local playerName = self:NormalizeName(self.playerName or self:GetPlayerFullName())
+	if not playerName then
+		return
+	end
+	local eventTime = GetTime and GetTime() or self:Now()
+	self.currentOrderNotificationFallbackToken = (self.currentOrderNotificationFallbackToken or 0) + 1
+	local token = self.currentOrderNotificationFallbackToken
+	local details = GetCurrentOrderFallbackDetails(rows)
+	C_Timer.After(ORDER_NOTIFICATION_FALLBACK_DELAY_SECONDS, function()
+		if AF.currentOrderNotificationFallbackToken ~= token then
+			return
+		end
+		if AF.lastOrderNotificationWhisperCharacter == playerName
+			and AF.lastOrderNotificationWhisperAt
+			and AF.lastOrderNotificationWhisperAt >= eventTime - 0.25
+		then
+			return
+		end
+		AF:DebugLog("orders", string.format("fallback character=%s count=%s profession=%s", tostring(playerName), tostring(count or 1), tostring(details.professionName or "")))
+		AF:ShowOrderNotification(playerName, tonumber(count) or 1, details)
+	end)
 end
 
 function AF:OnOrderPlacementResponse(result)
@@ -936,7 +978,7 @@ function AF:SetupOrderNotificationToast(frame, characterName, count, details)
 	frame.Icon:SetTexture(itemIcon or "Interface\\Icons\\INV_Misc_Note_01")
 	SetToastIconQuality(frame, itemQuality, itemLink or itemID)
 	frame.Title:SetText(self:Text("ORDER_NOTIFICATION_TITLE"))
-	frame.ItemName:SetText(itemName or details.itemName or self:Text("ORDER_NOTIFICATION_UNKNOWN_ITEM"))
+	frame.ItemName:SetText(itemName or details.itemName or details.professionName or self:Text("ORDER_NOTIFICATION_UNKNOWN_ITEM"))
 	SetItemTextColor(frame.ItemName, itemQuality)
 	frame.Meta:SetText(self:Text(
 		"ORDER_NOTIFICATION_META",
