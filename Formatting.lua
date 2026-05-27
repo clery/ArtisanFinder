@@ -425,11 +425,42 @@ local function AddItemTooltipLine(AF, tooltip, itemID, text, fallbackR, fallback
 	tooltip:AddLine(text, r, g, b, true)
 end
 
+function AF:GetReagentDisplaySignature(reagents)
+	local parts = {}
+	for _, reagent in ipairs(reagents or {}) do
+		local kind = reagent.kind == "currency" and "c" or "i"
+		parts[#parts + 1] = table.concat({
+			kind,
+			tostring(tonumber(reagent.currencyID or reagent.itemID or reagent.id) or 0),
+			tostring(tonumber(reagent.quantity) or 1),
+			tostring(tonumber(reagent.quality) or 0),
+			tostring(tonumber(reagent.dataSlotIndex) or 0),
+		}, ":")
+	end
+	table.sort(parts)
+	return table.concat(parts, ";")
+end
+
+function AF:ReagentListsMatch(left, right)
+	local leftSignature = self:GetReagentDisplaySignature(left)
+	return leftSignature ~= "" and leftSignature == self:GetReagentDisplaySignature(right)
+end
+
+function AF:GetDistinctOptionalBestReagents(baseReagents, optionalReagents)
+	if not optionalReagents or self:ReagentListsMatch(optionalReagents, baseReagents) then
+		return nil
+	end
+	return optionalReagents
+end
+
 function AF:AddCapabilityTooltipLines(tooltip, entry)
 	if not tooltip or not entry then
 		return
 	end
 	local legacyReagentDisplay = self:GetLegacyReagentDisplay(entry)
+	local hasBestReagents = self:HasDisplayableReagentLines(entry.bestReagents, { hideNoQuality = true })
+	local optionalBestReagents = self:GetDistinctOptionalBestReagents(entry.bestReagents, entry.optionalBestReagents)
+	local hasOptionalBestReagents = self:HasDisplayableReagentLines(optionalBestReagents, { hideNoQuality = true })
 
 	local optionalText = self:FormatOptionalReagentImpact(entry, false)
 	if optionalText ~= "" then
@@ -441,19 +472,19 @@ function AF:AddCapabilityTooltipLines(tooltip, entry)
 		elseif tonumber(entry.optionalSlotCount) and tonumber(entry.optionalSlotCount) > 0 then
 			AddTooltipLine(tooltip, self:Text("OPTIONAL_REAGENTS_SLOT_COUNT", entry.optionalSlotCount), TOOLTIP_OPTIONAL_COMMENT_COLOR, true)
 		end
-		if entry.optionalBestReagents and self:HasDisplayableReagentLines(entry.optionalBestReagents, { hideNoQuality = true }) then
+		if hasOptionalBestReagents then
 			tooltip:AddLine(" ")
 			AddTooltipLine(tooltip, self:Text("OPTIONAL_REAGENTS_SUGGESTED_REAGENTS"), TOOLTIP_SECTION_COLOR)
-			self:AddReagentLines(tooltip, entry.optionalBestReagents, TOOLTIP_OPTIONAL_COMMENT_COLOR[1], TOOLTIP_OPTIONAL_COMMENT_COLOR[2], TOOLTIP_OPTIONAL_COMMENT_COLOR[3], { slotLabels = true, compactQualityLabels = true, hideNoQuality = true })
+			self:AddReagentLines(tooltip, optionalBestReagents, TOOLTIP_OPTIONAL_COMMENT_COLOR[1], TOOLTIP_OPTIONAL_COMMENT_COLOR[2], TOOLTIP_OPTIONAL_COMMENT_COLOR[3], { slotLabels = true, compactQualityLabels = true, hideNoQuality = true })
 		end
 	end
 
-	if self:HasDisplayableReagentLines(entry.bestReagents, { hideNoQuality = true })
+	if hasBestReagents
 		or (legacyReagentDisplay and ((legacyReagentDisplay.details and legacyReagentDisplay.details ~= "") or (legacyReagentDisplay.summary and legacyReagentDisplay.summary ~= "")))
 		or (entry.bestReagentDetails and entry.bestReagentDetails ~= "") then
 		tooltip:AddLine(" ")
 		AddTooltipLine(tooltip, self:Text("SUGGESTED_REAGENTS"), TOOLTIP_SECTION_COLOR)
-		if self:HasDisplayableReagentLines(entry.bestReagents, { hideNoQuality = true }) then
+		if hasBestReagents then
 			self:AddReagentLines(tooltip, entry.bestReagents, 1, 1, 1, { hideNoQuality = true })
 		elseif legacyReagentDisplay and legacyReagentDisplay.details and legacyReagentDisplay.details ~= "" then
 			self:AddReagentDetailTooltipLines(tooltip, legacyReagentDisplay.details)
@@ -545,7 +576,6 @@ function AF:AddReagentLines(tooltip, reagents, r, g, b, options)
 	options = options or {}
 	local added = false
 	local requestedItemData = false
-	local missing = {}
 	local skipped = 0
 	for _, reagent in ipairs(reagents or {}) do
 		if options.hideNoQuality and not ReagentIsSuggestedDisplayable(self, reagent) then
@@ -553,7 +583,7 @@ function AF:AddReagentLines(tooltip, reagents, r, g, b, options)
 		else
 			local quantity = tonumber(reagent.quantity) or 1
 			local slotText = options.slotLabels and reagent.slotText and reagent.slotText ~= "" and (reagent.slotText .. ": ") or ""
-			if reagent.kind == "currency" and reagent.currencyID and C_CurrencyInfo and C_CurrencyInfo.GetCurrencyInfo then
+			if reagent.kind == "currency" and reagent.currencyID then
 				local currencyInfo = C_CurrencyInfo.GetCurrencyInfo(reagent.currencyID)
 				local currencyName = currencyInfo and currencyInfo.name
 				if currencyName and currencyName ~= "" then
@@ -592,7 +622,6 @@ function AF:AddReagentLines(tooltip, reagents, r, g, b, options)
 						added = true
 					else
 						requestedItemData = true
-						table.insert(missing, tostring(itemID))
 					end
 				end
 			end
@@ -608,7 +637,7 @@ function AF:AddReagentLines(tooltip, reagents, r, g, b, options)
 end
 
 local function GetLocalReagentQualityMarkup(itemID)
-	if not itemID or not C_TradeSkillUI or not C_TradeSkillUI.GetItemReagentQualityInfo then
+	if not itemID then
 		return ""
 	end
 	local ok, qualityInfo = pcall(C_TradeSkillUI.GetItemReagentQualityInfo, itemID)
@@ -632,7 +661,7 @@ function AF:AddReagentDetailTooltipLines(tooltip, details)
 			local qualityText = GetLocalReagentQualityMarkup(id)
 			AddItemTooltipLine(self, tooltip, id, string.format("%s%s x%d%s", itemIcon ~= "" and (itemIcon .. " ") or "", itemName, quantity, qualityText ~= "" and (" " .. qualityText) or ""), 1, 1, 1)
 			added = true
-		elseif kind == "c" and id and C_CurrencyInfo and C_CurrencyInfo.GetCurrencyInfo then
+		elseif kind == "c" and id then
 			local currencyInfo = C_CurrencyInfo.GetCurrencyInfo(id)
 			local currencyName = currencyInfo and currencyInfo.name
 			if currencyName and currencyName ~= "" then

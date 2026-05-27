@@ -478,21 +478,28 @@ function AF:HandleQuery(parts, sender, channel)
 end
 
 function AF:HandleReagentDetailRequest(parts, sender)
-
 	local itemID = tonumber(parts[3])
 	local recipeID = tonumber(parts[4]) or 0
 	local queryToken = tonumber(parts[5])
 	local crafterName = self:NormalizeName(self:DecodeField(parts[6]))
+	if not itemID or not queryToken or not sender then
+		return false
+	end
 
 	local item = self:FindProfileItem(crafterName, itemID, recipeID)
 
 	local throttleKey = table.concat({ "D", sender, crafterName or "", itemID, recipeID, queryToken }, ":")
 	self.responseThrottle = self.responseThrottle or {}
 	local lastSent = self.responseThrottle[throttleKey]
+	if lastSent and self:Now() - lastSent < self.DETAIL_REQUEST_THROTTLE then
+		return false
+	end
 
 	if self:SendReagentDetail(item, sender, queryToken, crafterName) then
 		self.responseThrottle[throttleKey] = self:Now()
+		return true
 	end
+	return false
 end
 
 function AF:SendReagentDetail(item, target, queryToken, crafterName)
@@ -641,7 +648,7 @@ function AF:HandleResponse(parts, sender)
 		return
 	end
 	local guildResponse = responseTarget ~= nil
-	local guildRosterEntry = guildResponse and self.GetCachedGuildRosterEntry and self:GetCachedGuildRosterEntry(crafterName) or nil
+	local guildRosterEntry = guildResponse and self:GetCachedGuildRosterEntry(crafterName) or nil
 
 	local verifiedForCurrentQuery = queryToken
 		and self.currentCustomerQueryToken
@@ -653,7 +660,7 @@ function AF:HandleResponse(parts, sender)
 	local previous = self.db.customerCache[itemKey][cacheKey]
 	local previousRecipeID = tonumber(previous and previous.recipeID) or 0
 	local savedReagents = responseReagents or (previousRecipeID == recipeID and previous and previous.bestReagents) or nil
-	local savedOptionalBestReagents = previousRecipeID == recipeID and previous and previous.optionalBestReagents or nil
+	local savedOptionalBestReagents = self:GetDistinctOptionalBestReagents(savedReagents, previousRecipeID == recipeID and previous and previous.optionalBestReagents or nil)
 	hasReagentSummary = hasReagentSummary and (responseSupportsReagentDetails or savedReagents ~= nil)
 	if professionLink ~= "" then
 		self:RememberProfessionLink(crafterName, professionID, professionLink)
@@ -809,8 +816,8 @@ function AF:ApplyPendingReagentDetail(sender, itemID, recipeID, queryToken, craf
 		end
 		entry.bestReagents = pending.reagents or entry.bestReagents
 		entry.bestReagentSummaryUpdatedAt = self:Now()
-		entry.optionalBestReagents = pending.optionalBestReagents or entry.optionalBestReagents
-		entry.optionalBestReagentSummaryUpdatedAt = pending.optionalBestReagents and self:Now() or entry.optionalBestReagentSummaryUpdatedAt
+		entry.optionalBestReagents = self:GetDistinctOptionalBestReagents(entry.bestReagents, pending.optionalBestReagents or entry.optionalBestReagents)
+		entry.optionalBestReagentSummaryUpdatedAt = entry.optionalBestReagents and self:Now() or nil
 		entry.reagentDetailRequested = nil
 		self.pendingReagentDetails[key] = nil
 	end

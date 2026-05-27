@@ -956,7 +956,7 @@ function AF:AttachCustomerUI()
 			end
 		end
 		frame.elapsed = (frame.elapsed or 0) + elapsed
-		local pollInterval = AF.IsDevFakeRowsEnabled and AF:IsDevFakeRowsEnabled() and CUSTOMER_DEBUG_QUERY_POLL_INTERVAL or CUSTOMER_QUERY_POLL_INTERVAL
+		local pollInterval = AF:IsDevFakeRowsEnabled() and CUSTOMER_DEBUG_QUERY_POLL_INTERVAL or CUSTOMER_QUERY_POLL_INTERVAL
 		if frame.elapsed >= pollInterval then
 			frame.elapsed = 0
 			AF:RefreshCustomerQuery()
@@ -1433,7 +1433,7 @@ function AF:OpenCrafterProfession(entry)
 	if self:IsGuildOrderEntry(entry) then
 		local guid = entry.guildMemberGUID or self:GetGuildMemberGUID(entry.orderTarget or entry.name)
 		local professionID = tonumber(entry.professionID)
-		if not guid or not professionID or not C_GuildInfo or not C_GuildInfo.QueryGuildMemberRecipes then
+		if not guid or not professionID then
 			self:SetProfessionButtonTooltip(self:Text("PROFESSION_LINK_UNAVAILABLE_TOOLTIP"), 6)
 			return
 		end

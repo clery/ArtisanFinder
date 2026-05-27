@@ -93,6 +93,24 @@ local function SetDebugWhoStatus(AF, name, online, failed)
 	end
 end
 
+local function ApplyDebugCraftFields(entry, item, now)
+	entry.recipeID = item.recipeID
+	entry.recipeDifficulty = item.recipeDifficulty
+	entry.totalSkill = item.totalSkill
+	entry.outputItemLevel = item.outputItemLevel
+	entry.bestTotalSkill = item.bestTotalSkill
+	entry.bestOutputItemLevel = item.bestOutputItemLevel
+	entry.bestReagents = item.bestReagents
+	entry.bestReagentSummaryUpdatedAt = item.bestReagentSummaryUpdatedAt or now
+	entry.bestReagentTruncated = item.bestReagentTruncated
+	entry.bestReagentPendingNames = item.bestReagentPendingNames
+	entry.optionalBestReagents = item.optionalBestReagents
+	entry.optionalBestReagentSummaryUpdatedAt = item.optionalBestReagentSummaryUpdatedAt or now
+	entry.optionalBestReagentTruncated = item.optionalBestReagentTruncated
+	entry.professionLink = item.professionLink
+	return entry
+end
+
 local function HasDebugSelfResults(AF, itemKey)
 	local cache = AF.db.customerCache[tostring(itemKey or "")]
 	if not cache then
@@ -179,7 +197,7 @@ function AF:InjectDebugSelfResult(itemID, professionID)
 
 	local actualName = self:GetPlayerFullName()
 	local actualPriceCopper, actualFreeCommission, actualNote = self:GetItemPrice(itemID, item.professionID)
-	self.db.customerCache[itemKey].__debug_self_actual = {
+	self.db.customerCache[itemKey].__debug_self_actual = ApplyDebugCraftFields({
 		name = actualName,
 		target = actualName,
 		orderTarget = actualName,
@@ -188,37 +206,23 @@ function AF:InjectDebugSelfResult(itemID, professionID)
 		priceCopper = actualPriceCopper,
 		freeCommission = actualFreeCommission,
 		note = actualNote,
-		recipeID = item.recipeID,
-		recipeDifficulty = item.recipeDifficulty,
-		totalSkill = item.totalSkill,
 		quality = item.quality,
 		rawQuality = item.rawQuality,
 		qualityAtlas = item.qualityAtlas,
 		concentrationQuality = nil,
 		concentrationCost = nil,
-		outputItemLevel = item.outputItemLevel,
 		bestQuality = item.bestQuality,
 		rawBestQuality = item.rawBestQuality,
 		bestQualityAtlas = item.bestQualityAtlas,
 		bestConcentrationQuality = nil,
-		bestTotalSkill = item.bestTotalSkill,
 		bestConcentrationCost = nil,
-		bestOutputItemLevel = item.bestOutputItemLevel,
-		bestReagents = item.bestReagents,
-		bestReagentSummaryUpdatedAt = item.bestReagentSummaryUpdatedAt or now,
-		bestReagentTruncated = item.bestReagentTruncated,
-		bestReagentPendingNames = item.bestReagentPendingNames,
-		optionalBestReagents = item.optionalBestReagents,
-		optionalBestReagentSummaryUpdatedAt = item.optionalBestReagentSummaryUpdatedAt or now,
-		optionalBestReagentTruncated = item.optionalBestReagentTruncated,
-		professionLink = item.professionLink,
 		updatedAt = now,
 		verifiedAt = now,
 		lastQueryToken = self.currentCustomerQueryToken,
 		lastQueryAt = self.lastQueryAt,
 		debug = true,
 		debugActual = true,
-	}
+	}, item, now)
 
 	for i, altBaseName in ipairs(DEBUG_ALT_NAMES) do
 		local altName = altBaseName .. "-" .. (GetRealmName() or "")
@@ -229,7 +233,7 @@ function AF:InjectDebugSelfResult(itemID, professionID)
 		local concentrationQuality = GetDebugConcentrationQuality(bestQuality, i ~= 2)
 		self:SetFavoriteArtisan(altName, i == 1)
 		SetDebugWhoStatus(self, altName, i == 1 and true or nil)
-		self.db.customerCache[itemKey]["__debug_alt_" .. i] = {
+		self.db.customerCache[itemKey]["__debug_alt_" .. i] = ApplyDebugCraftFields({
 			name = altName,
 			target = contactName,
 			orderTarget = altName,
@@ -238,38 +242,24 @@ function AF:InjectDebugSelfResult(itemID, professionID)
 			priceCopper = priceCopper,
 			freeCommission = priceCopper == 0,
 			note = i == 1 and "Alt crafter, whisper main" or "",
-			recipeID = item.recipeID,
-			recipeDifficulty = item.recipeDifficulty,
-			totalSkill = item.totalSkill,
 			quality = baseQuality,
 			rawQuality = baseQuality,
 			qualityAtlas = "Professions-Icon-Quality-Tier" .. baseQuality .. "-Small",
 			concentrationQuality = nil,
 			concentrationCost = nil,
-			outputItemLevel = item.outputItemLevel,
 			bestQuality = bestQuality,
 			rawBestQuality = bestQuality,
 			bestQualityAtlas = "Professions-Icon-Quality-Tier" .. bestQuality .. "-Small",
 			bestConcentrationQuality = concentrationQuality,
 			bestConcentrationQualityAtlas = concentrationQuality and ("Professions-Icon-Quality-Tier" .. concentrationQuality .. "-Small") or nil,
-			bestTotalSkill = item.bestTotalSkill,
 			bestConcentrationCost = concentrationQuality and (60 + i * 15) or nil,
-			bestOutputItemLevel = item.bestOutputItemLevel,
-			bestReagents = item.bestReagents,
-			bestReagentSummaryUpdatedAt = item.bestReagentSummaryUpdatedAt or now,
-			bestReagentTruncated = item.bestReagentTruncated,
-			bestReagentPendingNames = item.bestReagentPendingNames,
-			optionalBestReagents = item.optionalBestReagents,
-			optionalBestReagentSummaryUpdatedAt = item.optionalBestReagentSummaryUpdatedAt or now,
-			optionalBestReagentTruncated = item.optionalBestReagentTruncated,
-			professionLink = item.professionLink,
 			updatedAt = now,
 			verifiedAt = now,
 			lastQueryToken = self.currentCustomerQueryToken,
 			lastQueryAt = self.lastQueryAt,
 			debug = true,
 			debugAlt = true,
-		}
+		}, item, now)
 	end
 
 	for i = 1, DEBUG_CERTIFIED_COUNT - 1 do
@@ -291,7 +281,7 @@ function AF:InjectDebugSelfResult(itemID, professionID)
 		else
 			SetDebugWhoStatus(self, debugName, (i <= 3 or i == 5) and true or nil)
 		end
-		self.db.customerCache[itemKey]["__debug_self_" .. i] = {
+		self.db.customerCache[itemKey]["__debug_self_" .. i] = ApplyDebugCraftFields({
 			name = debugName,
 			target = debugName,
 			orderTarget = debugName,
@@ -300,36 +290,22 @@ function AF:InjectDebugSelfResult(itemID, professionID)
 			priceCopper = isFree and 0 or priceCopper,
 			freeCommission = isFree,
 			note = note,
-			recipeID = item.recipeID,
-			recipeDifficulty = item.recipeDifficulty,
-			totalSkill = item.totalSkill,
 			quality = baseQuality,
 			rawQuality = baseQuality,
 			qualityAtlas = "Professions-Icon-Quality-Tier" .. baseQuality .. "-Small",
 			concentrationQuality = nil,
 			concentrationCost = nil,
-			outputItemLevel = item.outputItemLevel,
 			bestQuality = bestQuality,
 			rawBestQuality = bestQuality,
 			bestQualityAtlas = "Professions-Icon-Quality-Tier" .. bestQuality .. "-Small",
 			bestConcentrationQuality = concentrationQuality,
 			bestConcentrationQualityAtlas = concentrationQuality and ("Professions-Icon-Quality-Tier" .. concentrationQuality .. "-Small") or nil,
-			bestTotalSkill = item.bestTotalSkill,
 			bestConcentrationCost = concentrationQuality and (80 + i * 10) or nil,
-			bestOutputItemLevel = item.bestOutputItemLevel,
-			bestReagents = item.bestReagents,
-			bestReagentSummaryUpdatedAt = item.bestReagentSummaryUpdatedAt or now,
-			bestReagentTruncated = item.bestReagentTruncated,
-			bestReagentPendingNames = item.bestReagentPendingNames,
-			optionalBestReagents = item.optionalBestReagents,
-			optionalBestReagentSummaryUpdatedAt = item.optionalBestReagentSummaryUpdatedAt or now,
-			optionalBestReagentTruncated = item.optionalBestReagentTruncated,
-			professionLink = item.professionLink,
 			updatedAt = pinned and now or (now - (i * 300)),
 			verifiedAt = i == 6 and nil or now,
 			lastQueryToken = i == 6 and 0 or self.currentCustomerQueryToken,
 			lastQueryAt = i == 6 and nil or self.lastQueryAt,
 			debug = true,
-		}
+		}, item, now)
 	end
 end

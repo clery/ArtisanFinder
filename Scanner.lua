@@ -159,7 +159,7 @@ function AF:ShouldQueueProfessionEquipmentScan(profession)
 end
 
 function AF:RestartActiveScanForEquipmentUpgrade(profession)
-	if self.IsOwnProfessionWindowOpen and not self:IsOwnProfessionWindowOpen() then
+	if not self:IsOwnProfessionWindowOpen() then
 		return false
 	end
 	if not self.activeScan or not profession or tonumber(self.activeScan.professionID) ~= tonumber(profession.id) then
@@ -273,7 +273,7 @@ function AF:StoreBestProfessionSkillSnapshots(profession, snapshots)
 end
 
 function AF:PrepareProfessionForScan(profession)
-	if self.IsOwnProfessionWindowOpen and not self:IsOwnProfessionWindowOpen() then
+	if not self:IsOwnProfessionWindowOpen() then
 		return nil
 	end
 
@@ -410,7 +410,7 @@ function AF:IsLowerOrEqualEquipmentProbe(existing, probe)
 end
 
 function AF:ScanJob(profession, professionEntry, job)
-	if self.IsOwnProfessionWindowOpen and not self:IsOwnProfessionWindowOpen() then
+	if not self:IsOwnProfessionWindowOpen() then
 		self:PauseActiveProfessionScan(true)
 		return false
 	end
@@ -493,7 +493,7 @@ function AF:IsCurrentProfessionScanAvailable(professionID)
 	if not C_TradeSkillUI.IsTradeSkillReady() then
 		return false
 	end
-	if self.IsOwnProfessionWindowOpen and not self:IsOwnProfessionWindowOpen() then
+	if not self:IsOwnProfessionWindowOpen() then
 		return false
 	end
 	local current = self:GetCurrentProfessionInfo()
@@ -630,7 +630,7 @@ function AF:ProcessScanQueue()
 	if self.scanProcessing then
 		return
 	end
-	if self.IsOwnProfessionWindowOpen and not self:IsOwnProfessionWindowOpen() then
+	if not self:IsOwnProfessionWindowOpen() then
 		self:PauseActiveProfessionScan(true)
 		return
 	end
@@ -652,7 +652,7 @@ function AF:ProcessScanQueue()
 			AF.deferredScanResume = true
 			return
 		end
-		if AF.IsOwnProfessionWindowOpen and not AF:IsOwnProfessionWindowOpen() then
+		if not AF:IsOwnProfessionWindowOpen() then
 			AF:PauseActiveProfessionScan(true)
 			return
 		end
@@ -768,7 +768,7 @@ function AF:StartOrResumeCurrentProfessionScan(force, silent, mode, forceProbe, 
 		self.deferredScanResume = true
 		return 0
 	end
-	if self.IsOwnProfessionWindowOpen and not self:IsOwnProfessionWindowOpen() then
+	if not self:IsOwnProfessionWindowOpen() then
 		self:DebugLog("scan", "start skipped: profession window closed")
 		self.activeScan = nil
 		return 0
@@ -915,7 +915,7 @@ function AF:QueueAutoScan(force)
 end
 
 function AF:QueueProfessionDataSourceProbe()
-	if self:IsInCombatLocked() or (self.IsOwnProfessionWindowOpen and not self:IsOwnProfessionWindowOpen()) then
+	if self:IsInCombatLocked() or not self:IsOwnProfessionWindowOpen() then
 		return
 	end
 	local profession = self:GetCurrentProfessionInfo()
@@ -955,7 +955,7 @@ function AF:StartProfessionEquipmentWatch()
 			C_Timer.After(1.0, Tick)
 			return
 		end
-		if (AF.IsOwnProfessionWindowOpen and not AF:IsOwnProfessionWindowOpen()) or not C_TradeSkillUI.IsTradeSkillReady() then
+		if not AF:IsOwnProfessionWindowOpen() or not C_TradeSkillUI.IsTradeSkillReady() then
 			return
 		end
 		local profession = AF:GetCurrentProfessionInfo()
@@ -987,7 +987,7 @@ function AF:QueueAutoScanForChange(reason)
 		end
 		return
 	end
-	if self.IsOwnProfessionWindowOpen and not self:IsOwnProfessionWindowOpen() then
+	if not self:IsOwnProfessionWindowOpen() then
 		self.pendingAutoScanReason = nil
 		return
 	end
@@ -1020,7 +1020,7 @@ function AF:QueueAutoScanForChange(reason)
 				AF.deferredProfessionEquipmentSkillLineID = AF.pendingProfessionEquipmentSkillLineID
 				return
 			end
-			if AF.IsOwnProfessionWindowOpen and not AF:IsOwnProfessionWindowOpen() then
+			if not AF:IsOwnProfessionWindowOpen() then
 				AF.pendingAutoScanReason = nil
 				return
 			end
@@ -1067,7 +1067,7 @@ function AF:QueueAutoScanForChange(reason)
 end
 
 function AF:ResumeCurrentProfessionScanIfNeeded()
-	if self.IsOwnProfessionWindowOpen and not self:IsOwnProfessionWindowOpen() then
+	if not self:IsOwnProfessionWindowOpen() then
 		self.activeScan = nil
 		return 0
 	end

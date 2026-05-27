@@ -40,7 +40,7 @@ local function CanShowOrderNotification(self)
 end
 
 local function CountPersonalOrders()
-	local infos = C_CraftingOrders and C_CraftingOrders.GetPersonalOrdersInfo and C_CraftingOrders.GetPersonalOrdersInfo() or {}
+	local infos = C_CraftingOrders.GetPersonalOrdersInfo() or {}
 	local total = 0
 	local rows = {}
 	for _, info in ipairs(infos) do
@@ -89,8 +89,8 @@ local function GetOrderNotificationItemInfo(details)
 		itemName = itemName or name
 		itemLink = itemLink or link
 		itemQuality = itemQuality or tonumber(quality)
-		itemIcon = itemIcon or tonumber(icon) or (C_Item.GetItemIconByID and C_Item.GetItemIconByID(itemID))
-		if not name and C_Item.RequestLoadItemDataByID then
+		itemIcon = itemIcon or tonumber(icon) or C_Item.GetItemIconByID(itemID)
+		if not name then
 			pcall(C_Item.RequestLoadItemDataByID, itemID)
 		end
 	end
@@ -461,22 +461,20 @@ function AF:InitializeOrderNotifications()
 		return
 	end
 	self.orderNotificationsInitialized = true
-	if C_CraftingOrders and C_CraftingOrders.PlaceNewOrder then
-		hooksecurefunc(C_CraftingOrders, "PlaceNewOrder", function(orderInfo)
-			if type(orderInfo) == "table"
-				and orderInfo.orderType == Enum.CraftingOrderType.Personal
-				and orderInfo.orderTarget
-				and orderInfo.orderTarget ~= ""
-			then
-				AF.pendingPersonalOrderTarget = AF:NormalizeName(orderInfo.orderTarget)
-				AF.pendingPersonalOrderDetails = AF:CapturePersonalOrderDetails(orderInfo)
-				AF:DebugLog("orders", "pending target=" .. tostring(AF.pendingPersonalOrderTarget))
-			else
-				AF.pendingPersonalOrderTarget = nil
-				AF.pendingPersonalOrderDetails = nil
-			end
-		end)
-	end
+	hooksecurefunc(C_CraftingOrders, "PlaceNewOrder", function(orderInfo)
+		if type(orderInfo) == "table"
+			and orderInfo.orderType == Enum.CraftingOrderType.Personal
+			and orderInfo.orderTarget
+			and orderInfo.orderTarget ~= ""
+		then
+			AF.pendingPersonalOrderTarget = AF:NormalizeName(orderInfo.orderTarget)
+			AF.pendingPersonalOrderDetails = AF:CapturePersonalOrderDetails(orderInfo)
+			AF:DebugLog("orders", "pending target=" .. tostring(AF.pendingPersonalOrderTarget))
+		else
+			AF.pendingPersonalOrderTarget = nil
+			AF.pendingPersonalOrderDetails = nil
+		end
+	end)
 	self:InitializeCustomerOrderFormHook()
 	self:InitializeCraftingOrderIndicator()
 	self.db.orderNotifications = self.db.orderNotifications or {}

@@ -48,21 +48,11 @@ local function IsCurrentPlayer(AF, name)
 	return AF:NormalizeName(name) == AF:NormalizeName(AF.playerName or AF:GetPlayerFullName())
 end
 
-local function GetGuildRosterRequester()
-	if C_GuildInfo and C_GuildInfo.GuildRoster then
-		return C_GuildInfo.GuildRoster
-	end
-	return nil
-end
-
 local function RequestGuildRoster()
 	if SetGuildRosterShowOffline then
 		pcall(SetGuildRosterShowOffline, true)
 	end
-	local requester = GetGuildRosterRequester()
-	if requester then
-		pcall(requester)
-	end
+	pcall(C_GuildInfo.GuildRoster)
 end
 
 local function QueryGuildRecipeData()
@@ -607,10 +597,6 @@ function AF:QueueGuildRecipeMemberQuery(professionID, recipeID)
 	if professionID == 0 or recipeID == 0 or not IsInGuild or not IsInGuild() then
 		return false
 	end
-	if not C_GuildInfo or not C_GuildInfo.QueryGuildMembersForRecipe then
-		return false
-	end
-
 	self.guildRecipeQueries = self.guildRecipeQueries or {}
 	local key = BuildRecipeKey(professionID, recipeID)
 	local now = self:Now()
@@ -700,7 +686,7 @@ function AF:GetOnlineGuildQueryTargets(professionID, recipeID, limit)
 	end
 
 	local function addMemberTarget(name)
-		local contactName = self.GetRememberedArtisanContact and self:GetRememberedArtisanContact(name)
+		local contactName = self:GetRememberedArtisanContact(name)
 		if contactName and contactName ~= self:NormalizeName(name) then
 			addTarget(contactName)
 		end

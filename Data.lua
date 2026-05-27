@@ -230,6 +230,18 @@ local function ClearVolatileCraftFields(item)
 	item.fullScanAt = nil
 end
 
+local function NormalizeOptionalBestReagents(entry)
+	if type(entry) ~= "table" then
+		return
+	end
+	entry.optionalBestReagents = AF:GetDistinctOptionalBestReagents(entry.bestReagents, entry.optionalBestReagents)
+	if not entry.optionalBestReagents then
+		entry.optionalBestReagentSignature = nil
+		entry.optionalBestReagentSummaryUpdatedAt = nil
+		entry.optionalBestReagentTruncated = nil
+	end
+end
+
 local function GetLegacyReagentDisplayKey(entry)
 	if type(entry) ~= "table" then
 		return nil
@@ -354,6 +366,7 @@ local function NormalizeCraftProfile(profile)
 				item.professionID = supportedID
 				ClearLocalizedCraftFields(item)
 				ClearVolatileCraftFields(item)
+				NormalizeOptionalBestReagents(item)
 			else
 				profile.items[itemKey] = nil
 			end
@@ -398,6 +411,7 @@ local function NormalizeCustomerCacheEntry(entry)
 	PreserveLegacyReagentDisplay(entry)
 	ClearLocalizedCraftFields(entry)
 	ClearVolatileCraftFields(entry)
+	NormalizeOptionalBestReagents(entry)
 	return entry
 end
 
@@ -579,6 +593,8 @@ function ApplyDBDefaults(db)
 		db.orderNotificationBannerEnabled = true
 	end
 	if db.orderNotificationChannel == nil then
+		db.orderNotificationChannel = "default"
+	elseif db.orderNotificationChannel == "Master" then
 		db.orderNotificationChannel = "default"
 	end
 	if db.orderNotificationPoint == nil then
@@ -971,7 +987,7 @@ function AF:StoreProfessionLink(characterName, professionID, professionLink)
 		return nil
 	end
 	local activeCharacter = self:NormalizeName(self.activeArtisanCharacter or self.playerName or self:GetPlayerFullName())
-	if characterName == activeCharacter and self.IsOwnProfessionWindowOpen and not self:IsOwnProfessionWindowOpen() then
+	if characterName == activeCharacter and not self:IsOwnProfessionWindowOpen() then
 		return nil
 	end
 
@@ -1158,7 +1174,7 @@ function AF:IsGuildOrderEntry(entry)
 	if entry.ownAlt and self:IsNameOnConnectedRealm(entry.orderTarget or entry.name or entry.target) then
 		return false
 	end
-	return Enum and Enum.CraftingOrderType and Enum.CraftingOrderType.Guild ~= nil
+	return Enum.CraftingOrderType.Guild ~= nil
 end
 
 function AF:GetDisplayPlayerName(name)
@@ -1252,7 +1268,7 @@ function AF:IsDeprecatedScannedProfession(profile, professionID, profession)
 	if self:GetProfessionScannedCount(profile, professionID) <= 0 then
 		return false
 	end
-	local currentVersion = self.GetCurrentProfessionScanSignatureVersion and self:GetCurrentProfessionScanSignatureVersion()
+	local currentVersion = self:GetCurrentProfessionScanSignatureVersion()
 	if not currentVersion then
 		return false
 	end

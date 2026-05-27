@@ -124,6 +124,23 @@ local function CopyCustomerEntry(entry)
 	return copy
 end
 
+local FAVORITE_CACHE_ROW_OPTIONS = { unavailableFavorite = true, useOrderTarget = true }
+local OFFLINE_CACHE_ROW_OPTIONS = { offlineCached = true, offlineFallback = true, useOrderTarget = true }
+
+local function PrepareCachedCustomerEntry(AF, entry, options)
+	local copy = CopyCustomerEntry(entry)
+	copy.certified = true
+	copy.tradeLead = false
+	copy.unavailableFavorite = options and options.unavailableFavorite or nil
+	copy.offlineCached = options and options.offlineCached or nil
+	copy.offlineFallback = options and options.offlineFallback or nil
+	if options and options.useOrderTarget then
+		copy.target = copy.orderTarget or copy.name
+	end
+	copy.professionLink = copy.professionLink or AF:GetRememberedProfessionLink(copy.orderTarget or copy.name, copy.professionID)
+	return copy
+end
+
 local function ClearGuildAffiliation(entry)
 	entry.guildMember = nil
 	entry.guildOnline = nil
@@ -132,10 +149,7 @@ local function ClearGuildAffiliation(entry)
 end
 
 local function MarkGuildAffiliation(AF, entry)
-	if not entry or not AF.GetCachedGuildRosterEntry then
-		if entry then
-			ClearGuildAffiliation(entry)
-		end
+	if not entry then
 		return entry
 	end
 	if entry.debug then
@@ -303,11 +317,7 @@ function AF:GetCachedArtisans(itemID, filterText, sortMode, queryToken)
 		local verifiedForQuery = queryToken and tonumber(entry.lastQueryToken) == tonumber(queryToken) and entry.verifiedAt
 		if verifiedForQuery and not (entry.debug and not self:IsDevFakeRowsEnabled()) and entry.updatedAt and now - entry.updatedAt <= self.CACHE_MAX_AGE then
 			if EntryMatchesCustomerFilter(self, entry, filterText) then
-				local rowEntry = CopyCustomerEntry(entry)
-				rowEntry.certified = true
-				rowEntry.tradeLead = false
-				rowEntry.unavailableFavorite = nil
-				rowEntry.professionLink = rowEntry.professionLink or self:GetRememberedProfessionLink(rowEntry.orderTarget or rowEntry.name, rowEntry.professionID)
+				local rowEntry = PrepareCachedCustomerEntry(self, entry)
 				if self:IsCustomerEntryOrderEligible(rowEntry) then
 					table.insert(rows, rowEntry)
 					MarkSeen(self, seenNames, rowEntry)
@@ -319,12 +329,7 @@ function AF:GetCachedArtisans(itemID, filterText, sortMode, queryToken)
 	for _, entry in pairs(itemCache or {}) do
 		local favoriteKey = self:GetFavoriteArtisanKey(entry)
 		if favoriteKey and not (entry.debug and not self:IsDevFakeRowsEnabled()) and not seenNames[favoriteKey] and self:IsFavoriteArtisan(entry) and EntryMatchesCustomerFilter(self, entry, filterText) then
-			local favoriteEntry = CopyCustomerEntry(entry)
-			favoriteEntry.certified = true
-			favoriteEntry.tradeLead = false
-			favoriteEntry.unavailableFavorite = true
-			favoriteEntry.target = favoriteEntry.orderTarget or favoriteEntry.name
-			favoriteEntry.professionLink = favoriteEntry.professionLink or self:GetRememberedProfessionLink(favoriteEntry.orderTarget or favoriteEntry.name, favoriteEntry.professionID)
+			local favoriteEntry = PrepareCachedCustomerEntry(self, entry, FAVORITE_CACHE_ROW_OPTIONS)
 			if self:IsCustomerEntryOrderEligible(favoriteEntry) then
 				table.insert(rows, favoriteEntry)
 				MarkSeen(self, seenNames, favoriteEntry)
@@ -365,13 +370,7 @@ function AF:GetCachedArtisans(itemID, filterText, sortMode, queryToken)
 				and now - updatedAt <= self.CACHE_MAX_AGE
 				and EntryMatchesCustomerFilter(self, entry, filterText)
 			then
-				local offlineEntry = CopyCustomerEntry(entry)
-				offlineEntry.certified = true
-				offlineEntry.tradeLead = false
-				offlineEntry.offlineCached = true
-				offlineEntry.offlineFallback = true
-				offlineEntry.target = offlineEntry.orderTarget or offlineEntry.name
-				offlineEntry.professionLink = offlineEntry.professionLink or self:GetRememberedProfessionLink(offlineEntry.orderTarget or offlineEntry.name, offlineEntry.professionID)
+				local offlineEntry = PrepareCachedCustomerEntry(self, entry, OFFLINE_CACHE_ROW_OPTIONS)
 				if self:IsCustomerEntryOrderEligible(offlineEntry) then
 					table.insert(candidates, offlineEntry)
 				end

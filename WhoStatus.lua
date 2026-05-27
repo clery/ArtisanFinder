@@ -236,9 +236,7 @@ end
 
 function AF:InitializeWhoStatus()
 	self.whoStatus = self.whoStatus or {}
-	if C_AddOns and C_AddOns.LoadAddOn then
-		pcall(C_AddOns.LoadAddOn, "Blizzard_FriendsFrame")
-	end
+	pcall(C_AddOns.LoadAddOn, "Blizzard_FriendsFrame")
 	EnsureWhoFrame()
 	if ChatFrame_AddMessageEventFilter and not self.whoStatusChatFilterRegistered then
 		ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", SuppressOwnWhoSystemMessage)
@@ -356,7 +354,7 @@ function AF:IsCustomerEntryOffline(entry)
 	if not self:IsCustomerEntryWhoRefreshable(entry) then
 		return false
 	end
-	if self.HasProfessionOpenFailed and self:HasProfessionOpenFailed(entry) then
+	if self:HasProfessionOpenFailed(entry) then
 		return true
 	end
 	return self:GetWhoStatus(GetEntryWhoName(entry)) == false

@@ -379,8 +379,7 @@ AF.frame:SetScript("OnEvent", function(_, event, ...)
 			return
 		end
 		local closeProfessionBook = event == "TRADE_SKILL_SHOW"
-			and ((AF.IsIntroTutorialActive and AF:IsIntroTutorialActive())
-				or (AF.IsMinimapTutorialActive and AF:IsMinimapTutorialActive()))
+			and (AF:IsIntroTutorialActive() or AF:IsMinimapTutorialActive())
 		if event == "TRADE_SKILL_SHOW" and AF.CloseIntroTutorial then
 			AF:CloseIntroTutorial()
 		end
@@ -403,7 +402,7 @@ AF.frame:SetScript("OnEvent", function(_, event, ...)
 					AF:RefreshCrafterUI()
 				end
 			end
-			local ownProfessionWindowOpen = AF.IsOwnProfessionWindowOpen and AF:IsOwnProfessionWindowOpen()
+			local ownProfessionWindowOpen = AF:IsOwnProfessionWindowOpen()
 			if event == "TRADE_SKILL_DATA_SOURCE_CHANGED" and ownProfessionWindowOpen and AF.QueueProfessionDataSourceProbe then
 				AF:QueueProfessionDataSourceProbe()
 			end
@@ -437,7 +436,7 @@ AF.frame:SetScript("OnEvent", function(_, event, ...)
 			end
 			return
 		end
-		local ownProfessionWindowOpen = AF.IsOwnProfessionWindowOpen and AF:IsOwnProfessionWindowOpen()
+		local ownProfessionWindowOpen = AF:IsOwnProfessionWindowOpen()
 		if event == "PROFESSION_EQUIPMENT_CHANGED" and ownProfessionWindowOpen then
 			AF.pendingProfessionEquipmentSkillLineID = ...
 			AF.pendingProfessionEquipmentScan = true

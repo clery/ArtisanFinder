@@ -406,7 +406,7 @@ function AF:ApplyCrafterDefaultsCollapsed(collapsed)
 			collapseButton:SetPoint("TOPRIGHT", defaults, "TOPRIGHT", 1, 0)
 			collapseButton:SetMinimizedLook()
 		end
-			self:RaiseButtonAboveAnchor(collapseButton, ProfessionsFrame, CRAFTER_COLLAPSE_BUTTON_LEVEL_OFFSET)
+		self:RaiseButtonAboveAnchor(collapseButton, ProfessionsFrame, CRAFTER_COLLAPSE_BUTTON_LEVEL_OFFSET)
 		collapseButton:Show()
 	end
 end
@@ -425,8 +425,8 @@ end
 
 function AF:IsLinkedProfessionOpen()
 	return C_TradeSkillUI.IsTradeSkillLinked() == true
-		or (C_TradeSkillUI.IsTradeSkillGuildMember and C_TradeSkillUI.IsTradeSkillGuildMember() == true)
-		or (C_TradeSkillUI.IsTradeSkillGuild and C_TradeSkillUI.IsTradeSkillGuild() == true)
+		or C_TradeSkillUI.IsTradeSkillGuild() == true
+		or C_TradeSkillUI.IsTradeSkillGuildMember() == true
 end
 
 function AF:IsOwnProfessionWindowOpen()
@@ -493,7 +493,7 @@ function AF:RefreshCrafterReopenButton()
 end
 
 function AF:GetCurrentCraftingRecipeContext()
-	if self.IsOwnProfessionWindowOpen and not self:IsOwnProfessionWindowOpen() then
+	if not self:IsOwnProfessionWindowOpen() then
 		return nil
 	end
 
@@ -521,7 +521,7 @@ function AF:GetCurrentCraftingRecipeContext()
 	if professionInfo and not self:ProfessionInfoMatchesProfession(currentProfession, professionInfo) then
 		return nil
 	end
-	if not professionInfo and self.RecipeBelongsToProfession and not self:RecipeBelongsToProfession(currentProfession, recipeInfo, self:GetCurrentProfessionCategoryIDs(), recipeID) then
+	if not professionInfo and not self:RecipeBelongsToProfession(currentProfession, recipeInfo, self:GetCurrentProfessionCategoryIDs(), recipeID) then
 		return nil
 	end
 
@@ -563,7 +563,7 @@ function AF:EnsureCurrentRecipeEntry(context, options)
 	if not context or not context.itemID then
 		return nil
 	end
-	if self.IsOwnProfessionWindowOpen and not self:IsOwnProfessionWindowOpen() then
+	if not self:IsOwnProfessionWindowOpen() then
 		return nil
 	end
 	options = options or {}

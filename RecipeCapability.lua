@@ -150,7 +150,7 @@ local function GetRecipeOutputItemLevel(recipeID, operationInfo, reagentInfo)
 	local quality = tonumber(GetOperationQuality(operationInfo))
 	local overrideQualityID = quality and recipeInfo and recipeInfo.qualityIDs and recipeInfo.qualityIDs[quality] or quality
 	local okOutput, outputInfo = pcall(C_TradeSkillUI.GetRecipeOutputItemData, recipeID, reagentInfo or {}, nil, overrideQualityID)
-	if okOutput and type(outputInfo) == "table" and outputInfo.hyperlink and C_Item and C_Item.GetDetailedItemLevelInfo then
+	if okOutput and type(outputInfo) == "table" and outputInfo.hyperlink then
 		local okLevel, itemLevel = pcall(C_Item.GetDetailedItemLevelInfo, outputInfo.hyperlink)
 		if okLevel and tonumber(itemLevel) then
 			return tonumber(itemLevel)
@@ -579,7 +579,7 @@ function AF:GetProfessionLink()
 end
 
 function AF:CaptureCurrentProfessionLink(profession, reason)
-	if self.IsOwnProfessionWindowOpen and not self:IsOwnProfessionWindowOpen() then
+	if not self:IsOwnProfessionWindowOpen() then
 		return nil
 	end
 
@@ -1181,10 +1181,10 @@ function AF:ApplyRecipeCapability(item, recipeID)
 	item.optionalReagents = capability.optionalReagents
 	item.optionalReagentSummary = nil
 	item.optionalSlotCount = capability.optionalSlotCount
-	item.optionalBestReagents = capability.optionalBestReagents
-	item.optionalBestReagentSignature = capability.optionalBestReagentSignature
-	item.optionalBestReagentSummaryUpdatedAt = capability.optionalBestReagents and self:Now() or nil
-	item.optionalBestReagentTruncated = capability.optionalBestReagentTruncated == true
+	item.optionalBestReagents = self:GetDistinctOptionalBestReagents(capability.bestReagents, capability.optionalBestReagents)
+	item.optionalBestReagentSignature = item.optionalBestReagents and capability.optionalBestReagentSignature or nil
+	item.optionalBestReagentSummaryUpdatedAt = item.optionalBestReagents and self:Now() or nil
+	item.optionalBestReagentTruncated = item.optionalBestReagents and capability.optionalBestReagentTruncated == true
 	item.debugBestCandidateSummary = nil
 	item.professionLink = capability.professionLink or item.professionLink
 	self:ApplyRecipeSkillProbe(item, recipeID, capability)
