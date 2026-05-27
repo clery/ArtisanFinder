@@ -7,6 +7,9 @@ local FAST_SCAN_FULL_JOB_DELAY = 0.01
 local FAST_SCAN_PROBE_JOBS_PER_TICK = 25
 local FAST_SCAN_FULL_JOBS_PER_TICK = 4
 local FAST_SCAN_TICK_BUDGET_MS = 8
+local SCAN_TICK_BUDGET_MS = 12
+local FAST_SCAN_FULL_JOB_CHUNK_MS = 4
+local SCAN_FULL_JOB_CHUNK_MS = 12
 local SLOW_SCAN_TICK_WARNING_MS = 1000
 local SCAN_GC_STEP_SIZE = 32
 local HEAVY_JOB_QUALITY_TIER_THRESHOLD = 12
@@ -28,6 +31,34 @@ local function CopyScanItem(item)
 		copy[key] = value
 	end
 	return copy
+end
+
+local function GetDebugItemName(itemID)
+	local name = GetItemInfo and GetItemInfo(itemID)
+	return name and name ~= "" and name or tostring(itemID or "?")
+end
+
+local function FormatScanStats(stats)
+	stats = stats or {}
+	return string.format(
+		"eval=%d tiers=%d normal=%d conc=%d ilvl=%d skipQuality=%d skipConc=%d skipMaxConc=%d prune=%d noNormal=%d endpoint=%s saved=%d",
+		tonumber(stats.evaluated) or 0,
+		tonumber(stats.qualityTierCombinations) or 0,
+		tonumber(stats.normalCalls) or 0,
+		tonumber(stats.concentrationCalls) or 0,
+		tonumber(stats.outputItemLevelCalls) or 0,
+		tonumber(stats.skippedByQuality) or 0,
+		tonumber(stats.skippedConcentration) or 0,
+		tonumber(stats.skippedMaxQualityConcentration) or 0,
+		tonumber(stats.prunedBelowBest) or 0,
+		tonumber(stats.noNormalInfo) or 0,
+		tostring(stats.endpointShortcut == true),
+		tonumber(stats.endpointShortcutSaved) or 0
+	)
+end
+
+local function GetLuaMemoryKB()
+	return collectgarbage and collectgarbage("count") or 0
 end
 
 local function GetRecommendationSnapshot(item)
@@ -397,6 +428,17 @@ local function AppendPendingJob(progress, job)
 	progress.pendingTotal = index
 end
 
+local function ClearScanProgressRuntimeState(progress)
+	for _, job in pairs(progress and progress.pending or {}) do
+		if type(job) == "table" then
+			job.scanState = nil
+			job.scanStartedMS = nil
+			job.scanResumeCount = nil
+			job.lastDebugMS = nil
+		end
+	end
+end
+
 function AF:IsLowerOrEqualEquipmentProbe(existing, probe)
 	if not existing or not probe then
 		return false
@@ -454,6 +496,19 @@ function AF:ScanJob(profession, professionEntry, job)
 			end
 			if needsFull then
 				local qualityTierCombinations = self:EstimateRecipeQualityTierCombinations(job.recipeID)
+				self:DebugLog("scan", string.format(
+					"queue full recipe=%s item=%s name=%s reason=%s equipmentUpgrade=%s tiers=%d savedQuality=%s probeQuality=%s savedSkill=%s probeSkill=%s",
+					tostring(job.recipeID),
+					tostring(job.itemID),
+					GetDebugItemName(job.itemID),
+					self:ProbeRequiresFullScan(savedItem, job.recipeID, job.itemID, probe) and "probeChanged" or "equipmentUpgrade",
+					tostring(equipmentSkillUpgrade == true),
+					tonumber(qualityTierCombinations) or 0,
+					tostring(savedItem and savedItem.quality or ""),
+					tostring(probe.quality or ""),
+					tostring(savedItem and savedItem.totalSkill or ""),
+					tostring(probe.totalSkill or "")
+				))
 				AppendPendingJob(professionEntry.scanProgress, {
 					key = "full:" .. GetScanJobKey(job.recipeID, job.itemID),
 					kind = "full",
@@ -466,6 +521,13 @@ function AF:ScanJob(profession, professionEntry, job)
 			end
 		else
 			local qualityTierCombinations = self:EstimateRecipeQualityTierCombinations(job.recipeID)
+			self:DebugLog("scan", string.format(
+				"queue full recipe=%s item=%s name=%s reason=noProbe tiers=%d",
+				tostring(job.recipeID),
+				tostring(job.itemID),
+				GetDebugItemName(job.itemID),
+				tonumber(qualityTierCombinations) or 0
+			))
 			AppendPendingJob(professionEntry.scanProgress, {
 				key = "full:" .. GetScanJobKey(job.recipeID, job.itemID),
 				kind = "full",
@@ -477,11 +539,97 @@ function AF:ScanJob(profession, professionEntry, job)
 			return true
 		end
 	else
+		local cachedBest = self.recipeCapabilityCache and self.recipeCapabilityCache[job.recipeID]
+		if cachedBest then
+			local beforeRecommendation = GetRecommendationSnapshot(existing)
+			self:ApplyRecipeCapability(existing, job.recipeID, cachedBest)
+			local afterRecommendation = GetRecommendationSnapshot(existing)
+			if beforeRecommendation ~= afterRecommendation and existing.bestReagents then
+				professionEntry.scanProgress.recommendationsUpdated = (tonumber(professionEntry.scanProgress.recommendationsUpdated) or 0) + 1
+			end
+			self:DebugLog("scan", string.format(
+				"full cache recipe=%s item=%s name=%s changed=%s bestQuality=%s bestConc=%s bestIlvl=%s %s",
+				tostring(job.recipeID),
+				tostring(job.itemID),
+				GetDebugItemName(job.itemID),
+				tostring(beforeRecommendation ~= afterRecommendation),
+				tostring(existing.bestQuality or ""),
+				tostring(existing.bestConcentrationQuality or ""),
+				tostring(existing.bestOutputItemLevel or ""),
+				FormatScanStats(cachedBest.debugScanStats)
+			))
+			existing.updatedAt = self:Now()
+			professionEntry.recipes[tostring(job.recipeID)] = true
+			return true
+		end
+		local jobState = job.scanState
+		if not jobState then
+			jobState = self:CreateBestReagentCapabilityCoroutine(job.recipeID, nil, false)
+			job.scanState = jobState
+			job.scanStartedMS = GetScanTimeMS()
+			job.scanResumeCount = 0
+			job.lastDebugMS = job.scanStartedMS
+			self:DebugLog("scan", string.format(
+				"full start recipe=%s item=%s name=%s tiers=%d",
+				tostring(job.recipeID),
+				tostring(job.itemID),
+				GetDebugItemName(job.itemID),
+				tonumber(job.qualityTierCombinations or (jobState.stats and jobState.stats.qualityTierCombinations)) or 0
+			))
+		end
+		job.scanResumeCount = (tonumber(job.scanResumeCount) or 0) + 1
+		local budget = self.db and self.db.fastScan == true and FAST_SCAN_FULL_JOB_CHUNK_MS or SCAN_FULL_JOB_CHUNK_MS
+		local best, err = self:ResumeBestReagentCapabilityState(jobState, budget)
+		if not best and err then
+			self:DebugLog("scan", string.format(
+				"full failed recipe=%s item=%s name=%s resumes=%d ms=%.1f %s error=%s",
+				tostring(job.recipeID),
+				tostring(job.itemID),
+				GetDebugItemName(job.itemID),
+				tonumber(job.scanResumeCount) or 0,
+				GetScanTimeMS() - (tonumber(job.scanStartedMS) or GetScanTimeMS()),
+				FormatScanStats(jobState.stats),
+				tostring(err)
+			))
+			return "skipped"
+		end
+		if not best then
+			local nowMS = GetScanTimeMS()
+			if nowMS - (tonumber(job.lastDebugMS) or 0) >= 1000 then
+				job.lastDebugMS = nowMS
+				self:DebugLog("scan", string.format(
+					"full progress recipe=%s item=%s name=%s resumes=%d ms=%.1f %s",
+					tostring(job.recipeID),
+					tostring(job.itemID),
+					GetDebugItemName(job.itemID),
+					tonumber(job.scanResumeCount) or 0,
+					nowMS - (tonumber(job.scanStartedMS) or nowMS),
+					FormatScanStats(jobState.stats)
+				))
+			end
+			return "continuing"
+		end
 		local beforeRecommendation = GetRecommendationSnapshot(existing)
-		self:ApplyRecipeCapability(existing, job.recipeID)
+		self:ApplyRecipeCapability(existing, job.recipeID, best)
 		local afterRecommendation = GetRecommendationSnapshot(existing)
 		if beforeRecommendation ~= afterRecommendation and existing.bestReagents then
 			professionEntry.scanProgress.recommendationsUpdated = (tonumber(professionEntry.scanProgress.recommendationsUpdated) or 0) + 1
+		end
+		self:DebugLog("scan", string.format(
+			"full done recipe=%s item=%s name=%s resumes=%d ms=%.1f changed=%s bestQuality=%s bestConc=%s bestIlvl=%s %s",
+			tostring(job.recipeID),
+			tostring(job.itemID),
+			GetDebugItemName(job.itemID),
+			tonumber(job.scanResumeCount) or 0,
+			GetScanTimeMS() - (tonumber(job.scanStartedMS) or GetScanTimeMS()),
+			tostring(beforeRecommendation ~= afterRecommendation),
+			tostring(existing.bestQuality or ""),
+			tostring(existing.bestConcentrationQuality or ""),
+			tostring(existing.bestOutputItemLevel or ""),
+			FormatScanStats(best.debugScanStats or (jobState and jobState.stats))
+		))
+		if self.recipeCapabilityCache then
+			self.recipeCapabilityCache[job.recipeID] = best
 		end
 	end
 	existing.updatedAt = self:Now()
@@ -585,6 +733,27 @@ function AF:GetScanJobsPerTick(job)
 	return FAST_SCAN_PROBE_JOBS_PER_TICK
 end
 
+function AF:ReleaseScanRuntimeMemory(reason)
+	local beforeKB = GetLuaMemoryKB()
+	if self.ClearRecipeCapabilityRuntimeCaches then
+		self:ClearRecipeCapabilityRuntimeCaches()
+	else
+		self.recipeCapabilityCache = nil
+		self.recipeCapabilityCacheSignature = nil
+	end
+	if collectgarbage then
+		collectgarbage("collect")
+	end
+	local afterKB = GetLuaMemoryKB()
+	self:DebugLog("scan", string.format(
+		"memory release reason=%s before=%.1fKB after=%.1fKB freed=%.1fKB",
+		tostring(reason or ""),
+		beforeKB,
+		afterKB,
+		math.max(0, beforeKB - afterKB)
+	))
+end
+
 function AF:CompleteActiveScan(active, professionEntry, progress)
 	professionEntry.scanSignature = progress.professionSignature or progress.signature
 	professionEntry.scanMode = progress.mode
@@ -604,6 +773,7 @@ function AF:CompleteActiveScan(active, professionEntry, progress)
 	end
 	self:StoreBestProfessionEquipmentState(currentProfession, self:GetCurrentProfessionEquipmentState(currentProfession))
 	self:StoreBestProfessionSkillSnapshots(currentProfession, self:GetCurrentProfessionSkillSnapshots(currentProfession))
+	self:ReleaseScanRuntimeMemory("complete")
 	if progress.reason == "PROFESSION_EQUIPMENT_CHANGED" and (tonumber(progress.skillUpgrades) or 0) == 0 then
 		self:DebugLog("scan", string.format(
 			"complete profession=%s mode=%s scanned=%d recommendations=%d noEquipmentUpgrades=true",
@@ -687,6 +857,10 @@ function AF:ProcessScanQueue()
 			end
 			processedCount = processed
 			lastJob = job
+			if result == "continuing" then
+				progress.updatedAt = AF:Now()
+				break
+			end
 			progress.pendingIndex = pendingIndex + 1
 			progress.pending[pendingIndex] = nil
 			progress.completed[job.key] = true
@@ -695,7 +869,8 @@ function AF:ProcessScanQueue()
 				progress.scanned = (tonumber(progress.scanned) or 0) + 1
 			end
 			progress.updatedAt = AF:Now()
-			if AF.db and AF.db.fastScan == true and processed > 0 and GetScanTimeMS() - tickStarted >= FAST_SCAN_TICK_BUDGET_MS then
+			local tickBudget = AF.db and AF.db.fastScan == true and FAST_SCAN_TICK_BUDGET_MS or SCAN_TICK_BUDGET_MS
+			if processed > 0 and GetScanTimeMS() - tickStarted >= tickBudget then
 				break
 			end
 		end
@@ -749,13 +924,18 @@ function AF:PauseActiveProfessionScan(silent)
 	if professionEntry and professionEntry.scanSignature == active.signature then
 		professionEntry.scanProgress = nil
 		self.activeScan = nil
+		self:ReleaseScanRuntimeMemory("pause-complete")
 		return
 	end
 	local progress = professionEntry and professionEntry.scanProgress
 	local remaining = GetPendingCount(progress)
+	ClearScanProgressRuntimeState(progress)
 	self.activeScan = nil
+	self.scanProcessing = false
+	self.scanQueueToken = (self.scanQueueToken or 0) + 1
 	self:RefreshScanProgressUI(true)
 	self:DebugLog("scan", string.format("paused profession=%s remaining=%d silent=%s", tostring(active.professionID), tonumber(remaining) or 0, tostring(silent == true)))
+	self:ReleaseScanRuntimeMemory("pause")
 
 	if remaining > 0 and not silent then
 		self:Print(self:Text("SCAN_PAUSED", self:GetProfessionName(active.professionID), remaining))
@@ -802,6 +982,11 @@ function AF:StartOrResumeCurrentProfessionScan(force, silent, mode, forceProbe, 
 		return 0
 	end
 	mode = force and "full" or (mode or "probe")
+
+	if self.recipeCapabilityCacheSignature ~= currentSignature then
+		self.recipeCapabilityCacheSignature = currentSignature
+		self.recipeCapabilityCache = {}
+	end
 
 	if self.activeScan and tonumber(self.activeScan.professionID) == tonumber(profession.id) then
 		return 0

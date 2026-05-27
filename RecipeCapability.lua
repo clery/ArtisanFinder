@@ -145,9 +145,33 @@ local function ApplyOperationInfo(target, recipeID, operationInfo)
 	target.quality, target.qualityAtlas = GetRecipeDisplayQualityInfo(recipeID, operationInfo, {})
 end
 
+local RECIPE_INFO_CACHE = {}
+
+local function WipeTable(tbl)
+	if not tbl then
+		return
+	end
+	for key in pairs(tbl) do
+		tbl[key] = nil
+	end
+end
+
+local function GetCachedRecipeInfo(recipeID)
+	local recipeInfo = RECIPE_INFO_CACHE[recipeID]
+	if not recipeInfo then
+		recipeInfo = C_TradeSkillUI.GetRecipeInfo(recipeID)
+		RECIPE_INFO_CACHE[recipeID] = recipeInfo
+	end
+	return recipeInfo
+end
+
 local function GetRecipeOutputItemLevel(recipeID, operationInfo, reagentInfo)
-	local recipeInfo = C_TradeSkillUI.GetRecipeInfo(recipeID)
+	local recipeInfo = GetCachedRecipeInfo(recipeID)
 	local quality = tonumber(GetOperationQuality(operationInfo))
+	local recipeItemLevel = tonumber(recipeInfo and recipeInfo.itemLevel)
+	if recipeItemLevel and quality and type(recipeInfo.qualityIlvlBonuses) == "table" and recipeInfo.qualityIlvlBonuses[quality] ~= nil then
+		return recipeItemLevel + (tonumber(recipeInfo.qualityIlvlBonuses[quality]) or 0)
+	end
 	local overrideQualityID = quality and recipeInfo and recipeInfo.qualityIDs and recipeInfo.qualityIDs[quality] or quality
 	local okOutput, outputInfo = pcall(C_TradeSkillUI.GetRecipeOutputItemData, recipeID, reagentInfo or {}, nil, overrideQualityID)
 	if okOutput and type(outputInfo) == "table" and outputInfo.hyperlink then
@@ -156,7 +180,6 @@ local function GetRecipeOutputItemLevel(recipeID, operationInfo, reagentInfo)
 			return tonumber(itemLevel)
 		end
 	end
-	local recipeItemLevel = tonumber(recipeInfo and recipeInfo.itemLevel)
 	if recipeItemLevel and quality and type(recipeInfo.qualityIlvlBonuses) == "table" then
 		return recipeItemLevel + (tonumber(recipeInfo.qualityIlvlBonuses[quality]) or 0)
 	end
@@ -193,6 +216,107 @@ local function IsBetterOperation(normalInfo, concentrationInfo, reagentQualitySc
 		return inverseCost > bestInverseCost
 	end
 	return totalSkill > bestSkill
+end
+
+local function IsOperationBelowBest(normalInfo, concentrationInfo, best, normalOnly, outputItemLevel)
+	if not best then
+		return false
+	end
+	local itemLevel, quality, concentrationQuality = ScoreOperationPair(normalInfo, concentrationInfo, outputItemLevel)
+	local bestItemLevel, bestQuality, bestConcentrationQuality = ScoreOperationPair(best.normalInfo, best.concentrationInfo, best.outputItemLevel)
+	if itemLevel ~= bestItemLevel then
+		return itemLevel < bestItemLevel
+	end
+	if quality ~= bestQuality then
+		return quality < bestQuality
+	end
+	if not normalOnly and concentrationQuality ~= bestConcentrationQuality then
+		return concentrationQuality < bestConcentrationQuality
+	end
+	return false
+end
+
+local function CopyRecipeScanStats(stats)
+	local copy = {}
+	for key, value in pairs(stats or {}) do
+		copy[key] = value
+	end
+	return copy
+end
+
+local function BuildBestReagentCapability(recipeID, best)
+	if not best or not best.normalInfo then
+		return best or {}
+	end
+	if best.bestQuality or best.rawBestQuality or best.bestReagentTruncated ~= nil then
+		best.debugScanStats = CopyRecipeScanStats(best.debugScanStats)
+		return best
+	end
+	return {
+		normalInfo = best.normalInfo,
+		concentrationInfo = best.concentrationInfo,
+		reagentInfo = best.reagentInfo,
+		rawBestQuality = GetOperationQuality(best.normalInfo),
+		bestQuality = GetRecipeDisplayQuality(recipeID, best.normalInfo, best.reagentInfo),
+		bestQualityAtlas = select(2, GetRecipeDisplayQualityInfo(recipeID, best.normalInfo, best.reagentInfo)),
+		bestConcentrationQuality = GetRecipeDisplayQuality(recipeID, best.concentrationInfo, best.reagentInfo),
+		bestConcentrationQualityAtlas = select(2, GetRecipeDisplayQualityInfo(recipeID, best.concentrationInfo, best.reagentInfo)),
+		bestTotalSkill = GetOperationTotalSkill(best.normalInfo) or GetOperationTotalSkill(best.concentrationInfo),
+		bestConcentrationCost = best.concentrationInfo and best.concentrationInfo.concentrationCost or nil,
+		bestOutputItemLevel = best.outputItemLevel,
+		bestReagents = best.bestReagents,
+		bestReagentSignature = best.bestReagentSignature,
+		bestReagentTruncated = best.truncated == true,
+		reagentQualityScore = best.reagentQualityScore,
+		debugScanStats = CopyRecipeScanStats(best.debugScanStats),
+	}
+end
+
+local function CreateRecipeScanStats()
+	return {
+		evaluated = 0,
+		normalCalls = 0,
+		concentrationCalls = 0,
+		outputItemLevelCalls = 0,
+		skippedByQuality = 0,
+		skippedConcentration = 0,
+		prunedBelowBest = 0,
+		noNormalInfo = 0,
+		qualityTierCombinations = 1,
+		endpointShortcut = false,
+		endpointShortcutSaved = 0,
+		skippedMaxQualityConcentration = 0,
+	}
+end
+
+local function SelectEndpointReagents(candidateSlots, highest)
+	local selected = {}
+	for slotIndex, candidate in ipairs(candidateSlots or {}) do
+		local selectedReagent
+		for _, reagent in ipairs(candidate.slot.reagents) do
+			if highest then
+				if IsHigherQualityReagent(reagent, selectedReagent) then
+					selectedReagent = reagent
+				end
+			elseif IsLowerQualityReagent(reagent, selectedReagent) then
+				selectedReagent = reagent
+			end
+		end
+		selected[slotIndex] = selectedReagent
+	end
+	return selected
+end
+
+local function HasSamePrimaryOutcome(left, right, normalOnly)
+	if not left or not right then
+		return false
+	end
+	local leftItemLevel, leftQuality, leftConcentrationQuality = ScoreOperationPair(left.normalInfo, left.concentrationInfo, left.outputItemLevel)
+	local rightItemLevel, rightQuality, rightConcentrationQuality = ScoreOperationPair(right.normalInfo, right.concentrationInfo, right.outputItemLevel)
+	if leftItemLevel ~= rightItemLevel or leftQuality ~= rightQuality then
+		return false
+	end
+	return normalOnly or leftConcentrationQuality == rightConcentrationQuality
 end
 
 local function AddReagentInfo(tbl, reagentSlotSchematic, reagent)
@@ -598,7 +722,7 @@ function AF:CaptureCurrentProfessionLink(profession, reason)
 	return self:StoreProfessionLink(characterName, professionID, link)
 end
 
-function AF:GetRecipeCapability(recipeID)
+function AF:GetRecipeCapability(recipeID, best)
 	local capability = {}
 	local ok, operationInfo = pcall(C_TradeSkillUI.GetCraftingOperationInfo, recipeID, {}, nil, false)
 	if ok and type(operationInfo) == "table" then
@@ -617,8 +741,16 @@ function AF:GetRecipeCapability(recipeID)
 		end
 	end
 
-	local best = self:GetBestReagentCapability(recipeID)
-	if best then
+	if not best then
+		best = self.recipeCapabilityCache and self.recipeCapabilityCache[recipeID]
+		if not best then
+			best = self:GetBestReagentCapability(recipeID)
+			if self.recipeCapabilityCache then
+				self.recipeCapabilityCache[recipeID] = best
+			end
+		end
+	end
+	if best and type(best) == "table" then
 		capability.bestQuality = best.bestQuality
 		capability.bestQualityAtlas = best.bestQualityAtlas
 		capability.rawBestQuality = best.rawBestQuality
@@ -651,6 +783,13 @@ function AF:GetRecipeCapability(recipeID)
 	capability.professionLink = self:CaptureCurrentProfessionLink()
 	capability.skillProbeSignature = self:BuildSkillProbeSignature(recipeID, capability)
 	return capability
+end
+
+function AF:ClearRecipeCapabilityRuntimeCaches()
+	WipeTable(RECIPE_INFO_CACHE)
+	WipeTable(self.recipeCapabilityCache)
+	self.recipeCapabilityCache = nil
+	self.recipeCapabilityCacheSignature = nil
 end
 
 function AF:GetRecipeSkillProbe(recipeID)
@@ -980,6 +1119,279 @@ function AF:EstimateRecipeQualityTierCombinations(recipeID)
 	return combinations
 end
 
+local function GetRecipeCapabilityTimeMS()
+	if debugprofilestop then
+		return debugprofilestop()
+	end
+	return GetTime() * 1000
+end
+
+function AF:CreateBestReagentCapabilityCoroutine(recipeID, forcedReagents, normalOnly)
+	local recipeInfo = C_TradeSkillUI.GetRecipeInfo(recipeID)
+	local recipeLevel = recipeInfo and recipeInfo.unlockedRecipeLevel
+	local okSchematic, schematic = pcall(C_TradeSkillUI.GetRecipeSchematic, recipeID, false, recipeLevel)
+	local state = {
+		recipeID = recipeID,
+		normalOnly = normalOnly,
+		candidateSlots = {},
+		fixedReagents = {},
+		slotQualityTiers = {},
+		selected = {},
+		best = nil,
+		startTime = nil,
+		budget = nil,
+		stats = CreateRecipeScanStats(),
+	}
+
+	if not okSchematic or type(schematic) ~= "table" or type(schematic.reagentSlotSchematics) ~= "table" then
+		state.best = { debugReason = "recipe schematic unavailable" }
+		state.co = coroutine.create(function()
+			return state.best
+		end)
+		return state
+	end
+
+	local visibleSlots = 0
+	for _, reagentSlotSchematic in ipairs(schematic.reagentSlotSchematics) do
+		if not reagentSlotSchematic.hiddenInCraftingForm and type(reagentSlotSchematic.reagents) == "table" and #reagentSlotSchematic.reagents > 0 then
+			visibleSlots = visibleSlots + 1
+			local reagentType = reagentSlotSchematic.reagentType
+			local isBasic = Enum and Enum.CraftingReagentType and reagentType == Enum.CraftingReagentType.Basic
+			local isRequired = reagentSlotSchematic.required == true
+			if (isBasic or isRequired) and #reagentSlotSchematic.reagents > 1 then
+				table.insert(state.candidateSlots, { slot = reagentSlotSchematic, optional = false })
+			elseif isRequired then
+				local bestReagent
+				for _, reagent in ipairs(reagentSlotSchematic.reagents) do
+					if IsLowerQualityReagent(reagent, bestReagent) then
+						bestReagent = reagent
+					end
+				end
+				if bestReagent then
+					table.insert(state.fixedReagents, { slot = reagentSlotSchematic, reagent = bestReagent })
+				end
+			end
+		end
+	end
+	if type(forcedReagents) == "table" then
+		for _, forced in ipairs(forcedReagents) do
+			if forced and forced.slot and forced.reagent then
+				table.insert(state.fixedReagents, forced)
+			end
+		end
+	end
+
+	if #state.candidateSlots == 0 and #state.fixedReagents == 0 then
+		state.best = { debugReason = visibleSlots == 0 and "no visible reagent slots" or "no required or finite reagent candidates" }
+		state.co = coroutine.create(function()
+			return state.best
+		end)
+		return state
+	end
+
+	for _, candidate in ipairs(state.candidateSlots) do
+		local uniqueQualities = {}
+		for _, reagent in ipairs(candidate.slot.reagents) do
+			uniqueQualities[GetReagentQuality(reagent) or 0] = true
+		end
+		local tierCount = 0
+		for _ in pairs(uniqueQualities) do
+			tierCount = tierCount + 1
+		end
+		state.stats.qualityTierCombinations = state.stats.qualityTierCombinations * math.max(1, tierCount)
+	end
+
+	local function Evaluate(selected, truncated)
+		state.stats.evaluated = state.stats.evaluated + 1
+		local allReagentInfo = {}
+		local modifiedReagentInfo = {}
+		local bestReagents = {}
+		local reagentQualityScore = 0
+		for _, fixed in ipairs(state.fixedReagents) do
+			AddReagentInfo(allReagentInfo, fixed.slot, fixed.reagent)
+			if IsModifiedReagentSlot(fixed.slot) then
+				AddReagentInfo(modifiedReagentInfo, fixed.slot, fixed.reagent)
+			end
+			AddRecommendedReagentEntry(bestReagents, fixed.slot, fixed.reagent)
+			reagentQualityScore = reagentQualityScore + ((GetReagentQuality(fixed.reagent) or 0) * (GetQuantityRequired(fixed.slot, fixed.reagent) or 1))
+		end
+		for slotIndex, candidate in ipairs(state.candidateSlots) do
+			local slot = candidate.slot
+			local reagent = selected[slotIndex]
+			if reagent then
+				AddReagentInfo(allReagentInfo, slot, reagent)
+				if IsModifiedReagentSlot(slot) then
+					AddReagentInfo(modifiedReagentInfo, slot, reagent)
+				end
+				AddRecommendedReagentEntry(bestReagents, slot, reagent)
+				reagentQualityScore = reagentQualityScore + ((GetReagentQuality(reagent) or 0) * (GetQuantityRequired(slot, reagent) or 1))
+			end
+		end
+
+		local reagentVariants = {
+			{ name = "modified", reagents = modifiedReagentInfo },
+			{ name = "all", reagents = allReagentInfo },
+			{ name = "empty", reagents = {} },
+		}
+		state.stats.normalCalls = state.stats.normalCalls + 1
+		local normalInfo, normalVariant = TryCraftingOperationInfo(recipeID, reagentVariants, false)
+		local operationReagentInfo = normalVariant == "all" and allReagentInfo
+			or normalVariant == "modified" and modifiedReagentInfo
+			or {}
+		local concentrationInfo = nil
+		local outputItemLevel = nil
+		local candidateBest = nil
+		if normalInfo then
+			local normalQuality = tonumber(GetOperationQuality(normalInfo))
+			local bestQuality = state.best and tonumber(GetOperationQuality(state.best.normalInfo))
+			local canCompete = not state.best or not normalQuality or not bestQuality or normalQuality >= bestQuality
+			if canCompete then
+				state.stats.outputItemLevelCalls = state.stats.outputItemLevelCalls + 1
+				outputItemLevel = GetRecipeOutputItemLevel(recipeID, normalInfo, operationReagentInfo)
+				local shouldComputeConcentration = not normalOnly
+				local normalDisplayQuality = GetRecipeDisplayQuality(recipeID, normalInfo, operationReagentInfo)
+				local recipeInfo = GetCachedRecipeInfo(recipeID)
+				local maxQuality = tonumber(recipeInfo and recipeInfo.maxQuality)
+				if maxQuality and normalDisplayQuality and normalDisplayQuality >= maxQuality then
+					shouldComputeConcentration = false
+					state.stats.skippedMaxQualityConcentration = state.stats.skippedMaxQualityConcentration + 1
+				end
+				if state.best and normalQuality and bestQuality then
+					local bestItemLevel, bestQualityScore = ScoreOperationPair(state.best.normalInfo, state.best.concentrationInfo, state.best.outputItemLevel)
+					local candidateItemLevel, candidateQuality = ScoreOperationPair(normalInfo, nil, outputItemLevel)
+					if candidateItemLevel < bestItemLevel or (candidateItemLevel == bestItemLevel and candidateQuality < bestQualityScore) then
+						shouldComputeConcentration = false
+					end
+				end
+				if shouldComputeConcentration then
+					state.stats.concentrationCalls = state.stats.concentrationCalls + 1
+					concentrationInfo = TryCraftingOperationInfo(recipeID, reagentVariants, true)
+				else
+					state.stats.skippedConcentration = state.stats.skippedConcentration + 1
+				end
+				candidateBest = {
+					normalInfo = normalInfo,
+					concentrationInfo = type(concentrationInfo) == "table" and concentrationInfo or nil,
+					reagentInfo = operationReagentInfo,
+					reagentQualityScore = reagentQualityScore,
+					outputItemLevel = outputItemLevel,
+					bestReagents = bestReagents,
+					bestReagentSignature = BuildReagentSignature(bestReagents),
+					truncated = truncated,
+					debugScanStats = state.stats,
+				}
+				if IsBetterOperation(normalInfo, concentrationInfo, reagentQualityScore, state.best, normalOnly, outputItemLevel) then
+					state.best = candidateBest
+				end
+			else
+				state.stats.skippedByQuality = state.stats.skippedByQuality + 1
+			end
+			local belowBest = IsOperationBelowBest(normalInfo, concentrationInfo, state.best, normalOnly, outputItemLevel)
+			if belowBest then
+				state.stats.prunedBelowBest = state.stats.prunedBelowBest + 1
+			end
+			if state.startTime and state.budget and GetRecipeCapabilityTimeMS() - state.startTime >= state.budget then
+				coroutine.yield()
+			end
+			return belowBest, candidateBest
+		end
+		state.stats.noNormalInfo = state.stats.noNormalInfo + 1
+		return false
+	end
+
+	for slotIndex, candidate in ipairs(state.candidateSlots) do
+		local tiers = {}
+		for _, reagent in ipairs(candidate.slot.reagents) do
+			local quality = GetReagentQuality(reagent) or 0
+			tiers[quality] = true
+		end
+		state.slotQualityTiers[slotIndex] = {}
+		for quality in pairs(tiers) do
+			table.insert(state.slotQualityTiers[slotIndex], quality)
+		end
+		table.sort(state.slotQualityTiers[slotIndex], function(a, b)
+			return a > b
+		end)
+	end
+
+	local function VisitByQuality(slotIndex)
+		if slotIndex > #state.candidateSlots then
+			return Evaluate(state.selected, false)
+		end
+
+		local candidate = state.candidateSlots[slotIndex]
+		if candidate.optional then
+			state.selected[slotIndex] = nil
+			local belowBest = VisitByQuality(slotIndex + 1)
+			if state.startTime and state.budget and GetRecipeCapabilityTimeMS() - state.startTime >= state.budget then
+				coroutine.yield()
+			end
+			if belowBest then
+				return false
+			end
+		end
+		for _, targetQuality in ipairs(state.slotQualityTiers[slotIndex]) do
+			local bestReagent = nil
+			for _, reagent in ipairs(candidate.slot.reagents) do
+				if (GetReagentQuality(reagent) or 0) == targetQuality then
+					if not bestReagent or IsHigherQualityReagent(reagent, bestReagent) then
+						bestReagent = reagent
+					end
+				end
+			end
+			if bestReagent then
+				state.selected[slotIndex] = bestReagent
+				local belowBest = VisitByQuality(slotIndex + 1)
+				if state.startTime and state.budget and GetRecipeCapabilityTimeMS() - state.startTime >= state.budget then
+					coroutine.yield()
+				end
+				if belowBest then
+					state.selected[slotIndex] = nil
+					break
+				end
+			end
+		end
+		state.selected[slotIndex] = nil
+		return false
+	end
+
+	state.co = coroutine.create(function()
+		if state.stats.qualityTierCombinations > HEAVY_JOB_QUALITY_TIER_THRESHOLD then
+			local _, highBest = Evaluate(SelectEndpointReagents(state.candidateSlots, true), false)
+			local _, lowBest = Evaluate(SelectEndpointReagents(state.candidateSlots, false), false)
+			if HasSamePrimaryOutcome(highBest, lowBest, normalOnly) then
+				state.stats.endpointShortcut = true
+				state.stats.endpointShortcutSaved = math.max(0, (tonumber(state.stats.qualityTierCombinations) or 0) - (tonumber(state.stats.evaluated) or 0))
+				return state.best
+			end
+		end
+		VisitByQuality(1)
+		return state.best
+	end)
+	return state
+end
+
+function AF:ResumeBestReagentCapabilityState(state, workBudgetMS)
+	if not state or type(state) ~= "table" or not state.co then
+		return nil, "invalid capability state"
+	end
+	if coroutine.status(state.co) == "dead" then
+		state.best = BuildBestReagentCapability(state.recipeID, state.best)
+		return state.best
+	end
+	state.startTime = GetRecipeCapabilityTimeMS()
+	state.budget = tonumber(workBudgetMS) or 5
+	local ok, result = coroutine.resume(state.co)
+	if not ok then
+		return nil, result
+	end
+	if coroutine.status(state.co) == "dead" then
+		state.best = BuildBestReagentCapability(state.recipeID, result or state.best)
+		return state.best
+	end
+	return nil
+end
+
 function AF:GetBestReagentCapability(recipeID, forcedReagents, normalOnly)
 	local recipeInfo = C_TradeSkillUI.GetRecipeInfo(recipeID)
 	local recipeLevel = recipeInfo and recipeInfo.unlockedRecipeLevel
@@ -1028,7 +1440,20 @@ function AF:GetBestReagentCapability(recipeID, forcedReagents, normalOnly)
 	end
 
 	local best
+	local stats = CreateRecipeScanStats()
+	for _, candidate in ipairs(candidateSlots) do
+		local uniqueQualities = {}
+		for _, reagent in ipairs(candidate.slot.reagents) do
+			uniqueQualities[GetReagentQuality(reagent) or 0] = true
+		end
+		local tierCount = 0
+		for _ in pairs(uniqueQualities) do
+			tierCount = tierCount + 1
+		end
+		stats.qualityTierCombinations = stats.qualityTierCombinations * math.max(1, tierCount)
+	end
 	local function Evaluate(selectedReagents, truncated)
+		stats.evaluated = stats.evaluated + 1
 		local allReagentInfo = {}
 		local modifiedReagentInfo = {}
 		local bestReagents = {}
@@ -1059,28 +1484,67 @@ function AF:GetBestReagentCapability(recipeID, forcedReagents, normalOnly)
 			{ name = "all", reagents = allReagentInfo },
 			{ name = "empty", reagents = {} },
 		}
+		stats.normalCalls = stats.normalCalls + 1
 		local normalInfo, normalVariant = TryCraftingOperationInfo(recipeID, reagentVariants, false)
 		local operationReagentInfo = normalVariant == "all" and allReagentInfo
 			or normalVariant == "modified" and modifiedReagentInfo
 			or {}
 		local concentrationInfo = nil
 		local outputItemLevel = nil
+		local candidateBest = nil
 		if normalInfo then
-			outputItemLevel = GetRecipeOutputItemLevel(recipeID, normalInfo, operationReagentInfo)
-			concentrationInfo = TryCraftingOperationInfo(recipeID, reagentVariants, true)
+			local normalQuality = tonumber(GetOperationQuality(normalInfo))
+			local bestQuality = best and tonumber(GetOperationQuality(best.normalInfo))
+			local canCompete = not best or not normalQuality or not bestQuality or normalQuality >= bestQuality
+			if canCompete then
+				stats.outputItemLevelCalls = stats.outputItemLevelCalls + 1
+				outputItemLevel = GetRecipeOutputItemLevel(recipeID, normalInfo, operationReagentInfo)
+				local shouldComputeConcentration = not normalOnly
+				local normalDisplayQuality = GetRecipeDisplayQuality(recipeID, normalInfo, operationReagentInfo)
+				local recipeInfo = GetCachedRecipeInfo(recipeID)
+				local maxQuality = tonumber(recipeInfo and recipeInfo.maxQuality)
+				if maxQuality and normalDisplayQuality and normalDisplayQuality >= maxQuality then
+					shouldComputeConcentration = false
+					stats.skippedMaxQualityConcentration = stats.skippedMaxQualityConcentration + 1
+				end
+				if best and normalQuality and bestQuality then
+					local bestItemLevel, bestQualityScore = ScoreOperationPair(best.normalInfo, best.concentrationInfo, best.outputItemLevel)
+					local candidateItemLevel, candidateQuality = ScoreOperationPair(normalInfo, nil, outputItemLevel)
+					if candidateItemLevel < bestItemLevel or (candidateItemLevel == bestItemLevel and candidateQuality < bestQualityScore) then
+						shouldComputeConcentration = false
+					end
+				end
+				if shouldComputeConcentration then
+					stats.concentrationCalls = stats.concentrationCalls + 1
+					concentrationInfo = TryCraftingOperationInfo(recipeID, reagentVariants, true)
+				else
+					stats.skippedConcentration = stats.skippedConcentration + 1
+				end
+				candidateBest = {
+					normalInfo = normalInfo,
+					concentrationInfo = type(concentrationInfo) == "table" and concentrationInfo or nil,
+					reagentInfo = operationReagentInfo,
+					reagentQualityScore = reagentQualityScore,
+					outputItemLevel = outputItemLevel,
+					bestReagents = bestReagents,
+					bestReagentSignature = BuildReagentSignature(bestReagents),
+					truncated = truncated,
+					debugScanStats = stats,
+				}
+				if IsBetterOperation(normalInfo, concentrationInfo, reagentQualityScore, best, normalOnly, outputItemLevel) then
+					best = candidateBest
+				end
+			else
+				stats.skippedByQuality = stats.skippedByQuality + 1
+			end
+			local belowBest = IsOperationBelowBest(normalInfo, concentrationInfo, best, normalOnly, outputItemLevel)
+			if belowBest then
+				stats.prunedBelowBest = stats.prunedBelowBest + 1
+			end
+			return belowBest, candidateBest
 		end
-		if type(normalInfo) == "table" and IsBetterOperation(normalInfo, concentrationInfo, reagentQualityScore, best, normalOnly, outputItemLevel) then
-			best = {
-				normalInfo = normalInfo,
-				concentrationInfo = type(concentrationInfo) == "table" and concentrationInfo or nil,
-				reagentInfo = operationReagentInfo,
-				reagentQualityScore = reagentQualityScore,
-				outputItemLevel = outputItemLevel,
-				bestReagents = bestReagents,
-				bestReagentSignature = BuildReagentSignature(bestReagents),
-				truncated = truncated,
-			}
-		end
+		stats.noNormalInfo = stats.noNormalInfo + 1
+		return false
 	end
 
 	local slotQualityTiers = {}
@@ -1094,19 +1558,22 @@ function AF:GetBestReagentCapability(recipeID, forcedReagents, normalOnly)
 		for quality in pairs(tiers) do
 			table.insert(slotQualityTiers[slotIndex], quality)
 		end
-		table.sort(slotQualityTiers[slotIndex])
+		table.sort(slotQualityTiers[slotIndex], function(a, b)
+			return a > b
+		end)
 	end
 
 	local selected = {}
 	local function VisitByQuality(slotIndex)
 		if slotIndex > #candidateSlots then
-			Evaluate(selected, false)
-			return
+			return Evaluate(selected, false)
 		end
 		local candidate = candidateSlots[slotIndex]
 		if candidate.optional then
 			selected[slotIndex] = nil
-			VisitByQuality(slotIndex + 1)
+			if VisitByQuality(slotIndex + 1) then
+				return false
+			end
 		end
 		for _, targetQuality in ipairs(slotQualityTiers[slotIndex]) do
 			local bestReagent = nil
@@ -1119,10 +1586,23 @@ function AF:GetBestReagentCapability(recipeID, forcedReagents, normalOnly)
 			end
 			if bestReagent then
 				selected[slotIndex] = bestReagent
-				VisitByQuality(slotIndex + 1)
+				if VisitByQuality(slotIndex + 1) then
+					selected[slotIndex] = nil
+					break
+				end
 			end
 		end
 		selected[slotIndex] = nil
+		return false
+	end
+	if stats.qualityTierCombinations > HEAVY_JOB_QUALITY_TIER_THRESHOLD then
+		local _, highBest = Evaluate(SelectEndpointReagents(candidateSlots, true), false)
+		local _, lowBest = Evaluate(SelectEndpointReagents(candidateSlots, false), false)
+		if HasSamePrimaryOutcome(highBest, lowBest, normalOnly) then
+			stats.endpointShortcut = true
+			stats.endpointShortcutSaved = math.max(0, (tonumber(stats.qualityTierCombinations) or 0) - (tonumber(stats.evaluated) or 0))
+			return BuildBestReagentCapability(recipeID, best)
+		end
 	end
 	VisitByQuality(1)
 
@@ -1130,29 +1610,14 @@ function AF:GetBestReagentCapability(recipeID, forcedReagents, normalOnly)
 		return {}
 	end
 
-	return {
-		normalInfo = best.normalInfo,
-		reagentInfo = best.reagentInfo,
-		rawBestQuality = GetOperationQuality(best.normalInfo),
-		bestQuality = GetRecipeDisplayQuality(recipeID, best.normalInfo, best.reagentInfo),
-		bestQualityAtlas = select(2, GetRecipeDisplayQualityInfo(recipeID, best.normalInfo, best.reagentInfo)),
-		bestConcentrationQuality = GetRecipeDisplayQuality(recipeID, best.concentrationInfo, best.reagentInfo),
-		bestConcentrationQualityAtlas = select(2, GetRecipeDisplayQualityInfo(recipeID, best.concentrationInfo, best.reagentInfo)),
-		bestTotalSkill = GetOperationTotalSkill(best.normalInfo) or GetOperationTotalSkill(best.concentrationInfo),
-		bestConcentrationCost = best.concentrationInfo and best.concentrationInfo.concentrationCost or nil,
-		bestOutputItemLevel = best.outputItemLevel,
-		bestReagents = best.bestReagents,
-		bestReagentSignature = best.bestReagentSignature,
-		bestReagentTruncated = best.truncated == true,
-		reagentQualityScore = best.reagentQualityScore,
-	}
+	return BuildBestReagentCapability(recipeID, best)
 end
 
-function AF:ApplyRecipeCapability(item, recipeID)
+function AF:ApplyRecipeCapability(item, recipeID, best)
 	if not item or not recipeID then
 		return
 	end
-	local capability = self:GetRecipeCapability(recipeID)
+	local capability = self:GetRecipeCapability(recipeID, best)
 	item.concentrationQuality = capability.concentrationQuality
 	item.concentrationQualityAtlas = capability.concentrationQualityAtlas
 	item.concentrationCost = capability.concentrationCost

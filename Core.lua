@@ -428,6 +428,9 @@ AF.frame:SetScript("OnEvent", function(_, event, ...)
 		else
 			AF.activeScan = nil
 		end
+		if AF.ReleaseScanRuntimeMemory then
+			AF:ReleaseScanRuntimeMemory("close")
+		end
 	elseif SCAN_CHANGE_EVENTS[event] then
 		if AF:IsInCombatLocked() then
 			AF.deferredAutoScanReason = event

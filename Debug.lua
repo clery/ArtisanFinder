@@ -10,6 +10,16 @@ local function EscapeLogText(value)
 	return tostring(value or ""):gsub("|", "||")
 end
 
+local function GetDebugTimestamp()
+	local nowMS = debugprofilestop and debugprofilestop() or ((GetTime and GetTime() or 0) * 1000)
+	AF.debugTimestampBaseMS = AF.debugTimestampBaseMS or nowMS
+	AF.debugTimestampBaseTime = AF.debugTimestampBaseTime or (time and time() or 0)
+	local elapsedMS = math.max(0, nowMS - AF.debugTimestampBaseMS)
+	local stampTime = AF.debugTimestampBaseTime + math.floor(elapsedMS / 1000)
+	local stamp = date and date("%H:%M:%S", stampTime) or "00:00:00"
+	return string.format("%s.%03d", stamp, math.floor(elapsedMS % 1000))
+end
+
 function AF:IsDebugEnabled()
 	return self.db and self.db.debugEnabled == true
 end
@@ -31,7 +41,7 @@ function AF:DebugLog(category, message)
 		return
 	end
 	self.debugLogLines = self.debugLogLines or {}
-	local line = string.format("[%s] %s", EscapeLogText(category or "debug"), EscapeLogText(message))
+	local line = string.format("%s [%s] %s", GetDebugTimestamp(), EscapeLogText(category or "debug"), EscapeLogText(message))
 	table.insert(self.debugLogLines, line)
 	while #self.debugLogLines > DEBUG_LOG_LIMIT do
 		table.remove(self.debugLogLines, 1)
