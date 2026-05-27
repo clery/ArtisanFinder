@@ -352,27 +352,32 @@ function AF:BuildScanProgress(profession, professionEntry, signature, force, mod
 
 	local profile = self.db.artisanProfile
 	local pending = {}
+	local skippedOrderable = 0
 	for _, recipeID in ipairs(recipeIDs) do
 		local recipeInfo = C_TradeSkillUI.GetRecipeInfo(recipeID)
 		local learned = not recipeInfo or recipeInfo.learned ~= false
 		if learned then
-			local outputs = self:GetRecipeOutputItemIDs(recipeID)
-			for itemID in pairs(outputs) do
-				local key = mode .. ":" .. GetScanJobKey(recipeID, itemID)
-				local existing = profile.items[tostring(itemID)]
-				local needsFull = force
-					or not existing
-					or tonumber(existing.recipeID) ~= tonumber(recipeID)
-					or tonumber(existing.professionID) ~= tonumber(profession.id)
-					or not existing.bestReagents
-					or existing.bestReagentPendingNames == true
-				if force or not completed[key] then
-					table.insert(pending, {
-						key = key,
-						kind = needsFull and "full" or mode,
-						recipeID = recipeID,
-						itemID = itemID,
-					})
+			if not self:IsRecipeOrderableForScan(profession, recipeInfo) then
+				skippedOrderable = skippedOrderable + 1
+			else
+				local outputs = self:GetRecipeOutputItemIDs(recipeID)
+				for itemID in pairs(outputs) do
+					local key = mode .. ":" .. GetScanJobKey(recipeID, itemID)
+					local existing = profile.items[tostring(itemID)]
+					local needsFull = force
+						or not existing
+						or tonumber(existing.recipeID) ~= tonumber(recipeID)
+						or tonumber(existing.professionID) ~= tonumber(profession.id)
+						or not existing.bestReagents
+						or existing.bestReagentPendingNames == true
+					if force or not completed[key] then
+						table.insert(pending, {
+							key = key,
+							kind = needsFull and "full" or mode,
+							recipeID = recipeID,
+							itemID = itemID,
+						})
+					end
 				end
 			end
 		end
@@ -394,7 +399,16 @@ function AF:BuildScanProgress(profession, professionEntry, signature, force, mod
 		reason = reason,
 		startedAt = previous and previous.startedAt or self:Now(),
 		updatedAt = self:Now(),
+		skippedOrderable = skippedOrderable,
 	}
+	if skippedOrderable > 0 then
+		self:DebugLog("scan", string.format(
+			"orderable filter profession=%s skipped=%d dataVersion=%s",
+			tostring(profession and profession.id or ""),
+			skippedOrderable,
+			tostring(self:GetOrderableRecipeDataVersion())
+		))
+	end
 	return professionEntry.scanProgress
 end
 
@@ -734,6 +748,7 @@ function AF:GetScanJobsPerTick(job)
 end
 
 function AF:ReleaseScanRuntimeMemory(reason)
+	reason = tostring(reason or "")
 	local beforeKB = GetLuaMemoryKB()
 	if self.ClearRecipeCapabilityRuntimeCaches then
 		self:ClearRecipeCapabilityRuntimeCaches()
@@ -741,13 +756,23 @@ function AF:ReleaseScanRuntimeMemory(reason)
 		self.recipeCapabilityCache = nil
 		self.recipeCapabilityCacheSignature = nil
 	end
+	local gcMode = "none"
 	if collectgarbage then
-		collectgarbage("collect")
+		if reason == "complete" then
+			collectgarbage("collect")
+			gcMode = "collect"
+		else
+			for _ = 1, 4 do
+				collectgarbage("step", SCAN_GC_STEP_SIZE)
+			end
+			gcMode = "step"
+		end
 	end
 	local afterKB = GetLuaMemoryKB()
 	self:DebugLog("scan", string.format(
-		"memory release reason=%s before=%.1fKB after=%.1fKB freed=%.1fKB",
-		tostring(reason or ""),
+		"memory release reason=%s gc=%s before=%.1fKB after=%.1fKB freed=%.1fKB",
+		reason,
+		gcMode,
 		beforeKB,
 		afterKB,
 		math.max(0, beforeKB - afterKB)
@@ -1038,12 +1063,13 @@ function AF:StartOrResumeCurrentProfessionScan(force, silent, mode, forceProbe, 
 		signature = progress.signature,
 	}
 	self:DebugLog("scan", string.format(
-		"started profession=%s mode=%s pending=%d force=%s reason=%s",
+		"started profession=%s mode=%s pending=%d force=%s reason=%s orderableSkipped=%d",
 		tostring(profession.id),
 		tostring(mode),
 		GetPendingCount(progress),
 		tostring(force == true),
-		tostring(reason or "")
+		tostring(reason or ""),
+		tonumber(progress.skippedOrderable) or 0
 	))
 	professionEntry.scanSignature = nil
 	self:RefreshScanProgressUI(true)

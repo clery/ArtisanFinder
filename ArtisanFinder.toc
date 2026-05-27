@@ -43,6 +43,7 @@ Locales\zhCN.lua
 Util.lua
 Formatting.lua
 Data.lua
+OrderableRecipes.lua
 CustomerCache.lua
 Guild.lua
 WhoStatus.lua

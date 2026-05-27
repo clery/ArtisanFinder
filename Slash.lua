@@ -73,6 +73,7 @@ function AF:PrintDevHelp()
 	self:Print(self:Text("DEV_HELP_NOTIFY"))
 	self:Print(self:Text("DEV_HELP_ORDERS"))
 	self:Print(self:Text("DEV_HELP_SOUND"))
+	self:Print("/af dev orderdump: dump orderable recipe data for maintainer updates.")
 end
 
 function AF:PrintClearHelp()
@@ -346,6 +347,8 @@ function AF:HandleDevSlash(rest)
 		else
 			self:Print(self:Text("DEV_HELP_SOUND"))
 		end
+	elseif command == "orderdump" then
+		self:DumpOrderableRecipeData()
 	else
 		self:Print(self:Text("DEV_UNKNOWN", rest))
 		self:PrintDevHelp()

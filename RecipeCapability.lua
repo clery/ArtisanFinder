@@ -4,7 +4,7 @@ local MAX_REAGENT_COMBINATIONS = 72
 local MAX_OPTIONAL_REAGENT_TESTS_PER_SLOT = 8
 local MAX_OPTIONAL_REAGENT_COMBINATIONS = 96
 local HEAVY_JOB_QUALITY_TIER_THRESHOLD = 12
-local SCAN_SIGNATURE_VERSION = 32
+local SCAN_SIGNATURE_VERSION = 33
 local SKILL_PROBE_SIGNATURE_VERSION = 1
 local FULL_SCAN_SIGNATURE_VERSION = 3
 local GetOperationQuality
@@ -1081,7 +1081,7 @@ function AF:GetCurrentProfessionScanSignature(profession)
 		return nil
 	end
 
-	return table.concat({ SCAN_SIGNATURE_VERSION, recipeSignature }, "|")
+	return table.concat({ SCAN_SIGNATURE_VERSION, self:GetOrderableRecipeDataVersion(), recipeSignature }, "|")
 end
 
 function AF:GetCurrentProfessionScanSignatureVersion()
