@@ -26,15 +26,19 @@ ArtisanFinder does not place orders for you. It only helps fill or open the righ
 
 ## For Crafters
 
+### Quality, commissions and availability
+
 ArtisanFinder adds lightweight controls to the Professions UI for item-specific and profession-default commissions, notes, and availability. It scans crafting professions in the background and can advertise scanned professions from your other characters while you are online. The crafter panel also includes a customer preview tooltip so you can check what customers will see.
 
 Availability is session-based and resets after login or reload. You can cycle between unavailable, current-character availability, and account-wide availability from the minimap button, or let automatic availability enable it in trade-chat areas and disable it in selected instance types.
 
 ![ArtisanFinder crafter view](Images/CrafterView.png)
 
+### Notifications
+
 If an addon-enabled customer places a personal order for one of your characters while you are on another character, ArtisanFinder can play your selected notification sound and show a loot-style notification with the item, customer, character, and commission. Notifications are remembered until cleared or completed, and the Blizzard crafting order minimap icon can also show known alt orders.
 
-![ArtisanFinder crafter view](Images/PersonalOrderToast.png)
+![ArtisanFinder crafter view](Images/NotificationExample.gif)
 
 ## Reagent Guidance
 
