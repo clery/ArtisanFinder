@@ -177,20 +177,34 @@ function AF:BuildCustomerRowViewModel(entry)
 	local displayName = self:GetDisplayPlayerName(entry.name or "?")
 	local statusTooltipText
 	local isOnline = self:IsCustomerEntryOnline(entry)
+	local availabilityState = entry.availabilityState
+	if not availabilityState then
+		if self:IsCustomerEntryWhoCheckFailed(entry) then
+			availabilityState = "check_failed"
+		elseif entry.unavailableCached or entry.unavailableFavorite then
+			availabilityState = "unavailable"
+		elseif self:IsCustomerEntryOffline(entry) then
+			availabilityState = "offline"
+		elseif entry.offlineCached and not isOnline then
+			availabilityState = entry.tradeLead and "unknown" or "unavailable"
+		elseif isOnline then
+			availabilityState = "online"
+		end
+	end
 	if self:IsCustomerEntryWhoCheckFailed(entry) then
 		local statusText = self:Text("ONLINE_CHECK_FAILED")
 		displayName = displayName .. " |cffaa5555(" .. statusText .. ")|r"
 		statusTooltipText = "(" .. statusText .. ")"
-	elseif self:IsCustomerEntryOffline(entry) then
-		local statusText = self:Text("OFFLINE")
-		displayName = displayName .. " |cff888888(" .. statusText .. ")|r"
-		statusTooltipText = "(" .. statusText .. ")"
-	elseif entry.unavailableFavorite then
+	elseif availabilityState == "unavailable" then
 		local statusText = self:Text("UNAVAILABLE")
 		displayName = displayName .. " |cff888888(" .. statusText .. ")|r"
 		statusTooltipText = "(" .. statusText .. ")"
-	elseif entry.offlineCached and not isOnline then
-		displayName = displayName .. " |cff888888(" .. self:Text(entry.tradeLead and "UNKNOWN" or "UNAVAILABLE") .. ")|r"
+	elseif availabilityState == "offline" then
+		local statusText = self:Text("OFFLINE")
+		displayName = displayName .. " |cff888888(" .. statusText .. ")|r"
+		statusTooltipText = "(" .. statusText .. ")"
+	elseif availabilityState == "unknown" then
+		displayName = displayName .. " |cff888888(" .. self:Text("UNKNOWN") .. ")|r"
 	end
 	if entry.afk then
 		displayName = displayName .. " |cffffd100(" .. self:Text("AWAY") .. ")|r"
@@ -237,6 +251,7 @@ function AF:BuildCustomerRowViewModel(entry)
 		whoName = self:GetCustomerEntryWhoName(entry),
 		whoPending = self:IsCustomerEntryWhoPending(entry),
 		statusTooltipText = statusTooltipText,
+		availabilityState = availabilityState,
 	}
 end
 

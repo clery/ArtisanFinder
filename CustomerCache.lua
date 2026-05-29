@@ -44,6 +44,9 @@ local function GetAvailabilitySort(AF, entry)
 	if entry.ownAlt then
 		return 0
 	end
+	if entry.unavailableCached then
+		return 1
+	end
 	if entry.unavailableFavorite then
 		return 2
 	end
@@ -206,6 +209,14 @@ local function AddCachedAddonGuildMemberRows(AF, rows, itemCache, itemID, profes
 			if entry.guildMember == true or rosterEntry then
 				local rowEntry = PrepareCachedCustomerEntry(AF, entry)
 				MarkGuildAffiliation(AF, rowEntry)
+				if rowEntry.guildOnline ~= true then
+					rowEntry.unavailableCached = true
+					rowEntry.availabilityState = "unavailable"
+				else
+					rowEntry.updatedAt = rowEntry.verifiedAt or rowEntry.lastQueryAt or rowEntry.updatedAt
+					rowEntry.availabilityState = "online"
+				end
+				rowEntry.customerSource = "cached-addon-guild"
 				if AF:IsCustomerEntryOrderEligible(rowEntry) then
 					table.insert(rows, rowEntry)
 					MarkSeen(AF, seenNames, rowEntry)

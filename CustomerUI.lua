@@ -36,6 +36,78 @@ local function GetSortIndexByKey(key)
 	return 1
 end
 
+local function GetCustomerRowSource(entry)
+	if not entry then
+		return "none"
+	end
+	if entry.customerSource then
+		return entry.customerSource
+	end
+	if entry.ownAlt then
+		return entry.ownSelf and "own-self" or "own-alt"
+	end
+	if entry.tradeLead then
+		return entry.guildMember and "guild-fallback" or "trade-lead"
+	end
+	if entry.offlineFallback then
+		return "offline-fallback"
+	end
+	if entry.unavailableFavorite then
+		return "favorite-cache"
+	end
+	if entry.guildMember then
+		return "addon-guild"
+	end
+	return "addon"
+end
+
+local function GetCustomerRowOrderType(AF, entry)
+	if not entry then
+		return "none"
+	end
+	return AF:IsGuildOrderEntry(entry) and "guild" or "personal"
+end
+
+local function GetCustomerRowAvailability(AF, entry)
+	if not entry then
+		return "none"
+	end
+	if entry.availabilityState then
+		return entry.availabilityState
+	end
+	if AF:IsCustomerEntryOnline(entry) then
+		return "online"
+	end
+	if entry.unavailableCached or entry.unavailableFavorite then
+		return "unavailable"
+	end
+	if AF:IsCustomerEntryOffline(entry) then
+		return "offline"
+	end
+	if entry.offlineCached then
+		return entry.tradeLead and "unknown" or "unavailable"
+	end
+	return "unknown"
+end
+
+local function BuildCustomerResultDebugSummary(AF, rows)
+	local counts = {}
+	for _, entry in ipairs(rows or {}) do
+		local key = table.concat({
+			GetCustomerRowSource(entry),
+			GetCustomerRowAvailability(AF, entry),
+			GetCustomerRowOrderType(AF, entry),
+		}, "/")
+		counts[key] = (counts[key] or 0) + 1
+	end
+	local parts = {}
+	for key, count in pairs(counts) do
+		table.insert(parts, key .. "=" .. tostring(count))
+	end
+	table.sort(parts)
+	return table.concat(parts, ", ")
+end
+
 function AF:GetCustomerSortOptions()
 	local options = {}
 	for _, mode in ipairs(SORT_MODES) do
@@ -1390,10 +1462,11 @@ function AF:RefreshCustomerResults(statusOverride)
 	local queryToken = self.currentCustomerQueryToken
 	local tutorialActive = self.customerTutorialActive == true
 	local rows = tutorialActive and { self:GetCustomerTutorialRow() } or (itemID and self:GetCachedArtisans(itemID, filterText, sortMode, queryToken) or {})
-	local previousLoggedCount = frame.debugLastResultCount
-	if itemID and previousLoggedCount ~= #rows then
-		frame.debugLastResultCount = #rows
-		self:DebugLog("results", string.format("item=%s rows=%d filter=%s sort=%s", tostring(itemID), #rows, tostring(filterText), tostring(sortMode)))
+	local debugSummary = BuildCustomerResultDebugSummary(self, rows)
+	local debugSignature = table.concat({ tostring(itemID or ""), tostring(#rows), tostring(filterText), tostring(sortMode), debugSummary }, "|")
+	if itemID and frame.debugLastResultSignature ~= debugSignature then
+		frame.debugLastResultSignature = debugSignature
+		self:DebugLog("results", string.format("item=%s rows=%d filter=%s sort=%s classes=%s", tostring(itemID), #rows, tostring(filterText), tostring(sortMode), debugSummary))
 	end
 	if tutorialActive then
 		self:SetCustomerStatusText(self:Text("TUTORIAL_CUSTOMER_STATUS"))
