@@ -790,6 +790,14 @@ function AF:AttachCrafterUI()
 		end
 	end)
 
+	defaults.shopButton = CreateFrame("Button", nil, defaults, "UIPanelButtonTemplate")
+	defaults.shopButton:SetSize(126, 22)
+	defaults.shopButton:SetPoint("TOPLEFT", 214, -252)
+	defaults.shopButton:SetText(self:Text("SHOP_CUSTOMIZE_BUTTON"))
+	defaults.shopButton:SetScript("OnClick", function()
+		AF:ShowShopEditor()
+	end)
+
 	local markItemDirty = function()
 		ClampCommissionEditBox(frame.price)
 		ValidateCommissionInput(frame.price, frame)
@@ -833,6 +841,7 @@ function AF:AttachCrafterUI()
 		defaults.scanProgressText,
 		defaults.errorText,
 		defaults.advertiseCheck,
+		defaults.shopButton,
 	}
 
 	if form.RegisterCallback and ProfessionsRecipeSchematicFormMixin then

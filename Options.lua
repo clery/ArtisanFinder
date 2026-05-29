@@ -203,6 +203,17 @@ function AF:InitializeOptions()
 		true
 	))
 
+	AddSection("OPTIONS_SECTION_SHOP", "OPTIONS_SECTION_SHOP_DESC")
+	Settings.RegisterInitializer(category, CreateSettingsButtonInitializer(
+		self:Text("SHOP_EDITOR_TITLE"),
+		self:Text("SHOP_CUSTOMIZE_BUTTON"),
+		function()
+			AF:ShowShopEditor()
+		end,
+		self:Text("SHOP_CUSTOMIZE_DESC"),
+		true
+	))
+
 	AddSection("OPTIONS_SECTION_AVAILABILITY")
 	local autoAvailability = RegisterProxySetting(
 		"ArtisanFinder_AutoAvailability",

@@ -7,6 +7,7 @@ ArtisanFinder helps players find available crafters directly from the Crafting O
 *   Live artisan search from the Crafting Orders form.
 *   Crafter profiles with commissions, notes, quality data, and suggested reagents.
 *   Multi-character advertising for scanned professions from your alts.
+*   Account-wide shop branding with a custom shop name, color, tabard-style emblem, and customer-facing shop tooltip.
 *   Guild and trade-chat crafter discovery.
 *   Favorites, search, sorting, online checks, and personal order helpers.
 *   Personal order notifications for addon-enabled customers and artisans.

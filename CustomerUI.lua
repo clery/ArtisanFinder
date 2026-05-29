@@ -389,10 +389,10 @@ local function ConfigureCustomerRow(row)
 		row.name:SetMaxLines(1)
 	end
 	row.updatedAt:ClearAllPoints()
-	row.updatedAt:SetPoint("TOPRIGHT", -65, -6)
+	row.updatedAt:SetPoint("TOPRIGHT", -85, -6)
 	row.detail:ClearAllPoints()
 	row.detail:SetPoint("TOPLEFT", row.name, "BOTTOMLEFT", 0, -3)
-	row.detail:SetPoint("RIGHT", -65, 0)
+	row.detail:SetPoint("RIGHT", -85, 0)
 	if row.detail.SetWordWrap then
 		row.detail:SetWordWrap(false)
 	end
@@ -401,7 +401,7 @@ local function ConfigureCustomerRow(row)
 	end
 	row.capability:ClearAllPoints()
 	row.capability:SetPoint("TOPLEFT", row.detail, "BOTTOMLEFT", 0, -3)
-	row.capability:SetPoint("RIGHT", -65, 0)
+	row.capability:SetPoint("RIGHT", -85, 0)
 
 	row.action:SetNormalTexture("Interface\\Buttons\\UI-OptionsButton")
 	row.action:SetPushedTexture("Interface\\Buttons\\UI-OptionsButton")
@@ -422,9 +422,27 @@ local function ConfigureCustomerRow(row)
 		end
 	end)
 
+	row.shopButton = CreateFrame("Button", nil, row)
+	row.shopButton:SetSize(18, 18)
+	row.shopButton:SetPoint("RIGHT", row.action, "LEFT", -1, 0)
+	row.shopButton:SetFrameLevel((row.action:GetFrameLevel() or row:GetFrameLevel() or 0) + 2)
+	row.shopButton.icon = row.shopButton:CreateTexture(nil, "ARTWORK")
+	row.shopButton.icon:SetSize(16, 16)
+	row.shopButton.icon:SetPoint("CENTER")
+	row.shopButton:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+	row.shopButton:SetScript("OnEnter", function(button)
+		if row.entry then
+			AF:ShowShopTooltip(button, row.entry)
+		end
+	end)
+	row.shopButton:SetScript("OnLeave", function(button)
+		AF:HideShopTooltip(button)
+	end)
+	row.shopButton:Hide()
+
 	row.whoRefresh = CreateFrame("Button", nil, row)
 	row.whoRefresh:SetSize(18, 18)
-	row.whoRefresh:SetPoint("RIGHT", row.action, "LEFT", -1, 0)
+	row.whoRefresh:SetPoint("RIGHT", row.shopButton, "LEFT", -1, 0)
 	row.whoRefresh:SetFrameLevel((row.action:GetFrameLevel() or row:GetFrameLevel() or 0) + 2)
 	SetButtonAtlas(row.whoRefresh, "UI-RefreshButton", "UI-RefreshButton", "UI-RefreshButton", "UI-RefreshButton")
 	if row.whoRefresh:GetDisabledTexture() then

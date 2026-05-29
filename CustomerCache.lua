@@ -329,6 +329,17 @@ function AF:GetOwnAltRows(itemID, professionID, filterText, seenNames, recipeID)
 			ownAlt = true,
 			ownSelf = isCurrentCharacter,
 		}
+		if self:IsShopEnabled() then
+			local shop = self:GetShopProfile()
+			entry.shop = {
+				enabled = true,
+				name = shop.name,
+				nameColor = shop.nameColor,
+				tabard = shop.tabard,
+				hasDescription = shop.description ~= "",
+			}
+			entry.shopProfessionSummary = self:GetShopProfessionSummary()
+		end
 		if EntryMatchesCustomerFilter(self, entry, filterText) then
 			local seenKey = GetSeenKey(self, entry)
 			if seenKey and not seenNames[seenKey] and self:IsCustomerEntryOrderEligible(entry) then

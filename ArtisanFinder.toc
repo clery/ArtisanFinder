@@ -44,6 +44,7 @@ Util.lua
 Formatting.lua
 Data.lua
 OrderableRecipes.lua
+Shop.lua
 CustomerCache.lua
 Guild.lua
 WhoStatus.lua

@@ -509,6 +509,8 @@ function ApplyDBDefaults(db)
 	db.tradeLeadCache = db.tradeLeadCache or {}
 	db.whoOnlineCache = db.whoOnlineCache or {}
 	db.connectedRealmCache = db.connectedRealmCache or {}
+	db.shop = AF.NormalizeShopProfile and AF:NormalizeShopProfile(db.shop) or (db.shop or {})
+	db.shopDescriptionCache = db.shopDescriptionCache or {}
 	db.guildCache = db.guildCache or {}
 	db.guildCache.rosterByName = db.guildCache.rosterByName or {}
 	db.guildCache.recipeMembers = db.guildCache.recipeMembers or {}
@@ -713,6 +715,11 @@ end
 
 MIGRATIONS[15] = function(db)
 	ApplyDBDefaults(db)
+end
+
+MIGRATIONS[16] = function(db)
+	db.shop = db.shop or {}
+	db.shopDescriptionCache = db.shopDescriptionCache or {}
 end
 
 function AF:MigrateDB(db)

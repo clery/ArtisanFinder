@@ -280,6 +280,10 @@ function AF:OnAddonMessage(prefix, message, channel, sender)
 		self:HandleReagentDetail(parts, normalizedSender)
 	elseif kind == "O" then
 		self:HandleOrderNotification(parts, normalizedSender)
+	elseif kind == "SQ" then
+		self:HandleShopDescriptionRequest(parts, normalizedSender)
+	elseif kind == "SD" then
+		self:HandleShopDescription(parts, normalizedSender)
 	end
 end
 
@@ -436,7 +440,19 @@ function AF:HandleQuery(parts, sender, channel)
 				tonumber(item.bestOutputItemLevel) or "",
 				tonumber(item.optionalOutputItemLevel) or "",
 			}
+			local shopFields = self.GetShopResponseFields and self:GetShopResponseFields()
+			if shopFields then
+				for _, field in ipairs(shopFields) do
+					table.insert(payloadParts, field)
+				end
+			end
 			local payload = table.concat(payloadParts, "|")
+			if #payload > 255 and shopFields then
+				while #payloadParts > 34 do
+					table.remove(payloadParts)
+				end
+				payload = table.concat(payloadParts, "|")
+			end
 			if #payload > 255 then
 				payloadParts[29] = ""
 				payloadParts[22] = 0
@@ -634,6 +650,7 @@ function AF:HandleResponse(parts, sender)
 	local afk = tonumber(parts[30]) == 1
 	local bestOutputItemLevel = tonumber(parts[31])
 	local optionalOutputItemLevel = tonumber(parts[32])
+	local shop = self.DecodeShopResponse and self:DecodeShopResponse(parts) or nil
 	local cacheKey = crafterName
 
 	if not itemID then
@@ -708,6 +725,8 @@ function AF:HandleResponse(parts, sender)
 		guildOnline = guildResponse and true or nil,
 		guildMemberGUID = guildRosterEntry and guildRosterEntry.guid or nil,
 		afk = afk or nil,
+		shop = shop,
+		shopProfessionSummary = shop and self:GetProfessionName(professionID) or nil,
 	}
 	if responseReagents then
 		self.db.customerCache[itemKey][cacheKey].bestReagentSummaryUpdatedAt = self:Now()

@@ -175,6 +175,7 @@ function AF:BuildCustomerRowViewModel(entry)
 	end
 
 	local displayName = self:GetDisplayPlayerName(entry.name or "?")
+	displayName = self:FormatShopCustomerName(entry, displayName)
 	local statusTooltipText
 	local isOnline = self:IsCustomerEntryOnline(entry)
 	if self:IsCustomerEntryWhoCheckFailed(entry) then
@@ -237,6 +238,7 @@ function AF:BuildCustomerRowViewModel(entry)
 		whoName = self:GetCustomerEntryWhoName(entry),
 		whoPending = self:IsCustomerEntryWhoPending(entry),
 		statusTooltipText = statusTooltipText,
+		shop = entry.shop,
 	}
 end
 
@@ -262,6 +264,7 @@ function AF:ApplyCustomerRowViewModel(row, viewModel, minimumHeight, bottomPaddi
 	local noteTruncated = SetFittedDetailText(row, viewModel.detail, viewModel.detailNote)
 	row.noteTooltipText = noteTruncated and viewModel.detailNote or nil
 	row.capability:SetText(viewModel.capability or "")
+	self:ApplyShopRowDecor(row, viewModel)
 	PositionWhoSpinner(row, viewModel.whoPending)
 	self:UpdateCustomerRowWhoRefreshButton(row)
 

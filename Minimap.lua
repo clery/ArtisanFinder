@@ -82,6 +82,10 @@ function AF:ShowMinimapAdvertisingMenu(owner)
 	MenuUtil.CreateContextMenu(owner or GetMinimapButton(), function(_, rootDescription)
 		rootDescription:SetTag("ARTISANFINDER_MINIMAP_ADVERTISING")
 		rootDescription:CreateTitle(AF:Text("MINIMAP_ADVERTISING_MENU_TITLE"))
+		rootDescription:CreateButton(AF:Text("SHOP_CUSTOMIZE_BUTTON"), function()
+			AF:ShowShopEditor()
+		end)
+		rootDescription:CreateDivider()
 		local currentCharacter
 		local currentSubmenu
 		for _, row in ipairs(rows) do
