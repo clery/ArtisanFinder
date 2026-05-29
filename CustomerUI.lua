@@ -1342,6 +1342,13 @@ function AF:GetVisibleCustomerEntries()
 	return entries
 end
 
+local function GetGuildProfessionGUID(AF, entry)
+	if not entry or not entry.guildMember then
+		return nil
+	end
+	return entry.guildMemberGUID or AF:GetGuildMemberGUID(entry.orderTarget or entry.name)
+end
+
 function AF:CanReliablyOpenProfession(entry)
 	if not entry then
 		return false
@@ -1349,11 +1356,14 @@ function AF:CanReliablyOpenProfession(entry)
 	if entry.tutorialFake then
 		return false
 	end
-	if entry.ownAlt and not self:IsGuildOrderEntry(entry) then
+	if GetGuildProfessionGUID(self, entry) then
+		return tonumber(entry.professionID) ~= nil
+	end
+	if entry.ownAlt then
 		return false
 	end
 	if self:IsGuildOrderEntry(entry) then
-		return entry.guildMemberGUID ~= nil or self:GetGuildMemberGUID(entry.orderTarget or entry.name) ~= nil
+		return false
 	end
 	if entry.offline then
 		return false
@@ -1448,14 +1458,14 @@ function AF:OpenCrafterProfession(entry)
 		return
 	end
 
-	if self:IsGuildOrderEntry(entry) then
-		local guid = entry.guildMemberGUID or self:GetGuildMemberGUID(entry.orderTarget or entry.name)
+	local guildProfessionGUID = GetGuildProfessionGUID(self, entry)
+	if guildProfessionGUID then
 		local professionID = tonumber(entry.professionID)
-		if not guid or not professionID then
+		if not professionID then
 			self:SetProfessionButtonTooltip(self:Text("PROFESSION_LINK_UNAVAILABLE_TOOLTIP"), 6)
 			return
 		end
-		local ok = pcall(C_GuildInfo.QueryGuildMemberRecipes, guid, professionID)
+		local ok = pcall(C_GuildInfo.QueryGuildMemberRecipes, guildProfessionGUID, professionID)
 		if not ok then
 			self:SetProfessionButtonTooltip(self:Text("PROFESSION_LINK_UNAVAILABLE_TOOLTIP"), 6)
 			return

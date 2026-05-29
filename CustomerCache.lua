@@ -173,14 +173,13 @@ local function MarkGuildAffiliation(AF, entry)
 	if entry.debug then
 		return ClearGuildAffiliation(entry)
 	end
-	if entry.ownAlt and AF:IsNameOnConnectedRealm(entry.orderTarget or entry.name or entry.target) then
-		return ClearGuildAffiliation(entry)
-	end
 
 	local rosterEntry = AF:GetCachedGuildRosterEntry(entry.orderTarget or entry.name or entry.target)
 	if rosterEntry then
 		entry.guildMember = true
-		entry.guildOnline = rosterEntry.online
+		if entry.guildOnline ~= true then
+			entry.guildOnline = rosterEntry.online
+		end
 		entry.guildMemberGUID = rosterEntry.guid
 		return entry
 	end
@@ -188,20 +187,29 @@ local function MarkGuildAffiliation(AF, entry)
 	return ClearGuildAffiliation(entry)
 end
 
-local function MarkKnownAddonGuildMembersSeen(AF, itemCache, itemID, professionID, recipeID, seenNames)
+local function AddCachedAddonGuildMemberRows(AF, rows, itemCache, itemID, professionID, recipeID, filterText, seenNames)
 	local now = AF:Now()
 	for _, entry in pairs(itemCache or {}) do
 		local updatedAt = tonumber(entry and entry.updatedAt) or 0
+		local seenKey = GetSeenKey(AF, entry)
 		if entry
+			and seenKey
+			and not seenNames[seenKey]
 			and entry.tradeLead ~= true
 			and not entry.debug
 			and updatedAt > 0
 			and now - updatedAt <= AF.CACHE_MAX_AGE
 			and EntryMatchesCustomerContext(AF, entry, itemID, professionID, recipeID)
+			and EntryMatchesCustomerFilter(AF, entry, filterText)
 		then
 			local rosterEntry = AF:GetCachedGuildRosterEntry(entry.orderTarget or entry.name or entry.target)
 			if entry.guildMember == true or rosterEntry then
-				MarkSeen(AF, seenNames, entry)
+				local rowEntry = PrepareCachedCustomerEntry(AF, entry)
+				MarkGuildAffiliation(AF, rowEntry)
+				if AF:IsCustomerEntryOrderEligible(rowEntry) then
+					table.insert(rows, rowEntry)
+					MarkSeen(AF, seenNames, rowEntry)
+				end
 			end
 		end
 	end
@@ -212,7 +220,7 @@ local function PrepareOwnAltOrderEligibility(AF, entry)
 		return true
 	end
 	if AF:IsNameOnConnectedRealm(entry.orderTarget or entry.name or entry.target) then
-		ClearGuildAffiliation(entry)
+		MarkGuildAffiliation(AF, entry)
 		return true
 	end
 
@@ -376,8 +384,8 @@ function AF:GetCachedArtisans(itemID, filterText, sortMode, queryToken)
 	end
 	local showUncertifiedPeople = self.db.showUncertifiedPeople ~= false
 	local includeGuildRows = showUncertifiedPeople and not self:IsDevFakeRowsEnabled()
+	AddCachedAddonGuildMemberRows(self, rows, itemCache, itemID, self.currentCustomerProfessionID, self.currentCustomerRecipeID, filterText, seenNames)
 	if includeGuildRows and self.GetGuildProfessionRows then
-		MarkKnownAddonGuildMembersSeen(self, itemCache, itemID, self.currentCustomerProfessionID, self.currentCustomerRecipeID, seenNames)
 		for _, entry in ipairs(self:GetGuildProfessionRows(itemID, self.currentCustomerProfessionID, filterText, seenNames, self.currentCustomerRecipeID)) do
 			table.insert(rows, entry)
 			MarkSeen(self, seenNames, entry)

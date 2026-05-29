@@ -1181,7 +1181,7 @@ function AF:IsGuildOrderEntry(entry)
 	if not entry or not entry.guildMember then
 		return false
 	end
-	if entry.ownAlt and self:IsNameOnConnectedRealm(entry.orderTarget or entry.name or entry.target) then
+	if self:IsNameOnConnectedRealm(entry.orderTarget or entry.name or entry.target) then
 		return false
 	end
 	return Enum.CraftingOrderType.Guild ~= nil
