@@ -71,7 +71,7 @@ local function GetCommissionSort(entry)
 end
 
 local function GetSortName(entry)
-	return tostring(entry and entry.name or ""):lower()
+	return tostring(entry and (entry.displayName or entry.name) or ""):lower()
 end
 
 local function GetSeenKey(AF, entry)
@@ -106,6 +106,7 @@ local function EntryMatchesCustomerFilter(AF, entry, filterText)
 		return true
 	end
 	local haystack = table.concat({
+		entry.displayName or "",
 		entry.name or "",
 		entry.professionName or "",
 		entry.note or "",

@@ -48,6 +48,38 @@ local function IsCurrentPlayer(AF, name)
 	return AF:NormalizeName(name) == AF:NormalizeName(AF.playerName or AF:GetPlayerFullName())
 end
 
+local function GetOnlineGuildContact(AF, name)
+	if not AF.GetRememberedArtisanContact then
+		return nil, nil
+	end
+	local normalizedName = AF:NormalizeName(name)
+	local contactName = AF:GetRememberedArtisanContact(normalizedName)
+	if not contactName or contactName == normalizedName then
+		return nil, nil
+	end
+	local contactEntry = AF:GetCachedGuildRosterEntry(contactName)
+	if contactEntry and contactEntry.online == true then
+		return contactName, contactEntry
+	end
+	return nil, nil
+end
+
+local function HasSeenGuildContact(seenNames, name, contactName)
+	return seenNames and (seenNames[name] or (contactName and seenNames[contactName]))
+end
+
+local function MarkSeenGuildContact(seenNames, name, contactName)
+	if not seenNames then
+		return
+	end
+	if name then
+		seenNames[name] = true
+	end
+	if contactName then
+		seenNames[contactName] = true
+	end
+end
+
 local function RequestGuildRoster()
 	if SetGuildRosterShowOffline then
 		pcall(SetGuildRosterShowOffline, true)
@@ -472,12 +504,16 @@ function AF:GetGuildCachedProfessionMemberRows(itemID, professionID, filterText,
 	recipeID = tonumber(recipeID) or 0
 	for name, member in pairs(professionCache.members or {}) do
 		name = self:ResolveGuildMemberName(name, true)
-		if name and not IsCurrentPlayer(self, name) and not seenNames[name] then
+		local contactName, contactRosterEntry = GetOnlineGuildContact(self, name)
+		if name and not IsCurrentPlayer(self, name) and not HasSeenGuildContact(seenNames, name, contactName) then
 			local knowsRecipe = recipeID ~= 0 and member.recipeIDs and member.recipeIDs[tostring(recipeID)] == true
 			local rosterEntry = self:GetGuildRosterEntry(name)
 			local online = rosterEntry and rosterEntry.online
 			if not rosterEntry then
 				online = member.online == true
+			end
+			if contactRosterEntry then
+				online = true
 			end
 			local isOnline = online == true
 			local rowUpdatedAt = isOnline and (member.lastAvailableAt or member.updatedAt)
@@ -503,9 +539,13 @@ function AF:GetGuildCachedProfessionMemberRows(itemID, professionID, filterText,
 					guildMemberGUID = rosterEntry and rosterEntry.guid or nil,
 					recipeID = recipeID,
 				}
+				if contactName then
+					entry.target = contactName
+					entry.displayName = contactName
+				end
 				if filterText == "" or self:CustomerEntryMatchesFilter(entry, filterText) then
 					table.insert(rows, entry)
-					seenNames[name] = true
+					MarkSeenGuildContact(seenNames, name, contactName)
 				end
 			end
 		end
@@ -532,11 +572,15 @@ function AF:GetGuildRecipeMemberRows(itemID, professionID, filterText, seenNames
 	seenNames = seenNames or {}
 	for _, memberName in ipairs(recipeData.members or {}) do
 		local name = self:ResolveGuildMemberName(memberName, true)
-		if name and not IsCurrentPlayer(self, name) and not seenNames[name] then
+		local contactName, contactRosterEntry = GetOnlineGuildContact(self, name)
+		if name and not IsCurrentPlayer(self, name) and not HasSeenGuildContact(seenNames, name, contactName) then
 			local rosterEntry = self:GetGuildRosterEntry(name)
 			local online = rosterEntry and rosterEntry.online
 			if not rosterEntry then
 				online = recipeData.online and recipeData.online[name] == true
+			end
+			if contactRosterEntry then
+				online = true
 			end
 			local isOnline = online == true
 			local professionCache = self.guildProfessionMembers and self.guildProfessionMembers[tostring(professionID)]
@@ -564,9 +608,13 @@ function AF:GetGuildRecipeMemberRows(itemID, professionID, filterText, seenNames
 					guildMemberGUID = rosterEntry and rosterEntry.guid or nil,
 					recipeID = recipeID,
 				}
+				if contactName then
+					entry.target = contactName
+					entry.displayName = contactName
+				end
 				if filterText == "" or self:CustomerEntryMatchesFilter(entry, filterText) then
 					table.insert(rows, entry)
-					seenNames[name] = true
+					MarkSeenGuildContact(seenNames, name, contactName)
 				end
 			end
 		end

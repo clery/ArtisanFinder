@@ -174,7 +174,8 @@ function AF:BuildCustomerRowViewModel(entry)
 		}
 	end
 
-	local displayName = self:GetDisplayPlayerName(entry.name or "?")
+	local displayNameSource = entry.displayName or entry.name or "?"
+	local displayName = self:GetDisplayPlayerName(displayNameSource)
 	local statusTooltipText
 	local isOnline = self:IsCustomerEntryOnline(entry)
 	local availabilityState = entry.availabilityState
@@ -216,7 +217,8 @@ function AF:BuildCustomerRowViewModel(entry)
 	local onlineAs
 	local crafterName = self:NormalizeName(entry.orderTarget or entry.name)
 	local contactName = self:NormalizeName(entry.target)
-	if contactName and crafterName and contactName ~= crafterName and not entry.offlineCached and not entry.unavailableFavorite then
+	local displayNameTarget = self:NormalizeName(entry.displayName)
+	if contactName and crafterName and contactName ~= crafterName and displayNameTarget ~= contactName and not entry.offlineCached and not entry.unavailableFavorite then
 		onlineAs = self:Text("ONLINE_AS", self:GetDisplayPlayerName(contactName))
 	end
 	if entry.tradeLead then
