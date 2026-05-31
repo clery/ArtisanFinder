@@ -209,13 +209,8 @@ local function AddCachedAddonGuildMemberRows(AF, rows, itemCache, itemID, profes
 			if entry.guildMember == true or rosterEntry then
 				local rowEntry = PrepareCachedCustomerEntry(AF, entry)
 				MarkGuildAffiliation(AF, rowEntry)
-				if rowEntry.guildOnline ~= true then
-					rowEntry.unavailableCached = true
-					rowEntry.availabilityState = "unavailable"
-				else
-					rowEntry.updatedAt = rowEntry.verifiedAt or rowEntry.lastQueryAt or rowEntry.updatedAt
-					rowEntry.availabilityState = "online"
-				end
+				rowEntry.unavailableCached = true
+				rowEntry.availabilityState = "unavailable"
 				rowEntry.customerSource = "cached-addon-guild"
 				if AF:IsCustomerEntryOrderEligible(rowEntry) then
 					table.insert(rows, rowEntry)
