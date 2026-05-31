@@ -17,16 +17,6 @@ local function IsAddonEnabledEntry(entry)
 	return entry and not entry.tradeLead
 end
 
-local function GetPinnedCategorySort(AF, entry)
-	if AF:IsFavoriteArtisan(entry) then
-		return 0
-	end
-	if entry and entry.ownAlt then
-		return 1
-	end
-	return 2
-end
-
 local function GetSourceCategorySort(_, entry)
 	if IsAddonEnabledEntry(entry) then
 		return entry.guildMember and 0 or 1
@@ -81,7 +71,10 @@ local function GetSeenKey(AF, entry)
 	if entry.tradeLead and entry.professionLink then
 		return "trade:" .. tostring(entry.target or entry.name or "") .. ":" .. tostring(entry.professionLink)
 	end
-	return AF:GetFavoriteArtisanKey(entry) or entry.target or entry.name
+	if not entry.tradeLead then
+		return AF:GetFavoriteArtisanKey(entry) or entry.orderTarget or entry.name or entry.target
+	end
+	return entry.target or entry.name
 end
 
 local function MarkSeen(AF, seenNames, entry)
@@ -93,11 +86,22 @@ local function MarkSeen(AF, seenNames, entry)
 	if favoriteKey then
 		seenNames[favoriteKey] = true
 	end
-	if entry and entry.name then
-		seenNames[entry.name] = true
+	if entry and not entry.tradeLead then
+		if entry.orderTarget then
+			seenNames[entry.orderTarget] = true
+		end
+		if entry.name then
+			seenNames[entry.name] = true
+		end
+		return
 	end
-	if entry and entry.target then
-		seenNames[entry.target] = true
+	if entry then
+		if entry.name then
+			seenNames[entry.name] = true
+		end
+		if entry.target then
+			seenNames[entry.target] = true
+		end
 	end
 end
 
@@ -461,24 +465,28 @@ function AF:GetCachedArtisans(itemID, filterText, sortMode, queryToken)
 
 	sortMode = sortMode or "best"
 	table.sort(rows, function(a, b)
-		local aPinned = GetPinnedCategorySort(self, a)
-		local bPinned = GetPinnedCategorySort(self, b)
-		if aPinned ~= bPinned then
-			return aPinned < bPinned
+		local aFavorite = self:IsFavoriteArtisan(a)
+		local bFavorite = self:IsFavoriteArtisan(b)
+		if aFavorite ~= bFavorite then
+			return aFavorite
+		end
+
+		local aOwnAlt = a and a.ownAlt == true
+		local bOwnAlt = b and b.ownAlt == true
+		if aOwnAlt ~= bOwnAlt then
+			return aOwnAlt
+		end
+
+		local aCategory = GetSourceCategorySort(self, a)
+		local bCategory = GetSourceCategorySort(self, b)
+		if aCategory ~= bCategory then
+			return aCategory < bCategory
 		end
 
 		local aAvailability = GetAvailabilitySort(self, a)
 		local bAvailability = GetAvailabilitySort(self, b)
 		if aAvailability ~= bAvailability then
 			return aAvailability < bAvailability
-		end
-
-		if aPinned == 2 then
-			local aCategory = GetSourceCategorySort(self, a)
-			local bCategory = GetSourceCategorySort(self, b)
-			if aCategory ~= bCategory then
-				return aCategory < bCategory
-			end
 		end
 
 		local aCommissionRank, aPrice = GetCommissionSort(a)
