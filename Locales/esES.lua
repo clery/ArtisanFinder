@@ -3,7 +3,7 @@ local locale = GetLocale()
 AF.Locales = AF.Locales or {}
 local L = {}
 AF.Locales.esES = L
-if locale == "esES" or locale == "esMX" then
+if locale == "esES" then
 	AF.L = L
 end
 L.ADDON_LOADED = "cargado. La disponibilidad del artesano está desactivada para esta sesión."
@@ -155,6 +155,8 @@ L.OPTIONS_DEFAULT_SORT = "Ordenación predeterminada"
 L.OPTIONS_DEFAULT_SORT_DESC = "Elige el modo de ordenación usado al abrir los resultados de cliente."
 L.OPTIONS_SHOW_OWN_CHARACTER_ROWS = "Mostrar tus personajes"
 L.OPTIONS_SHOW_OWN_CHARACTER_ROWS_DESC = "Incluye tu personaje actual en los resultados de búsqueda de cliente cuando pueda fabricar el objeto seleccionado."
+L.OPTIONS_DISABLE_AUTOMATIC_SCANS = "Desactivar escaneos automáticos"
+L.OPTIONS_DISABLE_AUTOMATIC_SCANS_DESC = "Solo escanea datos de profesión al pulsar Reescanear."
 L.OPTIONS_CLEANUP_FREQUENCY = "Limpieza de caché"
 L.OPTIONS_CLEANUP_FREQUENCY_DESC = "Elimina artesanos en caché que no sean favoritos y no se hayan actualizado recientemente."
 L.OPTIONS_OFFLINE_FALLBACK_RESULTS = "Mostrar desconectados bajo"

@@ -2,10 +2,10 @@
 
 ## Title: ArtisanFinder
 ## Notes: Find available artisans from Crafting Orders and manage crafter availability from Professions.
-## Notes-frFR: Trouvez des artisans disponibles depuis les commandes d'artisanat et gerez votre disponibilité depuis les metiers.
+## Notes-frFR: Trouvez des artisans disponibles depuis les commandes d'artisanat et gérez votre disponibilité depuis les métiers.
 ## Notes-deDE: Findet verfuegbare Handwerker ueber Handwerksauftraege und verwaltet die Verfuegbarkeit ueber Berufe.
-## Notes-esES: Encuentra artesanos disponibles desde los pedidos de fabricacion y gestiona la disponibilidad desde las profesiones.
-## Notes-esMX: Encuentra artesanos disponibles desde los pedidos de fabricacion y gestiona la disponibilidad desde las profesiones.
+## Notes-esES: Encuentra artesanos disponibles desde los pedidos de fabricación y gestiona la disponibilidad desde las profesiones.
+## Notes-esMX: Encuentra artesanos disponibles desde las órdenes de fabricación y administra la disponibilidad desde las profesiones.
 ## Notes-ruRU: Находите доступных ремесленников через заказы на изготовление и управляйте доступностью через профессии.
 ## Notes-zhCN: 从制造订单中查找可用工匠，并在专业界面管理工匠可用状态。
 ## Notes-zhTW: 從製造訂單中尋找可用工匠，並在專業技能介面管理工匠可用狀態。
@@ -37,8 +37,10 @@ Locales\enUS.lua
 Locales\frFR.lua
 Locales\deDE.lua
 Locales\esES.lua
+Locales\esMX.lua
 Locales\ruRU.lua
 Locales\zhCN.lua
+Locales\zhTW.lua
 
 Util.lua
 Formatting.lua

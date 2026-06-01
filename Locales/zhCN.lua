@@ -3,7 +3,7 @@ local locale = GetLocale()
 AF.Locales = AF.Locales or {}
 local L = {}
 AF.Locales.zhCN = L
-if locale == "zhCN" or locale == "zhTW" then
+if locale == "zhCN" then
 	AF.L = L
 end
 L.ADDON_LOADED = "已加载。本次会话的工匠可用状态为关闭。"
@@ -155,6 +155,8 @@ L.OPTIONS_DEFAULT_SORT = "默认排序"
 L.OPTIONS_DEFAULT_SORT_DESC = "选择客户结果面板打开时使用的排序方式。"
 L.OPTIONS_SHOW_OWN_CHARACTER_ROWS = "显示自己的角色"
 L.OPTIONS_SHOW_OWN_CHARACTER_ROWS_DESC = "当当前角色可以制造所选物品时，将其包含在客户搜索结果中。"
+L.OPTIONS_DISABLE_AUTOMATIC_SCANS = "禁用自动扫描"
+L.OPTIONS_DISABLE_AUTOMATIC_SCANS_DESC = "仅在点击重新扫描时扫描专业数据。"
 L.OPTIONS_CLEANUP_FREQUENCY = "缓存清理"
 L.OPTIONS_CLEANUP_FREQUENCY_DESC = "移除最近未刷新的非收藏缓存工匠。"
 L.OPTIONS_OFFLINE_FALLBACK_RESULTS = "少于此数时显示离线"

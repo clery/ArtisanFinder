@@ -351,14 +351,26 @@ function AF:NormalizeLocale(locale)
 	if lower == "dede" then
 		return "deDE"
 	end
-	if lower == "eses" or lower == "esmx" then
+	if lower == "eses" then
 		return "esES"
+	end
+	if lower == "esmx" then
+		return "esMX"
 	end
 	if lower == "ruru" then
 		return "ruRU"
 	end
-	if lower == "zhcn" or lower == "zhtw" then
+	if lower == "ptpt" then
+		return "ptPT"
+	end
+	if lower == "ptbr" then
+		return "ptBR"
+	end
+	if lower == "zhcn" then
 		return "zhCN"
+	end
+	if lower == "zhtw" then
+		return "zhTW"
 	end
 	return locale
 end

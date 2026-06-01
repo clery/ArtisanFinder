@@ -63,7 +63,7 @@ ArtisanFinder has an Options -> AddOns panel ordered around common controls firs
 
 ## Languages
 
-ArtisanFinder includes localization support for English, French, German, Spanish, Russian, and Chinese. Spanish also covers `esMX`, and Chinese also covers `zhTW`.
+ArtisanFinder includes localization support for English, French, German, European Spanish, Latin American Spanish, European Portuguese, Brazilian Portuguese, Russian, Simplified Chinese, and Traditional Chinese.
 
 ## Useful Commands
 
