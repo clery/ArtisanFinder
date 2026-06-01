@@ -1,6 +1,6 @@
 # ArtisanFinder
 
-## [v2.0.0](https://github.com/clery/ArtisanFinder/releases/tag/v2.0.0) (2026-05-26)
+## [v2.0.0](https://github.com/clery/ArtisanFinder/releases/tag/v2.0.0) (2026-06-01)
 
 [Full Changelog](https://github.com/clery/ArtisanFinder/compare/v1.2.6b...v2.0.0) | [Previous Releases](https://github.com/clery/ArtisanFinder/releases)
 
