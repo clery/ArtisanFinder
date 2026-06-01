@@ -19,6 +19,7 @@ L.OFFLINE = "Offline"
 L.AWAY = "Ausente"
 L.ONLINE_CHECK_FAILED = "Falha ao verificar estado online"
 L.MINIMAP_LIBS_MISSING = "as bibliotecas do minimapa não estavam disponíveis."
+L.ADDON_COMMS_UNAVAILABLE_INSTANCE = "A comunicação do ArtisanFinder não está disponível durante atividades restritas."
 
 L.FREE_COMMISSION = "Qualquer comissão"
 L.NO_PRICE_SET = "Sem preço definido"

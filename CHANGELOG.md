@@ -1,5 +1,22 @@
 # ArtisanFinder
 
+## [v2.0.1](https://github.com/clery/ArtisanFinder/releases/tag/v2.0.1) (2026-06-02)
+
+[Full Changelog](https://github.com/clery/ArtisanFinder/compare/v2.0.0...v2.0.1) | [Previous Releases](https://github.com/clery/ArtisanFinder/releases)
+
+### Added
+
+* Localization for simplified Chinese, latin america spanish, portuguese and brazilian portuguese.
+
+### Changed
+
+* Small communication optimizations.
+* Addon message communiation is now compressed.
+
+### Fixed
+
+* Small memory leak for long sessions.
+
 ## [v2.0.0](https://github.com/clery/ArtisanFinder/releases/tag/v2.0.0) (2026-06-01)
 
 [Full Changelog](https://github.com/clery/ArtisanFinder/compare/v1.2.6b...v2.0.0) | [Previous Releases](https://github.com/clery/ArtisanFinder/releases)

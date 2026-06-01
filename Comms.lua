@@ -167,6 +167,14 @@ local function BuildPayload(parts)
 	return table.concat(parts, "|")
 end
 
+local function IsOnlineGuildWhisperTarget(AF, target)
+	if not AF.GetCachedGuildRosterEntry then
+		return false
+	end
+	local rosterEntry = AF:GetCachedGuildRosterEntry(target)
+	return rosterEntry and rosterEntry.online == true
+end
+
 function AF:CleanupResponseThrottle(now)
 	if not self.responseThrottle then
 		return 0
@@ -335,15 +343,18 @@ function AF:BroadcastQuery(itemID, professionID)
 		local recipeID = tonumber(self.currentCustomerRecipeID) or 0
 		local whisperTargets = self:GetOnlineGuildQueryTargets(normalizedProfessionID, recipeID, 30)
 		local skippedWhispers = 0
+		local skippedOfflineWhispers = 0
 		for _, target in ipairs(whisperTargets) do
 			if sentOnChannel and self:IsNameOnConnectedRealm(target) then
 				skippedWhispers = skippedWhispers + 1
+			elseif not IsOnlineGuildWhisperTarget(self, target) then
+				skippedOfflineWhispers = skippedOfflineWhispers + 1
 			else
 				sent = self:SendAddon(payload, "WHISPER", target, "BULK", queueName .. ":GUILD_WHISPER:" .. tostring(target)) or sent
 			end
 		end
-		if skippedWhispers > 0 and self:IsDevTrafficLogsEnabled() then
-			self:DebugLog("query", string.format("skipped guild whispers reachableOnChannel=%d", skippedWhispers))
+		if (skippedWhispers > 0 or skippedOfflineWhispers > 0) and self:IsDevTrafficLogsEnabled() then
+			self:DebugLog("query", string.format("skipped guild whispers reachableOnChannel=%d offline=%d", skippedWhispers, skippedOfflineWhispers))
 		end
 	end
 	self:DebugLog("query", string.format("sent item=%s profession=%s channel=%s guild=%s result=%s", tostring(itemID), tostring(normalizedProfessionID), tostring(channelID or 0), tostring(IsInGuild and IsInGuild() == true), tostring(sent == true)))
