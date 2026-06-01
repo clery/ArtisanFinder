@@ -430,6 +430,8 @@ function AF:OnAddonMessage(prefix, message, channel, sender)
 		self:HandleReagentDetail(parts, normalizedSender)
 	elseif kind == "O" then
 		self:HandleOrderNotification(parts, normalizedSender)
+	elseif kind == "F" then
+		self:HandleFulfilledOrderNotification(parts, normalizedSender)
 	end
 end
 

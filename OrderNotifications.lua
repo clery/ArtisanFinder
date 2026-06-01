@@ -8,6 +8,7 @@ local TOAST_FADE_IN_SECONDS = 0.18
 local TOAST_HOLD_SECONDS = 4.4
 local TOAST_FADE_OUT_SECONDS = 0.7
 local ORDER_NOTIFICATION_FALLBACK_DELAY_SECONDS = 1
+local CUSTOMER_ORDER_REFRESH_DELAY_SECONDS = 0.5
 local DEV_ORDER_ITEM_ID = 240949
 local DEV_CUSTOMER_NAMES = {
 	"Aelindra",
@@ -99,10 +100,10 @@ local function GetOrderNotificationItemInfo(details)
 	local itemIcon = tonumber(details.itemIcon)
 	if itemID then
 		local name, link, quality, _, _, _, _, _, _, icon = C_Item.GetItemInfo(itemID)
-		itemName = itemName or name
-		itemLink = itemLink or link
-		itemQuality = itemQuality or tonumber(quality)
-		itemIcon = itemIcon or tonumber(icon) or C_Item.GetItemIconByID(itemID)
+		itemName = name or itemName
+		itemLink = link or itemLink
+		itemQuality = tonumber(quality) or itemQuality
+		itemIcon = tonumber(icon) or itemIcon or C_Item.GetItemIconByID(itemID)
 		if not name then
 			pcall(C_Item.RequestLoadItemDataByID, itemID)
 		end
@@ -206,17 +207,48 @@ local function CopyOrderDetails(details)
 	local itemLink = details.itemLink and details.itemLink ~= "" and details.itemLink or nil
 	local itemName = details.itemName and details.itemName ~= "" and details.itemName or nil
 	local customerName = details.customerName and details.customerName ~= "" and details.customerName or nil
+	local crafterName = details.crafterName and details.crafterName ~= "" and details.crafterName or nil
 	local professionName = details.professionName and details.professionName ~= "" and details.professionName or nil
 	return {
+		notificationType = details.notificationType,
 		itemID = tonumber(details.itemID),
+		orderID = details.orderID,
 		itemLink = itemLink,
 		itemName = itemName,
 		itemQuality = tonumber(details.itemQuality),
 		itemIcon = tonumber(details.itemIcon),
 		commissionCopper = tonumber(details.commissionCopper),
 		customerName = customerName,
+		crafterName = crafterName,
 		professionName = professionName,
 	}
+end
+
+local function GetCustomerOrderKey(order)
+	if type(order) ~= "table" then
+		return nil
+	end
+	if order.orderID then
+		return tostring(order.orderID)
+	end
+	return table.concat({
+		tostring(order.itemID or ""),
+		tostring(order.spellID or ""),
+		tostring(order.orderType or ""),
+		tostring(order.expirationTime or ""),
+		tostring(order.crafterName or ""),
+	}, ":")
+end
+
+local function IsCustomerOrderFulfilled(order)
+	return type(order) == "table"
+		and Enum
+		and Enum.CraftingOrderState
+		and order.orderState == Enum.CraftingOrderState.Fulfilled
+end
+
+local function GetCustomerOrderStateValue(order)
+	return type(order) == "table" and tostring(order.orderState or "") or ""
 end
 
 local function HasOrderItemDetails(details)
@@ -286,6 +318,43 @@ local function FillOrderDetailsFromRecipeInfo(details, recipeInfo)
 	return FillOrderDetailsFromItemInfo(details)
 end
 
+local function FillOrderDetailsFromOrderInfo(details, order)
+	if type(order) ~= "table" then
+		return FillOrderDetailsFromItemInfo(details)
+	end
+	details.itemID = details.itemID or tonumber(order.itemID)
+	details.itemLink = details.itemLink or order.outputItemHyperlink or order.recraftItemHyperlink
+	details.itemID = details.itemID or AF:GetItemIDFromLink(details.itemLink)
+	details.itemName = details.itemName or (details.itemID and AF:GetItemName(details.itemID))
+	details.itemIcon = details.itemIcon or (details.itemID and C_Item.GetItemIconByID(details.itemID))
+	details.commissionCopper = details.commissionCopper or tonumber(order.tipAmount)
+	details.customerName = details.customerName or order.customerName
+	details.crafterName = details.crafterName or order.crafterName
+	if order.skillLineAbilityID and C_TradeSkillUI and C_TradeSkillUI.GetProfessionNameForSkillLineAbility then
+		details.professionName = details.professionName or C_TradeSkillUI.GetProfessionNameForSkillLineAbility(order.skillLineAbilityID)
+	end
+	if order.skillLineAbilityID and C_TradeSkillUI and C_TradeSkillUI.GetRecipeInfoForSkillLineAbility then
+		local okRecipeInfo, recipeInfo = pcall(C_TradeSkillUI.GetRecipeInfoForSkillLineAbility, order.skillLineAbilityID)
+		if okRecipeInfo then
+			FillOrderDetailsFromRecipeInfo(details, recipeInfo)
+		end
+	end
+	return FillOrderDetailsFromItemInfo(details)
+end
+
+local function GetFulfilledOrderDetails(order)
+	local details = {
+		notificationType = "fulfilled",
+		commissionCopper = tonumber(order and order.tipAmount),
+		customerName = order and order.customerName,
+		crafterName = order and order.crafterName,
+		orderID = order and order.orderID,
+		itemID = order and tonumber(order.itemID),
+		itemLink = order and (order.outputItemHyperlink or order.recraftItemHyperlink),
+	}
+	return FillOrderDetailsFromOrderInfo(details, order)
+end
+
 local function ResetOrderNotificationToast(_, toast)
 	toast:Hide()
 	toast:ClearAllPoints()
@@ -338,6 +407,15 @@ function AF:ShowOrderNotification(characterName, count, details)
 		return
 	end
 	self:ShowOrderNotificationToast(characterName, count, details)
+end
+
+function AF:NotifyCustomerOrderFulfilled(order, details)
+	details = CopyOrderDetails(details or GetFulfilledOrderDetails(order))
+	details.notificationType = "fulfilled"
+	FillOrderDetailsFromOrderInfo(details, order)
+	self:DebugLog("orders", string.format("fulfilled order=%s item=%s crafter=%s", tostring(order and order.orderID or ""), tostring(details.itemID or ""), tostring(details.crafterName or "")))
+	self:PlayOrderNotificationSound()
+	self:ShowOrderNotification(self.playerName or self:GetPlayerFullName(), 1, details)
 end
 
 function AF:NotifyPersonalOrder(characterName, count, sender, details)
@@ -474,6 +552,36 @@ function AF:HandleOrderNotification(parts, sender)
 	self:NotifyPersonalOrder(characterName, count, sender, details)
 end
 
+function AF:HandleFulfilledOrderNotification(parts, sender)
+	local orderID = self:DecodeField(parts[3])
+	local crafterName = self:DecodeField(parts[6])
+	if not crafterName or crafterName == "" then
+		crafterName = sender
+	end
+	local details = {
+		notificationType = "fulfilled",
+		orderID = orderID,
+		itemID = tonumber(parts[4]),
+		commissionCopper = tonumber(parts[5]),
+		crafterName = crafterName,
+		itemName = self:DecodeField(parts[7]),
+		itemIcon = tonumber(parts[8]),
+		professionName = self:DecodeField(parts[9]),
+		itemQuality = tonumber(parts[10]),
+	}
+	if orderID and orderID ~= "" then
+		self.db.customerOrderStates = self.db.customerOrderStates or {}
+		self.db.customerOrderStates[tostring(orderID)] = tostring(Enum.CraftingOrderState.Fulfilled)
+	end
+	self:NotifyCustomerOrderFulfilled({
+		orderID = orderID,
+		orderState = Enum.CraftingOrderState.Fulfilled,
+		itemID = details.itemID,
+		tipAmount = details.commissionCopper,
+		crafterName = details.crafterName,
+	}, details)
+end
+
 function AF:SendOrderNotification(characterName, count, details)
 	characterName = self:NormalizeName(characterName)
 	if not characterName or not self.SendAddon then
@@ -508,6 +616,43 @@ function AF:SendOrderNotification(characterName, count, details)
 		payloadParts[index] = tostring(value or "")
 	end
 	return self:SendAddon(table.concat(payloadParts, "|"), "WHISPER", messageTarget, "NORMAL", "O:" .. characterName)
+end
+
+function AF:SendFulfilledOrderNotification(order, details)
+	if type(order) ~= "table" or not order.customerName or order.customerName == "" or not self.SendAddon then
+		return false
+	end
+	details = CopyOrderDetails(details or GetFulfilledOrderDetails(order))
+	details.notificationType = "fulfilled"
+	FillOrderDetailsFromOrderInfo(details, order)
+	local target = self:NormalizeName(order.customerName)
+	if not target then
+		return false
+	end
+	local payloadParts = {
+		"F",
+		self.PROTOCOL_VERSION,
+		self:EncodeField(order.orderID and tostring(order.orderID) or ""),
+		tonumber(details.itemID) or "",
+		tonumber(details.commissionCopper) or "",
+		self:EncodeField(details.crafterName or self.playerName or self:GetPlayerFullName()),
+		self:EncodeField(details.itemName or ""),
+		tonumber(details.itemIcon) or "",
+		self:EncodeField(details.professionName or ""),
+		tonumber(details.itemQuality) or "",
+	}
+	self:DebugLog("orders", "send fulfilled target=" .. tostring(target) .. " order=" .. tostring(order.orderID or "") .. " item=" .. tostring(details.itemID or ""))
+	if self.SendPayloadParts and self:SendPayloadParts(payloadParts, "WHISPER", target, "NORMAL", "F:" .. tostring(order.orderID or "")) then
+		return true
+	end
+	payloadParts[3] = self:EncodeField(order.orderID and tostring(order.orderID) or "", 48)
+	payloadParts[6] = self:EncodeField(details.crafterName or self.playerName or self:GetPlayerFullName(), 48)
+	payloadParts[7] = self:EncodeField(details.itemName or "", 64)
+	payloadParts[9] = self:EncodeField(details.professionName or "", 40)
+	for index, value in ipairs(payloadParts) do
+		payloadParts[index] = tostring(value or "")
+	end
+	return self:SendAddon(table.concat(payloadParts, "|"), "WHISPER", target, "NORMAL", "F:" .. tostring(order.orderID or ""))
 end
 
 function AF:OnPersonalOrderCountsUpdated()
@@ -553,6 +698,110 @@ function AF:QueueCurrentOrderNotificationFallback(count, rows)
 	end)
 end
 
+function AF:QueueCustomerOrderStateRefresh(reason, delay)
+	if not C_CraftingOrders or not C_CraftingOrders.ListMyOrders then
+		return
+	end
+	self.customerOrderStateRefreshToken = (self.customerOrderStateRefreshToken or 0) + 1
+	local token = self.customerOrderStateRefreshToken
+	C_Timer.After(delay or CUSTOMER_ORDER_REFRESH_DELAY_SECONDS, function()
+		if AF.customerOrderStateRefreshToken ~= token then
+			return
+		end
+		AF:RefreshCustomerOrderStates(reason)
+	end)
+end
+
+function AF:RefreshCustomerOrderStates(reason)
+	if self.customerOrderStateRequestActive or not C_FunctionContainers or not C_FunctionContainers.CreateCallback or not C_CraftingOrders or not C_CraftingOrders.ListMyOrders then
+		return
+	end
+	self.customerOrderStateRequestActive = true
+	self.customerOrderStateRequestToken = (self.customerOrderStateRequestToken or 0) + 1
+	local requestToken = self.customerOrderStateRequestToken
+	self.customerOrderStateRefreshOrders = {}
+	C_Timer.After(10, function()
+		if AF.customerOrderStateRequestActive and AF.customerOrderStateRequestToken == requestToken then
+			AF.customerOrderStateRequestActive = nil
+			AF.customerOrderStateRefreshOrders = nil
+			AF:DebugLog("orders", "customer states timeout reason=" .. tostring(reason or ""))
+		end
+	end)
+
+	local function Request(offset)
+		if not C_FunctionContainers or not C_FunctionContainers.CreateCallback or not C_CraftingOrders or not C_CraftingOrders.ListMyOrders then
+			AF.customerOrderStateRequestActive = nil
+			AF.customerOrderStateRefreshOrders = nil
+			AF:DebugLog("orders", "customer states unavailable reason=" .. tostring(reason or ""))
+			return
+		end
+		local callback
+		callback = C_FunctionContainers.CreateCallback(function(result, expectMoreRows)
+			if not AF.customerOrderStateRequestActive or AF.customerOrderStateRequestToken ~= requestToken then
+				return
+			end
+			if result and Enum and Enum.CraftingOrderResult and result ~= Enum.CraftingOrderResult.Ok then
+				AF.customerOrderStateRequestActive = nil
+				AF.customerOrderStateRefreshOrders = nil
+				AF:DebugLog("orders", string.format("customer states failed result=%s reason=%s", tostring(result), tostring(reason or "")))
+				return
+			end
+			local orders = C_CraftingOrders and C_CraftingOrders.GetMyOrders and C_CraftingOrders.GetMyOrders() or {}
+			for index = (tonumber(offset) or 0) + 1, #orders do
+				table.insert(AF.customerOrderStateRefreshOrders, orders[index])
+			end
+			if expectMoreRows and #orders > (tonumber(offset) or 0) then
+				Request(#orders)
+				return
+			end
+			AF.customerOrderStateRequestActive = nil
+			AF:ProcessCustomerOrderStates(AF.customerOrderStateRefreshOrders, result, reason)
+			AF.customerOrderStateRefreshOrders = nil
+		end)
+		local ok = pcall(C_CraftingOrders.ListMyOrders, {
+			offset = tonumber(offset) or 0,
+			callback = callback,
+		})
+		if not ok then
+			AF.customerOrderStateRequestActive = nil
+			AF.customerOrderStateRefreshOrders = nil
+			AF:DebugLog("orders", "customer states request failed reason=" .. tostring(reason or ""))
+		end
+	end
+
+	Request(0)
+end
+
+function AF:ProcessCustomerOrderStates(orders, result, reason)
+	self.db.customerOrderStates = self.db.customerOrderStates or {}
+	local initialized = self.customerOrderStatesInitialized == true
+	local seen = {}
+	for _, order in ipairs(orders or {}) do
+		local key = GetCustomerOrderKey(order)
+		if key then
+			seen[key] = true
+			local previousState = self.db.customerOrderStates[key]
+			local currentState = GetCustomerOrderStateValue(order)
+			if (initialized or previousState ~= nil)
+				and IsCustomerOrderFulfilled(order)
+				and previousState
+				and previousState ~= ""
+				and previousState ~= currentState
+			then
+				self:NotifyCustomerOrderFulfilled(order)
+			end
+			self.db.customerOrderStates[key] = currentState
+		end
+	end
+	for key in pairs(self.db.customerOrderStates) do
+		if not seen[key] then
+			self.db.customerOrderStates[key] = nil
+		end
+	end
+	self.customerOrderStatesInitialized = true
+	self:DebugLog("orders", string.format("customer states result=%s reason=%s count=%s", tostring(result or ""), tostring(reason or ""), tostring(#(orders or {}))))
+end
+
 function AF:OnOrderPlacementResponse(result)
 	if result ~= Enum.CraftingOrderResult.Ok then
 		self.pendingPersonalOrderTarget = nil
@@ -569,6 +818,37 @@ function AF:OnOrderPlacementResponse(result)
 		end
 		self:SendOrderNotification(target, 1, details)
 	end
+	if self.QueueCustomerOrderStateRefresh then
+		self:QueueCustomerOrderStateRefresh("placement-response", 2)
+	end
+end
+
+function AF:OnFulfillOrderResponse(result, orderID)
+	local key = orderID and tostring(orderID) or nil
+	local pending = key and self.pendingFulfilledOrderNotifications and self.pendingFulfilledOrderNotifications[key]
+	if key and self.pendingFulfilledOrderNotifications then
+		self.pendingFulfilledOrderNotifications[key] = nil
+	end
+	if result ~= Enum.CraftingOrderResult.Ok or not pending then
+		return
+	end
+	self:SendFulfilledOrderNotification(pending.order, pending.details)
+end
+
+function AF:CapturePendingFulfilledOrder(orderID)
+	if not C_CraftingOrders or not C_CraftingOrders.GetClaimedOrder then
+		return
+	end
+	local order = C_CraftingOrders.GetClaimedOrder()
+	if type(order) ~= "table" or tostring(order.orderID or "") ~= tostring(orderID or "") then
+		return
+	end
+	self.pendingFulfilledOrderNotifications = self.pendingFulfilledOrderNotifications or {}
+	self.pendingFulfilledOrderNotifications[tostring(orderID)] = {
+		order = order,
+		details = GetFulfilledOrderDetails(order),
+	}
+	self:DebugLog("orders", "pending fulfilled order=" .. tostring(orderID) .. " customer=" .. tostring(order.customerName or ""))
 end
 
 function AF:CapturePersonalOrderDetails(orderInfo, form)
@@ -675,11 +955,17 @@ function AF:InitializeOrderNotifications()
 			AF.pendingPersonalOrderDetails = nil
 		end
 	end)
+	if C_CraftingOrders.FulfillOrder then
+		hooksecurefunc(C_CraftingOrders, "FulfillOrder", function(orderID)
+			AF:CapturePendingFulfilledOrder(orderID)
+		end)
+	end
 	self:InitializeCustomerOrderFormHook()
 	self:InitializeCraftingOrderIndicator()
 	self.db.orderNotifications = self.db.orderNotifications or {}
 	self.altOrderNotifications = self.db.orderNotifications
 	self:OnPersonalOrderCountsUpdated()
+	self:QueueCustomerOrderStateRefresh("init", 2)
 end
 
 function AF:GetKnownOrderRows()
@@ -730,6 +1016,31 @@ function AF:DevNotifyOrder(characterName, count)
 		itemIcon = itemIcon,
 		commissionCopper = GetRandomDevCommission(),
 		customerName = GetRandomDevCustomerName(),
+		professionName = self:Text("DEBUG_ORDER_PROFESSION"),
+	})
+end
+
+function AF:DevNotifyFulfilledOrder(crafterName)
+	self.db.debugEnabled = true
+	self.db.devEnabled = true
+	local _, itemName, itemLink, itemQuality, itemIcon = GetOrderNotificationItemInfo({ itemID = DEV_ORDER_ITEM_ID, itemName = "Masterwork Sin'dorei Band" })
+	local devCrafterName = crafterName and crafterName ~= "" and crafterName or GetRandomDevCustomerName()
+	local commissionCopper = GetRandomDevCommission()
+	self:NotifyCustomerOrderFulfilled({
+		orderID = "dev-fulfilled",
+		orderState = Enum.CraftingOrderState.Fulfilled,
+		itemID = DEV_ORDER_ITEM_ID,
+		tipAmount = commissionCopper,
+		crafterName = devCrafterName,
+	}, {
+		notificationType = "fulfilled",
+		itemID = DEV_ORDER_ITEM_ID,
+		itemName = itemName or "Masterwork Sin'dorei Band",
+		itemLink = itemLink,
+		itemQuality = itemQuality,
+		itemIcon = itemIcon,
+		commissionCopper = commissionCopper,
+		crafterName = devCrafterName,
 		professionName = self:Text("DEBUG_ORDER_PROFESSION"),
 	})
 end
@@ -979,6 +1290,7 @@ end
 function AF:SetupOrderNotificationToast(frame, characterName, count, details)
 	details = CopyOrderDetails(details)
 	local itemID, itemName, itemLink, itemQuality, itemIcon = GetOrderNotificationItemInfo(details)
+	local isFulfilled = details.notificationType == "fulfilled"
 	frame.itemID = itemID
 	frame.itemLink = itemLink
 	frame.elapsed = 0
@@ -987,18 +1299,26 @@ function AF:SetupOrderNotificationToast(frame, characterName, count, details)
 	frame:SetScale(self:GetOrderNotificationScale())
 	frame.Icon:SetTexture(itemIcon or "Interface\\Icons\\INV_Misc_Note_01")
 	SetToastIconQuality(frame, itemQuality, itemLink or itemID)
-	frame.Title:SetText(self:Text("ORDER_NOTIFICATION_TITLE"))
-	frame.ItemName:SetText(itemName or details.itemName or details.professionName or self:Text("ORDER_NOTIFICATION_UNKNOWN_ITEM"))
+	frame.Title:SetText(self:Text(isFulfilled and "ORDER_FULFILLED_NOTIFICATION_TITLE" or "ORDER_NOTIFICATION_TITLE"))
+	frame.ItemName:SetText(itemName or details.itemName or details.professionName or self:Text(isFulfilled and "ORDER_FULFILLED_NOTIFICATION_UNKNOWN_ITEM" or "ORDER_NOTIFICATION_UNKNOWN_ITEM"))
 	SetItemTextColor(frame.ItemName, itemQuality)
-	frame.Meta:SetText(self:Text(
-		"ORDER_NOTIFICATION_META",
-		FormatOrderCharacter(self, characterName),
-		FormatOrderCustomer(self, details.customerName or self:Text("UNKNOWN_CUSTOMER"))
-	))
-	frame.Commission:SetText(self:Text(
-		"ORDER_NOTIFICATION_COMMISSION",
-		self:FormatMoney(tonumber(details.commissionCopper) or 0)
-	))
+	if isFulfilled then
+		frame.Meta:SetText(self:Text(
+			"ORDER_FULFILLED_NOTIFICATION_META",
+			FormatOrderCustomer(self, details.crafterName or self:Text("UNKNOWN_CRAFTER"))
+		))
+		frame.Commission:SetText(self:Text("ORDER_FULFILLED_NOTIFICATION_ACTION"))
+	else
+		frame.Meta:SetText(self:Text(
+			"ORDER_NOTIFICATION_META",
+			FormatOrderCharacter(self, characterName),
+			FormatOrderCustomer(self, details.customerName or self:Text("UNKNOWN_CUSTOMER"))
+		))
+		frame.Commission:SetText(self:Text(
+			"ORDER_NOTIFICATION_COMMISSION",
+			self:FormatMoney(tonumber(details.commissionCopper) or 0)
+		))
+	end
 end
 
 function AF:RefreshOrderNotificationToasts()

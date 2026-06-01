@@ -71,6 +71,7 @@ function AF:PrintDevHelp()
 	self:Print(self:Text("DEV_HELP_FAKE"))
 	self:Print(self:Text("DEV_HELP_TRAFFIC"))
 	self:Print(self:Text("DEV_HELP_NOTIFY"))
+	self:Print(self:Text("DEV_HELP_FULFILLED"))
 	self:Print(self:Text("DEV_HELP_ORDERS"))
 	self:Print(self:Text("DEV_HELP_SOUND"))
 	self:Print("/af dev orderdump: dump orderable recipe data for maintainer updates.")
@@ -331,6 +332,10 @@ function AF:HandleDevSlash(rest)
 			characterName = nil
 		end
 		self:DevNotifyOrder(characterName ~= "" and characterName or self:GetPlayerFullName(), tonumber(count) or 1)
+	elseif command == "fulfilled" then
+		if self.DevNotifyFulfilledOrder then
+			self:DevNotifyFulfilledOrder(commandRest)
+		end
 	elseif command == "orders" then
 		local subcommand, subRest = NormalizeCommand(commandRest)
 		if subcommand == "current" then

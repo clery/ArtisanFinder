@@ -1,5 +1,13 @@
 # ArtisanFinder
 
+## [v2.0.2](https://github.com/clery/ArtisanFinder/releases/tag/v2.0.2) (2026-06-02)
+
+[Full Changelog](https://github.com/clery/ArtisanFinder/compare/v2.0.1...v2.0.2) | [Previous Releases](https://github.com/clery/ArtisanFinder/releases)
+
+### Added
+
+* Notifications for customers when a crafting order has been fulfilled.
+
 ## [v2.0.1](https://github.com/clery/ArtisanFinder/releases/tag/v2.0.1) (2026-06-02)
 
 [Full Changelog](https://github.com/clery/ArtisanFinder/compare/v2.0.0...v2.0.1) | [Previous Releases](https://github.com/clery/ArtisanFinder/releases)
@@ -11,7 +19,7 @@
 ### Changed
 
 * Small communication optimizations.
-* Addon message communiation is now compressed.
+* Addon message communication is now compressed.
 
 ### Fixed
 

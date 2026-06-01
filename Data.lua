@@ -614,6 +614,7 @@ function ApplyDBDefaults(db)
 		db.orderNotificationGrowDirection = "DOWN"
 	end
 	db.orderNotifications = db.orderNotifications or {}
+	db.customerOrderStates = db.customerOrderStates or {}
 	if db.offlineFallbackResults == nil then
 		db.offlineFallbackResults = 10
 	end

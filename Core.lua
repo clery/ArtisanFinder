@@ -22,7 +22,10 @@ local EVENTS = {
 	"GUILD_TRADESKILL_UPDATE",
 	"GUILD_RECIPE_KNOWN_BY_MEMBERS",
 	"CRAFTINGORDERS_SHOW_CUSTOMER",
+	"CRAFTINGORDERS_CAN_REQUEST",
+	"CRAFTINGORDERS_UPDATE_ORDER_COUNT",
 	"CRAFTINGORDERS_ORDER_PLACEMENT_RESPONSE",
+	"CRAFTINGORDERS_FULFILL_ORDER_RESPONSE",
 	"CRAFTINGORDERS_UPDATE_PERSONAL_ORDER_COUNTS",
 	"TRADE_SKILL_SHOW",
 	"TRADE_SKILL_CLOSE",
@@ -359,6 +362,9 @@ AF.frame:SetScript("OnEvent", function(_, event, ...)
 		if AF:IsProtectedActionRestricted() then
 			return
 		end
+		if AF.QueueCustomerOrderStateRefresh then
+			AF:QueueCustomerOrderStateRefresh("show-customer", 0.5)
+		end
 		C_Timer.After(0, function()
 			if AF:IsProtectedActionRestricted() then
 				return
@@ -373,6 +379,14 @@ AF.frame:SetScript("OnEvent", function(_, event, ...)
 	elseif event == "CRAFTINGORDERS_ORDER_PLACEMENT_RESPONSE" then
 		if AF.OnOrderPlacementResponse then
 			AF:OnOrderPlacementResponse(...)
+		end
+	elseif event == "CRAFTINGORDERS_FULFILL_ORDER_RESPONSE" then
+		if AF.OnFulfillOrderResponse then
+			AF:OnFulfillOrderResponse(...)
+		end
+	elseif event == "CRAFTINGORDERS_CAN_REQUEST" or event == "CRAFTINGORDERS_UPDATE_ORDER_COUNT" then
+		if AF.QueueCustomerOrderStateRefresh then
+			AF:QueueCustomerOrderStateRefresh(event:lower(), 0.5)
 		end
 	elseif event == "CRAFTINGORDERS_UPDATE_PERSONAL_ORDER_COUNTS" then
 		if AF.OnPersonalOrderCountsUpdated then
