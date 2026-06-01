@@ -1,5 +1,7 @@
 local _, AF = ...
 
+local COMPRESSED_PAYLOAD_KIND = "Z"
+
 function AF:InitializeComms()
 	C_ChatInfo.RegisterAddonMessagePrefix(self.PREFIX)
 	self.responseThrottle = {}
@@ -158,6 +160,70 @@ function AF:HideDiscoveryChannelFromChat(delay)
 	end)
 end
 
+local function BuildPayload(parts)
+	for index, value in ipairs(parts) do
+		parts[index] = tostring(value or "")
+	end
+	return table.concat(parts, "|")
+end
+
+function AF:GetCommsCompressionLibraries()
+	if self.commsCompressionChecked then
+		return self.libSerialize, self.libDeflate
+	end
+	self.commsCompressionChecked = true
+	if LibStub then
+		self.libSerialize = LibStub:GetLibrary("LibSerialize", true)
+		self.libDeflate = LibStub:GetLibrary("LibDeflate", true)
+	end
+	return self.libSerialize, self.libDeflate
+end
+
+function AF:EncodeCompressedPayloadParts(parts)
+	local serializer, deflater = self:GetCommsCompressionLibraries()
+	if not serializer or not deflater then
+		return nil
+	end
+	local ok, serialized = pcall(serializer.Serialize, serializer, parts)
+	if not ok or type(serialized) ~= "string" then
+		return nil
+	end
+	local compressed = deflater:CompressDeflate(serialized)
+	if type(compressed) ~= "string" then
+		return nil
+	end
+	local encoded = deflater:EncodeForWoWAddonChannel(compressed)
+	if type(encoded) ~= "string" or encoded == "" then
+		return nil
+	end
+	local payload = BuildPayload({
+		COMPRESSED_PAYLOAD_KIND,
+		self.PROTOCOL_VERSION,
+		encoded,
+	})
+	return #payload <= 255 and payload or nil
+end
+
+function AF:DecodeCompressedPayloadParts(encoded)
+	local serializer, deflater = self:GetCommsCompressionLibraries()
+	if not serializer or not deflater then
+		return nil
+	end
+	local decoded = deflater:DecodeForWoWAddonChannel(tostring(encoded or ""))
+	if type(decoded) ~= "string" then
+		return nil
+	end
+	local decompressed = deflater:DecompressDeflate(decoded)
+	if type(decompressed) ~= "string" then
+		return nil
+	end
+	local ok, parts = serializer:Deserialize(decompressed)
+	if not ok or type(parts) ~= "table" then
+		return nil
+	end
+	return parts
+end
+
 function AF:SendAddon(prefixPayload, chatType, target, priority, queueName)
 	if self:IsAddonCommsUnavailable() then
 		if self:IsDevTrafficLogsEnabled() then
@@ -172,6 +238,18 @@ function AF:SendAddon(prefixPayload, chatType, target, priority, queueName)
 		self:DebugLog("send", string.format("%s %s %s", tostring(chatType or "?"), tostring(target or ""), tostring(prefixPayload or "")))
 	end
 	return true
+end
+
+function AF:SendPayloadParts(payloadParts, chatType, target, priority, queueName)
+	local payload = BuildPayload(payloadParts)
+	if #payload <= 255 then
+		return self:SendAddon(payload, chatType, target, priority, queueName)
+	end
+	local compressedPayload = self:EncodeCompressedPayloadParts(payloadParts)
+	if compressedPayload then
+		return self:SendAddon(compressedPayload, chatType, target, priority, queueName)
+	end
+	return false
 end
 
 function AF:BroadcastQuery(itemID, professionID)
@@ -281,6 +359,13 @@ function AF:OnAddonMessage(prefix, message, channel, sender)
 	local kind, version = parts[1], parts[2]
 	if version ~= self.PROTOCOL_VERSION then
 		return
+	end
+	if kind == COMPRESSED_PAYLOAD_KIND then
+		parts = self:DecodeCompressedPayloadParts(parts[3]) or {}
+		kind, version = parts[1], parts[2]
+		if version ~= self.PROTOCOL_VERSION then
+			return
+		end
 	end
 	if self:IsDevTrafficLogsEnabled() then
 		self:DebugLog("recv", string.format("%s %s %s", tostring(channel or "?"), tostring(normalizedSender or "?"), tostring(message or "")))
@@ -417,7 +502,6 @@ function AF:HandleQuery(parts, sender, channel)
 			local encodedNote = self:EncodeNote(note)
 			local encodedLink = self:EncodeField(item.professionLink)
 			local responseProfessionID = self:GetSupportedProfessionID(item.professionID, item)
-			local encodedReagents = self:EncodeField(self:EncodeReagentEntries(item.bestReagents), 160)
 			local payloadParts = {
 				"R",
 				self.PROTOCOL_VERSION,
@@ -447,44 +531,50 @@ function AF:HandleQuery(parts, sender, channel)
 				tonumber(item.optionalConcentrationQuality) or "",
 				tonumber(item.optionalSlotCount) or "",
 				channel == "GUILD" and self:EncodeField(requesterName, 48) or "",
-				encodedReagents,
+				self:EncodeField(self:EncodeReagentEntries(item.bestReagents)),
 				UnitIsAFK and UnitIsAFK("player") and 1 or 0,
 				tonumber(item.bestOutputItemLevel) or "",
 				tonumber(item.optionalOutputItemLevel) or "",
 			}
-			local payload = table.concat(payloadParts, "|")
-			if #payload > 255 then
-				payloadParts[29] = ""
-				payloadParts[22] = 0
-				payload = table.concat(payloadParts, "|")
-			end
-			if #payload > 255 then
-				payloadParts[15] = ""
-				payload = table.concat(payloadParts, "|")
-			end
-			if #payload > 255 then
-				payloadParts[7] = self:EncodeField(note, 32)
-				payload = table.concat(payloadParts, "|")
-			end
-			if #payload > 255 then
-				payloadParts[17] = ""
-				payloadParts[18] = ""
-				payloadParts[19] = ""
-				payloadParts[20] = ""
-				payloadParts[21] = 0
-				payloadParts[22] = 0
-				payloadParts[24] = ""
-				payloadParts[25] = ""
-				payloadParts[26] = ""
-				payloadParts[27] = ""
-				payloadParts[29] = ""
-				payload = table.concat(payloadParts, "|")
-			end
-
 			local responseChannel = channel == "GUILD" and "GUILD" or "WHISPER"
 			local responseTarget = responseChannel == "WHISPER" and sender or nil
-			if self:SendAddon(payload, responseChannel, responseTarget, "NORMAL", "R:" .. tostring(sender)) then
+			local sent = self:SendPayloadParts(payloadParts, responseChannel, responseTarget, "NORMAL", "R:" .. tostring(sender))
+			if sent then
 				self.responseThrottle[throttleKey] = self:Now()
+			else
+				payloadParts[29] = self:EncodeField(self:EncodeReagentEntries(item.bestReagents), 160)
+				local payload = BuildPayload(payloadParts)
+				if #payload > 255 then
+					payloadParts[29] = ""
+					payloadParts[22] = 0
+					payload = BuildPayload(payloadParts)
+				end
+				if #payload > 255 then
+					payloadParts[15] = ""
+					payload = BuildPayload(payloadParts)
+				end
+				if #payload > 255 then
+					payloadParts[7] = self:EncodeField(note, 32)
+					payload = BuildPayload(payloadParts)
+				end
+				if #payload > 255 then
+					payloadParts[17] = ""
+					payloadParts[18] = ""
+					payloadParts[19] = ""
+					payloadParts[20] = ""
+					payloadParts[21] = 0
+					payloadParts[22] = 0
+					payloadParts[24] = ""
+					payloadParts[25] = ""
+					payloadParts[26] = ""
+					payloadParts[27] = ""
+					payloadParts[29] = ""
+					payload = BuildPayload(payloadParts)
+				end
+
+				if self:SendAddon(payload, responseChannel, responseTarget, "NORMAL", "R:" .. tostring(sender)) then
+					self.responseThrottle[throttleKey] = self:Now()
+				end
 			end
 		end
 	end
@@ -523,6 +613,22 @@ function AF:SendReagentDetail(item, target, queryToken, crafterName)
 
 	local optionalDetails = self:EncodeReagentEntries(item and item.optionalBestReagents)
 	local detailText = optionalDetails and optionalDetails ~= "" and ("R4:" .. details .. "\nO4:" .. optionalDetails) or ("R3:" .. details)
+	local queueName = table.concat({ "D", target or "", crafterName or "", item.itemID or 0, item.recipeID or 0, queryToken or 0 }, ":")
+	local fullPayload = {
+		"D",
+		self.PROTOCOL_VERSION,
+		tonumber(item.itemID) or 0,
+		tonumber(item.recipeID) or 0,
+		queryToken,
+		1,
+		1,
+		self:EncodeField(detailText),
+		self:EncodeField(crafterName, 48),
+	}
+	if self:SendPayloadParts(fullPayload, "WHISPER", target, "BULK", queueName) then
+		return true
+	end
+
 	local encodedSummary = self:EncodeReagentSummary(detailText, 1050)
 	local chunks = {}
 	local maxChunkBytes = 150
@@ -545,7 +651,6 @@ function AF:SendReagentDetail(item, target, queryToken, crafterName)
 			chunk,
 			self:EncodeField(crafterName, 48),
 		}, "|")
-		local queueName = table.concat({ "D", target or "", crafterName or "", item.itemID or 0, item.recipeID or 0, queryToken or 0 }, ":")
 		sent = self:SendAddon(payload, "WHISPER", target, "BULK", queueName) or sent
 	end
 	return sent

@@ -482,22 +482,32 @@ function AF:SendOrderNotification(characterName, count, details)
 	details = CopyOrderDetails(details)
 	FillOrderDetailsFromItemInfo(details)
 	local messageTarget = self:GetRememberedArtisanContact(characterName) or characterName
-	local payload = table.concat({
+	local payloadParts = {
 		"O",
 		self.PROTOCOL_VERSION,
-		self:EncodeField(characterName, 48),
+		self:EncodeField(characterName),
 		tonumber(count) or 1,
 		self:Now(),
 		tonumber(details.itemID) or "",
 		tonumber(details.commissionCopper) or "",
-		self:EncodeField(details.customerName or self.playerName or self:GetPlayerFullName(), 48),
-		self:EncodeField(details.itemName or "", 64),
+		self:EncodeField(details.customerName or self.playerName or self:GetPlayerFullName()),
+		self:EncodeField(details.itemName or ""),
 		tonumber(details.itemIcon) or "",
-		self:EncodeField(details.professionName or "", 40),
+		self:EncodeField(details.professionName or ""),
 		tonumber(details.itemQuality) or "",
-	}, "|")
+	}
 	self:DebugLog("orders", "send target=" .. tostring(messageTarget) .. " orderTarget=" .. tostring(characterName) .. " item=" .. tostring(details.itemID or ""))
-	return self:SendAddon(payload, "WHISPER", messageTarget, "NORMAL", "O:" .. characterName)
+	if self.SendPayloadParts and self:SendPayloadParts(payloadParts, "WHISPER", messageTarget, "NORMAL", "O:" .. characterName) then
+		return true
+	end
+	payloadParts[3] = self:EncodeField(characterName, 48)
+	payloadParts[8] = self:EncodeField(details.customerName or self.playerName or self:GetPlayerFullName(), 48)
+	payloadParts[9] = self:EncodeField(details.itemName or "", 64)
+	payloadParts[11] = self:EncodeField(details.professionName or "", 40)
+	for index, value in ipairs(payloadParts) do
+		payloadParts[index] = tostring(value or "")
+	end
+	return self:SendAddon(table.concat(payloadParts, "|"), "WHISPER", messageTarget, "NORMAL", "O:" .. characterName)
 end
 
 function AF:OnPersonalOrderCountsUpdated()

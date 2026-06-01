@@ -10,6 +10,10 @@ externals:
   Libs/LibDataBroker-1.1: https://github.com/tekkub/libdatabroker-1-1.git
   Libs/LibDBIcon-1.0: https://repos.curseforge.com/wow/libdbicon-1-0/trunk/LibDBIcon-1.0
   Libs/ChatThrottleLib: https://repos.curseforge.com/wow/chatthrottlelib/trunk
+  Libs/LibSerialize:
+    url: https://github.com/rossnichols/LibSerialize.git
+    tag: v1.0.0
+  Libs/LibDeflate: https://github.com/SafeteeWoW/LibDeflate.git
   Libs/LibEditMode: https://github.com/p3lim-wow/LibEditMode.git
 
 ignore:
