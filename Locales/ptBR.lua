@@ -9,6 +9,7 @@ end
 
 L.ADDON_LOADED = "carregado. A disponibilidade de artesão está desativada nesta sessão."
 L.ONLINE_CHECK_FAILED = "Falha ao verificar status online"
+L.ADDON_COMMS_UNAVAILABLE_INSTANCE = "A comunicação do ArtisanFinder não está disponível durante atividades restritas."
 L.FREE_COMMISSION = "Qualquer comissão"
 L.RECOMMENDED_REAGENTS_QUALITY = "Com reagentes recomendados %s"
 L.OPTIONAL_REAGENTS_SLOT_COUNT = "%d espaços opcionais testados."
