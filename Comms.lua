@@ -322,9 +322,11 @@ function AF:BroadcastQuery(itemID, professionID)
 	}, "|")
 
 	local sent = false
+	local sentOnChannel = false
 	local queueName = table.concat({ "Q", itemID, normalizedProfessionID }, ":")
 	if channelID and channelID ~= 0 then
-		sent = self:SendAddon(payload, "CHANNEL", tostring(channelID), "NORMAL", queueName .. ":CHANNEL") or sent
+		sentOnChannel = self:SendAddon(payload, "CHANNEL", tostring(channelID), "NORMAL", queueName .. ":CHANNEL")
+		sent = sentOnChannel or sent
 	end
 	if IsInGuild and IsInGuild() then
 		sent = self:SendAddon(payload, "GUILD", nil, "NORMAL", queueName .. ":GUILD") or sent
@@ -332,8 +334,16 @@ function AF:BroadcastQuery(itemID, professionID)
 	if self.GetOnlineGuildQueryTargets then
 		local recipeID = tonumber(self.currentCustomerRecipeID) or 0
 		local whisperTargets = self:GetOnlineGuildQueryTargets(normalizedProfessionID, recipeID, 30)
+		local skippedWhispers = 0
 		for _, target in ipairs(whisperTargets) do
-			sent = self:SendAddon(payload, "WHISPER", target, "BULK", queueName .. ":GUILD_WHISPER:" .. tostring(target)) or sent
+			if sentOnChannel and self:IsNameOnConnectedRealm(target) then
+				skippedWhispers = skippedWhispers + 1
+			else
+				sent = self:SendAddon(payload, "WHISPER", target, "BULK", queueName .. ":GUILD_WHISPER:" .. tostring(target)) or sent
+			end
+		end
+		if skippedWhispers > 0 and self:IsDevTrafficLogsEnabled() then
+			self:DebugLog("query", string.format("skipped guild whispers reachableOnChannel=%d", skippedWhispers))
 		end
 	end
 	self:DebugLog("query", string.format("sent item=%s profession=%s channel=%s guild=%s result=%s", tostring(itemID), tostring(normalizedProfessionID), tostring(channelID or 0), tostring(IsInGuild and IsInGuild() == true), tostring(sent == true)))
