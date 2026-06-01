@@ -23,7 +23,7 @@ local function GetMinimapDefault()
 	}
 end
 
-local function CreateSliderSetting(name, desc, defaultValue, minValue, maxValue, step, getter, setter, formatter)
+local function CreateSliderSetting(name, desc, defaultValue, minValue, maxValue, step, getter, setter, formatter, editableValue)
 	return {
 		name = name,
 		desc = desc,
@@ -39,6 +39,7 @@ local function CreateSliderSetting(name, desc, defaultValue, minValue, maxValue,
 		maxValue = maxValue,
 		valueStep = step,
 		formatter = formatter,
+		editableValue = editableValue ~= false,
 	}
 end
 
@@ -56,6 +57,38 @@ local function CreateDropdownSetting(name, desc, defaultValue, values, getter, s
 			setter(value)
 		end,
 	}
+end
+
+local function FormatPercent(value)
+	return string.format("%d%%", math.floor((tonumber(value) or 1) * 100 + 0.5))
+end
+
+local function HideReadOnlySliderEditBoxes(dialog)
+	for _, widget in next, dialog.Settings.widgets or {} do
+		if widget.setting and widget.setting.editableValue == false and widget.EditBox then
+			widget.EditBox:Hide()
+		end
+	end
+end
+
+local function PatchReadOnlySliderValues(lib)
+	local dialog = lib.internal and lib.internal.dialog
+	if not dialog or dialog.artisanFinderReadOnlySliderValuesPatched then
+		return
+	end
+	dialog.artisanFinderReadOnlySliderValuesPatched = true
+	local updateSettings = dialog.UpdateSettings
+	dialog.UpdateSettings = function(self, ...)
+		local result = updateSettings(self, ...)
+		HideReadOnlySliderEditBoxes(self)
+		return result
+	end
+	local refreshWidgets = dialog.RefreshWidgets
+	dialog.RefreshWidgets = function(self, ...)
+		local result = refreshWidgets(self, ...)
+		HideReadOnlySliderEditBoxes(self)
+		return result
+	end
 end
 
 function AF:RegisterOrderNotificationEditModeFrame(lib)
@@ -81,9 +114,8 @@ function AF:RegisterOrderNotificationEditModeFrame(lib)
 			function(value)
 				AF:SetOrderNotificationScale(value)
 			end,
-			function(value)
-				return string.format("%d%%", math.floor((tonumber(value) or 1) * 100 + 0.5))
-			end
+			FormatPercent,
+			false
 		),
 		CreateDropdownSetting(
 			self:Text("EDITMODE_TOAST_GROW_DIRECTION"),
@@ -116,6 +148,24 @@ function AF:RegisterStandaloneMinimapEditModeFrame(lib)
 		AF.db.minimap.standaloneY = math.floor((tonumber(y) or 0) + 0.5)
 		AF:PositionStandaloneMinimapButton()
 	end, GetMinimapDefault(), self:Text("EDITMODE_STANDALONE_BUTTON"))
+	lib:AddFrameSettings(button, {
+		CreateSliderSetting(
+			self:Text("EDITMODE_STANDALONE_SCALE"),
+			self:Text("EDITMODE_STANDALONE_SCALE_DESC"),
+			1,
+			0.5,
+			3,
+			0.05,
+			function()
+				return AF:GetStandaloneMinimapScale()
+			end,
+			function(value)
+				AF:SetStandaloneMinimapScale(value)
+			end,
+			FormatPercent,
+			false
+		),
+	})
 end
 
 function AF:InitializeEditMode()
@@ -129,4 +179,5 @@ function AF:InitializeEditMode()
 	self.editModeInitialized = true
 	self:RegisterOrderNotificationEditModeFrame(lib)
 	self:RegisterStandaloneMinimapEditModeFrame(lib)
+	PatchReadOnlySliderValues(lib)
 end

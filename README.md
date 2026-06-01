@@ -79,6 +79,10 @@ ArtisanFinder includes localization support for English, French, German, Spanish
 
 ArtisanFinder was inspired by the convenience of Easycraft.io and the in-game Dofus Artisan list, adapted for World of Warcraft's Crafting Orders and Professions UI.
 
+## Special thanks
+
+I would like to thank a few people who made this project possible by their feedback, their help in testing, as well as their help in designing some of the assets of the project: **my sister** for the beautiful icons, **Foxas**, **Valkhes** and **Dolkian** for their thorough testing and search for bugs, and **Reiisal** for his input on the addon's accessibility, feedback and continuous support during this adventure.
+
 ## Third-Party Libraries
 
 ArtisanFinder embeds several addon libraries under `Libs/`. Their license and notice information is listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

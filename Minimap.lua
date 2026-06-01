@@ -1,8 +1,23 @@
 local _, AF = ...
 
-local ICON = "Interface\\Icons\\inv_12_profession_blacksmithing_repairhammer_purple"
+local MINIMAP_ICON = "Interface\\AddOns\\ArtisanFinder\\Assets\\MinimapIcon.tga"
+local STANDALONE_ICON = "Interface\\AddOns\\ArtisanFinder\\Assets\\Icon.tga"
+local MINIMAP_ICON_SIZE = 18
+local STANDALONE_SCALE_MIN = 0.5
+local STANDALONE_SCALE_MAX = 3
 local ICON_COORDS = { 0, 1, 0, 1 }
 local OUTDATED_BADGE_TEXTURE = "Interface\\DialogFrame\\UI-Dialog-Icon-AlertNew"
+
+local function ClampNumber(value, minValue, maxValue, fallback)
+	value = tonumber(value) or fallback
+	if value < minValue then
+		return minValue
+	end
+	if value > maxValue then
+		return maxValue
+	end
+	return value
+end
 
 local function GetOutdatedBadgeMarkup(size)
 	size = tonumber(size) or 14
@@ -204,7 +219,7 @@ function AF:InitializeMinimap()
 	self.minimapBroker = ldb:NewDataObject("ArtisanFinder", {
 		type = "data source",
 		text = "ArtisanFinder",
-		icon = ICON,
+		icon = MINIMAP_ICON,
 		iconCoords = ICON_COORDS,
 		OnClick = function(owner, button)
 			HandleMinimapClick(owner, button)
@@ -233,14 +248,13 @@ function AF:InitializeStandaloneMinimapButton()
 	if self.standaloneMinimapButton then
 		return
 	end
-	local button = CreateFrame("Button", "ArtisanFinderStandaloneButton", UIParent, "BackdropTemplate")
+	local button = CreateFrame("Button", "ArtisanFinderStandaloneButton", UIParent)
 	button:SetSize(42, 42)
 	button:EnableMouse(true)
 	button:RegisterForClicks("LeftButtonUp", "RightButtonUp", "MiddleButtonUp")
 	button:SetClampedToScreen(true)
-	self:ApplyProfessionPanel(button)
 	button.icon = button:CreateTexture(nil, "ARTWORK")
-	button.icon:SetTexture(ICON)
+	button.icon:SetTexture(STANDALONE_ICON)
 	button.icon:SetSize(28, 28)
 	button.icon:SetPoint("CENTER")
 	button:SetScript("OnClick", function(self, clickButton)
@@ -283,6 +297,16 @@ function AF:PositionStandaloneMinimapButton()
 	button:SetPoint(point, UIParent, point, self.db.minimap.standaloneX or -180, self.db.minimap.standaloneY or -120)
 end
 
+function AF:GetStandaloneMinimapScale()
+	return ClampNumber(self.db and self.db.minimap and self.db.minimap.standaloneScale, STANDALONE_SCALE_MIN, STANDALONE_SCALE_MAX, 1)
+end
+
+function AF:SetStandaloneMinimapScale(scale)
+	self.db.minimap = self.db.minimap or {}
+	self.db.minimap.standaloneScale = ClampNumber(scale, STANDALONE_SCALE_MIN, STANDALONE_SCALE_MAX, 1)
+	self:RefreshStandaloneMinimapButton()
+end
+
 function AF:ResetMinimapButtonPosition()
 	self.db.minimap = self.db.minimap or {}
 	if self.db.minimap.standalone then
@@ -314,7 +338,7 @@ function AF:StyleMinimapButton()
 	self.minimapIcon:ResetButtonBorder("ArtisanFinder")
 	self.minimapIcon:ResetButtonBackground("ArtisanFinder")
 	self.minimapIcon:ResetButtonHighlightTexture("ArtisanFinder")
-	self.minimapIcon:SetButtonIcon("ArtisanFinder", ICON, 18, "CENTER", 0, 0)
+	self.minimapIcon:SetButtonIcon("ArtisanFinder", MINIMAP_ICON, MINIMAP_ICON_SIZE, "CENTER", 0, 0)
 	self:RefreshMinimapBadge()
 end
 
@@ -365,6 +389,7 @@ function AF:RefreshStandaloneMinimapButton()
 		return
 	end
 	local show = self.db.minimap.standalone == true and self.db.minimap.hide ~= true
+	button:SetScale(self:GetStandaloneMinimapScale())
 	if show then
 		self:PositionStandaloneMinimapButton()
 		local mode = self:GetAvailabilityMode()

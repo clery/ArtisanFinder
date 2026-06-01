@@ -165,7 +165,7 @@ function AF:ClearOptionsData()
 	self.db.offlineFallbackResults = 10
 	self.db.offlineFallbackMax = 20
 	self.db.showUncertifiedPeople = true
-	self.db.minimap = { angle = 225, hide = false, standalone = false, standaloneX = -180, standaloneY = -120 }
+	self.db.minimap = { angle = 225, hide = false, standalone = false, standaloneX = -180, standaloneY = -120, standaloneScale = 1 }
 	self.db.debugEnabled = false
 	self.db.devEnabled = false
 	self.db.devFakeRows = false

@@ -641,6 +641,9 @@ function ApplyDBDefaults(db)
 	if db.minimap.standalonePoint == nil then
 		db.minimap.standalonePoint = "CENTER"
 	end
+	if db.minimap.standaloneScale == nil then
+		db.minimap.standaloneScale = 1
+	end
 end
 
 MIGRATIONS[1] = function(db)
