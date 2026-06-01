@@ -167,6 +167,34 @@ local function BuildPayload(parts)
 	return table.concat(parts, "|")
 end
 
+function AF:CleanupResponseThrottle(now)
+	if not self.responseThrottle then
+		return 0
+	end
+	now = tonumber(now) or self:Now()
+	local cleanupInterval = tonumber(self.RESPONSE_THROTTLE_CLEANUP_INTERVAL) or 60
+	if self.responseThrottleCleanedAt and now - self.responseThrottleCleanedAt < cleanupInterval then
+		return 0
+	end
+	self.responseThrottleCleanedAt = now
+
+	local maxAge = tonumber(self.RESPONSE_THROTTLE_MAX_AGE)
+		or math.max(tonumber(self.RESPONSE_THROTTLE) or 0, tonumber(self.DETAIL_REQUEST_THROTTLE) or 0)
+	if maxAge <= 0 then
+		return 0
+	end
+	local cutoff = now - maxAge
+	local removed = 0
+	for key, lastSent in pairs(self.responseThrottle) do
+		lastSent = tonumber(lastSent) or 0
+		if lastSent <= 0 or lastSent <= cutoff then
+			self.responseThrottle[key] = nil
+			removed = removed + 1
+		end
+	end
+	return removed
+end
+
 function AF:GetCommsCompressionLibraries()
 	if self.commsCompressionChecked then
 		return self.libSerialize, self.libDeflate
@@ -491,6 +519,7 @@ function AF:HandleQuery(parts, sender, channel)
 		return
 	end
 
+	self:CleanupResponseThrottle()
 	for _, match in ipairs(matches) do
 		local item = match.item
 		local crafterName = match.characterName
@@ -591,6 +620,7 @@ function AF:HandleReagentDetailRequest(parts, sender)
 
 	local item = self:FindProfileItem(crafterName, itemID, recipeID)
 
+	self:CleanupResponseThrottle()
 	local throttleKey = table.concat({ "D", sender, crafterName or "", itemID, recipeID, queryToken }, ":")
 	self.responseThrottle = self.responseThrottle or {}
 	local lastSent = self.responseThrottle[throttleKey]
