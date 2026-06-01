@@ -7,6 +7,7 @@ if locale == "esMX" then
 	AF.L = L
 end
 
+L.ADDON_COMMS_UNAVAILABLE_INSTANCE = "La comunicación de ArtisanFinder no está disponible durante actividades restringidas."
 L.SELECT_ORDER_ITEM = "Selecciona un objeto de la orden."
 L.YOUR_ALT = "Tu personaje alterno"
 L.PERSONAL_ORDER = "Orden personal"

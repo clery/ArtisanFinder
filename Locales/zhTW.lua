@@ -19,6 +19,7 @@ L.OFFLINE = "離線"
 L.AWAY = "暫離"
 L.ONLINE_CHECK_FAILED = "線上狀態檢查失敗"
 L.MINIMAP_LIBS_MISSING = "小地圖函式庫無法使用。"
+L.ADDON_COMMS_UNAVAILABLE_INSTANCE = "ArtisanFinder 通訊在受限活動期間無法使用。"
 
 L.FREE_COMMISSION = "任何佣金"
 L.NO_PRICE_SET = "未設定價格"

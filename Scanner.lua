@@ -440,7 +440,7 @@ function AF:BuildScanProgressAsync(profession, professionEntry, signature, force
 		if token ~= AF.scanProgressBuildToken then
 			return
 		end
-		if AF:IsInCombatLocked() or not AF:IsOwnProfessionWindowOpen() then
+		if AF:IsProtectedActionRestricted() or not AF:IsOwnProfessionWindowOpen() then
 			AF.scanProgressBuildPending = nil
 			return
 		end
@@ -883,7 +883,7 @@ function AF:ProcessScanQueue()
 		self:PauseActiveProfessionScan(true)
 		return
 	end
-	if self:IsInCombatLocked() then
+	if self:IsProtectedActionRestricted() then
 		self.deferredScanResume = true
 		return
 	end
@@ -897,7 +897,7 @@ function AF:ProcessScanQueue()
 			return
 		end
 		AF.scanProcessing = false
-		if AF:IsInCombatLocked() then
+		if AF:IsProtectedActionRestricted() then
 			AF.deferredScanResume = true
 			return
 		end
@@ -1060,8 +1060,8 @@ function AF:StartBuiltProfessionScan(profession, professionEntry, currentSignatu
 end
 
 function AF:StartOrResumeCurrentProfessionScan(force, silent, mode, forceProbe, reason)
-	if self:IsInCombatLocked() then
-		self:DebugLog("scan", "deferred start: combat")
+	if self:IsProtectedActionRestricted() then
+		self:DebugLog("scan", "deferred start: restricted")
 		self.deferredScanResume = true
 		return 0
 	end
@@ -1204,7 +1204,7 @@ function AF:QueueProfessionDataSourceProbe()
 	if self.db and self.db.disableAutomaticScans == true then
 		return
 	end
-	if self:IsInCombatLocked() or not self:IsOwnProfessionWindowOpen() then
+	if self:IsProtectedActionRestricted() or not self:IsOwnProfessionWindowOpen() then
 		return
 	end
 	local profession = self:GetCurrentProfessionInfo()
@@ -1243,7 +1243,7 @@ function AF:StartProfessionEquipmentWatch()
 		if token ~= AF.professionEquipmentWatchToken then
 			return
 		end
-		if AF:IsInCombatLocked() then
+		if AF:IsProtectedActionRestricted() then
 			C_Timer.After(1.0, Tick)
 			return
 		end
@@ -1282,7 +1282,7 @@ function AF:QueueAutoScanForChange(reason)
 		end
 		return
 	end
-	if self:IsInCombatLocked() then
+	if self:IsProtectedActionRestricted() then
 		self.deferredAutoScanReason = reason or self.deferredAutoScanReason
 		if reason == "PROFESSION_EQUIPMENT_CHANGED" then
 			self.deferredProfessionEquipmentSkillLineID = self.pendingProfessionEquipmentSkillLineID or self.deferredProfessionEquipmentSkillLineID
@@ -1317,15 +1317,15 @@ function AF:QueueAutoScanForChange(reason)
 			return
 		end
 		AF.autoScanQueued = false
-			if AF:IsInCombatLocked() then
-				AF.deferredAutoScanReason = AF.pendingAutoScanReason
-				AF.deferredProfessionEquipmentSkillLineID = AF.pendingProfessionEquipmentSkillLineID
-				return
-			end
-			if not AF:IsOwnProfessionWindowOpen() then
-				AF.pendingAutoScanReason = nil
-				return
-			end
+		if AF:IsProtectedActionRestricted() then
+			AF.deferredAutoScanReason = AF.pendingAutoScanReason
+			AF.deferredProfessionEquipmentSkillLineID = AF.pendingProfessionEquipmentSkillLineID
+			return
+		end
+		if not AF:IsOwnProfessionWindowOpen() then
+			AF.pendingAutoScanReason = nil
+			return
+		end
 		local profession = AF:GetCurrentProfessionInfo()
 		if not profession then
 			return

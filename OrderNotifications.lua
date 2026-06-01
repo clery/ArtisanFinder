@@ -31,7 +31,7 @@ local function GetOrderSoundChannel()
 end
 
 local function CanShowOrderNotification(self)
-	if self:IsInCombatLocked() then
+	if self:IsProtectedActionRestricted() then
 		return false
 	end
 	if self:IsInUnavailableActivity() then

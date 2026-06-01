@@ -18,6 +18,7 @@ L.OFFLINE = "Offline"
 L.AWAY = "Away"
 L.ONLINE_CHECK_FAILED = "Online check failed"
 L.MINIMAP_LIBS_MISSING = "minimap libraries were not available."
+L.ADDON_COMMS_UNAVAILABLE_INSTANCE = "ArtisanFinder communication is unavailable during restricted activities."
 
 L.FREE_COMMISSION = "Any commission"
 L.NO_PRICE_SET = "No price set"

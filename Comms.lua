@@ -96,7 +96,7 @@ function AF:QueueDiscoveryChannelJoin(delay)
 	self.discoveryChannelJoinQueued = true
 	C_Timer.After(delay or 8, function()
 		AF.discoveryChannelJoinQueued = false
-		if AF:IsInCombatLocked() then
+		if AF:IsProtectedActionRestricted() then
 			AF.deferredDiscoveryChannelJoin = true
 			return
 		end
@@ -143,7 +143,7 @@ end
 
 function AF:HideDiscoveryChannelFromChat(delay)
 	C_Timer.After(delay or 0.25, function()
-		if AF:IsInCombatLocked() then
+		if AF:IsProtectedActionRestricted() then
 			return
 		end
 		for i = 1, (NUM_CHAT_WINDOWS or 0) do
@@ -159,7 +159,10 @@ function AF:HideDiscoveryChannelFromChat(delay)
 end
 
 function AF:SendAddon(prefixPayload, chatType, target, priority, queueName)
-	if self:IsInCombatLocked() then
+	if self:IsAddonCommsUnavailable() then
+		if self:IsDevTrafficLogsEnabled() then
+			self:DebugLog("send", string.format("blocked restricted %s %s %s", tostring(chatType or "?"), tostring(target or ""), tostring(prefixPayload or "")))
+		end
 		return false
 	end
 	priority = priority or "NORMAL"
@@ -172,9 +175,6 @@ function AF:SendAddon(prefixPayload, chatType, target, priority, queueName)
 end
 
 function AF:BroadcastQuery(itemID, professionID)
-	if self:IsInCombatLocked() then
-		return false
-	end
 	itemID = tonumber(itemID)
 	if not itemID then
 		return false
@@ -184,6 +184,19 @@ function AF:BroadcastQuery(itemID, professionID)
 	if normalizedProfessionID == 0 then
 		return false
 	end
+	if self:IsAddonCommsUnavailable() then
+		self.currentCustomerQueryToken = nil
+		self.currentCustomerQueryItemID = nil
+		self.currentCustomerQueryProfessionID = nil
+		self.lastQueryAt = nil
+		self.customerQueryBlockedByRestrictionItemID = itemID
+		self.customerQueryBlockedByRestrictionProfessionID = normalizedProfessionID
+		self:NotifyAddonCommsUnavailable()
+		self:DebugLog("query", string.format("blocked restricted item=%s profession=%s", tostring(itemID), tostring(normalizedProfessionID)))
+		return false
+	end
+	self.customerQueryBlockedByRestrictionItemID = nil
+	self.customerQueryBlockedByRestrictionProfessionID = nil
 	self.lastQueryItemID = itemID
 	self.lastQueryProfessionID = normalizedProfessionID
 	self.lastQueryAt = requestTime
@@ -221,6 +234,12 @@ function AF:BroadcastQuery(itemID, professionID)
 	return sent
 end
 
+function AF:IsCustomerQueryBlockedByRestriction(itemID, professionID)
+	return self:IsAddonCommsUnavailable()
+		and tonumber(self.customerQueryBlockedByRestrictionItemID) == tonumber(itemID)
+		and tonumber(self.customerQueryBlockedByRestrictionProfessionID or 0) == tonumber(professionID or self.currentCustomerProfessionID or 0)
+end
+
 function AF:QueueBroadcastQuery(itemID, professionID)
 	itemID = tonumber(itemID)
 	if not itemID then
@@ -234,9 +253,6 @@ function AF:QueueBroadcastQuery(itemID, professionID)
 	self.customerQueryQueued = true
 	C_Timer.After(0.2, function()
 		AF.customerQueryQueued = false
-		if AF:IsInCombatLocked() then
-			return
-		end
 		local pendingItemID = AF.pendingCustomerQueryItemID
 		local pendingProfessionID = AF.pendingCustomerQueryProfessionID
 		AF.pendingCustomerQueryItemID = nil

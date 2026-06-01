@@ -7,6 +7,7 @@ local EVENTS = {
 	"PLAYER_LOGIN",
 	"PLAYER_REGEN_ENABLED",
 	"PLAYER_REGEN_DISABLED",
+	"ADDON_RESTRICTION_STATE_CHANGED",
 	"PLAYER_ENTERING_WORLD",
 	"ZONE_CHANGED",
 	"ZONE_CHANGED_INDOORS",
@@ -100,7 +101,7 @@ function AF:GetAvailabilityMode()
 end
 
 function AF:IsAvailable()
-	return self:GetAvailabilityMode() ~= self.AVAILABILITY_UNAVAILABLE
+	return self:GetAvailabilityMode() ~= self.AVAILABILITY_UNAVAILABLE and not self:IsAddonCommsUnavailable()
 end
 
 function AF:IsCurrentCharacterOnlyAvailable()
@@ -133,6 +134,9 @@ function AF:SetAvailabilityMode(mode, silent)
 	end
 	if not silent and oldMode ~= mode then
 		self:Print(self:Text("AVAILABILITY_CHANGED", self:GetAvailabilityModeText(mode)))
+		if mode ~= self.AVAILABILITY_UNAVAILABLE and self:IsAddonCommsUnavailable() then
+			self:NotifyAddonCommsUnavailable()
+		end
 	end
 end
 
@@ -193,7 +197,7 @@ function AF:RefreshAutoAvailability(silent)
 	if not self.db or not self.db.autoAvailability then
 		return
 	end
-	if self:IsInCombatLocked() then
+	if self:IsProtectedActionRestricted() then
 		self.deferredAutoAvailabilityRefresh = true
 		return
 	end
@@ -210,14 +214,14 @@ function AF:QueueAutoAvailabilityRefresh()
 	if not self.db or not self.db.autoAvailability or self.autoAvailabilityQueued then
 		return
 	end
-	if self:IsInCombatLocked() then
+	if self:IsProtectedActionRestricted() then
 		self.deferredAutoAvailabilityRefresh = true
 		return
 	end
 	self.autoAvailabilityQueued = true
 	C_Timer.After(0.5, function()
 		AF.autoAvailabilityQueued = false
-		if AF:IsInCombatLocked() then
+		if AF:IsProtectedActionRestricted() then
 			AF.deferredAutoAvailabilityRefresh = true
 			return
 		end
@@ -253,6 +257,33 @@ function AF:TryAttachProfessionUIs()
 	end
 end
 
+local function FlushDeferredRestrictedWork()
+	if AF.HideDiscoveryChannelFromChat then
+		AF:HideDiscoveryChannelFromChat()
+	end
+	if AF.deferredDiscoveryChannelJoin and AF.QueueDiscoveryChannelJoin then
+		AF.deferredDiscoveryChannelJoin = nil
+		AF:QueueDiscoveryChannelJoin(1)
+	end
+	if AF.deferredAutoAvailabilityRefresh then
+		AF.deferredAutoAvailabilityRefresh = nil
+		AF:QueueAutoAvailabilityRefresh()
+	end
+	if AF.deferredAutoScanReason and AF.QueueAutoScanForChange then
+		local reason = AF.deferredAutoScanReason
+		AF.deferredAutoScanReason = nil
+		if reason == "PROFESSION_EQUIPMENT_CHANGED" then
+			AF.pendingProfessionEquipmentSkillLineID = AF.deferredProfessionEquipmentSkillLineID
+			AF.deferredProfessionEquipmentSkillLineID = nil
+		end
+		AF:QueueAutoScanForChange(reason)
+	end
+	if AF.deferredScanResume and AF.ResumeCurrentProfessionScanIfNeeded then
+		AF.deferredScanResume = nil
+		AF:ResumeCurrentProfessionScanIfNeeded()
+	end
+end
+
 AF.frame:SetScript("OnEvent", function(_, event, ...)
 	if event == "ADDON_LOADED" then
 		AF:OnAddonLoaded(...)
@@ -268,32 +299,20 @@ AF.frame:SetScript("OnEvent", function(_, event, ...)
 			AF.activeScan = nil
 		end
 	elseif event == "PLAYER_REGEN_ENABLED" then
-		if AF.HideDiscoveryChannelFromChat then
-			AF:HideDiscoveryChannelFromChat()
+		FlushDeferredRestrictedWork()
+	elseif event == "ADDON_RESTRICTION_STATE_CHANGED" then
+		if AF.RefreshCustomerResults then
+			AF:RefreshCustomerResults()
 		end
-		if AF.deferredDiscoveryChannelJoin and AF.QueueDiscoveryChannelJoin then
-			AF.deferredDiscoveryChannelJoin = nil
-			AF:QueueDiscoveryChannelJoin(1)
+		if AF.RefreshMinimap then
+			AF:RefreshMinimap()
 		end
-		if AF.deferredAutoAvailabilityRefresh then
-			AF.deferredAutoAvailabilityRefresh = nil
-			AF:QueueAutoAvailabilityRefresh()
+		if AF:IsProtectedActionRestricted() then
+			return
 		end
-		if AF.deferredAutoScanReason and AF.QueueAutoScanForChange then
-			local reason = AF.deferredAutoScanReason
-			AF.deferredAutoScanReason = nil
-			if reason == "PROFESSION_EQUIPMENT_CHANGED" then
-				AF.pendingProfessionEquipmentSkillLineID = AF.deferredProfessionEquipmentSkillLineID
-				AF.deferredProfessionEquipmentSkillLineID = nil
-			end
-			AF:QueueAutoScanForChange(reason)
-		end
-		if AF.deferredScanResume and AF.ResumeCurrentProfessionScanIfNeeded then
-			AF.deferredScanResume = nil
-			AF:ResumeCurrentProfessionScanIfNeeded()
-		end
+		FlushDeferredRestrictedWork()
 	elseif AUTO_AVAILABILITY_EVENTS[event] then
-		if AF:IsInCombatLocked() then
+		if AF:IsProtectedActionRestricted() then
 			AF.deferredAutoAvailabilityRefresh = true
 			return
 		end
@@ -306,14 +325,14 @@ AF.frame:SetScript("OnEvent", function(_, event, ...)
 		end
 		AF:QueueAutoAvailabilityRefresh()
 	elseif event == "CHAT_MSG_ADDON" then
-		if AF:IsInCombatLocked() then
+		if AF:IsProtectedActionRestricted() then
 			return
 		end
 		if AF.OnAddonMessage then
 			AF:OnAddonMessage(...)
 		end
 	elseif event == "CHAT_MSG_CHANNEL" then
-		if AF:IsInCombatLocked() then
+		if AF:IsProtectedActionRestricted() then
 			return
 		end
 		if AF.OnTradeChatMessage then
@@ -337,11 +356,11 @@ AF.frame:SetScript("OnEvent", function(_, event, ...)
 			AF:HandleGuildRecipeKnownByMembers(...)
 		end
 	elseif event == "CRAFTINGORDERS_SHOW_CUSTOMER" then
-		if AF:IsInCombatLocked() then
+		if AF:IsProtectedActionRestricted() then
 			return
 		end
 		C_Timer.After(0, function()
-			if AF:IsInCombatLocked() then
+			if AF:IsProtectedActionRestricted() then
 				return
 			end
 			AF:TryAttachProfessionUIs()
@@ -360,7 +379,7 @@ AF.frame:SetScript("OnEvent", function(_, event, ...)
 			AF:OnPersonalOrderCountsUpdated()
 		end
 	elseif event == "TRADE_SKILL_SHOW" or event == "TRADE_SKILL_DATA_SOURCE_CHANGED" then
-		if AF:IsInCombatLocked() then
+		if AF:IsProtectedActionRestricted() then
 			return
 		end
 		local closeProfessionBook = event == "TRADE_SKILL_SHOW"
@@ -376,7 +395,7 @@ AF.frame:SetScript("OnEvent", function(_, event, ...)
 			end
 		end
 		C_Timer.After(0, function()
-			if AF:IsInCombatLocked() then
+			if AF:IsProtectedActionRestricted() then
 				return
 			end
 			AF:TryAttachProfessionUIs()
@@ -417,7 +436,7 @@ AF.frame:SetScript("OnEvent", function(_, event, ...)
 			AF:ReleaseScanRuntimeMemory("close")
 		end
 	elseif SCAN_CHANGE_EVENTS[event] then
-		if AF:IsInCombatLocked() then
+		if AF:IsProtectedActionRestricted() then
 			AF.deferredAutoScanReason = event
 			if event == "PROFESSION_EQUIPMENT_CHANGED" then
 				AF.deferredProfessionEquipmentSkillLineID = ...

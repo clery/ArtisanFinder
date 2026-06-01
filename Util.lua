@@ -51,7 +51,7 @@ end
 
 function AF:IsInUnavailableActivity()
 	local disabled = self.db and self.db.autoAvailabilityDisable or {}
-	if C_PartyInfo.IsDelveInProgress() then
+	if C_PartyInfo and C_PartyInfo.IsDelveInProgress and C_PartyInfo.IsDelveInProgress() then
 		return disabled.delve ~= false
 	end
 	if not IsInInstance then
@@ -209,8 +209,101 @@ function AF:Now()
 	return time()
 end
 
-function AF:IsInCombatLocked()
+local ADDON_RESTRICTION_TYPE_KEYS = {
+	"Combat",
+	"Encounter",
+	"ChallengeMode",
+	"PvPMatch",
+	"Map",
+	"Chat",
+}
+
+local PROTECTED_ACTION_RESTRICTION_TYPE_KEYS = {
+	"Combat",
+	"Encounter",
+	"ChallengeMode",
+	"PvPMatch",
+	"Map",
+}
+
+local function RestrictedCall(fn, ...)
+	if type(fn) ~= "function" then
+		return false
+	end
+	local ok, restricted = pcall(fn, ...)
+	return ok and restricted == true
+end
+
+local function HasRestrictionType(restrictedActions, restrictionTypes, key)
+	local restrictionType = restrictionTypes and restrictionTypes[key]
+	if restrictionType == nil then
+		return false
+	end
+	local restrictionStates = Enum and Enum.AddOnRestrictionState
+	if restrictionStates and type(restrictedActions.GetAddOnRestrictionState) == "function" then
+		local ok, state = pcall(restrictedActions.GetAddOnRestrictionState, restrictionType)
+		return ok and (state == restrictionStates.Activating or state == restrictionStates.Active)
+	end
+	return RestrictedCall(restrictedActions.IsAddOnRestrictionActive, restrictionType)
+end
+
+function AF:IsRestricted(restrictionTypeKeys)
+	local restrictedActions = C_RestrictedActions
+	if restrictedActions then
+		if restrictionTypeKeys == nil then
+			if RestrictedCall(restrictedActions.IsRestricted) then
+				return true
+			end
+			if RestrictedCall(restrictedActions.IsInRestrictedInstance) then
+				return true
+			end
+		end
+		if restrictionTypeKeys == "Combat" and RestrictedCall(restrictedActions.InCombatLockdown) then
+			return true
+		end
+
+		local restrictionTypes = Enum and Enum.AddOnRestrictionType
+		if restrictionTypes and type(restrictedActions.IsAddOnRestrictionActive) == "function" then
+			if type(restrictionTypeKeys) == "string" then
+				return HasRestrictionType(restrictedActions, restrictionTypes, restrictionTypeKeys)
+			end
+			for _, key in ipairs(restrictionTypeKeys or ADDON_RESTRICTION_TYPE_KEYS) do
+				if HasRestrictionType(restrictedActions, restrictionTypes, key) then
+					return true
+				end
+			end
+		end
+	end
+
+	if (restrictionTypeKeys == nil or restrictionTypeKeys == "Chat")
+		and C_ChatInfo
+		and RestrictedCall(C_ChatInfo.AreOutgoingAddonChatMessagesRestricted)
+	then
+		return true
+	end
+
 	return InCombatLockdown and InCombatLockdown() == true
+end
+
+function AF:IsInCombatLocked()
+	return self:IsRestricted("Combat")
+end
+
+function AF:IsProtectedActionRestricted()
+	return self:IsRestricted(PROTECTED_ACTION_RESTRICTION_TYPE_KEYS)
+end
+
+function AF:IsAddonCommsUnavailable()
+	return self:IsRestricted("Chat")
+end
+
+function AF:NotifyAddonCommsUnavailable()
+	local now = self:Now()
+	if self.lastAddonCommsUnavailablePrintAt and now - self.lastAddonCommsUnavailablePrintAt < 10 then
+		return
+	end
+	self.lastAddonCommsUnavailablePrintAt = now
+	self:Print(self:Text("ADDON_COMMS_UNAVAILABLE_INSTANCE"))
 end
 
 

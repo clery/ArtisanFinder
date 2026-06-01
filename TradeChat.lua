@@ -209,7 +209,7 @@ function AF:InjectDebugTradeLeads()
 end
 
 function AF:OnTradeChatMessage(message, sender, _, channelName, _, _, _, _, channelBaseName)
-	if self:IsInCombatLocked() then
+	if self:IsProtectedActionRestricted() then
 		return
 	end
 	if self:IsInUnavailableActivity() then

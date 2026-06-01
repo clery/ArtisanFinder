@@ -1506,6 +1506,8 @@ function AF:RefreshCustomerResults(statusOverride)
 		end
 		if self:IsDevFakeRowsEnabled() and not self.db.artisanProfile.items[tostring(itemID)] then
 			self:SetCustomerStatusItem(itemID, itemName, "DEBUG_NOT_SCANNED")
+		elseif self.IsCustomerQueryBlockedByRestriction and self:IsCustomerQueryBlockedByRestriction(itemID, self.currentCustomerProfessionID) then
+			self:SetCustomerStatusText(self:Text("ADDON_COMMS_UNAVAILABLE_INSTANCE"))
 		elseif filterText ~= "" and hasAvailableUnfiltered then
 			self:SetCustomerStatusItem(itemID, itemName, "NO_FILTER_MATCH")
 		elseif self.pendingCustomerQueryItemID == itemID or (self.lastQueryAt and self:Now() - self.lastQueryAt < self.LIVE_QUERY_TIMEOUT) then
