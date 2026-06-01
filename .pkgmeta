@@ -1,4 +1,5 @@
 package-as: ArtisanFinder
+enable-nolib-creation: no
 manual-changelog:
   filename: CHANGELOG.md
   markup-type: markdown
@@ -6,7 +7,7 @@ manual-changelog:
 externals:
   Libs/LibStub: https://repos.curseforge.com/wow/libstub/trunk
   Libs/CallbackHandler-1.0: https://repos.curseforge.com/wow/callbackhandler/trunk/CallbackHandler-1.0
-  Libs/LibDataBroker-1.1: https://repos.curseforge.com/wow/libdatabroker-1-1
+  Libs/LibDataBroker-1.1: https://github.com/tekkub/libdatabroker-1-1.git
   Libs/LibDBIcon-1.0: https://repos.curseforge.com/wow/libdbicon-1-0/trunk/LibDBIcon-1.0
   Libs/ChatThrottleLib: https://repos.curseforge.com/wow/chatthrottlelib/trunk
   Libs/LibEditMode: https://github.com/p3lim-wow/LibEditMode.git

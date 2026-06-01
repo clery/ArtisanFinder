@@ -1,7 +1,7 @@
 local _, AF = ...
 
 local MINIMAP_ICON = "Interface\\AddOns\\ArtisanFinder\\Assets\\MinimapIcon.tga"
-local STANDALONE_ICON = "Interface\\AddOns\\ArtisanFinder\\Assets\\Icon.tga"
+local STANDALONE_ICON = "Interface\\AddOns\\ArtisanFinder\\Assets\\MinimapStandaloneIcon.tga"
 local MINIMAP_ICON_SIZE = 18
 local STANDALONE_SCALE_MIN = 0.5
 local STANDALONE_SCALE_MAX = 3

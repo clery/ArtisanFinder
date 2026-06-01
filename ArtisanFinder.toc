@@ -9,7 +9,7 @@
 ## Notes-ruRU: Находите доступных ремесленников через заказы на изготовление и управляйте доступностью через профессии.
 ## Notes-zhCN: 从制造订单中查找可用工匠，并在专业界面管理工匠可用状态。
 ## Notes-zhTW: 從製造訂單中尋找可用工匠，並在專業技能介面管理工匠可用狀態。
-## IconTexture: Interface\AddOns\ArtisanFinder\Assets\AddonIcon.png
+## IconTexture: Interface\AddOns\ArtisanFinder\Assets\Icon.png
 ## Author: clery
 ## Version: @project-version@
 ## Category: Professions
