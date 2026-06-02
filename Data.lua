@@ -551,6 +551,12 @@ function ApplyDBDefaults(db)
 	if db.autoAvailability == nil then
 		db.autoAvailability = false
 	end
+	if db.rememberManualAvailability == nil then
+		db.rememberManualAvailability = false
+	end
+	if db.manualAvailabilityMode ~= AF.AVAILABILITY_CURRENT and db.manualAvailabilityMode ~= AF.AVAILABILITY_ACCOUNT then
+		db.manualAvailabilityMode = AF.AVAILABILITY_UNAVAILABLE
+	end
 	if db.lastAvailabilityMode == nil then
 		db.lastAvailabilityMode = AF.AVAILABILITY_ACCOUNT
 	end

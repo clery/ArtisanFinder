@@ -8,6 +8,7 @@ if locale == "ptBR" then
 end
 
 L.ADDON_LOADED = "carregado. A disponibilidade de artesão está desativada nesta sessão."
+L.ADDON_LOADED_AVAILABILITY_RESTORED = "carregado. Disponibilidade de artesão restaurada: %s."
 L.ONLINE_CHECK_FAILED = "Falha ao verificar status online"
 L.ADDON_COMMS_UNAVAILABLE_INSTANCE = "A comunicação do ArtisanFinder não está disponível durante atividades restritas."
 L.FREE_COMMISSION = "Qualquer comissão"
@@ -125,6 +126,8 @@ L.OPTIONS_CLEANUP_FREQUENCY_DESC = "Remove artesãos em cache que não são favo
 L.OPTIONS_OFFLINE_FALLBACK_RESULTS_DESC = "Mostra artesãos offline em cache quando a lista atual tiver menos linhas do que este valor."
 L.OPTIONS_OFFLINE_FALLBACK_MAX_DESC = "Limita quantos artesãos offline em cache podem ser adicionados aos resultados de cliente."
 L.OPTIONS_AUTO_AVAILABILITY_DESC = "Marca você automaticamente como disponível em zonas com chat de comércio e indisponível em instâncias."
+L.OPTIONS_REMEMBER_MANUAL_AVAILABILITY = "Lembrar disponibilidade manual"
+L.OPTIONS_REMEMBER_MANUAL_AVAILABILITY_DESC = "Quando a disponibilidade automática estiver desligada, mantém sua última disponibilidade manual após recarregar ou reconectar."
 L.OPTIONS_AUTO_DISABLE_PARTY = "Autoindisponível em masmorras"
 L.OPTIONS_AUTO_DISABLE_PARTY_DESC = "A disponibilidade automática é desligada em instâncias de grupo."
 L.OPTIONS_AUTO_DISABLE_RAID = "Autoindisponível em raides"

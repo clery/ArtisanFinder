@@ -7,6 +7,7 @@ if locale == "zhCN" then
 	AF.L = L
 end
 L.ADDON_LOADED = "已加载。本次会话的工匠可用状态为关闭。"
+L.ADDON_LOADED_AVAILABILITY_RESTORED = "已加载。工匠可用状态已恢复：%s。"
 L.AVAILABILITY_CHANGED = "工匠可用状态%s。"
 L.ENABLED = "已开启"
 L.DISABLED = "已关闭"
@@ -166,6 +167,8 @@ L.OPTIONS_OFFLINE_FALLBACK_MAX = "最大离线行数"
 L.OPTIONS_OFFLINE_FALLBACK_MAX_DESC = "限制可加入客户结果的缓存离线工匠数量。"
 L.OPTIONS_AUTO_AVAILABILITY = "自动可用"
 L.OPTIONS_AUTO_AVAILABILITY_DESC = "在可使用交易频道的区域自动开启可用状态，进入副本时自动关闭。"
+L.OPTIONS_REMEMBER_MANUAL_AVAILABILITY = "记住手动可用状态"
+L.OPTIONS_REMEMBER_MANUAL_AVAILABILITY_DESC = "关闭自动可用时，重载或重新登录后保留上次手动设置的可用状态。"
 L.OPTIONS_HIDE_MINIMAP = "隐藏小地图按钮"
 L.OPTIONS_HIDE_MINIMAP_DESC = "隐藏 ArtisanFinder 小地图按钮。你可以在此选项面板中重新显示它。"
 L.OPTIONS_CLEANUP_DISABLED = "禁用"

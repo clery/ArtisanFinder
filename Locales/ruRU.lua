@@ -6,6 +6,7 @@ if GetLocale() == "ruRU" then
 	AF.L = L
 end
 L.ADDON_LOADED = "загружен. Доступность ремесленника отключена для этой сессии."
+L.ADDON_LOADED_AVAILABILITY_RESTORED = "загружен. Доступность ремесленника восстановлена: %s."
 L.AVAILABILITY_CHANGED = "доступность ремесленника: %s."
 L.ENABLED = "включена"
 L.DISABLED = "отключена"
@@ -165,6 +166,8 @@ L.OPTIONS_OFFLINE_FALLBACK_MAX = "Максимум строк не в сети"
 L.OPTIONS_OFFLINE_FALLBACK_MAX_DESC = "Ограничивает число ремесленников не в сети из кэша в результатах клиента."
 L.OPTIONS_AUTO_AVAILABILITY = "Автодоступность"
 L.OPTIONS_AUTO_AVAILABILITY_DESC = "Автоматически отмечает вас доступным в зонах с торговым чатом и недоступным в подземельях."
+L.OPTIONS_REMEMBER_MANUAL_AVAILABILITY = "Запоминать ручную доступность"
+L.OPTIONS_REMEMBER_MANUAL_AVAILABILITY_DESC = "Когда автодоступность выключена, сохраняет последнюю ручную доступность после перезагрузки интерфейса или повторного входа."
 L.OPTIONS_HIDE_MINIMAP = "Скрыть кнопку миникарты"
 L.OPTIONS_HIDE_MINIMAP_DESC = "Скрывает кнопку ArtisanFinder на миникарте. Ее можно снова показать в этой панели настроек."
 L.OPTIONS_CLEANUP_DISABLED = "Отключено"

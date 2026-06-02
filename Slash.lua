@@ -158,6 +158,8 @@ function AF:ClearOptionsData()
 	self.db.cacheCleanupDays = 7
 	self.db.disableAutomaticScans = false
 	self.db.autoAvailability = false
+	self.db.rememberManualAvailability = false
+	self.db.manualAvailabilityMode = self.AVAILABILITY_UNAVAILABLE
 	self.db.autoAvailabilityDisable = { party = true, raid = true, pvp = true, arena = true, delve = true }
 	self.db.tradeLeadMinutes = 15
 	self.db.freezeTradeLeadRows = false

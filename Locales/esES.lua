@@ -7,6 +7,7 @@ if locale == "esES" then
 	AF.L = L
 end
 L.ADDON_LOADED = "cargado. La disponibilidad del artesano está desactivada para esta sesión."
+L.ADDON_LOADED_AVAILABILITY_RESTORED = "cargado. Disponibilidad del artesano restaurada: %s."
 L.AVAILABILITY_CHANGED = "disponibilidad del artesano %s."
 L.ENABLED = "activada"
 L.DISABLED = "desactivada"
@@ -166,6 +167,8 @@ L.OPTIONS_OFFLINE_FALLBACK_MAX = "Máximo de filas desconectadas"
 L.OPTIONS_OFFLINE_FALLBACK_MAX_DESC = "Limita cuántos artesanos desconectados en caché se añaden a los resultados de cliente."
 L.OPTIONS_AUTO_AVAILABILITY = "Disponibilidad automática"
 L.OPTIONS_AUTO_AVAILABILITY_DESC = "Te marca automáticamente como disponible en zonas con chat de comercio y como no disponible en instancias."
+L.OPTIONS_REMEMBER_MANUAL_AVAILABILITY = "Recordar disponibilidad manual"
+L.OPTIONS_REMEMBER_MANUAL_AVAILABILITY_DESC = "Cuando la disponibilidad automática está desactivada, conserva tu última disponibilidad manual tras recargar o volver a conectar."
 L.OPTIONS_HIDE_MINIMAP = "Ocultar botón del minimapa"
 L.OPTIONS_HIDE_MINIMAP_DESC = "Oculta el botón de ArtisanFinder en el minimapa. Puedes volver a mostrarlo desde este panel de opciones."
 L.OPTIONS_CLEANUP_DISABLED = "Desactivado"

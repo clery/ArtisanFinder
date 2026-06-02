@@ -6,6 +6,7 @@ if GetLocale() == "deDE" then
 	AF.L = L
 end
 L.ADDON_LOADED = "geladen. Handwerker-Verfügbarkeit ist für diese Sitzung aus."
+L.ADDON_LOADED_AVAILABILITY_RESTORED = "geladen. Handwerker-Verfügbarkeit wiederhergestellt: %s."
 L.AVAILABILITY_CHANGED = "Handwerker-Verfügbarkeit %s."
 L.ENABLED = "aktiviert"
 L.DISABLED = "deaktiviert"
@@ -165,6 +166,8 @@ L.OPTIONS_OFFLINE_FALLBACK_MAX = "Maximale Offline-Zeilen"
 L.OPTIONS_OFFLINE_FALLBACK_MAX_DESC = "Begrenzt, wie viele zwischengespeicherte Offline-Handwerker zu den Kundenergebnissen hinzugefügt werden."
 L.OPTIONS_AUTO_AVAILABILITY = "Automatische Verfügbarkeit"
 L.OPTIONS_AUTO_AVAILABILITY_DESC = "Markiert dich in Handelschat-Bereichen automatisch als verfügbar und in Instanzen als nicht verfügbar."
+L.OPTIONS_REMEMBER_MANUAL_AVAILABILITY = "Manuelle Verfügbarkeit merken"
+L.OPTIONS_REMEMBER_MANUAL_AVAILABILITY_DESC = "Wenn automatische Verfügbarkeit aus ist, bleibt deine letzte manuelle Verfügbarkeit nach Neuladen und erneutem Einloggen erhalten."
 L.OPTIONS_HIDE_MINIMAP = "Minimap-Schaltfläche ausblenden"
 L.OPTIONS_HIDE_MINIMAP_DESC = "Blendet die ArtisanFinder-Minimap-Schaltfläche aus. Du kannst sie in diesem Optionsfenster wieder anzeigen."
 L.OPTIONS_CLEANUP_DISABLED = "Deaktiviert"

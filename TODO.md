@@ -1,3 +1,5 @@
+# TODO
+
 [] Think of a way to advertise a multi-character "shop"
     [] Customize shop button
     [] potentially a more complete description of your specializations
@@ -14,5 +16,3 @@
     [] When clicking a row, prefill the Crafting order like the current "Personal Order" and "Guild Order" buttons do, and add information to the Crafting Order panel with suggested reagent and optional reagent for best results (with or without each optional reagent)
 
 [] Find way to add rows to HUD Edit Mode
-
-[] Add option to remember last availability mode on /reload (not reset it to false everytime)

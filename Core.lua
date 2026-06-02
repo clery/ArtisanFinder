@@ -76,7 +76,11 @@ function AF:OnPlayerLogin()
 	self:EnsureDB()
 	self.playerName = self:GetPlayerFullName()
 	self:SelectActiveArtisanProfile(self.playerName)
-	self:SetAvailabilityMode(self.AVAILABILITY_UNAVAILABLE, true)
+	local initialAvailabilityMode = self.AVAILABILITY_UNAVAILABLE
+	if self.db.rememberManualAvailability == true and self.db.autoAvailability ~= true then
+		initialAvailabilityMode = self.db.manualAvailabilityMode or self.AVAILABILITY_UNAVAILABLE
+	end
+	self:SetAvailabilityMode(initialAvailabilityMode, true)
 
 	self:InitializeComms()
 	self:InitializeWhoStatus()
@@ -92,7 +96,11 @@ function AF:OnPlayerLogin()
 	self:InitializeTutorial()
 	self:InitializeEditMode()
 
-	self:Print(self:Text("ADDON_LOADED"))
+	if self:GetAvailabilityMode() ~= self.AVAILABILITY_UNAVAILABLE then
+		self:Print(self:Text("ADDON_LOADED_AVAILABILITY_RESTORED", self:GetAvailabilityModeText()))
+	else
+		self:Print(self:Text("ADDON_LOADED"))
+	end
 	C_Timer.After(3, function()
 		AF:PrintDeprecatedScanWarning()
 	end)
@@ -118,8 +126,13 @@ function AF:SetAvailabilityMode(mode, silent)
 	local oldMode = self:GetAvailabilityMode()
 	self.availabilityMode = mode
 	self.available = mode ~= self.AVAILABILITY_UNAVAILABLE
-	if mode ~= self.AVAILABILITY_UNAVAILABLE and self.db then
-		self.db.lastAvailabilityMode = mode
+	if self.db then
+		if mode ~= self.AVAILABILITY_UNAVAILABLE then
+			self.db.lastAvailabilityMode = mode
+		end
+		if self.db.autoAvailability ~= true then
+			self.db.manualAvailabilityMode = mode
+		end
 	end
 	if self.RefreshCrafterUIScanSafe then
 		self:RefreshCrafterUIScanSafe()

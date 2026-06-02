@@ -6,6 +6,7 @@ if GetLocale() == "frFR" then
 	AF.L = L
 end
 L.ADDON_LOADED = "chargé. La disponibilité de l'artisan est désactivée pour cette session."
+L.ADDON_LOADED_AVAILABILITY_RESTORED = "chargé. Disponibilité de l'artisan restaurée : %s."
 L.AVAILABILITY_CHANGED = "disponibilité de l'artisan %s."
 L.ENABLED = "activée"
 L.DISABLED = "désactivée"
@@ -166,6 +167,8 @@ L.OPTIONS_OFFLINE_FALLBACK_MAX = "Maximum de lignes hors ligne"
 L.OPTIONS_OFFLINE_FALLBACK_MAX_DESC = "Limite le nombre d'artisans hors ligne en cache ajoutés aux résultats client."
 L.OPTIONS_AUTO_AVAILABILITY = "Disponibilité automatique"
 L.OPTIONS_AUTO_AVAILABILITY_DESC = "Vous marque automatiquement disponible dans les zones avec canal Commerce, et indisponible en instance."
+L.OPTIONS_REMEMBER_MANUAL_AVAILABILITY = "Mémoriser la disponibilité manuelle"
+L.OPTIONS_REMEMBER_MANUAL_AVAILABILITY_DESC = "Quand la disponibilité automatique est désactivée, conserve votre dernière disponibilité manuelle après rechargement ou reconnexion."
 L.OPTIONS_HIDE_MINIMAP = "Masquer le bouton de minicarte"
 L.OPTIONS_HIDE_MINIMAP_DESC = "Masque le bouton de minicarte ArtisanFinder. Vous pouvez le réafficher depuis ce panneau d'options."
 L.OPTIONS_CLEANUP_DISABLED = "Désactivé"

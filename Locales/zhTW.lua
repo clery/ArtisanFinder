@@ -7,6 +7,7 @@ if GetLocale() == "zhTW" then
 end
 
 L.ADDON_LOADED = "已載入。本次連線階段的工匠可用狀態已關閉。"
+L.ADDON_LOADED_AVAILABILITY_RESTORED = "已載入。工匠可用狀態已恢復：%s。"
 L.AVAILABILITY_CHANGED = "工匠可用狀態%s。"
 L.ENABLED = "已啟用"
 L.DISABLED = "已停用"
@@ -245,6 +246,8 @@ L.OPTIONS_OFFLINE_FALLBACK_MAX = "最大離線列數"
 L.OPTIONS_OFFLINE_FALLBACK_MAX_DESC = "限制可加入客戶結果的快取離線工匠數量。"
 L.OPTIONS_AUTO_AVAILABILITY = "自動可用"
 L.OPTIONS_AUTO_AVAILABILITY_DESC = "在可使用交易頻道的區域自動開啟可用狀態，進入副本時自動關閉。"
+L.OPTIONS_REMEMBER_MANUAL_AVAILABILITY = "記住手動可用狀態"
+L.OPTIONS_REMEMBER_MANUAL_AVAILABILITY_DESC = "關閉自動可用時，重載或重新登入後保留上次手動設定的可用狀態。"
 L.OPTIONS_AUTO_DISABLE_PARTY = "地城中自動不可用"
 L.OPTIONS_AUTO_DISABLE_PARTY_DESC = "在隊伍副本中關閉自動可用狀態。"
 L.OPTIONS_AUTO_DISABLE_RAID = "團隊副本中自動不可用"

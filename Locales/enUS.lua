@@ -6,6 +6,7 @@ AF.Locales.enUS = L
 AF.L = L
 
 L.ADDON_LOADED = "loaded. Crafter availability is off for this session."
+L.ADDON_LOADED_AVAILABILITY_RESTORED = "loaded. Crafter availability restored: %s."
 L.AVAILABILITY_CHANGED = "crafter availability %s."
 L.ENABLED = "enabled"
 L.DISABLED = "disabled"
@@ -244,6 +245,8 @@ L.OPTIONS_OFFLINE_FALLBACK_MAX = "Maximum offline rows"
 L.OPTIONS_OFFLINE_FALLBACK_MAX_DESC = "Limit how many cached offline artisans can be added to the customer results."
 L.OPTIONS_AUTO_AVAILABILITY = "Automatic availability"
 L.OPTIONS_AUTO_AVAILABILITY_DESC = "Automatically mark yourself available in trade-chat areas and unavailable in instances."
+L.OPTIONS_REMEMBER_MANUAL_AVAILABILITY = "Remember manual availability"
+L.OPTIONS_REMEMBER_MANUAL_AVAILABILITY_DESC = "When automatic availability is off, keep your last manual availability after reloads and relogs."
 L.OPTIONS_AUTO_DISABLE_PARTY = "Auto-unavailable in dungeons"
 L.OPTIONS_AUTO_DISABLE_PARTY_DESC = "Automatic availability turns off in party instances."
 L.OPTIONS_AUTO_DISABLE_RAID = "Auto-unavailable in raids"

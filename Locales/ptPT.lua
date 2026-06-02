@@ -7,6 +7,7 @@ if GetLocale() == "ptPT" then
 end
 
 L.ADDON_LOADED = "carregado. A disponibilidade de artesão está desativada nesta sessão."
+L.ADDON_LOADED_AVAILABILITY_RESTORED = "carregado. Disponibilidade de artesão restaurada: %s."
 L.AVAILABILITY_CHANGED = "disponibilidade de artesão %s."
 L.ENABLED = "ativada"
 L.DISABLED = "desativada"
@@ -245,6 +246,8 @@ L.OPTIONS_OFFLINE_FALLBACK_MAX = "Máximo de linhas offline"
 L.OPTIONS_OFFLINE_FALLBACK_MAX_DESC = "Limita quantos artesãos offline em cache podem ser adicionados aos resultados de cliente."
 L.OPTIONS_AUTO_AVAILABILITY = "Disponibilidade automática"
 L.OPTIONS_AUTO_AVAILABILITY_DESC = "Marca-te automaticamente como disponível em zonas com chat de comércio e indisponível em instâncias."
+L.OPTIONS_REMEMBER_MANUAL_AVAILABILITY = "Lembrar disponibilidade manual"
+L.OPTIONS_REMEMBER_MANUAL_AVAILABILITY_DESC = "Quando a disponibilidade automática estiver desligada, mantém a tua última disponibilidade manual após recarregar ou voltar a entrar."
 L.OPTIONS_AUTO_DISABLE_PARTY = "Auto-indisponível em masmorras"
 L.OPTIONS_AUTO_DISABLE_PARTY_DESC = "A disponibilidade automática desliga-se em instâncias de grupo."
 L.OPTIONS_AUTO_DISABLE_RAID = "Auto-indisponível em raides"

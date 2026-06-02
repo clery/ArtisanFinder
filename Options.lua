@@ -218,6 +218,23 @@ function AF:InitializeOptions()
 	)
 	Settings.CreateCheckbox(category, autoAvailability, self:Text("OPTIONS_AUTO_AVAILABILITY_DESC"))
 
+	local rememberManualAvailability = RegisterProxySetting(
+		"ArtisanFinder_RememberManualAvailability",
+		Settings.VarType.Boolean,
+		"OPTIONS_REMEMBER_MANUAL_AVAILABILITY",
+		false,
+		function()
+			return AF.db.rememberManualAvailability == true
+		end,
+		function(value)
+			AF.db.rememberManualAvailability = value == true
+			if value == true and AF.db.autoAvailability ~= true then
+				AF.db.manualAvailabilityMode = AF:GetAvailabilityMode()
+			end
+		end
+	)
+	Settings.CreateCheckbox(category, rememberManualAvailability, self:Text("OPTIONS_REMEMBER_MANUAL_AVAILABILITY_DESC"))
+
 	for _, option in ipairs(AUTO_AVAILABILITY_ACTIVITY_OPTIONS) do
 		local activityKey = option.key
 		local labelKey = option.labelKey
