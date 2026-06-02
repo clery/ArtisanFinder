@@ -247,6 +247,24 @@ local function IsCustomerOrderFulfilled(order)
 		and order.orderState == Enum.CraftingOrderState.Fulfilled
 end
 
+local function IsPatronOrder(order)
+	return type(order) == "table"
+		and Enum
+		and Enum.CraftingOrderType
+		and order.orderType == Enum.CraftingOrderType.Npc
+end
+
+local function IsOwnOrderCustomer(self, customerName)
+	customerName = self:NormalizeName(customerName)
+	if not customerName then
+		return false
+	end
+	if customerName == self:NormalizeName(self.playerName or self:GetPlayerFullName()) then
+		return true
+	end
+	return self:IsOwnArtisanCharacter(customerName)
+end
+
 local function GetCustomerOrderStateValue(order)
 	return type(order) == "table" and tostring(order.orderState or "") or ""
 end
@@ -410,6 +428,10 @@ function AF:ShowOrderNotification(characterName, count, details)
 end
 
 function AF:NotifyCustomerOrderFulfilled(order, details)
+	if IsPatronOrder(order) then
+		self:DebugLog("orders", "skip patron fulfilled order=" .. tostring(order and order.orderID or ""))
+		return
+	end
 	details = CopyOrderDetails(details or GetFulfilledOrderDetails(order))
 	details.notificationType = "fulfilled"
 	FillOrderDetailsFromOrderInfo(details, order)
@@ -619,7 +641,11 @@ function AF:SendOrderNotification(characterName, count, details)
 end
 
 function AF:SendFulfilledOrderNotification(order, details)
-	if type(order) ~= "table" or not order.customerName or order.customerName == "" or not self.SendAddon then
+	if IsPatronOrder(order) then
+		self:DebugLog("orders", "skip patron fulfilled payload order=" .. tostring(order and order.orderID or ""))
+		return false
+	end
+	if type(order) ~= "table" or not order.customerName or order.customerName == "" then
 		return false
 	end
 	details = CopyOrderDetails(details or GetFulfilledOrderDetails(order))
@@ -627,6 +653,15 @@ function AF:SendFulfilledOrderNotification(order, details)
 	FillOrderDetailsFromOrderInfo(details, order)
 	local target = self:NormalizeName(order.customerName)
 	if not target then
+		return false
+	end
+	if IsOwnOrderCustomer(self, target) then
+		details.crafterName = details.crafterName or self.playerName or self:GetPlayerFullName()
+		self:DebugLog("orders", "skip own fulfilled whisper target=" .. tostring(target) .. " order=" .. tostring(order.orderID or ""))
+		self:NotifyCustomerOrderFulfilled(order, details)
+		return true
+	end
+	if not self.SendAddon then
 		return false
 	end
 	local payloadParts = {
@@ -777,20 +812,24 @@ function AF:ProcessCustomerOrderStates(orders, result, reason)
 	local initialized = self.customerOrderStatesInitialized == true
 	local seen = {}
 	for _, order in ipairs(orders or {}) do
-		local key = GetCustomerOrderKey(order)
-		if key then
-			seen[key] = true
-			local previousState = self.db.customerOrderStates[key]
-			local currentState = GetCustomerOrderStateValue(order)
-			if (initialized or previousState ~= nil)
-				and IsCustomerOrderFulfilled(order)
-				and previousState
-				and previousState ~= ""
-				and previousState ~= currentState
-			then
-				self:NotifyCustomerOrderFulfilled(order)
+		if IsPatronOrder(order) then
+			self:DebugLog("orders", "skip patron state order=" .. tostring(order.orderID or ""))
+		else
+			local key = GetCustomerOrderKey(order)
+			if key then
+				seen[key] = true
+				local previousState = self.db.customerOrderStates[key]
+				local currentState = GetCustomerOrderStateValue(order)
+				if (initialized or previousState ~= nil)
+					and IsCustomerOrderFulfilled(order)
+					and previousState
+					and previousState ~= ""
+					and previousState ~= currentState
+				then
+					self:NotifyCustomerOrderFulfilled(order)
+				end
+				self.db.customerOrderStates[key] = currentState
 			end
-			self.db.customerOrderStates[key] = currentState
 		end
 	end
 	for key in pairs(self.db.customerOrderStates) do
@@ -832,6 +871,10 @@ function AF:OnFulfillOrderResponse(result, orderID)
 	if result ~= Enum.CraftingOrderResult.Ok or not pending then
 		return
 	end
+	if IsPatronOrder(pending.order) then
+		self:DebugLog("orders", "skip patron fulfilled send order=" .. tostring(orderID or ""))
+		return
+	end
 	self:SendFulfilledOrderNotification(pending.order, pending.details)
 end
 
@@ -841,6 +884,10 @@ function AF:CapturePendingFulfilledOrder(orderID)
 	end
 	local order = C_CraftingOrders.GetClaimedOrder()
 	if type(order) ~= "table" or tostring(order.orderID or "") ~= tostring(orderID or "") then
+		return
+	end
+	if IsPatronOrder(order) then
+		self:DebugLog("orders", "skip patron pending fulfilled order=" .. tostring(orderID or ""))
 		return
 	end
 	self.pendingFulfilledOrderNotifications = self.pendingFulfilledOrderNotifications or {}

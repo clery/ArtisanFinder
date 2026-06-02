@@ -1,5 +1,13 @@
 # ArtisanFinder
 
+## [v2.0.3](https://github.com/clery/ArtisanFinder/releases/tag/v2.0.3) (2026-06-02)
+
+[Full Changelog](https://github.com/clery/ArtisanFinder/compare/v2.0.2...v2.0.3) | [Previous Releases](https://github.com/clery/ArtisanFinder/releases)
+
+### Fixed
+
+* Whisper tentative on Patron Order NPC or alt characters on Crafting Order completion
+
 ## [v2.0.2](https://github.com/clery/ArtisanFinder/releases/tag/v2.0.2) (2026-06-02)
 
 [Full Changelog](https://github.com/clery/ArtisanFinder/compare/v2.0.1...v2.0.2) | [Previous Releases](https://github.com/clery/ArtisanFinder/releases)

@@ -397,8 +397,13 @@ AF.frame:SetScript("OnEvent", function(_, event, ...)
 		if AF.OnFulfillOrderResponse then
 			AF:OnFulfillOrderResponse(...)
 		end
-	elseif event == "CRAFTINGORDERS_CAN_REQUEST" or event == "CRAFTINGORDERS_UPDATE_ORDER_COUNT" then
+	elseif event == "CRAFTINGORDERS_CAN_REQUEST" then
 		if AF.QueueCustomerOrderStateRefresh then
+			AF:QueueCustomerOrderStateRefresh(event:lower(), 0.5)
+		end
+	elseif event == "CRAFTINGORDERS_UPDATE_ORDER_COUNT" then
+		local orderType = ...
+		if orderType ~= Enum.CraftingOrderType.Npc and AF.QueueCustomerOrderStateRefresh then
 			AF:QueueCustomerOrderStateRefresh(event:lower(), 0.5)
 		end
 	elseif event == "CRAFTINGORDERS_UPDATE_PERSONAL_ORDER_COUNTS" then
