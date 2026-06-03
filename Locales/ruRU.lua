@@ -244,7 +244,6 @@ L.DEBUG_HELP_STATE = "/af debug state - показать состояние от
 L.DEBUG_HELP_LOGS = "/af debug logs - открыть копируемые журналы"
 L.DEBUG_HELP_CLEAR = "/af debug clear - очистить захваченные журналы"
 L.DEBUG_HELP_LOCALE = "/af debug locale <locale|reset> - предпросмотр языка на эту сессию"
-L.DEBUG_HELP_ORDERS = "/af debug orders - вывести состояние уведомлений о заказах"
 L.DEBUG_LOGS_TITLE = "Журналы отладки ArtisanFinder"
 L.DEBUG_LOGS_CLEAR = "Очистить"
 L.DEBUG_LOGS_CLEARED = "журналы отладки очищены."

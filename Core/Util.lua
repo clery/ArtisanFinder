@@ -1,27 +1,4 @@
-local addonName, AF = ...
-
-_G.ArtisanFinder = AF
-
-AF.ADDON_NAME = addonName
-AF.PREFIX = "ARTFIND1"
-AF.PROTOCOL_VERSION = "3"
-AF.CHANNEL_NAME = "ArtisanFinder"
-AF.AVAILABILITY_UNAVAILABLE = "unavailable"
-AF.AVAILABILITY_CURRENT = "current"
-AF.AVAILABILITY_ACCOUNT = "account"
-AF.CACHE_MAX_AGE = 14 * 24 * 60 * 60
-AF.RESPONSE_THROTTLE = 60
-AF.DETAIL_REQUEST_THROTTLE = 30
-AF.RESPONSE_THROTTLE_MAX_AGE = math.max(AF.RESPONSE_THROTTLE, AF.DETAIL_REQUEST_THROTTLE)
-AF.RESPONSE_THROTTLE_CLEANUP_INTERVAL = 60
-AF.REAGENT_DETAIL_CACHE_MAX_AGE = 60 * 60
-AF.LIVE_QUERY_TIMEOUT = 5
-AF.MAX_NOTE_CHARS = 256
-AF.MAX_NOTE_BYTES = 1024
-AF.MAX_COMMISSION_GOLD = 99999999
-AF.MAX_COMMISSION_COPPER = AF.MAX_COMMISSION_GOLD * 10000
-AF.MAX_LINK_BYTES = 96
-AF.SCHEMA_VERSION = 15
+local _, AF = ...
 
 function AF:Print(message)
 	print("|cff33ff99ArtisanFinder:|r " .. tostring(message))
@@ -209,6 +186,17 @@ end
 
 function AF:Now()
 	return time()
+end
+
+function AF:IsSecretValue(value)
+	return issecretvalue and issecretvalue(value) == true
+end
+
+function AF:HideEmbeddedItemTooltip(tooltip)
+	local itemTooltip = tooltip and tooltip.ItemTooltip
+	if itemTooltip and itemTooltip.Hide then
+		itemTooltip:Hide()
+	end
 end
 
 local ADDON_RESTRICTION_TYPE_KEYS = {

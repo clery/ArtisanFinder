@@ -60,7 +60,6 @@ function AF:PrintDebugHelp()
 	self:Print(self:Text("DEBUG_HELP_LOGS"))
 	self:Print(self:Text("DEBUG_HELP_CLEAR"))
 	self:Print(self:Text("DEBUG_HELP_LOCALE"))
-	self:Print(self:Text("DEBUG_HELP_ORDERS"))
 end
 
 function AF:PrintDevHelp()
@@ -267,18 +266,15 @@ function AF:HandleDebugSlash(rest)
 	elseif command == "" then
 		self:PrintDebugHelp()
 	elseif command == "logs" then
+		if self:IsDebugEnabled() and self.PrintOrderDebugState then
+			self:PrintOrderDebugState()
+		end
 		self:OpenDebugLogFrame()
 	elseif command == "clear" then
 		self:ClearDebugLog()
 	elseif command == "locale" then
 		if self:IsDebugEnabled() then
 			self:SetLocaleOverride(commandRest)
-		else
-			self:PrintSlashHelp()
-		end
-	elseif command == "orders" then
-		if self:IsDebugEnabled() and self.PrintOrderDebugState then
-			self:PrintOrderDebugState()
 		else
 			self:PrintSlashHelp()
 		end

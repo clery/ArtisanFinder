@@ -42,6 +42,9 @@ local function CanShowOrderNotification(self)
 end
 
 local function CountPersonalOrders()
+	if not C_CraftingOrders or not C_CraftingOrders.GetPersonalOrdersInfo then
+		return 0, {}
+	end
 	local infos = C_CraftingOrders.GetPersonalOrdersInfo() or {}
 	local total = 0
 	local rows = {}
@@ -1171,9 +1174,9 @@ function AF:ClearOrderNotifications(silent)
 end
 
 function AF:PrintOrderDebugState()
-	self:Print(self:Text("DEBUG_ORDERS_STATE", tostring(self.currentPersonalOrderCount or 0), tostring(self.lastOrderNotificationSender or "")))
+	self:DebugLog("orders", self:Text("DEBUG_ORDERS_STATE", tostring(self.currentPersonalOrderCount or 0), tostring(self.lastOrderNotificationSender or "")))
 	for _, row in ipairs(self:GetKnownOrderRows()) do
-		self:Print(self:Text(
+		self:DebugLog("orders", self:Text(
 			"DEBUG_ORDERS_ROW",
 			self:GetDisplayPlayerName(row.characterName),
 			row.itemName or row.professionName or "",
@@ -1243,6 +1246,7 @@ function AF:InitializeOrderNotificationToast(frame)
 		toast:SetAlpha(1)
 		if toast.itemLink or toast.itemID then
 			GameTooltip:SetOwner(toast, "ANCHOR_TOP")
+			AF:HideEmbeddedItemTooltip(GameTooltip)
 			if toast.itemLink then
 				GameTooltip:SetHyperlink(toast.itemLink)
 			elseif GameTooltip.SetItemByID then
@@ -1250,6 +1254,7 @@ function AF:InitializeOrderNotificationToast(frame)
 			else
 				GameTooltip:SetHyperlink("item:" .. tostring(toast.itemID))
 			end
+			AF:HideEmbeddedItemTooltip(GameTooltip)
 			GameTooltip:Show()
 		end
 	end)

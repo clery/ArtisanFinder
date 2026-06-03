@@ -47,7 +47,10 @@ local function CopyScanItem(item)
 end
 
 local function GetDebugItemName(itemID)
-	local name = GetItemInfo and GetItemInfo(itemID)
+	local name = C_Item and C_Item.GetItemInfo and C_Item.GetItemInfo(itemID)
+	if not name and C_Item and C_Item.RequestLoadItemDataByID then
+		pcall(C_Item.RequestLoadItemDataByID, itemID)
+	end
 	return name and name ~= "" and name or tostring(itemID or "?")
 end
 
@@ -489,6 +492,12 @@ local function GetPendingCount(progress)
 		return 0
 	end
 	return math.max(0, GetPendingTotal(progress) - GetPendingIndex(progress) + 1)
+end
+
+local function IsResumableScanProgress(progress, currentSignature)
+	return progress
+		and progress.professionSignature == currentSignature
+		and GetPendingCount(progress) > 0
 end
 
 local function GetNextPendingJob(progress)
@@ -1128,9 +1137,9 @@ function AF:StartOrResumeCurrentProfessionScan(force, silent, mode, forceProbe, 
 	end
 
 	local progress
-	local progressSignature = table.concat({ currentSignature, mode }, "|")
-	if not force and professionEntry.scanProgress and professionEntry.scanProgress.signature == progressSignature then
+	if not force and IsResumableScanProgress(professionEntry.scanProgress, currentSignature) then
 		progress = professionEntry.scanProgress
+		mode = progress.mode or mode
 	else
 		if self.scanProgressBuildPending
 			and tonumber(self.scanProgressBuildPending.professionID) == tonumber(profession.id)
@@ -1369,9 +1378,6 @@ function AF:QueueAutoScanForChange(reason)
 end
 
 function AF:ResumeCurrentProfessionScanIfNeeded()
-	if self.db and self.db.disableAutomaticScans == true then
-		return 0
-	end
 	if not self:IsOwnProfessionWindowOpen() then
 		self.activeScan = nil
 		return 0
@@ -1384,6 +1390,12 @@ function AF:ResumeCurrentProfessionScanIfNeeded()
 	local professionEntry = GetProfessionEntry(self, profession)
 	local currentSignature = self:GetCurrentProfessionScanSignature(profession)
 	if not currentSignature then
+		return 0
+	end
+	if professionEntry and IsResumableScanProgress(professionEntry.scanProgress, currentSignature) then
+		return self:StartOrResumeCurrentProfessionScan(false, true)
+	end
+	if self.db and self.db.disableAutomaticScans == true then
 		return 0
 	end
 	local pendingReason = self.pendingAutoScanReason

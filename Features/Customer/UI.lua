@@ -829,7 +829,9 @@ function AF:AttachCustomerUI()
 	frame.itemLink:SetScript("OnEnter", function(button)
 		if button.itemLinkText then
 			GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
+			AF:HideEmbeddedItemTooltip(GameTooltip)
 			GameTooltip:SetHyperlink(button.itemLinkText)
+			AF:HideEmbeddedItemTooltip(GameTooltip)
 			GameTooltip:Show()
 		end
 	end)

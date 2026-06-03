@@ -65,6 +65,16 @@ ArtisanFinder has an Options -> AddOns panel ordered around common controls firs
 
 ArtisanFinder includes localization support for English, French, German, European Spanish, Latin American Spanish, European Portuguese, Brazilian Portuguese, Russian, Simplified Chinese, and Traditional Chinese.
 
+## Source Layout
+
+Runtime files are loaded from [ArtisanFinder.toc](ArtisanFinder.toc), which preserves the required order for the addon namespace, localization, data, feature services, XML templates, UI attachments, and slash commands.
+
+*   [Core/](Core/) contains bootstrap, saved-variable/data helpers, the event coordinator, shared utilities, and slash command handling.
+*   [Data/](Data/) contains generated/static data tables.
+*   [Utils/](Utils/) contains shared formatting and tooltip helpers.
+*   [Features/](Features/) contains customer, crafter, social/comms, and order-notification modules.
+*   [UI/](UI/) contains XML templates plus options, minimap, edit mode, tutorial, and debug-log UI.
+
 ## Useful Commands
 
 *   `/af`: shows help for ArtisanFinder commands.

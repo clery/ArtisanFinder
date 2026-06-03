@@ -395,6 +395,10 @@ function AF:QueueBroadcastQuery(itemID, professionID)
 end
 
 function AF:OnAddonMessage(prefix, message, channel, sender)
+	if self:IsSecretValue(prefix) or self:IsSecretValue(message) or self:IsSecretValue(channel) or self:IsSecretValue(sender) then
+		self:DebugLog("recv", "skipped secret addon payload")
+		return
+	end
 	if prefix ~= self.PREFIX then
 		return
 	end

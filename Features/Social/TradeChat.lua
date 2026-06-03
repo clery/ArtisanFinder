@@ -212,6 +212,10 @@ function AF:OnTradeChatMessage(message, sender, _, channelName, _, _, _, _, chan
 	if self:IsProtectedActionRestricted() then
 		return
 	end
+	if self:IsSecretValue(message) or self:IsSecretValue(sender) or self:IsSecretValue(channelName) or self:IsSecretValue(channelBaseName) then
+		self:DebugLog("trade", "skipped secret chat payload")
+		return
+	end
 	if self:IsInUnavailableActivity() then
 		return
 	end

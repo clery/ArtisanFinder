@@ -7,8 +7,11 @@ local HELP_PLATE_TILE_BUTTON_SIZE = 46
 local HELP_PLATE_HIGHLIGHT_PADDING = 7
 
 local function EnsureHelpPlate()
-	C_AddOns.LoadAddOn("Blizzard_HelpPlate")
-	return true
+	if not C_AddOns or not C_AddOns.LoadAddOn then
+		return HelpPlate ~= nil
+	end
+	local ok = pcall(C_AddOns.LoadAddOn, "Blizzard_HelpPlate")
+	return ok == true and HelpPlate ~= nil
 end
 
 local function StopActiveTutorial()
