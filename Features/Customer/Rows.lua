@@ -88,18 +88,21 @@ local function EnsureWhoSpinner(row)
 	if not row.whoSpinner then
 		local spinner = CreateFrame("Frame", nil, row, "SpinnerTemplate")
 		spinner:SetSize(WHO_SPINNER_SIZE, WHO_SPINNER_SIZE)
-		spinner:EnableMouse(true)
-		spinner:SetScript("OnEnter", function(owner)
+		spinner:Hide()
+		row.whoSpinner = spinner
+	end
+	if not row.whoSpinner.artisanFinderConfigured then
+		row.whoSpinner.artisanFinderConfigured = true
+		row.whoSpinner:EnableMouse(true)
+		row.whoSpinner:SetScript("OnEnter", function(owner)
 			local refreshIcon = CreateAtlasMarkup and CreateAtlasMarkup("UI-RefreshButton", 14, 14) or ""
 			GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
 			GameTooltip:SetText(AF:Text("WHO_REFRESH_HINT", refreshIcon), 1, 0.82, 0, 1, true)
 			GameTooltip:Show()
 		end)
-		spinner:SetScript("OnLeave", function()
+		row.whoSpinner:SetScript("OnLeave", function()
 			GameTooltip:Hide()
 		end)
-		spinner:Hide()
-		row.whoSpinner = spinner
 	end
 	return row.whoSpinner
 end

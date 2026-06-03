@@ -1203,39 +1203,18 @@ function AF:InitializeOrderNotificationToast(frame)
 	frame:SetBackdropBorderColor(0.86, 0.72, 0.34, 0.95)
 	frame:Hide()
 
-	frame.Icon = frame:CreateTexture(nil, "ARTWORK")
-	frame.Icon:SetSize(48, 48)
-	frame.Icon:SetPoint("LEFT", 14, 0)
-	frame.Icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
-
-	frame.IconBorder = frame:CreateTexture(nil, "OVERLAY")
-	frame.IconBorder:SetPoint("TOPLEFT", frame.Icon, -5, 5)
-	frame.IconBorder:SetPoint("BOTTOMRIGHT", frame.Icon, 5, -5)
-	frame.IconBorder:SetTexture("Interface\\Common\\WhiteIconFrame")
 	frame.IconBorder:Hide()
 
-	frame.Title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-	frame.Title:SetPoint("TOPLEFT", frame, "TOPLEFT", 72, -10)
-	frame.Title:SetPoint("RIGHT", frame, "RIGHT", -14, 0)
 	frame.Title:SetJustifyH("LEFT")
 	frame.Title:SetWordWrap(false)
 
-	frame.ItemName = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalMed3")
-	frame.ItemName:SetPoint("TOPLEFT", frame.Title, "BOTTOMLEFT", 0, -2)
-	frame.ItemName:SetPoint("RIGHT", frame, "RIGHT", -14, 0)
 	frame.ItemName:SetJustifyH("LEFT")
 	frame.ItemName:SetWordWrap(false)
 
-	frame.Meta = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	frame.Meta:SetPoint("TOPLEFT", frame.ItemName, "BOTTOMLEFT", 0, -1)
-	frame.Meta:SetPoint("RIGHT", frame, "RIGHT", -14, 0)
 	frame.Meta:SetJustifyH("LEFT")
 	frame.Meta:SetTextColor(0.82, 0.82, 0.82)
 	frame.Meta:SetWordWrap(false)
 
-	frame.Commission = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	frame.Commission:SetPoint("TOPLEFT", frame.Meta, "BOTTOMLEFT", 0, -1)
-	frame.Commission:SetPoint("RIGHT", frame, "RIGHT", -14, 0)
 	frame.Commission:SetJustifyH("LEFT")
 	frame.Commission:SetTextColor(1, 0.82, 0)
 	frame.Commission:SetWordWrap(false)
@@ -1294,7 +1273,7 @@ end
 
 function AF:GetOrderNotificationToastPool()
 	if not self.orderNotificationToastPool then
-		self.orderNotificationToastPool = CreateFramePool("Button", UIParent, "BackdropTemplate", ResetOrderNotificationToast, nil, function(frame)
+		self.orderNotificationToastPool = CreateFramePool("Button", UIParent, "ArtisanFinderOrderNotificationToastTemplate", ResetOrderNotificationToast, nil, function(frame)
 			AF:InitializeOrderNotificationToast(frame)
 		end)
 	end
@@ -1305,8 +1284,7 @@ function AF:GetOrderNotificationAnchor()
 	if self.orderNotificationAnchor then
 		return self.orderNotificationAnchor
 	end
-	local anchor = CreateFrame("Frame", "ArtisanFinderOrderNotificationAnchor", UIParent)
-	anchor:SetSize(TOAST_WIDTH, TOAST_HEIGHT)
+	local anchor = CreateFrame("Frame", "ArtisanFinderOrderNotificationAnchor", UIParent, "ArtisanFinderOrderNotificationAnchorTemplate")
 	anchor:SetClampedToScreen(true)
 	anchor:EnableMouse(false)
 	anchor:Show()

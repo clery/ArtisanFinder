@@ -77,9 +77,7 @@ function AF:RefreshDebugLogFrame()
 end
 
 function AF:CreateDebugLogFrame()
-	local frame = CreateFrame("Frame", "ArtisanFinderDebugLogFrame", UIParent, "BasicFrameTemplateWithInset")
-	frame:SetSize(620, 420)
-	frame:SetPoint("CENTER")
+	local frame = CreateFrame("Frame", "ArtisanFinderDebugLogFrame", UIParent, "ArtisanFinderDebugLogFrameTemplate")
 	frame:SetMovable(true)
 	frame:EnableMouse(true)
 	frame:RegisterForDrag("LeftButton")
@@ -87,32 +85,18 @@ function AF:CreateDebugLogFrame()
 	frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
 	frame:Hide()
 
-	frame.title = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-	if frame.TitleBg then
-		frame.title:SetPoint("LEFT", frame.TitleBg, "LEFT", 5, 0)
-	else
-		frame.title:SetPoint("TOP", frame, "TOP", 0, -5)
-	end
 	frame.title:SetText(self:Text("DEBUG_LOGS_TITLE"))
 
-	frame.scroll = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
-	frame.scroll:SetPoint("TOPLEFT", 12, -32)
-	frame.scroll:SetPoint("BOTTOMRIGHT", -32, 42)
-
-	frame.editBox = CreateFrame("EditBox", nil, frame.scroll)
+	frame.editBox = frame.scroll.editBox
 	frame.editBox:SetMultiLine(true)
 	frame.editBox:SetAutoFocus(false)
 	frame.editBox:SetFontObject(ChatFontNormal)
 	frame.editBox:SetSize(560, 340)
-	frame.editBox:SetPoint("TOPLEFT")
 	frame.editBox:SetScript("OnEscapePressed", function(box)
 		box:ClearFocus()
 	end)
 	frame.scroll:SetScrollChild(frame.editBox)
 
-	frame.clear = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-	frame.clear:SetSize(96, 22)
-	frame.clear:SetPoint("BOTTOMRIGHT", -12, 12)
 	frame.clear:SetText(self:Text("DEBUG_LOGS_CLEAR"))
 	frame.clear:SetScript("OnClick", function()
 		AF:ClearDebugLog()

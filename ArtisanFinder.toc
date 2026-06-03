@@ -61,10 +61,10 @@ UI\Options.lua
 Core\Core.lua
 Features\Social\Comms.lua
 Features\Social\TradeChat.lua
+UI\Templates.xml
 Features\Orders\Notifications.lua
 Features\Crafter\RecipeCapability.lua
 Features\Crafter\Scanner.lua
-UI\Templates.xml
 Features\Customer\Rows.lua
 Features\Customer\DebugData.lua
 Features\Customer\UI.lua

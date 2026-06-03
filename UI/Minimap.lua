@@ -248,15 +248,11 @@ function AF:InitializeStandaloneMinimapButton()
 	if self.standaloneMinimapButton then
 		return
 	end
-	local button = CreateFrame("Button", "ArtisanFinderStandaloneButton", UIParent)
-	button:SetSize(42, 42)
+	local button = CreateFrame("Button", "ArtisanFinderStandaloneButton", UIParent, "ArtisanFinderStandaloneMinimapButtonTemplate")
 	button:EnableMouse(true)
 	button:RegisterForClicks("LeftButtonUp", "RightButtonUp", "MiddleButtonUp")
 	button:SetClampedToScreen(true)
-	button.icon = button:CreateTexture(nil, "ARTWORK")
 	button.icon:SetTexture(STANDALONE_ICON)
-	button.icon:SetSize(28, 28)
-	button.icon:SetPoint("CENTER")
 	button:SetScript("OnClick", function(self, clickButton)
 		HandleMinimapClick(self, clickButton)
 	end)
@@ -270,7 +266,6 @@ function AF:InitializeStandaloneMinimapButton()
 		AF.minimapTooltipShown = false
 		GameTooltip:Hide()
 	end)
-	button:Hide()
 	self.standaloneMinimapButton = button
 end
 
@@ -403,13 +398,6 @@ function AF:RefreshStandaloneMinimapButton()
 		button:Show()
 	else
 		button:Hide()
-	end
-	if not button.artisanFinderOutdatedBadge then
-		local badge = button:CreateTexture(nil, "OVERLAY", nil, 7)
-		badge:SetTexture(OUTDATED_BADGE_TEXTURE)
-		badge:SetSize(19, 19)
-		badge:SetPoint("TOPRIGHT", button, "TOPRIGHT", 6, 6)
-		button.artisanFinderOutdatedBadge = badge
 	end
 	button.artisanFinderOutdatedBadge:SetShown(show and self:HasOutdatedScannedRows())
 end

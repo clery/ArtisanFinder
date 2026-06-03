@@ -92,6 +92,15 @@
 					<Anchor point="RIGHT" x="-5" y="0"/>
 				</Anchors>
 			</Button>
+			<Button parentKey="whoRefresh" hidden="true">
+				<Size x="18" y="18"/>
+				<Anchors>
+					<Anchor point="RIGHT" x="-30" y="0"/>
+				</Anchors>
+			</Button>
+			<Frame parentKey="whoSpinner" inherits="SpinnerTemplate" hidden="true">
+				<Size x="16" y="16"/>
+			</Frame>
 		</Frames>
 	</Button>
 
@@ -122,6 +131,91 @@
 					<Anchor point="TOP" x="0" y="-96"/>
 				</Anchors>
 			</Button>
+		</Frames>
+	</Frame>
+
+	<Button name="ArtisanFinderCustomerMenuBlockerTemplate" virtual="true" hidden="true">
+		<Anchors>
+			<Anchor point="TOPLEFT"/>
+			<Anchor point="BOTTOMRIGHT"/>
+		</Anchors>
+	</Button>
+
+	<Frame name="ArtisanFinderCustomerMinimalScrollBarTemplate" virtual="true">
+		<Size x="17" y="100"/>
+		<Frames>
+			<Button parentKey="Back">
+				<Size x="17" y="11"/>
+				<Anchors>
+					<Anchor point="TOP"/>
+				</Anchors>
+				<NormalTexture atlas="minimal-scrollbar-arrow-top" useAtlasSize="true"/>
+				<PushedTexture atlas="minimal-scrollbar-arrow-top-down" useAtlasSize="true"/>
+				<DisabledTexture atlas="minimal-scrollbar-arrow-top" useAtlasSize="true"/>
+				<HighlightTexture atlas="minimal-scrollbar-arrow-top-over" alphaMode="ADD" useAtlasSize="true"/>
+			</Button>
+			<Button parentKey="Forward">
+				<Size x="17" y="11"/>
+				<Anchors>
+					<Anchor point="BOTTOM"/>
+				</Anchors>
+				<NormalTexture atlas="minimal-scrollbar-arrow-bottom" useAtlasSize="true"/>
+				<PushedTexture atlas="minimal-scrollbar-arrow-bottom-down" useAtlasSize="true"/>
+				<DisabledTexture atlas="minimal-scrollbar-arrow-bottom" useAtlasSize="true"/>
+				<HighlightTexture atlas="minimal-scrollbar-arrow-bottom-over" alphaMode="ADD" useAtlasSize="true"/>
+			</Button>
+			<Frame parentKey="Track">
+				<Size x="8" y="1"/>
+				<Anchors>
+					<Anchor point="TOP" x="0" y="-19"/>
+					<Anchor point="BOTTOM" x="0" y="19"/>
+				</Anchors>
+				<Layers>
+					<Layer level="ARTWORK">
+						<Texture parentKey="Begin" atlas="minimal-scrollbar-track-top" useAtlasSize="true">
+							<Anchors>
+								<Anchor point="TOPLEFT"/>
+							</Anchors>
+						</Texture>
+						<Texture parentKey="End" atlas="minimal-scrollbar-track-bottom" useAtlasSize="true">
+							<Anchors>
+								<Anchor point="BOTTOMLEFT"/>
+							</Anchors>
+						</Texture>
+						<Texture parentKey="Middle" atlas="!minimal-scrollbar-track-middle" useAtlasSize="true">
+							<Anchors>
+								<Anchor point="TOPLEFT" relativeKey="$parent.Begin" relativePoint="BOTTOMLEFT"/>
+								<Anchor point="BOTTOMRIGHT" relativeKey="$parent.End" relativePoint="TOPRIGHT"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+				</Layers>
+				<Frames>
+					<Button parentKey="Thumb">
+						<Size x="8" y="23"/>
+						<Layers>
+							<Layer level="OVERLAY">
+								<Texture parentKey="Begin" atlas="minimal-scrollbar-small-thumb-top" useAtlasSize="true">
+									<Anchors>
+										<Anchor point="TOPLEFT"/>
+									</Anchors>
+								</Texture>
+								<Texture parentKey="End" atlas="minimal-scrollbar-small-thumb-bottom" useAtlasSize="true">
+									<Anchors>
+										<Anchor point="BOTTOMLEFT"/>
+									</Anchors>
+								</Texture>
+								<Texture parentKey="Middle" atlas="minimal-scrollbar-small-thumb-middle" useAtlasSize="true">
+									<Anchors>
+										<Anchor point="TOPLEFT" relativeKey="$parent.Begin" relativePoint="BOTTOMLEFT"/>
+										<Anchor point="BOTTOMRIGHT" relativeKey="$parent.End" relativePoint="TOPRIGHT"/>
+									</Anchors>
+								</Texture>
+							</Layer>
+						</Layers>
+					</Button>
+				</Frames>
+			</Frame>
 		</Frames>
 	</Frame>
 
@@ -162,7 +256,13 @@
 			<Button parentKey="refresh" inherits="UIPanelButtonTemplate">
 				<Size x="70" y="24"/>
 			</Button>
-			<ScrollFrame parentKey="scroll" name="ArtisanFinderCustomerScrollFrame" inherits="UIPanelScrollFrameTemplate"/>
+			<ScrollFrame parentKey="scroll" name="ArtisanFinderCustomerScrollFrame" inherits="UIPanelScrollFrameTemplate">
+				<Frames>
+					<Frame parentKey="content" clipChildren="true">
+						<Size x="394" y="1"/>
+					</Frame>
+				</Frames>
+			</ScrollFrame>
 			<Frame parentKey="scrollInset" inherits="BackdropTemplate"/>
 		</Frames>
 		<Layers>
@@ -183,6 +283,24 @@
 			</Layer>
 		</Layers>
 	</Frame>
+
+	<Button name="ArtisanFinderCustomerPreviewButtonTemplate" virtual="true">
+		<Size x="18" y="18"/>
+	</Button>
+
+	<Button name="ArtisanFinderCrafterReopenButtonTemplate" virtual="true" inherits="UIPanelButtonTemplate">
+		<Size x="32" y="32"/>
+		<Layers>
+			<Layer level="ARTWORK">
+				<Texture parentKey="icon">
+					<Size x="20" y="20"/>
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+	</Button>
 
 	<Frame name="ArtisanFinderCrafterItemTemplate" virtual="true">
 		<Size x="326" y="82"/>
@@ -325,4 +443,123 @@
 			</CheckButton>
 		</Frames>
 	</Frame>
+
+	<Button name="ArtisanFinderOrderNotificationToastTemplate" virtual="true" inherits="BackdropTemplate" hidden="true">
+		<Size x="340" y="80"/>
+		<Layers>
+			<Layer level="ARTWORK">
+				<Texture parentKey="Icon">
+					<Size x="48" y="48"/>
+					<TexCoords left="0.07" right="0.93" top="0.07" bottom="0.93"/>
+					<Anchors>
+						<Anchor point="LEFT" x="14" y="0"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="OVERLAY">
+				<Texture parentKey="IconBorder" file="Interface\Common\WhiteIconFrame" hidden="true">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeKey="$parent.Icon" x="-5" y="5"/>
+						<Anchor point="BOTTOMRIGHT" relativeKey="$parent.Icon" x="5" y="-5"/>
+					</Anchors>
+				</Texture>
+				<FontString parentKey="Title" inherits="GameFontNormal" justifyH="LEFT" wordWrap="false">
+					<Anchors>
+						<Anchor point="TOPLEFT" x="72" y="-10"/>
+						<Anchor point="RIGHT" x="-14" y="0"/>
+					</Anchors>
+				</FontString>
+				<FontString parentKey="ItemName" inherits="GameFontNormalMed3" justifyH="LEFT" wordWrap="false">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeKey="$parent.Title" relativePoint="BOTTOMLEFT" x="0" y="-2"/>
+						<Anchor point="RIGHT" x="-14" y="0"/>
+					</Anchors>
+				</FontString>
+				<FontString parentKey="Meta" inherits="GameFontHighlightSmall" justifyH="LEFT" wordWrap="false">
+					<Color r="0.82" g="0.82" b="0.82" a="1"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeKey="$parent.ItemName" relativePoint="BOTTOMLEFT" x="0" y="-1"/>
+						<Anchor point="RIGHT" x="-14" y="0"/>
+					</Anchors>
+				</FontString>
+				<FontString parentKey="Commission" inherits="GameFontHighlightSmall" justifyH="LEFT" wordWrap="false">
+					<Color r="1" g="0.82" b="0" a="1"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeKey="$parent.Meta" relativePoint="BOTTOMLEFT" x="0" y="-1"/>
+						<Anchor point="RIGHT" x="-14" y="0"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+	</Button>
+
+	<Frame name="ArtisanFinderOrderNotificationAnchorTemplate" virtual="true">
+		<Size x="340" y="80"/>
+	</Frame>
+
+	<Frame name="ArtisanFinderDebugLogFrameTemplate" virtual="true" inherits="BasicFrameTemplateWithInset" hidden="true">
+		<Size x="620" y="420"/>
+		<Anchors>
+			<Anchor point="CENTER"/>
+		</Anchors>
+		<Layers>
+			<Layer level="OVERLAY">
+				<FontString parentKey="title" inherits="GameFontHighlight">
+					<Anchors>
+						<Anchor point="LEFT" relativeKey="$parent.TitleBg" x="5" y="0"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+		<Frames>
+			<ScrollFrame parentKey="scroll" inherits="UIPanelScrollFrameTemplate">
+				<Anchors>
+					<Anchor point="TOPLEFT" x="12" y="-32"/>
+					<Anchor point="BOTTOMRIGHT" x="-32" y="42"/>
+				</Anchors>
+				<Frames>
+					<EditBox parentKey="editBox" autoFocus="false" multiLine="true">
+						<Size x="560" y="340"/>
+						<Anchors>
+							<Anchor point="TOPLEFT"/>
+						</Anchors>
+						<FontString inherits="ChatFontNormal"/>
+						<Scripts>
+							<OnEscapePressed>
+								self:ClearFocus()
+							</OnEscapePressed>
+						</Scripts>
+					</EditBox>
+				</Frames>
+			</ScrollFrame>
+			<Button parentKey="clear" inherits="UIPanelButtonTemplate">
+				<Size x="96" y="22"/>
+				<Anchors>
+					<Anchor point="BOTTOMRIGHT" x="-12" y="12"/>
+				</Anchors>
+			</Button>
+		</Frames>
+	</Frame>
+
+	<Button name="ArtisanFinderStandaloneMinimapButtonTemplate" virtual="true" hidden="true">
+		<Size x="42" y="42"/>
+		<Layers>
+			<Layer level="ARTWORK">
+				<Texture parentKey="icon">
+					<Size x="28" y="28"/>
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="OVERLAY" textureSubLevel="7">
+				<Texture parentKey="artisanFinderOutdatedBadge" file="Interface\DialogFrame\UI-Dialog-Icon-AlertNew" hidden="true">
+					<Size x="19" y="19"/>
+					<Anchors>
+						<Anchor point="TOPRIGHT" x="6" y="6"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+	</Button>
 </Ui>

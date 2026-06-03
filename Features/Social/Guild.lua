@@ -267,21 +267,101 @@ function AF:RebuildGuildRosterNameLookup()
 	end
 end
 
-function AF:PruneGuildCachesToRoster(rosterNames)
+local function ClearCachedCustomerGuildAffiliation(entry, orderTarget)
+	if type(entry) ~= "table" then
+		return false
+	end
+	local changed = entry.guildMember ~= nil
+		or entry.guildOnline ~= nil
+		or entry.guildMemberGUID ~= nil
+		or entry.guildRecipeKnown ~= nil
+		or entry.guildKey ~= nil
+	if not changed then
+		return false
+	end
+	entry.guildMember = nil
+	entry.guildOnline = nil
+	entry.guildMemberGUID = nil
+	entry.guildRecipeKnown = nil
+	entry.guildKey = nil
+	if orderTarget then
+		entry.target = orderTarget
+	end
+	return true
+end
+
+local function CacheEntryMatchesDepartedGuildMember(AF, entry, cacheKey, rosterNames, departedNames, guildKey)
+	if type(entry) ~= "table" then
+		return nil
+	end
+	local name = AF:NormalizeName(entry.orderTarget or entry.name or entry.target or cacheKey)
+	if not name then
+		return nil
+	end
+	if departedNames[name] then
+		return name
+	end
+	if (entry.guildMember or entry.guildKey == guildKey) and not rosterNames[name] then
+		return name
+	end
+	return nil
+end
+
+function AF:ClearDepartedGuildCustomerCacheAffiliations(rosterNames, departedNames)
+	if type(rosterNames) ~= "table" or type(departedNames) ~= "table" then
+		return 0
+	end
+	local cleared = 0
+	local guildKey = self.currentGuildCacheKey
+	for _, itemCache in pairs(self.db and self.db.customerCache or {}) do
+		if type(itemCache) == "table" then
+			for cacheKey, entry in pairs(itemCache) do
+				local name = CacheEntryMatchesDepartedGuildMember(self, entry, cacheKey, rosterNames, departedNames, guildKey)
+				if name then
+					local orderTarget = self:IsNameOnConnectedRealm(name) and name or nil
+					if ClearCachedCustomerGuildAffiliation(entry, orderTarget) then
+						cleared = cleared + 1
+					end
+				end
+			end
+		end
+	end
+	return cleared
+end
+
+function AF:ReconcileGuildCachesToRoster(rosterNames)
 	if type(rosterNames) ~= "table" or not next(rosterNames) then
 		return
 	end
 
+	local departedNames = {}
 	for name in pairs(self.guildRosterByName or {}) do
-		if not rosterNames[name] then
+		local normalizedName = self:NormalizeName(name)
+		if not normalizedName or not rosterNames[normalizedName] then
+			if normalizedName then
+				departedNames[normalizedName] = true
+			end
+			self.guildRosterByName[name] = nil
+		elseif normalizedName ~= name then
 			self.guildRosterByName[name] = nil
 		end
 	end
 
 	for _, professionCache in pairs(self.guildProfessionMembers or {}) do
 		for name in pairs(professionCache.members or {}) do
-			if not rosterNames[name] then
+			local normalizedName = self:NormalizeName(name)
+			if not normalizedName or not rosterNames[normalizedName] then
+				if normalizedName then
+					departedNames[normalizedName] = true
+				end
 				professionCache.members[name] = nil
+			elseif normalizedName ~= name then
+				local member = professionCache.members[name]
+				professionCache.members[name] = nil
+				if type(member) == "table" and not professionCache.members[normalizedName] then
+					member.name = normalizedName
+					professionCache.members[normalizedName] = member
+				end
 			end
 		end
 	end
@@ -289,22 +369,40 @@ function AF:PruneGuildCachesToRoster(rosterNames)
 	for _, recipeCache in pairs(self.guildRecipeMembers or {}) do
 		local prunedMembers = {}
 		for _, name in ipairs(recipeCache.members or {}) do
-			if rosterNames[name] then
-				table.insert(prunedMembers, name)
+			local normalizedName = self:NormalizeName(name)
+			if normalizedName and rosterNames[normalizedName] then
+				table.insert(prunedMembers, normalizedName)
+			elseif normalizedName then
+				departedNames[normalizedName] = true
 			end
 		end
 		recipeCache.members = prunedMembers
 		for name in pairs(recipeCache.online or {}) do
-			if not rosterNames[name] then
+			local normalizedName = self:NormalizeName(name)
+			if not normalizedName or not rosterNames[normalizedName] then
+				if normalizedName then
+					departedNames[normalizedName] = true
+				end
+				recipeCache.online[name] = nil
+			elseif normalizedName ~= name then
+				recipeCache.online[normalizedName] = recipeCache.online[normalizedName] or recipeCache.online[name]
 				recipeCache.online[name] = nil
 			end
 		end
 		for name in pairs(recipeCache.lastAvailableAt or {}) do
-			if not rosterNames[name] then
+			local normalizedName = self:NormalizeName(name)
+			if not normalizedName or not rosterNames[normalizedName] then
+				if normalizedName then
+					departedNames[normalizedName] = true
+				end
+				recipeCache.lastAvailableAt[name] = nil
+			elseif normalizedName ~= name then
+				recipeCache.lastAvailableAt[normalizedName] = recipeCache.lastAvailableAt[normalizedName] or recipeCache.lastAvailableAt[name]
 				recipeCache.lastAvailableAt[name] = nil
 			end
 		end
 	end
+	self:ClearDepartedGuildCustomerCacheAffiliations(rosterNames, departedNames)
 	self:RebuildGuildRosterNameLookup()
 end
 
@@ -454,7 +552,7 @@ function AF:RefreshGuildRosterCache(requestRefresh)
 		end
 	end
 	if count > 0 then
-		self:PruneGuildCachesToRoster(rosterNames)
+		self:ReconcileGuildCachesToRoster(rosterNames)
 	end
 	return count
 end

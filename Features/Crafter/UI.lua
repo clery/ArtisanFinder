@@ -199,8 +199,7 @@ local function ConfigureInfoButton(button, tooltipTitle, tooltipText)
 end
 
 local function CreateCustomerPreviewButton(parent)
-	local button = CreateFrame("Button", nil, parent)
-	button:SetSize(18, 18)
+	local button = CreateFrame("Button", nil, parent, "ArtisanFinderCustomerPreviewButtonTemplate")
 	button:SetNormalTexture(CUSTOMER_PREVIEW_TEXTURE)
 	button:SetPushedTexture(CUSTOMER_PREVIEW_TEXTURE)
 	return button
@@ -452,13 +451,9 @@ function AF:EnsureCrafterReopenButton()
 		return nil
 	end
 
-	local button = CreateFrame("Button", "ArtisanFinderCrafterReopenButton", form, "UIPanelButtonTemplate")
-	button:SetSize(32, 32)
+	local button = CreateFrame("Button", "ArtisanFinderCrafterReopenButton", form, "ArtisanFinderCrafterReopenButtonTemplate")
 	button:SetFrameLevel((form:GetFrameLevel() or 0) + 20)
-	button.icon = button:CreateTexture(nil, "ARTWORK")
 	button.icon:SetTexture(CRAFTER_REOPEN_ICON)
-	button.icon:SetSize(20, 20)
-	button.icon:SetPoint("CENTER")
 	button:SetScript("OnClick", function()
 		if ProfessionsFrame and ProfessionsFrame.SetMaximized then
 			ProfessionsFrame:SetMaximized()
