@@ -45,4 +45,4 @@ L.MINIMAP_SHIFT_RIGHT_CLICK = "Mayús-clic derecho: borrar notificaciones de ór
 L.OPTIONS_CLEAR_ORDER_NOTIFICATIONS = "Borrar notificaciones"
 L.TUTORIAL_INTRO = "ArtisanFinder funciona en dos lugares. Abre cada una de tus profesiones una vez para escanear tus datos de fabricación. Después visita al PNJ de órdenes de fabricación para ver artesanos disponibles al crear una orden."
 L.TUTORIAL_CUSTOMER_STATUS = "Selecciona un objeto de orden en el formulario de órdenes de fabricación. ArtisanFinder buscará artesanos compatibles."
-L.TUTORIAL_CUSTOMER_ACTION = "Abre el menú de la fila para marcar un artesano como favorito, susurrarle, llenar una orden personal o de hermandad, o abrir su profesión si está disponible."
+L.TUTORIAL_CUSTOMER_ACTION = "Haz clic en una fila real para llenar automáticamente el formulario de orden de cliente.\n\nUsa el menú de la fila para marcar un artesano como favorito, susurrarle o abrir su profesión si está disponible."

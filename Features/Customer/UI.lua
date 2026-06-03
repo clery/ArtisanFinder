@@ -18,6 +18,8 @@ local CUSTOMER_QUERY_POLL_INTERVAL = 1.5
 local CUSTOMER_DEBUG_QUERY_POLL_INTERVAL = 5
 local CUSTOMER_ROW_AGE_TICK_INTERVAL = 30
 local CUSTOMER_OPEN_REFRESH_DEDUPE_SECONDS = 0.25
+local CUSTOMER_ROW_HIGHLIGHT_ALPHA = 0.28
+local CUSTOMER_ROW_OWN_HIGHLIGHT_ALPHA = 0.22
 
 local function GetSortMode(index)
 	return SORT_MODES[index or 1] or SORT_MODES[1]
@@ -66,6 +68,57 @@ local function GetCustomerRowOrderType(AF, entry)
 		return "none"
 	end
 	return AF:IsGuildOrderEntry(entry) and "guild" or "personal"
+end
+
+local function GetCustomerOrderFillData(AF, entry)
+	if not entry or entry.tutorialFake or entry.ownSelf then
+		return nil
+	end
+
+	local isGuildOrder = AF:IsGuildOrderEntry(entry)
+	local data = {
+		isGuildOrder = isGuildOrder,
+		orderType = isGuildOrder and Enum.CraftingOrderType.Guild or Enum.CraftingOrderType.Personal,
+		orderLabel = isGuildOrder
+			and (_G.PROFESSIONS_CRAFTING_FORM_ORDER_RECIPIENT_GUILD or _G.PROFESSIONS_CRAFTING_FORM_ORDER_RECIPIENT_GUILD_ORDER or AF:Text("GUILD_ORDER"))
+			or (_G.PROFESSIONS_CRAFTING_FORM_ORDER_RECIPIENT_PRIVATE or AF:Text("PERSONAL_ORDER")),
+	}
+
+	if not isGuildOrder then
+		data.recipient = AF:NormalizeName(entry.orderTarget or entry.name or entry.target)
+	end
+
+	if not entry.freeCommission and tonumber(entry.priceCopper) and tonumber(entry.priceCopper) > 0 then
+		data.commissionCopper = tonumber(entry.priceCopper) or 0
+		data.commissionGold = tostring(math.floor(data.commissionCopper / 10000))
+	end
+
+	return data
+end
+
+local function IsCustomerRowClickable(entry)
+	return entry and not entry.tutorialFake and not entry.ownSelf
+end
+
+local function SetCustomerRowHighlight(row, entry)
+	local highlight = row and row:GetHighlightTexture()
+	if not highlight then
+		return
+	end
+
+	if entry and entry.ownSelf then
+		if highlight.SetDesaturated then
+			highlight:SetDesaturated(true)
+		end
+		highlight:SetVertexColor(0.55, 0.55, 0.55)
+		highlight:SetAlpha(CUSTOMER_ROW_OWN_HIGHLIGHT_ALPHA)
+	else
+		if highlight.SetDesaturated then
+			highlight:SetDesaturated(false)
+		end
+		highlight:SetVertexColor(1, 1, 1)
+		highlight:SetAlpha(CUSTOMER_ROW_HIGHLIGHT_ALPHA)
+	end
 end
 
 local function GetCustomerRowAvailability(AF, entry)
@@ -407,6 +460,11 @@ end
 
 local function ConfigureCustomerRow(row)
 	AF:StyleListRow(row)
+	row:SetPushedTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
+	if row:GetPushedTexture() then
+		row:GetPushedTexture():SetBlendMode("ADD")
+		row:GetPushedTexture():SetAlpha(0.35)
+	end
 	row:EnableMouse(true)
 	row:RegisterForClicks("LeftButtonUp")
 
@@ -489,15 +547,17 @@ local function ConfigureCustomerRow(row)
 	end)
 	row:SetScript("OnEnter", function(buttonFrame)
 		if buttonFrame.entry then
-			GameTooltip:SetOwner(buttonFrame, "ANCHOR_RIGHT")
+			SetCustomerRowHighlight(buttonFrame, buttonFrame.entry)
 			if buttonFrame.entry.tutorialFake then
-				GameTooltip:SetText(buttonFrame.entry.name or AF:Text("TUTORIAL_FAKE_ARTISAN_NAME"), 1, 0.82, 0)
-				GameTooltip:AddLine(AF:Text("TUTORIAL_FAKE_ARTISAN_TOOLTIP"), 1, 1, 1, true)
-				AF:StyleCustomerTooltip(GameTooltip)
-				GameTooltip:Show()
+				GameTooltip:Hide()
 				return
 			end
+			GameTooltip:SetOwner(buttonFrame, "ANCHOR_RIGHT")
 			AF:AddCustomerEntryTooltipLines(GameTooltip, buttonFrame.entry, { requestReagentDetails = true })
+			if IsCustomerRowClickable(buttonFrame.entry) then
+				GameTooltip:AddLine(" ")
+				GameTooltip:AddLine(AF:Text("CUSTOMER_ROW_CLICK_TO_AUTOFILL"), 0.65, 0.65, 0.65, true)
+			end
 			AF:StyleCustomerTooltip(GameTooltip)
 			AF:FitTooltipWidthToContent(GameTooltip)
 			GameTooltip:Show()
@@ -508,6 +568,11 @@ local function ConfigureCustomerRow(row)
 		buttonFrame:SetScript("OnUpdate", nil)
 		HideCustomerNoteTooltip()
 		GameTooltip:Hide()
+	end)
+	row:SetScript("OnClick", function(buttonFrame)
+		if IsCustomerRowClickable(buttonFrame.entry) then
+			AF:FillPersonalOrder(buttonFrame.entry)
+		end
 	end)
 
 	return row
@@ -735,7 +800,6 @@ function AF:RefreshCustomerLocale()
 	self:UpdateCustomerRefreshButton()
 	frame.menu.favorite:SetText(self:Text(frame.menu.entry and self:IsFavoriteArtisan(frame.menu.entry) and "UNFAVORITE" or "FAVORITE"))
 	frame.menu.whisper:SetText(self:Text("WHISPER"))
-	frame.menu.personal:SetText(self:Text(self:IsGuildOrderEntry(frame.menu.entry) and "GUILD_ORDER" or "PERSONAL_ORDER"))
 	frame.menu.link:SetText(self:Text("PROFESSION"))
 end
 
@@ -931,14 +995,6 @@ function AF:AttachCustomerUI()
 	frame.menu.whisper:SetScript("OnClick", function()
 		if frame.menu.entry and not frame.menu.entry.tutorialFake and not frame.menu.entry.ownAlt then
 			AF:OpenWhisper(frame.menu.entry.target or frame.menu.entry.name)
-		end
-		AF:HideCustomerMenu()
-	end)
-
-	frame.menu.personal:SetText(self:Text("PERSONAL_ORDER"))
-	frame.menu.personal:SetScript("OnClick", function()
-		if frame.menu.entry and not frame.menu.entry.tutorialFake then
-			AF:FillPersonalOrder(frame.menu.entry)
 		end
 		AF:HideCustomerMenu()
 	end)
@@ -1153,11 +1209,9 @@ function AF:ShowCustomerMenu(entry, owner)
 	end
 	menu.entry = entry
 	menu.favorite:SetText(self:Text(self:IsFavoriteArtisan(entry) and "UNFAVORITE" or "FAVORITE"))
-	menu.personal:SetText(self:Text(self:IsGuildOrderEntry(entry) and "GUILD_ORDER" or "PERSONAL_ORDER"))
 	if entry.tutorialFake then
 		menu.favorite:SetText(self:Text(self.customerTutorialFavorite and "UNFAVORITE" or "FAVORITE"))
 		menu.whisper:Disable()
-		menu.personal:Disable()
 		menu.link:Disable()
 		self:SetProfessionButtonTooltip(self:Text("TUTORIAL_FAKE_ACTION_TOOLTIP"))
 	elseif entry.ownAlt then
@@ -1173,11 +1227,6 @@ function AF:ShowCustomerMenu(entry, owner)
 	else
 		menu.link:Disable()
 		self:SetProfessionButtonTooltip(self:Text("PROFESSION_LINK_UNAVAILABLE_TOOLTIP"))
-	end
-	if entry.ownSelf then
-		menu.personal:Disable()
-	elseif not entry.tutorialFake then
-		menu.personal:Enable()
 	end
 	menu:ClearAllPoints()
 	menu:SetPoint("TOPLEFT", owner, "TOPRIGHT", 2, 0)
@@ -1454,6 +1503,7 @@ function AF:RefreshCustomerResults(statusOverride)
 	for i, row in ipairs(self.customerRows or {}) do
 		local entry = rows[i]
 		row.entry = entry
+		SetCustomerRowHighlight(row, entry)
 		row:ClearAllPoints()
 		row:SetPoint("TOPLEFT", 0, -contentHeight)
 		row:SetWidth(math.max(280, frame.scroll:GetWidth() - 4))
@@ -1655,36 +1705,29 @@ function AF:FillPersonalOrder(entry)
 	end
 
 	local form = ProfessionsCustomerOrdersFrame.Form
-	local isGuildOrder = self:IsGuildOrderEntry(entry)
-	local orderType = isGuildOrder and Enum.CraftingOrderType.Guild or Enum.CraftingOrderType.Personal
-	local orderLabel = isGuildOrder
-		and (_G.PROFESSIONS_CRAFTING_FORM_ORDER_RECIPIENT_GUILD or _G.PROFESSIONS_CRAFTING_FORM_ORDER_RECIPIENT_GUILD_ORDER or self:Text("GUILD_ORDER"))
-		or (_G.PROFESSIONS_CRAFTING_FORM_ORDER_RECIPIENT_PRIVATE or self:Text("PERSONAL_ORDER"))
+	local fillData = GetCustomerOrderFillData(self, entry)
+	if not fillData then
+		return
+	end
 
-	form:SetOrderRecipient(orderType)
+	form:SetOrderRecipient(fillData.orderType)
 	if form.OrderRecipientDropdown then
-		form.OrderRecipientDropdown:SetText(orderLabel)
+		form.OrderRecipientDropdown:SetText(fillData.orderLabel)
 	end
 	if form.OrderRecipientTarget then
-		if isGuildOrder then
+		if fillData.isGuildOrder then
 			form.OrderRecipientTarget:SetText("")
-		else
-			local recipient = self:NormalizeName(entry.orderTarget or entry.name or entry.target)
-			form.OrderRecipientTarget:SetText(recipient)
+		elseif fillData.recipient then
+			form.OrderRecipientTarget:SetText(fillData.recipient)
 		end
 	end
 
-	local commissionCopper = 0
-	if not entry.freeCommission and tonumber(entry.priceCopper) and tonumber(entry.priceCopper) > 0 then
-		commissionCopper = tonumber(entry.priceCopper) or 0
-	end
-	if commissionCopper > 0 then
-		local commissionGold = tostring(math.floor(commissionCopper / 10000))
-		form.PaymentContainer.TipMoneyInputFrame.GoldBox:SetText(commissionGold)
+	if fillData.commissionGold then
+		form.PaymentContainer.TipMoneyInputFrame.GoldBox:SetText(fillData.commissionGold)
 	end
 
 	form:UpdateListOrderButton()
-	local message = self:Text(isGuildOrder and "GUILD_ORDER_FILLED" or "PERSONAL_ORDER_FILLED")
+	local message = self:Text(fillData.isGuildOrder and "GUILD_ORDER_FILLED" or "PERSONAL_ORDER_FILLED")
 	if not self:SetCustomerOrderFormMessage(message) then
 		self:Print(message)
 	end

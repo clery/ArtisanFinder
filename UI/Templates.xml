@@ -105,7 +105,7 @@
 	</Button>
 
 	<Frame name="ArtisanFinderCustomerMenuTemplate" virtual="true" inherits="BackdropTemplate">
-		<Size x="164" y="132"/>
+		<Size x="164" y="104"/>
 		<Frames>
 			<Button parentKey="favorite" inherits="UIPanelButtonTemplate">
 				<Size x="140" y="23"/>
@@ -119,16 +119,10 @@
 					<Anchor point="TOP" x="0" y="-40"/>
 				</Anchors>
 			</Button>
-			<Button parentKey="personal" inherits="UIPanelButtonTemplate">
-				<Size x="140" y="23"/>
-				<Anchors>
-					<Anchor point="TOP" x="0" y="-68"/>
-				</Anchors>
-			</Button>
 			<Button parentKey="link" inherits="UIPanelButtonTemplate">
 				<Size x="140" y="23"/>
 				<Anchors>
-					<Anchor point="TOP" x="0" y="-96"/>
+					<Anchor point="TOP" x="0" y="-68"/>
 				</Anchors>
 			</Button>
 		</Frames>

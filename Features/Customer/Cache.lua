@@ -171,6 +171,7 @@ local function ClearGuildAffiliation(entry)
 	entry.guildMember = nil
 	entry.guildOnline = nil
 	entry.guildMemberGUID = nil
+	entry.guildRecipeKnown = nil
 	entry.guildKey = nil
 	return entry
 end

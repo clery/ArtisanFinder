@@ -821,8 +821,9 @@ function AF:HandleResponse(parts, sender)
 		return
 	end
 	local guildResponse = responseTarget ~= nil
-	local guildKey = guildResponse and self.GetCurrentGuildCacheKey and self:GetCurrentGuildCacheKey() or nil
 	local guildRosterEntry = guildResponse and self:GetCachedGuildRosterEntry(crafterName) or nil
+	local validGuildResponse = guildResponse and guildRosterEntry ~= nil
+	local guildKey = validGuildResponse and self.GetCurrentGuildCacheKey and self:GetCurrentGuildCacheKey() or nil
 
 	local verifiedForCurrentQuery = queryToken
 		and self.currentCustomerQueryToken
@@ -843,7 +844,7 @@ function AF:HandleResponse(parts, sender)
 	else
 		professionLink = self:GetRememberedProfessionLink(crafterName, professionID) or ""
 	end
-	if self.RememberArtisanContact then
+	if validGuildResponse and self.RememberArtisanContact then
 		self:RememberArtisanContact(crafterName, sender, guildKey)
 	end
 	self.db.customerCache[itemKey][cacheKey] = {
@@ -883,8 +884,8 @@ function AF:HandleResponse(parts, sender)
 		verifiedAt = verifiedForCurrentQuery and self:Now() or nil,
 		lastQueryToken = queryToken,
 		lastQueryAt = verifiedForCurrentQuery and self.lastQueryAt or nil,
-		guildMember = guildResponse or nil,
-		guildOnline = guildResponse and true or nil,
+		guildMember = validGuildResponse or nil,
+		guildOnline = validGuildResponse and true or nil,
 		guildMemberGUID = guildRosterEntry and guildRosterEntry.guid or nil,
 		guildKey = guildKey,
 		afk = afk or nil,
@@ -900,7 +901,7 @@ function AF:HandleResponse(parts, sender)
 		tostring(itemID or ""),
 		tostring(professionID or ""),
 		tostring(verifiedForCurrentQuery == true),
-		tostring(guildResponse == true),
+		tostring(validGuildResponse == true),
 		tostring(responseReagents ~= nil)
 	))
 	self:ApplyPendingReagentDetail(sender, itemID, recipeID, queryToken, crafterName)

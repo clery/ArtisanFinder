@@ -91,6 +91,86 @@ local function GetGuildShortNameKey(name)
 	return shortName ~= "" and shortName or nil
 end
 
+local function HasExplicitRealm(name)
+	return tostring(name or ""):find("-", 1, true) ~= nil
+end
+
+local function CreateGuildRosterLookup()
+	return {
+		names = {},
+		shortNames = {},
+		guids = {},
+		namesByGUID = {},
+	}
+end
+
+local function AddGuildRosterLookupName(AF, lookup, name)
+	local normalizedName = AF:NormalizeName(name)
+	if not normalizedName then
+		return nil
+	end
+	lookup.names[normalizedName] = true
+	if not HasExplicitRealm(name) then
+		local shortKey = GetGuildShortNameKey(name)
+		if shortKey then
+			lookup.shortNames[shortKey] = true
+		end
+	end
+	return normalizedName
+end
+
+local function AddGuildRosterLookupGUID(lookup, guid, name)
+	guid = guid and tostring(guid) or nil
+	if guid and guid ~= "" then
+		lookup.guids[guid] = true
+		if name then
+			lookup.namesByGUID[guid] = name
+		end
+	end
+end
+
+local function EnsureGuildRosterLookup(AF, rosterNames)
+	if type(rosterNames) == "table" and rosterNames.names then
+		return rosterNames
+	end
+	local lookup = CreateGuildRosterLookup()
+	for name in pairs(rosterNames or {}) do
+		AddGuildRosterLookupName(AF, lookup, name)
+	end
+	return lookup
+end
+
+local function GuildRosterLookupHasName(AF, lookup, name)
+	local normalizedName = AF:NormalizeName(name)
+	if normalizedName and lookup.names[normalizedName] then
+		return true
+	end
+	if not HasExplicitRealm(name) then
+		local shortKey = GetGuildShortNameKey(name)
+		if shortKey and lookup.shortNames[shortKey] then
+			return true
+		end
+	end
+	return false
+end
+
+local function GuildRosterLookupHasGUID(lookup, guid)
+	guid = guid and tostring(guid) or nil
+	return guid and guid ~= "" and lookup.guids[guid] == true or false
+end
+
+local function GuildRosterLookupHasMember(AF, lookup, name, guid)
+	return GuildRosterLookupHasGUID(lookup, guid) or GuildRosterLookupHasName(AF, lookup, name)
+end
+
+local function GetTableKeys(tbl)
+	local keys = {}
+	for key in pairs(tbl or {}) do
+		table.insert(keys, key)
+	end
+	return keys
+end
+
 local function IsCurrentPlayer(AF, name)
 	return AF:NormalizeName(name) == AF:NormalizeName(AF.playerName or AF:GetPlayerFullName())
 end
@@ -290,35 +370,87 @@ local function ClearCachedCustomerGuildAffiliation(entry, orderTarget)
 	return true
 end
 
-local function CacheEntryMatchesDepartedGuildMember(AF, entry, cacheKey, rosterNames, departedNames, guildKey)
+local function EntryHasCachedGuildAffiliation(entry, guildKey)
+	return entry.guildMember ~= nil
+		or entry.guildOnline ~= nil
+		or entry.guildMemberGUID ~= nil
+		or entry.guildRecipeKnown ~= nil
+		or entry.guildKey ~= nil
+		or guildKey ~= nil and entry.guildKey == guildKey
+end
+
+local function ForEachCustomerGuildNameCandidate(AF, entry, cacheKey, callback)
 	if type(entry) ~= "table" then
+		return
+	end
+	local candidates = {
+		entry.orderTarget,
+		entry.name,
+		cacheKey,
+	}
+	if not entry.orderTarget and not entry.name then
+		table.insert(candidates, entry.target)
+	end
+	local seen = {}
+	for _, candidate in ipairs(candidates) do
+		local normalizedName = AF:NormalizeName(candidate)
+		if normalizedName and not seen[normalizedName] then
+			seen[normalizedName] = true
+			if callback(candidate, normalizedName) then
+				return
+			end
+		end
+	end
+end
+
+local function CacheEntryMatchesDepartedGuildMember(AF, entry, cacheKey, rosterLookup, departedLookup, guildKey)
+	if not EntryHasCachedGuildAffiliation(entry, guildKey) then
 		return nil
 	end
-	local name = AF:NormalizeName(entry.orderTarget or entry.name or entry.target or cacheKey)
-	if not name then
+	if GuildRosterLookupHasGUID(rosterLookup, entry.guildMemberGUID) then
 		return nil
 	end
-	if departedNames[name] then
-		return name
+	local matchedRoster
+	local departedName
+	local firstName
+	ForEachCustomerGuildNameCandidate(AF, entry, cacheKey, function(candidate, normalizedName)
+		firstName = firstName or normalizedName
+		if departedLookup.names[normalizedName] then
+			departedName = normalizedName
+			return true
+		end
+		if GuildRosterLookupHasName(AF, rosterLookup, candidate) then
+			matchedRoster = true
+			return true
+		end
+		return false
+	end)
+	if matchedRoster then
+		return nil
 	end
-	if (entry.guildMember or entry.guildKey == guildKey) and not rosterNames[name] then
-		return name
+	if departedName then
+		return departedName
 	end
-	return nil
+	if entry.guildMemberGUID and departedLookup.guids[tostring(entry.guildMemberGUID)] then
+		return firstName or tostring(entry.guildMemberGUID)
+	end
+	return firstName or tostring(entry.guildMemberGUID or "")
 end
 
 function AF:ClearDepartedGuildCustomerCacheAffiliations(rosterNames, departedNames)
 	if type(rosterNames) ~= "table" or type(departedNames) ~= "table" then
 		return 0
 	end
+	local rosterLookup = EnsureGuildRosterLookup(self, rosterNames)
+	local departedLookup = EnsureGuildRosterLookup(self, departedNames)
 	local cleared = 0
 	local guildKey = self.currentGuildCacheKey
 	for _, itemCache in pairs(self.db and self.db.customerCache or {}) do
 		if type(itemCache) == "table" then
 			for cacheKey, entry in pairs(itemCache) do
-				local name = CacheEntryMatchesDepartedGuildMember(self, entry, cacheKey, rosterNames, departedNames, guildKey)
+				local name = CacheEntryMatchesDepartedGuildMember(self, entry, cacheKey, rosterLookup, departedLookup, guildKey)
 				if name then
-					local orderTarget = self:IsNameOnConnectedRealm(name) and name or nil
+					local orderTarget = name ~= "" and self:IsNameOnConnectedRealm(name) and name or nil
 					if ClearCachedCustomerGuildAffiliation(entry, orderTarget) then
 						cleared = cleared + 1
 					end
@@ -329,18 +461,51 @@ function AF:ClearDepartedGuildCustomerCacheAffiliations(rosterNames, departedNam
 	return cleared
 end
 
+function AF:ClearDepartedGuildArtisanContacts(rosterNames, departedNames)
+	if type(rosterNames) ~= "table" or type(departedNames) ~= "table" then
+		return 0
+	end
+	local rosterLookup = EnsureGuildRosterLookup(self, rosterNames)
+	local departedLookup = EnsureGuildRosterLookup(self, departedNames)
+	local cleared = 0
+	local guildKey = self.currentGuildCacheKey
+	for _, crafterName in ipairs(GetTableKeys(self.db and self.db.artisanContacts)) do
+		local entry = self.db and self.db.artisanContacts and self.db.artisanContacts[crafterName]
+		if type(entry) == "table" and (guildKey == nil or entry.guildKey == nil or entry.guildKey == guildKey) then
+			local normalizedName = self:NormalizeName(crafterName)
+			if normalizedName
+				and (departedLookup.names[normalizedName] or not GuildRosterLookupHasName(self, rosterLookup, crafterName))
+			then
+				self.db.artisanContacts[crafterName] = nil
+				cleared = cleared + 1
+			end
+		end
+	end
+	return cleared
+end
+
 function AF:ReconcileGuildCachesToRoster(rosterNames)
-	if type(rosterNames) ~= "table" or not next(rosterNames) then
-		return
+	local rosterLookup = EnsureGuildRosterLookup(self, rosterNames)
+	if type(rosterLookup.names) ~= "table" or not next(rosterLookup.names) then
+		return 0
 	end
 
-	local departedNames = {}
-	for name in pairs(self.guildRosterByName or {}) do
+	local departedLookup = CreateGuildRosterLookup()
+	local removedRoster = 0
+	local removedProfession = 0
+	local removedRecipe = 0
+	for _, name in ipairs(GetTableKeys(self.guildRosterByName)) do
 		local normalizedName = self:NormalizeName(name)
-		if not normalizedName or not rosterNames[normalizedName] then
+		local entry = self.guildRosterByName[name]
+		local rosterName = entry and entry.guid and rosterLookup.namesByGUID[tostring(entry.guid)]
+		if not normalizedName or not GuildRosterLookupHasMember(self, rosterLookup, name, entry and entry.guid) then
 			if normalizedName then
-				departedNames[normalizedName] = true
+				AddGuildRosterLookupName(self, departedLookup, normalizedName)
 			end
+			AddGuildRosterLookupGUID(departedLookup, entry and entry.guid)
+			self.guildRosterByName[name] = nil
+			removedRoster = removedRoster + 1
+		elseif rosterName and rosterName ~= name then
 			self.guildRosterByName[name] = nil
 		elseif normalizedName ~= name then
 			self.guildRosterByName[name] = nil
@@ -348,15 +513,24 @@ function AF:ReconcileGuildCachesToRoster(rosterNames)
 	end
 
 	for _, professionCache in pairs(self.guildProfessionMembers or {}) do
-		for name in pairs(professionCache.members or {}) do
+		for _, name in ipairs(GetTableKeys(professionCache.members)) do
 			local normalizedName = self:NormalizeName(name)
-			if not normalizedName or not rosterNames[normalizedName] then
+			local member = professionCache.members[name]
+			local rosterName = member and member.guid and rosterLookup.namesByGUID[tostring(member.guid)]
+			if not normalizedName or not GuildRosterLookupHasMember(self, rosterLookup, name, member and member.guid) then
 				if normalizedName then
-					departedNames[normalizedName] = true
+					AddGuildRosterLookupName(self, departedLookup, normalizedName)
 				end
+				AddGuildRosterLookupGUID(departedLookup, member and member.guid)
 				professionCache.members[name] = nil
+				removedProfession = removedProfession + 1
+			elseif rosterName and rosterName ~= name then
+				professionCache.members[name] = nil
+				if type(member) == "table" and not professionCache.members[rosterName] then
+					member.name = rosterName
+					professionCache.members[rosterName] = member
+				end
 			elseif normalizedName ~= name then
-				local member = professionCache.members[name]
 				professionCache.members[name] = nil
 				if type(member) == "table" and not professionCache.members[normalizedName] then
 					member.name = normalizedName
@@ -370,18 +544,19 @@ function AF:ReconcileGuildCachesToRoster(rosterNames)
 		local prunedMembers = {}
 		for _, name in ipairs(recipeCache.members or {}) do
 			local normalizedName = self:NormalizeName(name)
-			if normalizedName and rosterNames[normalizedName] then
+			if normalizedName and GuildRosterLookupHasName(self, rosterLookup, name) then
 				table.insert(prunedMembers, normalizedName)
 			elseif normalizedName then
-				departedNames[normalizedName] = true
+				AddGuildRosterLookupName(self, departedLookup, normalizedName)
+				removedRecipe = removedRecipe + 1
 			end
 		end
 		recipeCache.members = prunedMembers
-		for name in pairs(recipeCache.online or {}) do
+		for _, name in ipairs(GetTableKeys(recipeCache.online)) do
 			local normalizedName = self:NormalizeName(name)
-			if not normalizedName or not rosterNames[normalizedName] then
+			if not normalizedName or not GuildRosterLookupHasName(self, rosterLookup, name) then
 				if normalizedName then
-					departedNames[normalizedName] = true
+					AddGuildRosterLookupName(self, departedLookup, normalizedName)
 				end
 				recipeCache.online[name] = nil
 			elseif normalizedName ~= name then
@@ -389,11 +564,11 @@ function AF:ReconcileGuildCachesToRoster(rosterNames)
 				recipeCache.online[name] = nil
 			end
 		end
-		for name in pairs(recipeCache.lastAvailableAt or {}) do
+		for _, name in ipairs(GetTableKeys(recipeCache.lastAvailableAt)) do
 			local normalizedName = self:NormalizeName(name)
-			if not normalizedName or not rosterNames[normalizedName] then
+			if not normalizedName or not GuildRosterLookupHasName(self, rosterLookup, name) then
 				if normalizedName then
-					departedNames[normalizedName] = true
+					AddGuildRosterLookupName(self, departedLookup, normalizedName)
 				end
 				recipeCache.lastAvailableAt[name] = nil
 			elseif normalizedName ~= name then
@@ -402,8 +577,22 @@ function AF:ReconcileGuildCachesToRoster(rosterNames)
 			end
 		end
 	end
-	self:ClearDepartedGuildCustomerCacheAffiliations(rosterNames, departedNames)
+	local clearedCustomers = self:ClearDepartedGuildCustomerCacheAffiliations(rosterLookup, departedLookup)
+	local clearedContacts = self:ClearDepartedGuildArtisanContacts(rosterLookup, departedLookup)
 	self:RebuildGuildRosterNameLookup()
+	local changed = removedRoster + removedProfession + removedRecipe + clearedCustomers + clearedContacts
+	if changed > 0 then
+		self:DebugLog("guild", string.format(
+			"reconciled roster=%d removedRoster=%d removedProfession=%d removedRecipe=%d clearedCustomers=%d clearedContacts=%d",
+			self.guildRosterCount or 0,
+			removedRoster,
+			removedProfession,
+			removedRecipe,
+			clearedCustomers,
+			clearedContacts
+		))
+	end
+	return changed
 end
 
 function AF:ResolveGuildMemberName(name, requestRefresh)
@@ -506,13 +695,13 @@ function AF:RefreshGuildRosterCache(requestRefresh)
 
 	self.guildRosterByName = self.guildRosterByName or {}
 	self.guildRosterNameByShort = {}
-	local rosterNames = {}
+	local rosterLookup = CreateGuildRosterLookup()
 	local count = 0
 	for index = 1, GetGuildRosterCount() do
 		local name, online, isMobile, guid = GetRosterInfo(index)
-		name = self:NormalizeName(name)
+		name = AddGuildRosterLookupName(self, rosterLookup, name)
+		AddGuildRosterLookupGUID(rosterLookup, guid, name)
 		if name then
-			rosterNames[name] = true
 			self:RememberGuildRosterNameLookup(name)
 			local entry = self.guildRosterByName[name] or {}
 			local isOnline = IsOnlineFlag(online)
@@ -551,8 +740,9 @@ function AF:RefreshGuildRosterCache(requestRefresh)
 			count = count + 1
 		end
 	end
+	self.guildRosterCount = count
 	if count > 0 then
-		self:ReconcileGuildCachesToRoster(rosterNames)
+		self:ReconcileGuildCachesToRoster(rosterLookup)
 	end
 	return count
 end
@@ -648,6 +838,9 @@ function AF:RememberGuildProfessionMember(professionID, name, professionName, on
 	local member = professionCache.members[name] or { name = name }
 	local now = updatedAt or self:Now()
 	local rosterEntry = self:GetGuildRosterEntry(name)
+	if not rosterEntry then
+		return nil
+	end
 	local isOnline = IsOnlineFlag(online)
 	if online == nil and rosterEntry then
 		isOnline = rosterEntry.online == true
@@ -659,6 +852,7 @@ function AF:RememberGuildProfessionMember(professionID, name, professionName, on
 	professionCache.members[name] = member
 	member.name = name
 	member.online = isOnline
+	member.guid = rosterEntry.guid
 	member.professionName = nil
 	if isOnline then
 		member.updatedAt = now
@@ -714,7 +908,7 @@ function AF:GetGuildCachedProfessionMemberRows(itemID, professionID, filterText,
 				or member.lastAvailableAt
 				or (rosterEntry and rosterEntry.lastAvailableAt)
 				or member.updatedAt
-			if knowsRecipe and not IsGuildMemberTooStale(self, isOnline, rowUpdatedAt) then
+			if rosterEntry and knowsRecipe and not IsGuildMemberTooStale(self, isOnline, rowUpdatedAt) then
 				local entry = {
 					name = name,
 					target = name,
@@ -784,7 +978,7 @@ function AF:GetGuildRecipeMemberRows(itemID, professionID, filterText, seenNames
 				or (cachedMember and cachedMember.lastAvailableAt)
 				or (rosterEntry and rosterEntry.lastAvailableAt)
 			local fallbackUpdatedAt = cachedMember and cachedMember.updatedAt
-			if not IsGuildMemberTooStale(self, isOnline, lastAvailableAt or fallbackUpdatedAt) then
+			if rosterEntry and not IsGuildMemberTooStale(self, isOnline, lastAvailableAt or fallbackUpdatedAt) then
 				local entry = {
 					name = name,
 					target = name,
