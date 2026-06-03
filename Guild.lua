@@ -37,6 +37,53 @@ local function IsGuildMemberTooStale(AF, online, lastAvailableAt)
 	return lastAvailableAt and AF:Now() - lastAvailableAt > GUILD_OFFLINE_MAX_AGE
 end
 
+local function GetGuildCacheNameKey(name)
+	name = tostring(name or ""):gsub("%s+", "")
+	name = name:lower()
+	return name ~= "" and name or nil
+end
+
+local function GetCurrentGuildInfo()
+	if not IsInGuild or not IsInGuild() or not GetGuildInfo then
+		return nil, nil
+	end
+	local guildName, _, _, guildRealm = GetGuildInfo("player")
+	if not guildName or guildName == "" then
+		return nil, nil
+	end
+	guildRealm = guildRealm or (GetNormalizedRealmName and GetNormalizedRealmName()) or GetRealmName()
+	return guildName, guildRealm
+end
+
+local function BuildGuildCacheKey(guildName, guildRealm)
+	local guildKey = GetGuildCacheNameKey(guildName)
+	if not guildKey then
+		return nil
+	end
+	local realmKey = GetGuildCacheNameKey(guildRealm)
+	return realmKey and (guildKey .. "-" .. realmKey) or guildKey
+end
+
+local function CreateGuildCache(guildKey, guildName, guildRealm)
+	return {
+		guildKey = guildKey,
+		guildName = guildName,
+		guildRealm = guildRealm,
+		rosterByName = {},
+		recipeMembers = {},
+		professionMembers = {},
+	}
+end
+
+local function HasLegacyGuildCacheData(guildCache)
+	return type(guildCache) == "table"
+		and (
+			next(guildCache.rosterByName or {}) ~= nil
+			or next(guildCache.recipeMembers or {}) ~= nil
+			or next(guildCache.professionMembers or {}) ~= nil
+		)
+end
+
 local function GetGuildShortNameKey(name)
 	name = tostring(name or ""):gsub("%s+", "")
 	local shortName = name:match("^([^-]+)") or name
@@ -53,7 +100,7 @@ local function GetOnlineGuildContact(AF, name)
 		return nil, nil
 	end
 	local normalizedName = AF:NormalizeName(name)
-	local contactName = AF:GetRememberedArtisanContact(normalizedName)
+	local contactName = AF:GetRememberedArtisanContact(normalizedName, AF:GetCurrentGuildCacheKey())
 	if not contactName or contactName == normalizedName then
 		return nil, nil
 	end
@@ -135,14 +182,63 @@ end
 function AF:EnsureGuildCache()
 	self.db = self.db or {}
 	self.db.guildCache = self.db.guildCache or {}
-	self.db.guildCache.rosterByName = self.db.guildCache.rosterByName or {}
-	self.db.guildCache.recipeMembers = self.db.guildCache.recipeMembers or {}
-	self.db.guildCache.professionMembers = self.db.guildCache.professionMembers or {}
-	self.guildRosterByName = self.db.guildCache.rosterByName
-	self.guildRecipeMembers = self.db.guildCache.recipeMembers
-	self.guildProfessionMembers = self.db.guildCache.professionMembers
+	self.db.guildCache.byGuild = self.db.guildCache.byGuild or {}
+
+	local guildName, guildRealm = GetCurrentGuildInfo()
+	local guildKey = BuildGuildCacheKey(guildName, guildRealm)
+	if self.currentGuildCacheKey ~= guildKey then
+		self.guildRosterNameByShort = {}
+		self.guildTradeSkillParsedAt = {}
+		self.guildRecipeQueries = {}
+		self.guildTradeSkillLastRefresh = 0
+	end
+	self.currentGuildCacheKey = guildKey
+
+	if not guildKey then
+		self.guildCache = CreateGuildCache(nil)
+		self.guildRosterByName = self.guildCache.rosterByName
+		self.guildRecipeMembers = self.guildCache.recipeMembers
+		self.guildProfessionMembers = self.guildCache.professionMembers
+		self.guildRosterNameByShort = self.guildRosterNameByShort or {}
+		return self.guildCache
+	end
+
+	if not self.db.guildCache.byGuild[guildKey] then
+		if HasLegacyGuildCacheData(self.db.guildCache) and not self.db.guildCache.legacyMigrated then
+			self.db.guildCache.byGuild[guildKey] = {
+				guildKey = guildKey,
+				guildName = guildName,
+				guildRealm = guildRealm,
+				rosterByName = self.db.guildCache.rosterByName or {},
+				recipeMembers = self.db.guildCache.recipeMembers or {},
+				professionMembers = self.db.guildCache.professionMembers or {},
+			}
+			self.db.guildCache.rosterByName = nil
+			self.db.guildCache.recipeMembers = nil
+			self.db.guildCache.professionMembers = nil
+			self.db.guildCache.legacyMigrated = true
+		else
+			self.db.guildCache.byGuild[guildKey] = CreateGuildCache(guildKey, guildName, guildRealm)
+		end
+	end
+
+	self.guildCache = self.db.guildCache.byGuild[guildKey]
+	self.guildCache.guildKey = guildKey
+	self.guildCache.guildName = guildName
+	self.guildCache.guildRealm = guildRealm
+	self.guildCache.rosterByName = self.guildCache.rosterByName or {}
+	self.guildCache.recipeMembers = self.guildCache.recipeMembers or {}
+	self.guildCache.professionMembers = self.guildCache.professionMembers or {}
+	self.guildRosterByName = self.guildCache.rosterByName
+	self.guildRecipeMembers = self.guildCache.recipeMembers
+	self.guildProfessionMembers = self.guildCache.professionMembers
 	self.guildRosterNameByShort = self.guildRosterNameByShort or {}
-	return self.db.guildCache
+	return self.guildCache
+end
+
+function AF:GetCurrentGuildCacheKey()
+	self:EnsureGuildCache()
+	return self.currentGuildCacheKey
 end
 
 function AF:RememberGuildRosterNameLookup(name)
@@ -247,16 +343,16 @@ end
 
 function AF:MarkCachedGuildMembersOffline()
 	for _, entry in pairs(self.guildRosterByName or {}) do
-		entry.online = nil
+		entry.online = false
 	end
 	for _, professionCache in pairs(self.guildProfessionMembers or {}) do
 		for _, member in pairs(professionCache.members or {}) do
-			member.online = nil
+			member.online = false
 		end
 	end
 	for _, recipeCache in pairs(self.guildRecipeMembers or {}) do
 		for name in pairs(recipeCache.online or {}) do
-			recipeCache.online[name] = nil
+			recipeCache.online[name] = false
 		end
 	end
 end
@@ -271,11 +367,16 @@ function AF:InitializeGuild()
 end
 
 function AF:ClearGuildMemberData(skipRefresh)
-	self.db.guildCache = {
-		rosterByName = {},
-		recipeMembers = {},
-		professionMembers = {},
-	}
+	self:EnsureGuildCache()
+	if self.currentGuildCacheKey and self.db.guildCache and self.db.guildCache.byGuild then
+		self.db.guildCache.byGuild[self.currentGuildCacheKey] = CreateGuildCache(self.currentGuildCacheKey, self.guildCache and self.guildCache.guildName, self.guildCache and self.guildCache.guildRealm)
+	else
+		self.db.guildCache = {
+			byGuild = {},
+			legacyMigrated = true,
+		}
+	end
+	self.guildRosterNameByShort = {}
 	self:EnsureGuildCache()
 	self.guildRecipeQueries = {}
 	self.guildTradeSkillLastRefresh = 0
@@ -295,11 +396,6 @@ end
 function AF:RefreshGuildRosterCache(requestRefresh)
 	self:EnsureGuildCache()
 	if not IsInGuild or not IsInGuild() then
-		self.db.guildCache = {
-			rosterByName = {},
-			recipeMembers = {},
-			professionMembers = {},
-		}
 		self:EnsureGuildCache()
 		return 0
 	end
@@ -537,6 +633,7 @@ function AF:GetGuildCachedProfessionMemberRows(itemID, professionID, filterText,
 					guildOnline = online,
 					lastAvailableAt = member.lastAvailableAt,
 					guildMemberGUID = rosterEntry and rosterEntry.guid or nil,
+					guildKey = self.currentGuildCacheKey,
 					recipeID = recipeID,
 				}
 				if contactName then
@@ -606,6 +703,7 @@ function AF:GetGuildRecipeMemberRows(itemID, professionID, filterText, seenNames
 					guildOnline = online,
 					lastAvailableAt = lastAvailableAt,
 					guildMemberGUID = rosterEntry and rosterEntry.guid or nil,
+					guildKey = self.currentGuildCacheKey,
 					recipeID = recipeID,
 				}
 				if contactName then
@@ -734,7 +832,7 @@ function AF:GetOnlineGuildQueryTargets(professionID, recipeID, limit)
 	end
 
 	local function addMemberTarget(name)
-		local contactName = self:GetRememberedArtisanContact(name)
+		local contactName = self:GetRememberedArtisanContact(name, self:GetCurrentGuildCacheKey())
 		if contactName and contactName ~= self:NormalizeName(name) then
 			addTarget(contactName)
 		end

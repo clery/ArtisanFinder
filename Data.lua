@@ -456,23 +456,29 @@ local function NormalizeTradeLeads(tbl)
 end
 
 local function NormalizeGuildProfessionCache(db)
-	local professionMembers = db.guildCache and db.guildCache.professionMembers
-	if type(professionMembers) ~= "table" then
-		return
-	end
-	for professionKey, cache in pairs(professionMembers) do
-		local supportedID = GetSupportedProfessionID(professionKey)
-		professionMembers[professionKey] = nil
-		if supportedID and type(cache) == "table" then
-			cache.professionID = supportedID
-			cache.professionName = nil
-			for _, member in pairs(cache.members or {}) do
-				if type(member) == "table" then
-					member.professionName = nil
-				end
-			end
-			professionMembers[tostring(supportedID)] = cache
+	local function normalizeContainer(container)
+		local professionMembers = container and container.professionMembers
+		if type(professionMembers) ~= "table" then
+			return
 		end
+		for professionKey, cache in pairs(professionMembers) do
+			local supportedID = GetSupportedProfessionID(professionKey)
+			professionMembers[professionKey] = nil
+			if supportedID and type(cache) == "table" then
+				cache.professionID = supportedID
+				cache.professionName = nil
+				for _, member in pairs(cache.members or {}) do
+					if type(member) == "table" then
+						member.professionName = nil
+					end
+				end
+				professionMembers[tostring(supportedID)] = cache
+			end
+		end
+	end
+	normalizeContainer(db.guildCache)
+	for _, guildCache in pairs(db.guildCache and db.guildCache.byGuild or {}) do
+		normalizeContainer(guildCache)
 	end
 end
 
@@ -510,9 +516,7 @@ function ApplyDBDefaults(db)
 	db.whoOnlineCache = db.whoOnlineCache or {}
 	db.connectedRealmCache = db.connectedRealmCache or {}
 	db.guildCache = db.guildCache or {}
-	db.guildCache.rosterByName = db.guildCache.rosterByName or {}
-	db.guildCache.recipeMembers = db.guildCache.recipeMembers or {}
-	db.guildCache.professionMembers = db.guildCache.professionMembers or {}
+	db.guildCache.byGuild = db.guildCache.byGuild or {}
 	db.minimap = db.minimap or { angle = 225, hide = false }
 	db.autoAvailabilityDisable = db.autoAvailabilityDisable or {}
 	db.tutorial = db.tutorial or {}
@@ -1062,7 +1066,7 @@ function AF:GetRememberedProfessionLink(characterName, professionID)
 	return legacyKey and links and links[legacyKey] or nil
 end
 
-function AF:RememberArtisanContact(crafterName, contactName)
+function AF:RememberArtisanContact(crafterName, contactName, guildKey)
 	crafterName = self:NormalizeName(crafterName)
 	contactName = self:NormalizeName(contactName)
 	if not crafterName or not contactName or not self.db then
@@ -1071,13 +1075,17 @@ function AF:RememberArtisanContact(crafterName, contactName)
 	self.db.artisanContacts = self.db.artisanContacts or {}
 	self.db.artisanContacts[crafterName] = {
 		target = contactName,
+		guildKey = guildKey,
 		updatedAt = self:Now(),
 	}
 end
 
-function AF:GetRememberedArtisanContact(crafterName)
+function AF:GetRememberedArtisanContact(crafterName, guildKey)
 	crafterName = self:NormalizeName(crafterName)
 	local entry = crafterName and self.db and self.db.artisanContacts and self.db.artisanContacts[crafterName]
+	if guildKey ~= nil and entry and entry.guildKey ~= guildKey then
+		return nil
+	end
 	return entry and self:NormalizeName(entry.target) or nil
 end
 

@@ -326,7 +326,9 @@ function AF:IsCustomerEntryOnline(entry)
 		return false
 	end
 	if entry.guildMember then
-		return entry.guildOnline == true
+		local rosterEntry = self:GetCachedGuildRosterEntry(entry.orderTarget or entry.name or entry.target)
+		entry.guildOnline = rosterEntry and rosterEntry.online or nil
+		return rosterEntry and rosterEntry.online == true or false
 	end
 	if not self:IsCustomerEntryWhoRefreshable(entry) then
 		return false
@@ -349,7 +351,9 @@ function AF:IsCustomerEntryOffline(entry)
 		return false
 	end
 	if entry.guildMember then
-		return entry.guildOnline == false
+		local rosterEntry = self:GetCachedGuildRosterEntry(entry.orderTarget or entry.name or entry.target)
+		entry.guildOnline = rosterEntry and rosterEntry.online or nil
+		return rosterEntry and rosterEntry.online == false or false
 	end
 	if not self:IsCustomerEntryWhoRefreshable(entry) then
 		return false

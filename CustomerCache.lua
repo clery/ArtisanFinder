@@ -171,6 +171,7 @@ local function ClearGuildAffiliation(entry)
 	entry.guildMember = nil
 	entry.guildOnline = nil
 	entry.guildMemberGUID = nil
+	entry.guildKey = nil
 	return entry
 end
 
@@ -185,10 +186,9 @@ local function MarkGuildAffiliation(AF, entry)
 	local rosterEntry = AF:GetCachedGuildRosterEntry(entry.orderTarget or entry.name or entry.target)
 	if rosterEntry then
 		entry.guildMember = true
-		if entry.guildOnline ~= true then
-			entry.guildOnline = rosterEntry.online
-		end
+		entry.guildOnline = rosterEntry.online
 		entry.guildMemberGUID = rosterEntry.guid
+		entry.guildKey = AF.GetCurrentGuildCacheKey and AF:GetCurrentGuildCacheKey() or entry.guildKey
 		return entry
 	end
 
@@ -211,7 +211,7 @@ local function AddCachedAddonGuildMemberRows(AF, rows, itemCache, itemID, profes
 			and EntryMatchesCustomerFilter(AF, entry, filterText)
 		then
 			local rosterEntry = AF:GetCachedGuildRosterEntry(entry.orderTarget or entry.name or entry.target)
-			if entry.guildMember == true or rosterEntry then
+			if rosterEntry then
 				local rowEntry = PrepareCachedCustomerEntry(AF, entry)
 				MarkGuildAffiliation(AF, rowEntry)
 				rowEntry.unavailableCached = true
@@ -244,7 +244,10 @@ function AF:IsCustomerEntryOrderEligible(entry)
 		return false
 	end
 	if entry.guildMember then
-		return true
+		MarkGuildAffiliation(self, entry)
+		if entry.guildMember then
+			return true
+		end
 	end
 	if entry.ownAlt then
 		return PrepareOwnAltOrderEligibility(self, entry)

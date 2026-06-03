@@ -16,3 +16,5 @@
     [] When clicking a row, prefill the Crafting order like the current "Personal Order" and "Guild Order" buttons do, and add information to the Crafting Order panel with suggested reagent and optional reagent for best results (with or without each optional reagent)
 
 [] Find way to add rows to HUD Edit Mode
+
+[] Reword row tutorial to remove mentions of fake rows. Make the fake row be from "Rakhnar" and the "Fake tutorial data" replaced by "Welcome to ArtisanFinder !"

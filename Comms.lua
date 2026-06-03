@@ -817,6 +817,7 @@ function AF:HandleResponse(parts, sender)
 		return
 	end
 	local guildResponse = responseTarget ~= nil
+	local guildKey = guildResponse and self.GetCurrentGuildCacheKey and self:GetCurrentGuildCacheKey() or nil
 	local guildRosterEntry = guildResponse and self:GetCachedGuildRosterEntry(crafterName) or nil
 
 	local verifiedForCurrentQuery = queryToken
@@ -839,7 +840,7 @@ function AF:HandleResponse(parts, sender)
 		professionLink = self:GetRememberedProfessionLink(crafterName, professionID) or ""
 	end
 	if self.RememberArtisanContact then
-		self:RememberArtisanContact(crafterName, sender)
+		self:RememberArtisanContact(crafterName, sender, guildKey)
 	end
 	self.db.customerCache[itemKey][cacheKey] = {
 		name = crafterName,
@@ -881,6 +882,7 @@ function AF:HandleResponse(parts, sender)
 		guildMember = guildResponse or nil,
 		guildOnline = guildResponse and true or nil,
 		guildMemberGUID = guildRosterEntry and guildRosterEntry.guid or nil,
+		guildKey = guildKey,
 		afk = afk or nil,
 	}
 	if responseReagents then
