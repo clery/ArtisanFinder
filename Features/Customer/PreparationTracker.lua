@@ -259,12 +259,6 @@ local function GetOwnedCount(reagent)
 			return tonumber(count)
 		end
 	end
-	if reagent.itemID and GetItemCount then
-		local ok, count = pcall(GetItemCount, reagent.itemID, true, false, true)
-		if ok and tonumber(count) then
-			return tonumber(count)
-		end
-	end
 	return 0
 end
 

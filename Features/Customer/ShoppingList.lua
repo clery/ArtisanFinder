@@ -58,17 +58,6 @@ local function GetReagentQualityInfo(itemID)
 	return nil
 end
 
-local function GetReagentDisplayName(candidate)
-	if not candidate or not candidate.itemID then
-		return AF:Text("UNKNOWN")
-	end
-	local itemName, itemLink = C_Item.GetItemInfo(candidate.itemID)
-	if itemLink and itemLink ~= "" then
-		return itemLink
-	end
-	return itemName or AF:Text("ITEM_FALLBACK") .. " " .. tostring(candidate.itemID)
-end
-
 local function GetReagentIcon(candidate)
 	if candidate and candidate.itemID then
 		return C_Item.GetItemIconByID(candidate.itemID) or "Interface\\Icons\\INV_Misc_QuestionMark"
@@ -88,12 +77,6 @@ local function GetOwnedCount(candidate)
 	end
 	if C_Item and C_Item.GetItemCount then
 		local ok, count = pcall(C_Item.GetItemCount, candidate.itemID, true, false, true)
-		if ok and tonumber(count) then
-			return tonumber(count)
-		end
-	end
-	if GetItemCount then
-		local ok, count = pcall(GetItemCount, candidate.itemID, true, false, true)
 		if ok and tonumber(count) then
 			return tonumber(count)
 		end

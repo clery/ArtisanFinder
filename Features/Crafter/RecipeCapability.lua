@@ -1,6 +1,5 @@
 local _, AF = ...
 
-local MAX_REAGENT_COMBINATIONS = 72
 local MAX_OPTIONAL_REAGENT_COMBINATIONS = 96
 local HEAVY_JOB_QUALITY_TIER_THRESHOLD = 12
 local SCAN_SIGNATURE_VERSION = 34
@@ -314,18 +313,6 @@ local function AddReagentInfo(tbl, reagentSlotSchematic, reagent)
 		dataSlotIndex = reagentSlotSchematic.dataSlotIndex,
 		quantity = quantity,
 	})
-end
-
-local function CopyReagentInfo(reagentInfo)
-	local copy = {}
-	for _, info in ipairs(reagentInfo or {}) do
-		copy[#copy + 1] = {
-			reagent = info.reagent,
-			dataSlotIndex = info.dataSlotIndex,
-			quantity = info.quantity,
-		}
-	end
-	return copy
 end
 
 local function IsModifiedReagentSlot(reagentSlotSchematic)

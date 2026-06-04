@@ -551,8 +551,8 @@ local function GetTooltipItemQualityColor(itemID)
 		local color = ITEM_QUALITY_COLORS[quality]
 		return color.r or 1, color.g or 1, color.b or 1
 	end
-	if quality and _G.GetItemQualityColor then
-		local r, g, b = _G.GetItemQualityColor(quality)
+	if quality and C_Item and C_Item.GetItemQualityColor then
+		local r, g, b = C_Item.GetItemQualityColor(quality)
 		if r then
 			return r, g, b
 		end

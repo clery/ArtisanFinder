@@ -64,17 +64,6 @@ local function GetWhoResultName(result)
 	return AF:NormalizeName(result and (result.fullName or result.Name or result.name))
 end
 
-local function NormalizeWhoQueryName(name, preserveRealmless)
-	if not name or name == "" then
-		return nil
-	end
-	name = tostring(name):gsub("%s+", "")
-	if preserveRealmless and not name:find("-", 1, true) then
-		return name
-	end
-	return AF:NormalizeName(name)
-end
-
 local function IsWhoResultMatch(requestedName, result)
 	local resultName = GetWhoResultName(result)
 	if resultName == requestedName then

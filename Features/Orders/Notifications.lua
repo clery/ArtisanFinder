@@ -132,8 +132,8 @@ local function SetItemTextColor(fontString, quality)
 	if quality and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[quality] then
 		local color = ITEM_QUALITY_COLORS[quality]
 		fontString:SetTextColor(color.r or 1, color.g or 1, color.b or 1)
-	elseif quality and GetItemQualityColor then
-		local r, g, b = GetItemQualityColor(quality)
+	elseif quality and C_Item and C_Item.GetItemQualityColor then
+		local r, g, b = C_Item.GetItemQualityColor(quality)
 		fontString:SetTextColor(r or 1, g or 1, b or 1)
 	else
 		fontString:SetTextColor(1, 1, 1)
@@ -146,8 +146,8 @@ local function GetItemQualityColorCode(quality)
 	if quality and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[quality] then
 		local color = ITEM_QUALITY_COLORS[quality]
 		r, g, b = color.r or r, color.g or g, color.b or b
-	elseif quality and GetItemQualityColor then
-		r, g, b = GetItemQualityColor(quality)
+	elseif quality and C_Item and C_Item.GetItemQualityColor then
+		r, g, b = C_Item.GetItemQualityColor(quality)
 	end
 	return string.format("|cff%02x%02x%02x", math.floor((r or 1) * 255 + 0.5), math.floor((g or 1) * 255 + 0.5), math.floor((b or 1) * 255 + 0.5))
 end
@@ -182,8 +182,8 @@ local function SetToastIconQuality(frame, quality, itemIDOrLink)
 		frame.IconBorder:SetTexture("Interface\\Common\\WhiteIconFrame")
 		frame.IconBorder:SetVertexColor(color.r or 1, color.g or 1, color.b or 1)
 		frame.IconBorder:Show()
-	elseif quality and GetItemQualityColor then
-		local r, g, b = GetItemQualityColor(quality)
+	elseif quality and C_Item and C_Item.GetItemQualityColor then
+		local r, g, b = C_Item.GetItemQualityColor(quality)
 		frame.IconBorder:SetTexture("Interface\\Common\\WhiteIconFrame")
 		frame.IconBorder:SetVertexColor(r or 1, g or 1, b or 1)
 		frame.IconBorder:Show()
