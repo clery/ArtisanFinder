@@ -81,12 +81,11 @@ local function GetRecommendationSnapshot(item)
 	if not item then
 		return ""
 	end
-	return table.concat({
-		tostring(item.bestReagentSignature or ""),
-		tostring(item.bestQuality or ""),
-		tostring(item.bestQualityAtlas or ""),
-		tostring(item.bestOutputItemLevel or ""),
-		tostring(item.rawBestQuality or ""),
+		return table.concat({
+			tostring(item.bestReagentSignature or ""),
+			tostring(item.bestQuality or ""),
+			tostring(item.bestOutputItemLevel or ""),
+			tostring(item.rawBestQuality or ""),
 		tostring(item.bestReagentTruncated == true),
 		tostring(item.bestReagentPendingNames == true),
 		tostring(item.optionalDifficultyDelta or ""),

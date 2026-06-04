@@ -65,8 +65,10 @@ UI\Templates.xml
 Features\Orders\Notifications.lua
 Features\Crafter\RecipeCapability.lua
 Features\Crafter\Scanner.lua
+Features\Customer\PreparationTracker.lua
 Features\Customer\Rows.lua
 Features\Customer\DebugData.lua
+Features\Customer\ShoppingList.lua
 Features\Customer\UI.lua
 Features\Crafter\UI.lua
 UI\Tutorial.lua

@@ -44,6 +44,170 @@
 		</Frames>
 	</Frame>
 
+	<Button name="ArtisanFinderCustomerOptionalPrepSlotTemplate" virtual="true">
+		<Size x="39" y="39"/>
+		<NormalTexture file="Interface\Buttons\UI-Quickslot2">
+			<Size x="64" y="64"/>
+			<Anchors>
+				<Anchor point="CENTER" x="0" y="-1"/>
+			</Anchors>
+		</NormalTexture>
+		<PushedTexture file="Interface\Buttons\UI-Quickslot-Depress"/>
+		<HighlightTexture file="Interface\Buttons\ButtonHilight-Square" alphaMode="ADD"/>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture parentKey="slotBackground" atlas="Professions-Slot-bg" setAllPoints="true"/>
+			</Layer>
+			<Layer level="ARTWORK">
+				<Texture parentKey="icon" hidden="true">
+					<TexCoords left="0.07" right="0.93" top="0.07" bottom="0.93"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="2" y="-2"/>
+						<Anchor point="BOTTOMRIGHT" x="-2" y="2"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="OVERLAY">
+				<Texture parentKey="iconBorder" atlas="Professions-Slot-Frame" hidden="true">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeKey="$parent.icon" relativePoint="TOPLEFT"/>
+						<Anchor point="BOTTOMRIGHT" relativeKey="$parent.icon" relativePoint="BOTTOMRIGHT" x="1" y="-1"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="OVERLAY" textureSubLevel="1">
+				<Texture parentKey="cropFrame" atlas="Professions-ChoiceReagent-Frame" useAtlasSize="true" scale="0.45" hidden="true">
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="OVERLAY" textureSubLevel="7">
+				<Texture parentKey="qualityOverlay" hidden="true">
+					<Anchors>
+						<Anchor point="TOPLEFT" x="-3" y="2"/>
+					</Anchors>
+				</Texture>
+				<Texture parentKey="addIcon" atlas="Professions-Slot-Plus" useAtlasSize="true" hidden="true">
+					<Anchors>
+						<Anchor point="BOTTOMRIGHT" x="-4" y="2"/>
+					</Anchors>
+				</Texture>
+				<Texture parentKey="addIconHighlight" atlas="Professions-Slot-Plus-Over" useAtlasSize="true" alphaMode="ADD" hidden="true">
+					<Anchors>
+						<Anchor point="CENTER" relativeKey="$parent.addIcon"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+	</Button>
+
+	<Button name="ArtisanFinderCustomerOptionalPickerButtonTemplate" virtual="true">
+		<Size x="37" y="37"/>
+		<NormalTexture file="Interface\Buttons\UI-Quickslot2">
+			<Size x="64" y="64"/>
+			<Anchors>
+				<Anchor point="CENTER" x="0" y="-1"/>
+			</Anchors>
+		</NormalTexture>
+		<PushedTexture file="Interface\Buttons\UI-Quickslot-Depress"/>
+		<HighlightTexture file="Interface\Buttons\ButtonHilight-Square" alphaMode="ADD"/>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture parentKey="slotBackground" atlas="Professions-Slot-bg" setAllPoints="true"/>
+			</Layer>
+			<Layer level="ARTWORK">
+				<Texture parentKey="icon">
+					<TexCoords left="0.07" right="0.93" top="0.07" bottom="0.93"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="2" y="-2"/>
+						<Anchor point="BOTTOMRIGHT" x="-2" y="2"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="OVERLAY">
+				<Texture parentKey="iconBorder" atlas="Professions-Slot-Frame" hidden="true">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeKey="$parent.icon" relativePoint="TOPLEFT"/>
+						<Anchor point="BOTTOMRIGHT" relativeKey="$parent.icon" relativePoint="BOTTOMRIGHT" x="1" y="-1"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="OVERLAY" textureSubLevel="1">
+				<Texture parentKey="cropFrame" atlas="Professions-ChoiceReagent-Frame" useAtlasSize="true" scale="0.4" hidden="true">
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="OVERLAY" textureSubLevel="7">
+				<Texture parentKey="qualityOverlay" hidden="true">
+					<Anchors>
+						<Anchor point="TOPLEFT" x="-3" y="2"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+	</Button>
+
+	<Frame name="ArtisanFinderCustomerOptionalPickerTemplate" virtual="true" inherits="TooltipBackdropTemplate" hidden="true" enableMouse="true">
+		<Size x="200" y="150"/>
+		<KeyValues>
+			<KeyValue key="backdropColor" value="BLACK_FONT_COLOR" type="global"/>
+		</KeyValues>
+		<Frames>
+			<Frame parentKey="slots">
+				<Size x="222" y="37"/>
+				<Anchors>
+					<Anchor point="TOPLEFT" x="15" y="-15"/>
+				</Anchors>
+			</Frame>
+		</Frames>
+	</Frame>
+
+	<Frame name="ArtisanFinderCustomerOptionalPrepTemplate" virtual="true" hidden="true">
+		<Size x="360" y="78"/>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture parentKey="topLine" file="Interface\Tooltips\UI-Tooltip-Border" hidden="true">
+					<Size y="1"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="27" y="-2"/>
+						<Anchor point="RIGHT" x="-65" y="0"/>
+					</Anchors>
+					<Color r="0.72" g="0.62" b="0.43" a="0.35"/>
+				</Texture>
+			</Layer>
+			<Layer level="OVERLAY">
+				<FontString parentKey="label" inherits="GameFontNormalSmall" justifyH="LEFT" wordWrap="false">
+					<Anchors>
+						<Anchor point="TOPLEFT" x="27" y="-10"/>
+					</Anchors>
+				</FontString>
+				<FontString parentKey="empty" inherits="GameFontDisableSmall" justifyH="LEFT" wordWrap="true" hidden="true">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeKey="$parent.label" relativePoint="BOTTOMLEFT" x="0" y="-7"/>
+						<Anchor point="RIGHT" x="-128" y="0"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+		<Frames>
+			<Frame parentKey="slots">
+				<Size x="196" y="40"/>
+				<Anchors>
+					<Anchor point="TOPLEFT" x="27" y="-28"/>
+				</Anchors>
+			</Frame>
+			<Button parentKey="track" inherits="UIPanelButtonTemplate">
+				<Size x="78" y="22"/>
+				<Anchors>
+					<Anchor point="TOPRIGHT" x="-65" y="-31"/>
+				</Anchors>
+			</Button>
+		</Frames>
+	</Frame>
+
 	<Button name="ArtisanFinderCustomerRowTemplate" virtual="true">
 		<Size x="394" y="58"/>
 		<Layers>
@@ -101,11 +265,17 @@
 			<Frame parentKey="whoSpinner" inherits="SpinnerTemplate" hidden="true">
 				<Size x="16" y="16"/>
 			</Frame>
+			<Frame parentKey="optionalPrep" inherits="ArtisanFinderCustomerOptionalPrepTemplate">
+				<Anchors>
+					<Anchor point="TOPLEFT" x="0" y="-58"/>
+					<Anchor point="RIGHT"/>
+				</Anchors>
+			</Frame>
 		</Frames>
 	</Button>
 
 	<Frame name="ArtisanFinderCustomerMenuTemplate" virtual="true" inherits="BackdropTemplate">
-		<Size x="164" y="104"/>
+		<Size x="164" y="132"/>
 		<Frames>
 			<Button parentKey="favorite" inherits="UIPanelButtonTemplate">
 				<Size x="140" y="23"/>
@@ -122,9 +292,35 @@
 			<Button parentKey="link" inherits="UIPanelButtonTemplate">
 				<Size x="140" y="23"/>
 				<Anchors>
+					<Anchor point="TOP" x="0" y="-96"/>
+				</Anchors>
+			</Button>
+			<Button parentKey="prepare" inherits="UIPanelButtonTemplate">
+				<Size x="140" y="23"/>
+				<Anchors>
 					<Anchor point="TOP" x="0" y="-68"/>
 				</Anchors>
 			</Button>
+			<Frame parentKey="prepareSubmenu" inherits="BackdropTemplate" hidden="true">
+				<Size x="174" y="76"/>
+				<Anchors>
+					<Anchor point="TOPLEFT" relativeKey="$parent.prepare" relativePoint="TOPRIGHT" x="2" y="0"/>
+				</Anchors>
+				<Frames>
+					<Button parentKey="standard" inherits="UIPanelButtonTemplate">
+						<Size x="150" y="23"/>
+						<Anchors>
+							<Anchor point="TOP" x="0" y="-12"/>
+						</Anchors>
+					</Button>
+					<Button parentKey="optional" inherits="UIPanelButtonTemplate">
+						<Size x="150" y="23"/>
+						<Anchors>
+							<Anchor point="TOP" x="0" y="-40"/>
+						</Anchors>
+					</Button>
+				</Frames>
+			</Frame>
 		</Frames>
 	</Frame>
 

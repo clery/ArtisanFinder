@@ -51,6 +51,23 @@
         "HelpPlate",
         "HelpTip",
         "ProfessionMicroButton",
-        "HelpPlateButtonMixin"
-    ]
+        "HelpPlateButtonMixin",
+        "ObjectiveTrackerFrame",
+        "ObjectiveTrackerContainerMixin",
+        "OBJECTIVE_DASH_STYLE_SHOW",
+        "PROFESSIONS_TRACKER_REAGENT_FORMAT",
+        "ObjectiveTrackerManager",
+        "OBJECTIVE_TRACKER_COLOR",
+        "ProfessionsRecipeTracker",
+        "ObjectiveTrackerModuleMixin",
+        "OBJECTIVE_DASH_STYLE_HIDE",
+        "OBJECTIVE_DASH_STYLE_HIDE_AND_COLLAPSE",
+        "ChatEdit_GetActiveWindow",
+        "ChatEdit_InsertLink",
+        "ChatFrameUtil",
+        "AuctionHouseFrame",
+        "TextureKitConstants",
+        "ColorManager"
+    ],
+    "Lua.type.weakUnionCheck": true
 }

@@ -545,6 +545,9 @@ local function ConfigureCustomerRow(row)
 	row.whoRefresh:SetScript("OnLeave", function()
 		GameTooltip:Hide()
 	end)
+	if AF.ConfigureCustomerOptionalPrepRow then
+		AF:ConfigureCustomerOptionalPrepRow(row)
+	end
 	row:SetScript("OnEnter", function(buttonFrame)
 		if buttonFrame.entry then
 			SetCustomerRowHighlight(buttonFrame, buttonFrame.entry)
@@ -571,7 +574,12 @@ local function ConfigureCustomerRow(row)
 	end)
 	row:SetScript("OnClick", function(buttonFrame)
 		if IsCustomerRowClickable(buttonFrame.entry) then
-			AF:FillPersonalOrder(buttonFrame.entry)
+			local context = AF.GetCustomerShoppingContext and AF:GetCustomerShoppingContext()
+			local keepShoppingList = context
+				and context.mode == "optional"
+				and AF.GetCustomerShoppingEntryKey
+				and context.entryKey == AF:GetCustomerShoppingEntryKey(buttonFrame.entry)
+			AF:FillPersonalOrder(buttonFrame.entry, keepShoppingList and { keepShoppingList = true } or nil)
 		end
 	end)
 
@@ -590,6 +598,12 @@ local function ResetCustomerRow(_, row)
 	end
 	if row.whoRefresh then
 		row.whoRefresh:Hide()
+	end
+	if row.optionalPrep then
+		row.optionalPrep:Hide()
+		if row.optionalPrep.slotPool then
+			row.optionalPrep.slotPool:ReleaseAll()
+		end
 	end
 	HideCustomerNoteTooltip()
 	row:ClearAllPoints()
@@ -776,6 +790,9 @@ function AF:SetCustomerPanelCollapsed(collapsed, skipRefresh)
 		if self.EndCustomerTutorial then
 			self:EndCustomerTutorial()
 		end
+		if self.HideCustomerShoppingList then
+			self:HideCustomerShoppingList()
+		end
 		self:HideCustomerMenu()
 	elseif not skipRefresh then
 		self:RefreshCustomerQuery(true)
@@ -800,7 +817,17 @@ function AF:RefreshCustomerLocale()
 	self:UpdateCustomerRefreshButton()
 	frame.menu.favorite:SetText(self:Text(frame.menu.entry and self:IsFavoriteArtisan(frame.menu.entry) and "UNFAVORITE" or "FAVORITE"))
 	frame.menu.whisper:SetText(self:Text("WHISPER"))
+	frame.menu.prepare:SetText(self:Text("PREPARE_ORDER"))
+	frame.menu.prepareSubmenu.standard:SetText(self:Text("PREPARE_ORDER_STANDARD"))
+	frame.menu.prepareSubmenu.optional:SetText(self:Text("PREPARE_ORDER_OPTIONAL"))
 	frame.menu.link:SetText(self:Text("PROFESSION"))
+	for _, row in ipairs(self.customerRows or {}) do
+		if row.optionalPrep then
+			row.optionalPrep.label:SetText(self:Text("OPTIONAL_REAGENTS"))
+			row.optionalPrep.empty:SetText(self:Text("CUSTOMER_SHOPPING_EMPTY"))
+			row.optionalPrep.track:SetText(self:Text("CUSTOMER_SHOPPING_TRACK"))
+		end
+	end
 end
 
 function AF:AttachCustomerUI()
@@ -876,6 +903,7 @@ function AF:AttachCustomerUI()
 	frame.statusSuffix:SetJustifyH("LEFT")
 	frame.statusSuffix:Hide()
 	frame.divider = self:AddDivider(frame, frame.status, -8)
+	self:InitializeCustomerShoppingList(frame)
 
 	frame.search:SetSize(172, 22)
 	frame.search:ClearAllPoints()
@@ -973,6 +1001,7 @@ function AF:AttachCustomerUI()
 	frame.menu:SetFrameStrata("FULLSCREEN_DIALOG")
 	frame.menu:SetFrameLevel(frame.menuBlocker:GetFrameLevel() + 10)
 	self:ApplyCustomerPopupPanel(frame.menu)
+	self:ApplyCustomerPopupPanel(frame.menu.prepareSubmenu)
 	frame.menu:Hide()
 
 	frame.menu.favorite:SetText(self:Text("FAVORITE"))
@@ -997,6 +1026,27 @@ function AF:AttachCustomerUI()
 			AF:OpenWhisper(frame.menu.entry.target or frame.menu.entry.name)
 		end
 		AF:HideCustomerMenu()
+	end)
+
+	local function ShowPrepareSubmenu()
+		frame.menu.prepareSubmenu:Show()
+	end
+
+	frame.menu.prepare:SetText(self:Text("PREPARE_ORDER"))
+	frame.menu.prepare:SetScript("OnEnter", ShowPrepareSubmenu)
+	frame.menu.prepare:SetScript("OnClick", ShowPrepareSubmenu)
+	frame.menu.prepareSubmenu:SetScript("OnEnter", ShowPrepareSubmenu)
+	frame.menu.prepareSubmenu.standard:SetText(self:Text("PREPARE_ORDER_STANDARD"))
+	frame.menu.prepareSubmenu.standard:SetScript("OnClick", function()
+		if frame.menu.entry then
+			AF:PrepareCustomerOrder(frame.menu.entry, "standard")
+		end
+	end)
+	frame.menu.prepareSubmenu.optional:SetText(self:Text("PREPARE_ORDER_OPTIONAL"))
+	frame.menu.prepareSubmenu.optional:SetScript("OnClick", function()
+		if frame.menu.entry then
+			AF:PrepareCustomerOrder(frame.menu.entry, "optional")
+		end
 	end)
 
 	frame.menu.link:SetText(self:Text("PROFESSION"))
@@ -1063,6 +1113,9 @@ function AF:AttachCustomerUI()
 		if AF.EndCustomerTutorial then
 			AF:EndCustomerTutorial()
 		end
+		if AF.HideCustomerShoppingList then
+			AF:HideCustomerShoppingList()
+		end
 		if AF.customerCollapseButton then
 			AF.customerCollapseButton:Hide()
 		end
@@ -1084,6 +1137,9 @@ function AF:AttachCustomerUI()
 		AF.customerFrame:Hide()
 		if AF.customerCollapseButton then
 			AF.customerCollapseButton:Hide()
+		end
+		if AF.HideCustomerShoppingList then
+			AF:HideCustomerShoppingList()
 		end
 		AF:HideCustomerMenu()
 		AF:RestoreCurrentListingsAnchor()
@@ -1109,6 +1165,9 @@ function AF:HideCustomerMenu()
 	end
 	self:ClearProfessionButtonTooltip()
 	frame.menu:Hide()
+	if frame.menu.prepareSubmenu then
+		frame.menu.prepareSubmenu:Hide()
+	end
 	frame.menuBlocker:Hide()
 end
 
@@ -1208,19 +1267,36 @@ function AF:ShowCustomerMenu(entry, owner)
 		return
 	end
 	menu.entry = entry
+	menu.prepareSubmenu:Hide()
 	menu.favorite:SetText(self:Text(self:IsFavoriteArtisan(entry) and "UNFAVORITE" or "FAVORITE"))
 	if entry.tutorialFake then
 		menu.favorite:SetText(self:Text(self.customerTutorialFavorite and "UNFAVORITE" or "FAVORITE"))
 		menu.whisper:Disable()
+		menu.prepare:Disable()
+		menu.prepareSubmenu.standard:Disable()
+		menu.prepareSubmenu.optional:Disable()
 		menu.link:Disable()
 		self:SetProfessionButtonTooltip(self:Text("TUTORIAL_FAKE_ACTION_TOOLTIP"))
+	elseif entry.ownSelf then
+		menu.whisper:Disable()
+		menu.prepare:Disable()
+		menu.prepareSubmenu.standard:Disable()
+		menu.prepareSubmenu.optional:Disable()
+		menu.link:Disable()
+		self:ClearProfessionButtonTooltip()
 	elseif entry.ownAlt then
 		menu.whisper:Disable()
+		menu.prepare:Enable()
+		menu.prepareSubmenu.standard:Enable()
+		menu.prepareSubmenu.optional:Enable()
 	else
 		menu.whisper:Enable()
+		menu.prepare:Enable()
+		menu.prepareSubmenu.standard:Enable()
+		menu.prepareSubmenu.optional:Enable()
 	end
-	if entry.tutorialFake then
-		-- Keep Favorite interactive for the tutorial row; all real side effects stay disabled.
+	if entry.tutorialFake or entry.ownSelf then
+		-- Keep Favorite interactive; side-effecting order/profession actions stay disabled.
 	elseif self:CanReliablyOpenProfession(entry) then
 		menu.link:Enable()
 		self:ClearProfessionButtonTooltip()
@@ -1348,7 +1424,9 @@ function AF:RefreshCustomerQuery(force)
 		return
 	end
 
-	local changed = self.currentCustomerItemID ~= context.itemID or self.currentCustomerProfessionID ~= context.professionID
+	local changed = self.currentCustomerItemID ~= context.itemID
+		or self.currentCustomerProfessionID ~= context.professionID
+		or self.currentCustomerRecipeID ~= context.recipeID
 	self.currentCustomerItemID = context.itemID
 	self.currentCustomerItemName = context.itemName
 	self.currentCustomerProfessionID = context.professionID
@@ -1494,6 +1572,8 @@ function AF:RefreshCustomerResults(statusOverride)
 	else
 		self:SetCustomerStatusText(self:Text("SELECT_ORDER_ITEM"))
 	end
+	frame.search:ClearAllPoints()
+	frame.search:SetPoint("TOPLEFT", frame.divider, "BOTTOMLEFT", 0, -8)
 	self:AcquireCustomerRows(#rows)
 	frame.content:SetWidth(math.max(1, frame.scroll:GetWidth() - 4))
 	frame.scrollBar:SetShown(true)
@@ -1512,6 +1592,14 @@ function AF:RefreshCustomerResults(statusOverride)
 		row.name:SetPoint("TOPLEFT", row.certified, "TOPRIGHT", 4, 0)
 		row.name:SetPoint("RIGHT", row.updatedAt, "LEFT", -4, 0)
 		local rowHeight = self:ApplyCustomerRowViewModel(row, self:BuildCustomerRowViewModel(entry), ROW_HEIGHT, ROW_BOTTOM_PADDING)
+		if row.optionalPrep then
+			row.optionalPrep:ClearAllPoints()
+			row.optionalPrep:SetPoint("TOPLEFT", row, "TOPLEFT", 0, -rowHeight)
+			row.optionalPrep:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+		end
+		if self.RefreshCustomerOptionalPrepRow then
+			rowHeight = rowHeight + self:RefreshCustomerOptionalPrepRow(row, entry)
+		end
 		row:SetHeight(rowHeight)
 		contentHeight = contentHeight + rowHeight
 	end
@@ -1535,6 +1623,24 @@ function AF:RefreshCustomerResults(statusOverride)
 		end
 	end
 	self:UpdateCustomerRefreshButton()
+end
+
+function AF:PrepareCustomerOrder(entry, mode)
+	if mode == "optional" then
+		self:FillPersonalOrder(entry, { keepShoppingList = true })
+		if self.ShowCustomerShoppingListForEntry then
+			self:ShowCustomerShoppingListForEntry(entry)
+		end
+	else
+		if self.HideCustomerShoppingList then
+			self:HideCustomerShoppingList()
+		end
+		self:FillPersonalOrder(entry)
+		if self.AddPreparedCraftToTracker then
+			self:AddPreparedCraftToTracker(entry, "standard")
+		end
+	end
+	self:HideCustomerMenu()
 end
 
 function AF:OpenCrafterProfession(entry)
@@ -1695,9 +1801,14 @@ function AF:SetCustomerOrderFormMessage(message)
 	return true
 end
 
-function AF:FillPersonalOrder(entry)
+function AF:FillPersonalOrder(entry, options)
 	if entry and entry.tutorialFake then
 		return
+	end
+	if not options or not options.keepShoppingList then
+		if self.HideCustomerShoppingList then
+			self:HideCustomerShoppingList()
+		end
 	end
 	if not entry or not ProfessionsCustomerOrdersFrame or not ProfessionsCustomerOrdersFrame.Form then
 		self:Print(self:Text("PERSONAL_ORDER_NO_FORM"))

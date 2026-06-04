@@ -89,7 +89,102 @@ function AF:GetCommissionInputText(priceCopper, freeCommission)
 	return tostring(priceCopper / 10000)
 end
 
-function AF:GetQualityIconMarkup(quality, atlas, size)
+local function GetReagentQualityInfoFromItem(itemInfo)
+	if not itemInfo or not C_TradeSkillUI or not C_TradeSkillUI.GetItemReagentQualityInfo then
+		return nil
+	end
+	local ok, qualityInfo = pcall(C_TradeSkillUI.GetItemReagentQualityInfo, itemInfo)
+	if ok and type(qualityInfo) == "table" then
+		return qualityInfo
+	end
+	return nil
+end
+
+local function GetMaxQualityFromReagents(reagents)
+	local maxQuality
+	for _, reagent in ipairs(reagents or {}) do
+		local quality = tonumber(reagent and reagent.quality)
+		if not quality and reagent and reagent.itemID then
+			local qualityInfo = GetReagentQualityInfoFromItem(reagent.itemID)
+			quality = tonumber(qualityInfo and qualityInfo.quality)
+		end
+		if quality and quality > 0 then
+			maxQuality = math.max(maxQuality or 0, quality)
+		end
+	end
+	return maxQuality
+end
+
+local function GetReagentQualityContextValue(context, key)
+	if type(context) ~= "table" then
+		return nil
+	end
+	local value = context[key]
+	if value ~= nil then
+		return value
+	end
+	local reagent = context.reagent
+	if type(reagent) == "table" then
+		return reagent[key]
+	end
+	return nil
+end
+
+local function GetReagentQualityMaxQuality(context)
+	local maxQuality = tonumber(GetReagentQualityContextValue(context, "maxQuality"))
+	if maxQuality then
+		return maxQuality
+	end
+	local slot = type(context) == "table" and (context.reagentSlotSchematic or context.slot) or nil
+	return GetMaxQualityFromReagents(slot and slot.reagents)
+end
+
+local function GetReagentQualityInfoFromContext(context)
+	if type(context) ~= "table" then
+		return nil
+	end
+	if type(context.qualityInfo) == "table" then
+		return context.qualityInfo
+	end
+	local itemInfo = context.itemInfo
+		or context.itemLink
+		or context.link
+		or context.itemID
+		or context.id
+		or (type(context.reagent) == "table" and (context.reagent.itemID or context.reagent.id))
+	return GetReagentQualityInfoFromItem(itemInfo)
+end
+
+local function BuildReagentQualityAtlasName(quality, maxQuality, small)
+	quality = tonumber(quality)
+	if not quality or quality <= 0 then
+		return nil
+	end
+	maxQuality = tonumber(maxQuality)
+	if maxQuality == 2 then
+		return "Professions-Icon-Quality-12-Tier" .. quality
+	end
+	if maxQuality and maxQuality > 2 and maxQuality <= 5 then
+		return "Professions-Icon-Quality-Tier" .. quality .. (small == false and "" or "-Small")
+	end
+	return nil
+end
+
+local function BuildReagentQualityAtlasCandidates(quality, context)
+	local maxQuality = GetReagentQualityMaxQuality(context)
+	local candidates = {}
+	local smallAtlas = BuildReagentQualityAtlasName(quality, maxQuality, true)
+	local normalAtlas = BuildReagentQualityAtlasName(quality, maxQuality, false)
+	if smallAtlas then
+		table.insert(candidates, smallAtlas)
+	end
+	if normalAtlas and normalAtlas ~= smallAtlas then
+		table.insert(candidates, normalAtlas)
+	end
+	return candidates
+end
+
+local function TryCreateQualityAtlasMarkup(atlas, size)
 	size = size or 14
 	if atlas and atlas ~= "" and CreateAtlasMarkup then
 		local ok, markup = pcall(CreateAtlasMarkup, atlas, size, size)
@@ -97,23 +192,55 @@ function AF:GetQualityIconMarkup(quality, atlas, size)
 			return markup
 		end
 	end
+	return nil
+end
+
+function AF:GetReagentQualityAtlas(quality, context)
+	if type(quality) == "table" then
+		context = quality
+		quality = context.quality or context.qualityTier
+	end
+	local qualityInfo = GetReagentQualityInfoFromContext(context)
+	if qualityInfo and qualityInfo.iconSmall then
+		return qualityInfo.iconSmall
+	end
+	local candidates = BuildReagentQualityAtlasCandidates(quality, context)
+	return candidates[1]
+end
+
+function AF:FormatReagentQuality(quality, size, context)
+	if type(quality) == "table" then
+		context = quality
+		quality = context.quality or context.qualityTier
+	end
+	if type(size) == "table" then
+		context = size
+		size = nil
+	end
+	size = size or 14
 	quality = tonumber(quality)
 	if not quality or quality <= 0 then
 		return nil
 	end
-	if CreateAtlasMarkup then
-		local atlasNames = {
-			"Professions-Icon-Quality-Tier" .. quality .. "-Small",
-			"Professions-Icon-Quality-Tier" .. quality,
-		}
-		for _, atlasName in ipairs(atlasNames) do
-			local ok, markup = pcall(CreateAtlasMarkup, atlasName, size, size)
-			if ok and markup and markup ~= "" then
-				return markup
-			end
-		end
+	local qualityInfo = GetReagentQualityInfoFromContext(context)
+	if qualityInfo then
+		quality = tonumber(qualityInfo.quality) or quality
+	end
+	local markup = TryCreateQualityAtlasMarkup(qualityInfo and qualityInfo.iconSmall, size)
+		or TryCreateQualityAtlasMarkup(qualityInfo and qualityInfo.iconChat, size)
+		or TryCreateQualityAtlasMarkup(qualityInfo and qualityInfo.icon, size)
+	for _, atlas in ipairs(BuildReagentQualityAtlasCandidates(quality, context)) do
+		markup = markup or TryCreateQualityAtlasMarkup(atlas, size)
+	end
+	if markup then
+		return markup
 	end
 	return "Q" .. quality
+end
+
+function AF:GetQualityIconMarkup(quality, atlas, size)
+	local context = type(atlas) == "table" and atlas or nil
+	return self:FormatReagentQuality(quality, size, context)
 end
 
 function AF:GetRecipeQualityIconMarkup(recipeID, quality, size)
@@ -124,7 +251,7 @@ function AF:GetRecipeQualityIconMarkup(recipeID, quality, size)
 	end
 	local ok, qualityInfo = pcall(C_TradeSkillUI.GetRecipeItemQualityInfo, recipeID, quality)
 	if ok and qualityInfo then
-		return self:GetQualityIconMarkup(tonumber(qualityInfo.quality) or quality, qualityInfo.iconSmall or qualityInfo.icon, size)
+		return self:FormatReagentQuality(tonumber(qualityInfo.quality) or quality, size, { qualityInfo = qualityInfo })
 	end
 	return nil
 end
@@ -173,11 +300,14 @@ local function GetReagentDisplayQualityInfo(itemID, reagent)
 	if itemID then
 		local ok, qualityInfo = pcall(C_TradeSkillUI.GetItemReagentQualityInfo, itemID)
 		if ok and qualityInfo then
-			return tonumber(qualityInfo.quality) or tonumber(reagent and reagent.quality),
-				qualityInfo.iconSmall or qualityInfo.icon or reagent and reagent.qualityAtlas
+			return tonumber(qualityInfo.quality) or tonumber(reagent and reagent.quality)
 		end
 	end
-	return tonumber(reagent and reagent.quality), reagent and reagent.qualityAtlas
+	return tonumber(reagent and reagent.quality)
+end
+
+function AF:GetItemReagentQuality(itemID, reagent)
+	return GetReagentDisplayQualityInfo(itemID, reagent)
 end
 
 local function GetTextureMarkup(texture, size)
@@ -611,8 +741,8 @@ function AF:AddReagentLines(tooltip, reagents, r, g, b, options)
 			else
 				local itemID = tonumber(reagent.itemID or reagent.id)
 				if itemID then
-					local quality, qualityAtlas = GetReagentDisplayQualityInfo(itemID, reagent)
-					local qualityText = self:GetQualityIconMarkup(quality, qualityAtlas, 16) or ""
+					local quality = GetReagentDisplayQualityInfo(itemID, reagent)
+					local qualityText = self:FormatReagentQuality(quality, 16, { itemID = itemID, reagent = reagent }) or ""
 					local itemName = self:GetItemName(itemID)
 					if options.showItemNames and itemName and itemName ~= "" then
 						local itemIcon = self:GetItemIconMarkup(itemID, 16) or ""
@@ -661,8 +791,7 @@ local function GetLocalReagentQualityMarkup(itemID)
 	if not ok or not qualityInfo then
 		return ""
 	end
-	local atlas = qualityInfo.iconSmall or qualityInfo.icon
-	return (AF:GetQualityIconMarkup(qualityInfo.quality, atlas, 16) or "")
+	return (AF:FormatReagentQuality(qualityInfo.quality, 16, { itemID = itemID, qualityInfo = qualityInfo }) or "")
 end
 
 function AF:AddReagentDetailTooltipLines(tooltip, details)

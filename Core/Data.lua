@@ -242,6 +242,65 @@ local function NormalizeOptionalBestReagents(entry)
 	end
 end
 
+local QUALITY_ATLAS_FIELD_NAMES = {
+	"qualityAtlas",
+	"reagentQualityAtlas",
+	"qualityIcon",
+	"concentrationQualityAtlas",
+	"bestQualityAtlas",
+	"bestConcentrationQualityAtlas",
+	"optionalQualityAtlas",
+	"optionalConcentrationQualityAtlas",
+}
+
+local REAGENT_CONTAINER_FIELD_NAMES = {
+	"bestReagents",
+	"optionalReagents",
+	"optionalBestReagents",
+	"reagents",
+}
+
+local function StripQualityAtlasFields(entry)
+	if type(entry) ~= "table" then
+		return
+	end
+	for _, fieldName in ipairs(QUALITY_ATLAS_FIELD_NAMES) do
+		entry[fieldName] = nil
+	end
+	for _, containerName in ipairs(REAGENT_CONTAINER_FIELD_NAMES) do
+		for _, reagent in ipairs(entry[containerName] or {}) do
+			if type(reagent) == "table" then
+				for _, fieldName in ipairs(QUALITY_ATLAS_FIELD_NAMES) do
+					reagent[fieldName] = nil
+				end
+			end
+		end
+	end
+end
+
+local function StripQualityAtlasFieldsFromDB(db)
+	StripQualityAtlasFields(db.artisanProfile)
+	for _, profile in pairs(type(db.artisanCharacters) == "table" and db.artisanCharacters or {}) do
+		StripQualityAtlasFields(profile)
+		for _, item in pairs(type(profile) == "table" and profile.items or {}) do
+			StripQualityAtlasFields(item)
+		end
+	end
+	for _, item in pairs(type(db.artisanProfile) == "table" and db.artisanProfile.items or {}) do
+		StripQualityAtlasFields(item)
+	end
+	for _, itemCache in pairs(type(db.customerCache) == "table" and db.customerCache or {}) do
+		if type(itemCache) == "table" then
+			for _, entry in pairs(itemCache) do
+				StripQualityAtlasFields(entry)
+			end
+		end
+	end
+	for _, preparedCraft in pairs(type(db.preparedCrafts) == "table" and db.preparedCrafts or {}) do
+		StripQualityAtlasFields(preparedCraft)
+	end
+end
+
 local function GetLegacyReagentDisplayKey(entry)
 	if type(entry) ~= "table" then
 		return nil
@@ -367,6 +426,7 @@ local function NormalizeCraftProfile(profile)
 				ClearLocalizedCraftFields(item)
 				ClearVolatileCraftFields(item)
 				NormalizeOptionalBestReagents(item)
+				StripQualityAtlasFields(item)
 			else
 				profile.items[itemKey] = nil
 			end
@@ -412,6 +472,7 @@ local function NormalizeCustomerCacheEntry(entry)
 	ClearLocalizedCraftFields(entry)
 	ClearVolatileCraftFields(entry)
 	NormalizeOptionalBestReagents(entry)
+	StripQualityAtlasFields(entry)
 	return entry
 end
 
@@ -499,6 +560,7 @@ local function NormalizeIDOnlyCraftData(db)
 	NormalizeTradeLeads(db.tradeLeads)
 	NormalizeTradeLeads(db.tradeLeadCache)
 	NormalizeGuildProfessionCache(db)
+	StripQualityAtlasFieldsFromDB(db)
 	db.responseThrottle = nil
 end
 
@@ -517,6 +579,7 @@ function ApplyDBDefaults(db)
 	db.connectedRealmCache = db.connectedRealmCache or {}
 	db.guildCache = db.guildCache or {}
 	db.guildCache.byGuild = db.guildCache.byGuild or {}
+	db.preparedCrafts = db.preparedCrafts or {}
 	db.minimap = db.minimap or { angle = 225, hide = false }
 	db.autoAvailabilityDisable = db.autoAvailabilityDisable or {}
 	db.tutorial = db.tutorial or {}
@@ -727,6 +790,11 @@ end
 
 MIGRATIONS[15] = function(db)
 	ApplyDBDefaults(db)
+end
+
+MIGRATIONS[16] = function(db)
+	ApplyDBDefaults(db)
+	StripQualityAtlasFieldsFromDB(db)
 end
 
 function AF:MigrateDB(db)
