@@ -10,8 +10,9 @@ local SCAN_BUILD_PROGRESS_BUDGET_MS = 6
 local SCAN_BUILD_PROGRESS_DELAY = 0.01
 local SCAN_TICK_WARNING_MS = 1000
 local SCAN_GC_STEP_SIZE = 32
-local HEAVY_JOB_QUALITY_TIER_THRESHOLD = 12
+local HEAVY_JOB_QUALITY_TIER_THRESHOLD = AF.HEAVY_JOB_QUALITY_TIER_THRESHOLD
 local scanBuildYieldState
+local CopyTable = AF.CopyTable
 
 local function GetScanTimeMS()
 	if debugprofilestop then
@@ -36,14 +37,6 @@ end
 
 local function GetScanJobKey(recipeID, itemID)
 	return tostring(recipeID or 0) .. ":" .. tostring(itemID or 0)
-end
-
-local function CopyScanItem(item)
-	local copy = {}
-	for key, value in pairs(item or {}) do
-		copy[key] = value
-	end
-	return copy
 end
 
 local function GetDebugItemName(itemID)
@@ -548,7 +541,7 @@ function AF:ScanJob(profession, professionEntry, job)
 	local profile = self.db.artisanProfile
 	local itemKey = tostring(job.itemID)
 	local savedItem = profile.items[itemKey]
-	local existing = CopyScanItem(savedItem)
+	local existing = CopyTable(savedItem)
 	if job.kind ~= "probe" then
 		profile.items[itemKey] = existing
 	end

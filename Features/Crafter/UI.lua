@@ -8,6 +8,7 @@ local COMMISSION_FIELD_HEIGHT = 36
 local COMMISSION_PRICE_MAX_LETTERS = 9
 local CRAFTER_REOPEN_ICON = 7548932 -- inv-12-profession-blacksmithing-repairhammer-purple
 local CUSTOMER_PREVIEW_TEXTURE = 4675733
+local CopyTable = AF.CopyTable
 
 local function UpdatePlaceholder(box)
 	box.Placeholder:SetShown((box:GetText() or "") == "")
@@ -213,10 +214,7 @@ local function ConfigureCustomerPreviewButton(button, getEntry)
 		if disabledText then
 			GameTooltip:AddLine(disabledText, 0.75, 0.75, 0.75, true)
 		elseif entry or defaultEntry then
-			local previewEntry = {}
-			for key, value in pairs(defaultEntry or {}) do
-				previewEntry[key] = value
-			end
+			local previewEntry = CopyTable(defaultEntry)
 			for key, value in pairs(entry or {}) do
 				previewEntry[key] = value
 			end

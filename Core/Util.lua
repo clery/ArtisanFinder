@@ -28,6 +28,18 @@ function AF:IsTradeChannelName(name)
 	return false
 end
 
+function AF.SortNumbers(left, right)
+	return tonumber(left) < tonumber(right)
+end
+
+function AF.CopyTable(source)
+	local copy = {}
+	for key, value in pairs(source or {}) do
+		copy[key] = value
+	end
+	return copy
+end
+
 function AF:IsInUnavailableActivity()
 	local disabled = self.db and self.db.autoAvailabilityDisable or {}
 	if C_PartyInfo and C_PartyInfo.IsDelveInProgress and C_PartyInfo.IsDelveInProgress() then

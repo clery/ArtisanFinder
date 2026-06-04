@@ -1,7 +1,7 @@
 local _, AF = ...
 
 local MAX_OPTIONAL_REAGENT_COMBINATIONS = 96
-local HEAVY_JOB_QUALITY_TIER_THRESHOLD = 12
+local HEAVY_JOB_QUALITY_TIER_THRESHOLD = AF.HEAVY_JOB_QUALITY_TIER_THRESHOLD
 local SCAN_SIGNATURE_VERSION = 34
 local SKILL_PROBE_SIGNATURE_VERSION = 1
 local FULL_SCAN_SIGNATURE_VERSION = 4
@@ -10,9 +10,8 @@ local GetRecipeDisplayQuality
 local GetRecipeDisplayQualityInfo
 local GetRecipeCapabilityTimeMS
 
-local function SortNumbers(left, right)
-	return tonumber(left) < tonumber(right)
-end
+local SortNumbers = AF.SortNumbers
+local CopyTable = AF.CopyTable
 
 GetRecipeCapabilityTimeMS = function()
 	if debugprofilestop then
@@ -224,20 +223,12 @@ local function IsOperationBelowBest(normalInfo, concentrationInfo, best, normalO
 	return false
 end
 
-local function CopyRecipeScanStats(stats)
-	local copy = {}
-	for key, value in pairs(stats or {}) do
-		copy[key] = value
-	end
-	return copy
-end
-
 local function BuildBestReagentCapability(recipeID, best)
 	if not best or not best.normalInfo then
 		return best or {}
 	end
 	if best.bestQuality or best.rawBestQuality or best.bestReagentTruncated ~= nil then
-		best.debugScanStats = CopyRecipeScanStats(best.debugScanStats)
+		best.debugScanStats = CopyTable(best.debugScanStats)
 		return best
 	end
 	return {
@@ -254,7 +245,7 @@ local function BuildBestReagentCapability(recipeID, best)
 		bestReagentSignature = best.bestReagentSignature,
 		bestReagentTruncated = best.truncated == true,
 		reagentQualityScore = best.reagentQualityScore,
-		debugScanStats = CopyRecipeScanStats(best.debugScanStats),
+		debugScanStats = CopyTable(best.debugScanStats),
 		optionalImpact = best.optionalImpact,
 	}
 end

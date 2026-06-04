@@ -1,5 +1,7 @@
 local _, AF = ...
 
+local CopyTable = AF.CopyTable
+
 local function GetSortQuality(entry)
 	return tonumber(entry and entry.bestQuality)
 		or tonumber(entry and entry.quality)
@@ -142,19 +144,11 @@ function AF:CustomerEntryMatchesFilter(entry, filterText)
 	return EntryMatchesCustomerFilter(self, entry, filterText)
 end
 
-local function CopyCustomerEntry(entry)
-	local copy = {}
-	for key, value in pairs(entry or {}) do
-		copy[key] = value
-	end
-	return copy
-end
-
 local FAVORITE_CACHE_ROW_OPTIONS = { unavailableFavorite = true, useOrderTarget = true }
 local OFFLINE_CACHE_ROW_OPTIONS = { offlineCached = true, offlineFallback = true, useOrderTarget = true }
 
 local function PrepareCachedCustomerEntry(AF, entry, options)
-	local copy = CopyCustomerEntry(entry)
+	local copy = CopyTable(entry)
 	copy.certified = true
 	copy.tradeLead = false
 	copy.unavailableFavorite = options and options.unavailableFavorite or nil
