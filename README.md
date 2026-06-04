@@ -9,6 +9,7 @@ ArtisanFinder helps players find available crafters directly from the Crafting O
 *   Multi-character advertising for scanned professions from your alts.
 *   Guild and trade-chat crafter discovery.
 *   Favorites, search, sorting, online checks, and personal order helpers.
+*   Prepare Order tracking with required components, optional reagents, quantities, quality markers, and Auctionator temporary searches.
 *   Personal order notifications for addon-enabled customers and artisans.
 *   Manual recipe scanning for supported crafting professions, with optional automatic rescans.
 *   Minimap, movable button, Options -> AddOns, and Blizzard Edit Mode controls.
@@ -19,6 +20,10 @@ ArtisanFinder helps players find available crafters directly from the Crafting O
 ## For Customers
 
 When you choose an item in the Crafting Order form, ArtisanFinder shows matching artisans who can help with that craft. Results can include commission, note, quality with recommended or optional reagents, AFK state, guild source, trade-chat leads, and actions for whispering or preparing an order.
+
+Use the customer row gear menu to prepare an order as Standard or With optional reagents. Standard preparation adds the craft to the ObjectiveTracker with required components and any artisan quality or reagent recommendations. With optional reagents opens Blizzard-style optional reagent slots inside the artisan row so you can choose one reagent per slot before tracking the craft.
+
+Prepared crafts appear under ArtisanFinder in the ObjectiveTracker with required components, vendor reagents, selected optional reagents, quantities, owned and missing counts, and quality markers where available. Left-click the craft header to open the profession recipe panel, right-click it to untrack, or use Search at the Auction House to run a temporary Auctionator multi-search for missing reagents when Auctionator is enabled.
 
 ArtisanFinder does not place orders for you. It only helps fill or open the right information so you can review everything before submitting an order yourself.
 

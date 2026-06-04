@@ -2,8 +2,6 @@ local _, AF = ...
 
 local TRACKER_MAX_REAGENTS = 12
 local TRACKER_MODULE_ORDER = 8.5
-local AUCTIONATOR_CALLER_ID = "ArtisanFinder"
-local AUCTIONATOR_LIST_PREFIX = "ArtisanFinder - "
 
 local PreparationObjectiveTrackerMixin = {}
 local auctionatorLoadAttempted = false
@@ -14,6 +12,15 @@ local function ReagentMatches(left, right)
 	end
 	return (left.itemID and left.itemID ~= 0 and tonumber(left.itemID) == tonumber(right.itemID or right.id))
 		or (left.currencyID and left.currencyID ~= 0 and tonumber(left.currencyID) == tonumber(right.currencyID))
+end
+
+local function FindMatchingSlotReagent(slot, reagent)
+	for _, slotReagent in ipairs(slot and slot.reagents or {}) do
+		if ReagentMatches(slotReagent, reagent) then
+			return slotReagent
+		end
+	end
+	return nil
 end
 
 local function GetQuantityRequired(slot, reagent)
@@ -134,7 +141,7 @@ local function NormalizeReagent(entry, options)
 		kind = currencyID and "currency" or "item",
 		itemID = itemID,
 		currencyID = currencyID,
-		quantity = tonumber(entry.quantity) or tonumber(options.quantity) or 1,
+		quantity = tonumber(options.quantity) or tonumber(entry.quantity) or 1,
 		quality = quality,
 		dataSlotIndex = tonumber(entry.dataSlotIndex) or tonumber(options.dataSlotIndex),
 		slotIndex = tonumber(entry.slotIndex) or tonumber(options.slotIndex),
@@ -175,15 +182,16 @@ end
 
 local function FindRecommendedForSlot(recommendations, slot)
 	local dataSlotIndex = tonumber(slot and slot.dataSlotIndex)
+	local slotIndex = tonumber(slot and slot.slotIndex)
 	for _, reagent in ipairs(recommendations or {}) do
-		if dataSlotIndex and tonumber(reagent.dataSlotIndex) == dataSlotIndex then
-			return reagent
-		end
-	end
-	for _, reagent in ipairs(recommendations or {}) do
-		for _, slotReagent in ipairs(slot and slot.reagents or {}) do
-			if ReagentMatches(slotReagent, reagent) then
-				return reagent
+		local slotReagent = FindMatchingSlotReagent(slot, reagent)
+		if slotReagent then
+			local reagentDataSlotIndex = tonumber(reagent.dataSlotIndex)
+			local reagentSlotIndex = tonumber(reagent.slotIndex)
+			local dataSlotMatches = not dataSlotIndex or not reagentDataSlotIndex or dataSlotIndex == reagentDataSlotIndex
+			local slotMatches = not slotIndex or not reagentSlotIndex or slotIndex == reagentSlotIndex
+			if dataSlotMatches and slotMatches then
+				return reagent, slotReagent
 			end
 		end
 	end
@@ -194,18 +202,18 @@ local function BuildRequiredReagents(entry, mode)
 	local reagents = {}
 	local seen = {}
 	local schematic = GetRecipeSchematic(entry and entry.recipeID)
-	local recommendations = entry and mode == "standard" and entry.bestReagents or entry.optionalBestReagents or {}
+	local recommendations = entry and entry.bestReagents or {}
 
 	if schematic then
 		for _, slot in ipairs(schematic.reagentSlotSchematics or {}) do
 			if IsBasicOrRequiredSlot(slot) and not IsOptionalSlot(slot) then
-				local recommended = FindRecommendedForSlot(recommendations, slot)
+				local recommended, recommendedSlotReagent = FindRecommendedForSlot(recommendations, slot)
 				local reagent = recommended and NormalizeReagent(recommended, {
 					dataSlotIndex = slot.dataSlotIndex,
 					slotIndex = slot.slotIndex,
 					slotText = GetSlotText(slot),
 					source = "recommendation",
-					quantity = recommended.quantity,
+					quantity = GetQuantityRequired(slot, recommendedSlotReagent),
 				})
 				if not reagent then
 					local fallback = PickFallbackReagent(slot)
@@ -351,8 +359,10 @@ function AF:RemovePreparedCraft(key)
 	if not self.db or not self.db.preparedCrafts then
 		return
 	end
+	local fallbackIndex = tonumber(key)
 	for index = #self.db.preparedCrafts, 1, -1 do
-		if self.db.preparedCrafts[index].key == key then
+		local entry = self.db.preparedCrafts[index]
+		if entry.key == key or (entry.key and key and tostring(entry.key) == tostring(key)) or (not entry.key and fallbackIndex == index) then
 			table.remove(self.db.preparedCrafts, index)
 			break
 		end
@@ -367,6 +377,80 @@ end
 
 local function GetPreparationCount()
 	return #GetPreparationEntries()
+end
+
+local function FindPreparedCraftEntry(block)
+	if not block then
+		return nil
+	end
+	if block.artisanFinderPreparedCraftEntry then
+		return block.artisanFinderPreparedCraftEntry
+	end
+
+	local key = block.id
+	if not key then
+		return nil
+	end
+
+	local entries = GetPreparationEntries()
+	for _, entry in ipairs(entries) do
+		if entry and entry.key and tostring(entry.key) == tostring(key) then
+			return entry
+		end
+	end
+
+	local index = tonumber(key)
+	if index and entries[index] then
+		return entries[index]
+	end
+
+	local recipeID = tonumber(tostring(key):match("^(%-?%d+)"))
+	if recipeID then
+		return { key = key, recipeID = math.abs(recipeID) }
+	end
+	return nil
+end
+
+local function GetPreparedCraftRecipeID(entry)
+	local recipeID = tonumber(entry and (entry.recipeID or entry.spellID))
+	if recipeID and recipeID > 0 then
+		return recipeID
+	end
+	return nil
+end
+
+local function OpenPreparedCraftRecipe(entry)
+	local recipeID = GetPreparedCraftRecipeID(entry)
+	if not recipeID or not C_TradeSkillUI then
+		return false
+	end
+	if issecretvalue and issecretvalue(recipeID) then
+		return false
+	end
+	if not ProfessionsFrame and ProfessionsFrame_LoadUI then
+		pcall(ProfessionsFrame_LoadUI)
+	end
+
+	if C_TradeSkillUI.IsRecipeProfessionLearned then
+		local ok, learned = pcall(C_TradeSkillUI.IsRecipeProfessionLearned, recipeID)
+		if ok and learned and C_TradeSkillUI.OpenRecipe then
+			return pcall(C_TradeSkillUI.OpenRecipe, recipeID)
+		elseif ok and not learned and Professions and Professions.InspectRecipe then
+			return pcall(Professions.InspectRecipe, recipeID)
+		end
+	end
+
+	if C_TradeSkillUI.OpenRecipe then
+		return pcall(C_TradeSkillUI.OpenRecipe, recipeID)
+	end
+	if ProfessionsUtil and ProfessionsUtil.OpenProfessionFrameToRecipe then
+		return pcall(ProfessionsUtil.OpenProfessionFrameToRecipe, recipeID)
+	end
+	return false
+end
+
+local function GetUntrackText()
+	return OBJECTIVES_TRACKER_UNTRACK or UNTRACK or PROFESSIONS_UNTRACK_RECIPE or OBJECTIVES_STOP_TRACKING or "Untrack"
 end
 
 local function IsAuctionHouseShown()
@@ -387,19 +471,18 @@ local function TryLoadAuctionator()
 	pcall(C_AddOns.LoadAddOn, "Auctionator")
 end
 
-local function GetAuctionatorShoppingListAPI()
+local function GetAuctionatorMultiSearchAPI()
 	TryLoadAuctionator()
 	local api = Auctionator and Auctionator.API and Auctionator.API.v1
 	if type(api) == "table"
-		and type(api.CreateShoppingList) == "function"
-		and type(api.ConvertToSearchString) == "function" then
+		and type(api.MultiSearchAdvanced) == "function" then
 		return api
 	end
 	return nil
 end
 
-local function IsAuctionatorShoppingListAvailable()
-	return GetAuctionatorShoppingListAPI() ~= nil
+local function IsAuctionatorMultiSearchAvailable()
+	return GetAuctionatorMultiSearchAPI() ~= nil
 end
 
 local function GetItemName(itemID)
@@ -426,56 +509,60 @@ local function AddItemContinuable(container, itemID)
 	container:AddContinuable(Item:CreateFromItemID(itemID))
 end
 
-local function MakeAuctionatorListName(entry, index)
-	local craftName = entry and entry.itemName or (entry and entry.recipeID) or index
-	local target = entry and entry.target
-	local name = AUCTIONATOR_LIST_PREFIX .. tostring(craftName or index)
-	local modeText = entry and entry.mode == "optional" and AF:Text("PREPARE_ORDER_OPTIONAL") or AF:Text("PREPARE_ORDER_STANDARD")
-	if modeText and modeText ~= "" then
-		name = name .. " - " .. modeText
+local function GetAuctionatorTemporarySearchName()
+	if type(AUCTIONATOR_L_REAGENT_SEARCH) == "string" and AUCTIONATOR_L_REAGENT_SEARCH ~= "" then
+		return AUCTIONATOR_L_REAGENT_SEARCH
 	end
-	if target and target ~= "" then
-		name = name .. " - " .. tostring(target)
-	end
-	return name
+	return AF:Text("PREP_TRACKER_AUCTIONATOR_SEARCH_NAME")
 end
 
 local function GetAuctionatorSearchKey(itemID, quality)
 	return tostring(itemID or 0) .. ":" .. tostring(quality or 0)
 end
 
-local function BuildAuctionatorSearchEntries(entry)
+local function BuildAuctionatorSearchEntries()
+	local totals = {}
+	local orderedTotals = {}
 	local searchEntries = {}
-	local seen = {}
 
-	for _, reagent in ipairs(entry and entry.reagents or {}) do
-		local itemID = tonumber(reagent.itemID)
-		if itemID and itemID > 0 then
-			local needed = tonumber(reagent.quantity) or 1
-			local missing = math.max(0, needed - GetOwnedCount(reagent))
-			if missing > 0 then
-				local quality = tonumber(reagent.quality) or 0
-				local key = GetAuctionatorSearchKey(itemID, quality)
-				local existing = seen[key]
-				if existing then
-					existing.quantity = existing.quantity + missing
-				else
-					existing = {
-						itemID = itemID,
-						quality = quality > 0 and quality or nil,
-						quantity = missing,
-					}
-					seen[key] = existing
-					table.insert(searchEntries, existing)
+	for _, entry in ipairs(GetPreparationEntries()) do
+		for _, reagent in ipairs(entry and entry.reagents or {}) do
+			local itemID = tonumber(reagent.itemID)
+			if itemID and itemID > 0 then
+				local needed = tonumber(reagent.quantity) or 1
+				if needed > 0 then
+					local quality = tonumber(reagent.quality) or 0
+					local key = GetAuctionatorSearchKey(itemID, quality)
+					local existing = totals[key]
+					if existing then
+						existing.quantity = existing.quantity + needed
+					else
+						existing = {
+							itemID = itemID,
+							quality = quality > 0 and quality or nil,
+							quantity = needed,
+							reagent = reagent,
+						}
+						totals[key] = existing
+						table.insert(orderedTotals, existing)
+					end
 				end
 			end
 		end
 	end
 
-	table.sort(searchEntries, function(left, right)
-		if tostring(left.itemName or "") ~= tostring(right.itemName or "") then
-			return tostring(left.itemName or "") < tostring(right.itemName or "")
+	for _, entry in ipairs(orderedTotals) do
+		local missing = math.max(0, (tonumber(entry.quantity) or 1) - GetOwnedCount(entry.reagent))
+		if missing > 0 then
+			table.insert(searchEntries, {
+				itemID = entry.itemID,
+				quality = entry.quality,
+				quantity = missing,
+			})
 		end
+	end
+
+	table.sort(searchEntries, function(left, right)
 		if left.itemID ~= right.itemID then
 			return left.itemID < right.itemID
 		end
@@ -485,7 +572,7 @@ local function BuildAuctionatorSearchEntries(entry)
 	return searchEntries
 end
 
-local function BuildAuctionatorSearchString(api, searchEntry)
+local function BuildAuctionatorSearchTerm(searchEntry)
 	local itemName = GetItemName(searchEntry and searchEntry.itemID)
 	if not itemName then
 		return nil
@@ -500,40 +587,39 @@ local function BuildAuctionatorSearchString(api, searchEntry)
 		term.tier = searchEntry.quality
 	end
 
-	local ok, searchString = pcall(api.ConvertToSearchString, AUCTIONATOR_CALLER_ID, term)
-	if ok and type(searchString) == "string" then
-		return searchString
-	end
-	return nil
+	return term
 end
 
-local function CreateAuctionatorShoppingListsFromPreparedCrafts()
-	local api = GetAuctionatorShoppingListAPI()
+local function SearchAuctionatorMissingReagents()
+	local api = GetAuctionatorMultiSearchAPI()
 	if not api then
-		return 0, 0
+		return 0, 0, false
 	end
 
-	local created = 0
+	local searchTerms = {}
 	local skipped = 0
-	for index, entry in ipairs(GetPreparationEntries()) do
-		local searchStrings = {}
-		for _, searchEntry in ipairs(BuildAuctionatorSearchEntries(entry)) do
-			local searchString = BuildAuctionatorSearchString(api, searchEntry)
-			if searchString then
-				table.insert(searchStrings, searchString)
-			else
-				skipped = skipped + 1
-			end
-		end
-
-		local listName = MakeAuctionatorListName(entry, index)
-		local ok = pcall(api.CreateShoppingList, AUCTIONATOR_CALLER_ID, listName, searchStrings)
-		if ok then
-			created = created + 1
+	for _, searchEntry in ipairs(BuildAuctionatorSearchEntries()) do
+		local searchTerm = BuildAuctionatorSearchTerm(searchEntry)
+		if searchTerm then
+			table.insert(searchTerms, searchTerm)
+		else
+			skipped = skipped + 1
 		end
 	end
 
-	return created, skipped
+	if #searchTerms == 0 then
+		return 0, skipped, true
+	end
+
+	local ok, errorMessage = pcall(api.MultiSearchAdvanced, GetAuctionatorTemporarySearchName(), searchTerms)
+	if not ok then
+		if AF.DebugLog then
+			AF:DebugLog("auctionator", "MultiSearchAdvanced failed: " .. tostring(errorMessage))
+		end
+		return 0, skipped, false
+	end
+
+	return #searchTerms, skipped, true
 end
 
 local function ContinueWhenPreparationItemsLoad(callback)
@@ -544,23 +630,19 @@ local function ContinueWhenPreparationItemsLoad(callback)
 	local continuableContainer = ContinuableContainer and ContinuableContainer.Create and ContinuableContainer:Create()
 	if continuableContainer then
 		local seen = {}
-		for _, entry in ipairs(GetPreparationEntries()) do
-			for _, searchEntry in ipairs(BuildAuctionatorSearchEntries(entry)) do
-				if searchEntry.itemID and not seen[searchEntry.itemID] then
-					seen[searchEntry.itemID] = true
-					AddItemContinuable(continuableContainer, searchEntry.itemID)
-				end
+		for _, searchEntry in ipairs(BuildAuctionatorSearchEntries()) do
+			if searchEntry.itemID and not seen[searchEntry.itemID] then
+				seen[searchEntry.itemID] = true
+				AddItemContinuable(continuableContainer, searchEntry.itemID)
 			end
 		end
 		continuableContainer:ContinueOnLoad(callback)
 		return
 	end
 
-	for _, entry in ipairs(GetPreparationEntries()) do
-		for _, searchEntry in ipairs(BuildAuctionatorSearchEntries(entry)) do
-			if C_Item and C_Item.RequestLoadItemDataByID and searchEntry.itemID then
-				pcall(C_Item.RequestLoadItemDataByID, searchEntry.itemID)
-			end
+	for _, searchEntry in ipairs(BuildAuctionatorSearchEntries()) do
+		if C_Item and C_Item.RequestLoadItemDataByID and searchEntry.itemID then
+			pcall(C_Item.RequestLoadItemDataByID, searchEntry.itemID)
 		end
 	end
 
@@ -571,15 +653,15 @@ local function ContinueWhenPreparationItemsLoad(callback)
 	end
 end
 
-function AF:CreateAuctionatorPreparationShoppingLists()
-	if not IsAuctionatorShoppingListAvailable() then
+function AF:SearchAuctionatorPreparationReagents()
+	if not IsAuctionHouseShown() or not IsAuctionatorMultiSearchAvailable() then
 		return false
 	end
 
 	ContinueWhenPreparationItemsLoad(function()
-		local created, skipped = CreateAuctionatorShoppingListsFromPreparedCrafts()
-		if created > 0 then
-			self:Print(self:Text("PREP_TRACKER_AUCTIONATOR_CREATED", created))
+		local searched, skipped, success = SearchAuctionatorMissingReagents()
+		if success and searched > 0 then
+			self:Print(self:Text("PREP_TRACKER_AUCTIONATOR_SEARCHED", searched))
 		end
 		if skipped > 0 and self.DebugLog then
 			self:DebugLog("auctionator", string.format("Skipped %d preparation reagent(s) with unavailable item names.", skipped))
@@ -766,7 +848,7 @@ function PreparationObjectiveTrackerMixin:UpdateSearchButton()
 	if not shouldShow then
 		return
 	end
-	if IsAuctionatorShoppingListAvailable() then
+	if IsAuctionatorMultiSearchAvailable() then
 		button:Enable()
 	else
 		button:Disable()
@@ -789,7 +871,11 @@ function PreparationObjectiveTrackerMixin:LayoutContents()
 end
 
 function PreparationObjectiveTrackerMixin:AddPreparedCraftBlock(entry, index)
-	local block = self:GetBlock(entry.key or index)
+	local entryKey = entry.key or index
+	local block = self:GetBlock(entryKey)
+	block.artisanFinderPreparedCraftEntry = entry
+	block.artisanFinderPreparedCraftKey = entryKey
+	block.artisanFinderPreparedCraftRecipeID = GetPreparedCraftRecipeID(entry)
 	local title = entry.itemName or entry.recipeID or ""
 	block:SetHeader(title)
 
@@ -835,7 +921,7 @@ function PreparationObjectiveTrackerMixin:AddPreparedCraftBlock(entry, index)
 				line.Icon:SetAtlas("ui-questtracker-tracker-check", false)
 			end
 		end
-		AttachLineButton(self, line, entry.key, reagent)
+		AttachLineButton(self, line, entryKey, reagent)
 	end
 
 	if #(entry.reagents or {}) > TRACKER_MAX_REAGENTS then
@@ -856,7 +942,8 @@ function PreparationObjectiveTrackerMixin:OnBlockHeaderClick(block, mouseButton)
 		activeChatWindow = ChatEdit_GetActiveWindow()
 	end
 	if IsModifiedClick and IsModifiedClick("CHATLINK") and activeChatWindow then
-		local recipeID = tonumber(key and tostring(key):match("^(%-?%d+)"))
+		local entry = FindPreparedCraftEntry(block)
+		local recipeID = GetPreparedCraftRecipeID(entry)
 		local link = recipeID and C_TradeSkillUI and C_TradeSkillUI.GetRecipeLink and C_TradeSkillUI.GetRecipeLink(recipeID)
 		if link then
 			if ChatFrameUtil and ChatFrameUtil.InsertLink then
@@ -872,28 +959,16 @@ function PreparationObjectiveTrackerMixin:OnBlockHeaderClick(block, mouseButton)
 		if MenuUtil and MenuUtil.CreateContextMenu and mouseButton == "RightButton" then
 			MenuUtil.CreateContextMenu(self:GetContextMenuParent(), function(_, rootDescription)
 				rootDescription:SetTag("MENU_ARTISANFINDER_PREPARATION_TRACKER")
-				rootDescription:CreateButton(AF:Text("PREP_TRACKER_REMOVE"), function()
+				rootDescription:CreateButton(GetUntrackText(), function()
 					AF:RemovePreparedCraft(key)
 				end)
 			end)
 		else
 			AF:RemovePreparedCraft(key)
 		end
+	else
+		OpenPreparedCraftRecipe(FindPreparedCraftEntry(block))
 	end
-end
-
-function PreparationObjectiveTrackerMixin:OnBlockHeaderEnter(block)
-	if not block then
-		return
-	end
-	GameTooltip:SetOwner(block.HeaderButton or block, "ANCHOR_RIGHT")
-	GameTooltip:SetText(block.HeaderText and block.HeaderText:GetText() or AF:Text("PREP_TRACKER_HEADER"), 1, 1, 1, 1, true)
-	GameTooltip:AddLine(AF:Text("PREP_TRACKER_REMOVE_HINT"), 0.65, 0.65, 0.65, true)
-	GameTooltip:Show()
-end
-
-function PreparationObjectiveTrackerMixin:OnBlockHeaderLeave()
-	GameTooltip:Hide()
 end
 
 local function CreatePreparationObjectiveTrackerModule()
@@ -919,15 +994,15 @@ local function CreatePreparationObjectiveTrackerModule()
 			button = CreateFrame("Button", nil, module.Header, "UIPanelButtonTemplate")
 		end
 		button:SetText(AF:Text("PREP_TRACKER_SEARCH"))
-		button:SetSize(64, 22)
-		button:SetPoint("RIGHT", module.Header.MinimizeButton or module.Header, "LEFT", -4, 0)
+		button:SetSize(75, 22)
+		button:SetPoint("TOPRIGHT", module.Header.MinimizeButton or module.Header, "TOPLEFT", -30, 5)
 		button:RegisterForClicks("LeftButtonUp")
 		button:SetScript("OnClick", function()
-			AF:CreateAuctionatorPreparationShoppingLists()
+			AF:SearchAuctionatorPreparationReagents()
 		end)
 		button:SetScript("OnEnter", function(self)
 			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-			if IsAuctionatorShoppingListAvailable() then
+			if IsAuctionatorMultiSearchAvailable() then
 				GameTooltip:SetText(AF:Text("PREP_TRACKER_SEARCH"), 1, 1, 1, 1, true)
 				GameTooltip:AddLine(AF:Text("PREP_TRACKER_AUCTIONATOR_TOOLTIP"), 0.65, 0.65, 0.65, true)
 			else

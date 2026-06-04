@@ -15,16 +15,4 @@
     [] See if adding communities as broadcast channels is possible.
     [] When clicking a row, prefill the Crafting order like the current "Personal Order" and "Guild Order" buttons do, and add information to the Crafting Order panel with suggested reagent and optional reagent for best results (with or without each optional reagent)
 
-[] Shopping List:
-    [] Integrate with other addons which provide shopping list
-        - Auctionator
-    [] Create own shopping list system
-        - Track recipe in the quest log
-        - Allow searching for those when auction house is open
-
-[] Fix wrong atlas used in PreparationTracker. Centralize quality/atlas formatting so anywhere needed, it will use the same code.
-[] Move "Prepare order" view inside the artisan's row.
-[] Simplify "Prepare order" view to only show X boxes like in Crafting Order panel, which open on-click a small modal containing only icons of the optional reagents and their quality on the top right of the icon
-[] When clicking search button for ArtisanFinder preparations while AH is opened, move to the right tab and to the right temporary Shopping list
-
 [] Explore EditModeExpanded

@@ -67,7 +67,11 @@
         "ChatFrameUtil",
         "AuctionHouseFrame",
         "TextureKitConstants",
-        "ColorManager"
+        "ColorManager",
+        "ProfessionsFrame_LoadUI",
+        "Professions",
+        "PROFESSIONS_UNTRACK_RECIPE",
+        "OBJECTIVES_STOP_TRACKING"
     ],
     "Lua.type.weakUnionCheck": true
 }

@@ -1,5 +1,20 @@
 # ArtisanFinder
 
+## [v2.0.5](https://github.com/clery/ArtisanFinder/releases/tag/v2.0.5) (2026-06-04)
+
+[Full Changelog](https://github.com/clery/ArtisanFinder/compare/v2.0.4...v2.0.5) | [Previous Releases](https://github.com/clery/ArtisanFinder/releases)
+
+### Added
+
+* Customer rows now include Prepare order actions for standard crafts and crafts with optional reagents.
+* Prepared crafts are tracked in the ObjectiveTracker with required components, selected optional reagents, needed quantities, owned and missing counts, and quality markers.
+* Auction House searches from prepared crafts now use Auctionator temporary multi-searches when Auctionator is enabled.
+
+### Changed
+
+* Reagent quality icons are now handled more consistently, required no-quality reagents are included, and compatible recent scans no longer require a rescan only for optional-reagent recommendation updates.
+* The "Personal Order" and "Guild Order" buttons have been removed to let a simple click on an artisan row autofill the form on the left.
+
 ## [v2.0.3](https://github.com/clery/ArtisanFinder/releases/tag/v2.0.3) (2026-06-02)
 
 [Full Changelog](https://github.com/clery/ArtisanFinder/compare/v2.0.2...v2.0.3) | [Previous Releases](https://github.com/clery/ArtisanFinder/releases)

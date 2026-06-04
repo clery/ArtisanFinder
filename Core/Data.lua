@@ -18,6 +18,7 @@ local PROFESSION_ID_ALIASES = {
 	[12] = 755, -- Midnight Jewelcrafting
 }
 local REALM_CONNECTION_CACHE_MAX_AGE = 30 * 24 * 60 * 60
+local MIN_COMPATIBLE_SCAN_SIGNATURE_VERSION = 33
 local ApplyDBDefaults
 local legacyReagentDisplayCache = {}
 local BASE_PROFESSION_SPELLS = {
@@ -1346,7 +1347,7 @@ function AF:GetProfessionScannedCount(profile, professionID)
 	end
 	local count = 0
 	for _, item in pairs(profile.items or {}) do
-		if self:GetSupportedProfessionID(item.professionID, item) == baseProfessionID then
+		if type(item) == "table" and self:GetSupportedProfessionID(item.professionID, item) == baseProfessionID then
 			count = count + 1
 		end
 	end
@@ -1355,6 +1356,28 @@ end
 
 local function GetScanSignatureVersion(signature)
 	return tonumber(tostring(signature or ""):match("^(%d+)|"))
+end
+
+local function IsCompatibleScanSignatureVersion(version, currentVersion)
+	version = tonumber(version)
+	currentVersion = tonumber(currentVersion)
+	return version and currentVersion and version >= MIN_COMPATIBLE_SCAN_SIGNATURE_VERSION and version <= currentVersion
+end
+
+function AF:IsScannedProfessionCoreDataUsable(profile, professionID)
+	if type(profile) ~= "table" or not professionID then
+		return false
+	end
+	local found = false
+	for itemKey, item in pairs(profile.items or {}) do
+		if type(item) == "table" and self:GetSupportedProfessionID(item.professionID, item) == self:GetSupportedProfessionID(professionID) then
+			found = true
+			if not tonumber(item.itemID or itemKey) or not tonumber(item.recipeID) then
+				return false
+			end
+		end
+	end
+	return found
 end
 
 function AF:IsDeprecatedScannedProfession(profile, professionID, profession)
@@ -1368,7 +1391,14 @@ function AF:IsDeprecatedScannedProfession(profile, professionID, profession)
 	if not currentVersion then
 		return false
 	end
-	return GetScanSignatureVersion(profession and profession.scanSignature) ~= currentVersion
+	local scanVersion = GetScanSignatureVersion(profession and profession.scanSignature)
+	if scanVersion == currentVersion then
+		return false
+	end
+	if IsCompatibleScanSignatureVersion(scanVersion, currentVersion) and self:IsScannedProfessionCoreDataUsable(profile, professionID) then
+		return false
+	end
+	return true
 end
 
 function AF:GetDeprecatedScanSummaries()
