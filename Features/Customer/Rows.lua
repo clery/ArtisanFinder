@@ -18,12 +18,12 @@ local function SetColorTexture(texture, hex, fallback, alpha)
 	if not texture then
 		return false
 	end
-	local r, g, b = AF:GetShopColorRGB(hex, fallback)
+	local r, g, b, colorAlpha = AF:GetShopColorRGBA(hex, fallback)
 	if not r then
 		texture:Hide()
 		return false
 	end
-	texture:SetVertexColor(r, g, b, alpha or 1)
+	texture:SetVertexColor(r, g, b, (colorAlpha or 1) * (alpha or 1))
 	texture:Show()
 	return true
 end
@@ -51,7 +51,7 @@ SetShopRowTexture = function(texture, rowTextureStyle, hex)
 		return false
 	end
 	local row = texture:GetParent()
-	local r, g, b = AF:GetShopColorRGB(hex, "24435d")
+	local r, g, b, colorAlpha = AF:GetShopColorRGBA(hex, "24435dff")
 	if row then
 		row.artisanFinderShopRowTextureSegmented = style.hTile == true
 	end
@@ -83,7 +83,7 @@ SetShopRowTexture = function(texture, rowTextureStyle, hex)
 			if segment.SetVertTile then
 				segment:SetVertTile(style.vTile == true)
 			end
-			segment:SetVertexColor(r or 1, g or 1, b or 1, SHOP_ROW_TEXTURE_ALPHA)
+			segment:SetVertexColor(r or 1, g or 1, b or 1, (colorAlpha or 1) * SHOP_ROW_TEXTURE_ALPHA)
 			segment:Show()
 			used = used + segmentWidth
 			index = index + 1

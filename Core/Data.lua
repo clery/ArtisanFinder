@@ -22,10 +22,8 @@ local MIN_COMPATIBLE_SCAN_SIGNATURE_VERSION = 33
 local ApplyDBDefaults
 local legacyReagentDisplayCache = {}
 local DEFAULT_SHOP_COSMETICS = {
-	rowColor = "24435d",
-	iconColor = "f0c35a",
-	emblemStyle = 0,
-	rowTextureStyle = 1,
+	rowColor = "24435d00",
+	iconColor = "f0c35aff",
 }
 local SHOP_ROW_TEXTURE_STYLES = {
 	[1] = {
@@ -199,8 +197,13 @@ local function EnsureProfileContainers(profile)
 end
 
 local function NormalizeHexColor(value, fallback)
-	value = tostring(value or ""):match("^%s*#?(%x%x%x%x%x%x)%s*$")
+	value = tostring(value or ""):match("^%s*#?(%x%x%x%x%x%x%x?%x?)%s*$")
 	if not value or value == "" then
+		return fallback
+	end
+	if #value == 6 then
+		value = value .. "ff"
+	elseif #value ~= 8 then
 		return fallback
 	end
 	return value:lower()
@@ -250,12 +253,18 @@ function AF:NormalizeShopRowTextureStyle(value, fallback)
 end
 
 function AF:GetShopRowTextureStyle(rowTextureStyle)
-	rowTextureStyle = self:NormalizeShopRowTextureStyle(rowTextureStyle, DEFAULT_SHOP_COSMETICS.rowTextureStyle) or DEFAULT_SHOP_COSMETICS.rowTextureStyle
-	return SHOP_ROW_TEXTURE_STYLES[rowTextureStyle] or SHOP_ROW_TEXTURE_STYLES[DEFAULT_SHOP_COSMETICS.rowTextureStyle]
+	rowTextureStyle = self:NormalizeShopRowTextureStyle(rowTextureStyle, nil)
+	return rowTextureStyle and SHOP_ROW_TEXTURE_STYLES[rowTextureStyle] or nil
 end
 
 function AF:GetShopRowTextureOptions()
-	local options = {}
+	local options = {
+		{
+			value = "",
+			key = "default",
+			labelKey = "SHOP_ROW_TEXTURE_DEFAULT",
+		},
+	}
 	for index = 1, self.MAX_SHOP_ROW_TEXTURE_STYLE or 10 do
 		local style = SHOP_ROW_TEXTURE_STYLES[index]
 		if style then
@@ -281,7 +290,7 @@ function AF:GetShopTabardEmblemPickerMaxStyle()
 end
 
 function AF:GetShopTabardEmblemOptions()
-	local options = {}
+	local options = { "" }
 	local maximum = self:GetShopTabardEmblemPickerMaxStyle()
 	for _, emblemStyle in ipairs(SHOP_TABARD_EMBLEM_OPTIONS) do
 		if emblemStyle <= maximum then
@@ -292,7 +301,7 @@ function AF:GetShopTabardEmblemOptions()
 end
 
 function AF:GetShopTabardEmblemTexCoords(emblemStyle)
-	emblemStyle = self:NormalizeShopTabardEmblemStyle(emblemStyle, DEFAULT_SHOP_COSMETICS.emblemStyle) or DEFAULT_SHOP_COSMETICS.emblemStyle
+	emblemStyle = self:NormalizeShopTabardEmblemStyle(emblemStyle, 0) or 0
 	local emblemSize = 64 / 1024
 	local xCoord = (emblemStyle % 16) * emblemSize
 	local yCoord = math.floor(emblemStyle / 16) * emblemSize
@@ -303,14 +312,19 @@ function AF:NormalizeShopColor(value, fallback)
 	return NormalizeHexColor(value, fallback)
 end
 
-function AF:GetShopColorRGB(value, fallback)
+function AF:GetShopColorRGBA(value, fallback)
 	local hex = NormalizeHexColor(value, fallback)
 	if not hex then
 		return nil
 	end
 	return tonumber(hex:sub(1, 2), 16) / 255,
 		tonumber(hex:sub(3, 4), 16) / 255,
-		tonumber(hex:sub(5, 6), 16) / 255
+		tonumber(hex:sub(5, 6), 16) / 255,
+		tonumber(hex:sub(7, 8), 16) / 255
+end
+
+function AF:GetShopColorRGB(value, fallback)
+	return self:GetShopColorRGBA(value, fallback)
 end
 
 function AF:ApplyShopRowTextureVisual(texture, rowTextureStyle, hex, fallback, alpha, options)
@@ -351,8 +365,8 @@ function AF:ApplyShopRowTextureVisual(texture, rowTextureStyle, hex, fallback, a
 		texture:SetTexCoord(0, 1, 0, 1)
 	end
 
-	local r, g, b = self:GetShopColorRGB(hex, fallback or "24435d")
-	texture:SetVertexColor(r or 1, g or 1, b or 1, alpha or 1)
+	local r, g, b, colorAlpha = self:GetShopColorRGBA(hex, fallback or "24435dff")
+	texture:SetVertexColor(r or 1, g or 1, b or 1, (colorAlpha or 1) * (alpha or 1))
 	return style
 end
 
@@ -377,8 +391,8 @@ function AF:NormalizeShopCosmetics(cosmetics)
 	normalized.shopName = self:NormalizeShopName(cosmetics.shopName)
 	normalized.rowColor = NormalizeHexColor(cosmetics.rowColor)
 	normalized.iconColor = NormalizeHexColor(cosmetics.iconColor)
-	normalized.emblemStyle = self:NormalizeShopTabardEmblemStyle(cosmetics.emblemStyle, HasShopCosmeticValue(normalized) and DEFAULT_SHOP_COSMETICS.emblemStyle or nil)
-	normalized.rowTextureStyle = self:NormalizeShopRowTextureStyle(cosmetics.rowTextureStyle, HasShopCosmeticValue(normalized) and DEFAULT_SHOP_COSMETICS.rowTextureStyle or nil)
+	normalized.emblemStyle = self:NormalizeShopTabardEmblemStyle(cosmetics.emblemStyle, nil)
+	normalized.rowTextureStyle = self:NormalizeShopRowTextureStyle(cosmetics.rowTextureStyle, nil)
 	return HasShopCosmeticValue(normalized) and normalized or nil
 end
 

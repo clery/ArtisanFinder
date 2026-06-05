@@ -17,5 +17,9 @@ externals:
 
 ignore:
   - .githooks
+  - .github
+  - .vscode
+  - .gitignore
   - README.md
   - Images
+  - tests
