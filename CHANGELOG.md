@@ -1,5 +1,13 @@
 # ArtisanFinder
 
+## [v2.0.6](https://github.com/clery/ArtisanFinder/releases/tag/v2.0.6) (2026-06-06)
+
+[Full Changelog](https://github.com/clery/ArtisanFinder/compare/v2.0.5...v2.0.6) | [Previous Releases](https://github.com/clery/ArtisanFinder/releases)
+
+### Added
+
+* Artisans can set a shop name plus row and tabard icon colors for customer result rows.
+
 ## [v2.0.5](https://github.com/clery/ArtisanFinder/releases/tag/v2.0.5) (2026-06-05)
 
 [Full Changelog](https://github.com/clery/ArtisanFinder/compare/v2.0.4...v2.0.5) | [Previous Releases](https://github.com/clery/ArtisanFinder/releases)

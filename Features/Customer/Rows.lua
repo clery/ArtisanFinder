@@ -3,6 +3,122 @@ local _, AF = ...
 local DETAIL_ELLIPSIS = "..."
 local WHO_SPINNER_SIZE = 16
 local WHO_SPINNER_PADDING = 5
+local SHOP_ROW_COLOR_ALPHA = 1
+local SHOP_ROW_TEXTURE_ALPHA = 1
+local SHOP_TABARD_EMBLEM_ALPHA = 1
+local SetShopRowTexture
+
+local function HideShopRowTextureSegments(row)
+	for _, segment in ipairs(row and row.shopRowTextureSegments or {}) do
+		segment:Hide()
+	end
+end
+
+local function SetColorTexture(texture, hex, fallback, alpha)
+	if not texture then
+		return false
+	end
+	local r, g, b = AF:GetShopColorRGB(hex, fallback)
+	if not r then
+		texture:Hide()
+		return false
+	end
+	texture:SetVertexColor(r, g, b, alpha or 1)
+	texture:Show()
+	return true
+end
+
+local function SetTextureShown(texture, shown)
+	if texture then
+		texture:SetShown(shown == true)
+	end
+end
+
+function AF:UpdateCustomerRowTabardSize(row, rowHeight)
+	if not row or not row.shopTabardEmblem then
+		return
+	end
+	local size = math.max(36, math.min(48, (tonumber(rowHeight) or row:GetHeight() or 58) - 8))
+	row.shopTabardEmblem:SetSize(size, size)
+	if row.shopRowTexture and row.artisanFinderShopCosmetics and SetShopRowTexture then
+		SetShopRowTexture(row.shopRowTexture, row.artisanFinderShopCosmetics.rowTextureStyle, row.artisanFinderShopCosmetics.rowColor)
+	end
+end
+
+SetShopRowTexture = function(texture, rowTextureStyle, hex)
+	local style = AF:GetShopRowTextureStyle(rowTextureStyle)
+	if not texture or not style then
+		return false
+	end
+	local row = texture:GetParent()
+	local r, g, b = AF:GetShopColorRGB(hex, "24435d")
+	if row then
+		row.artisanFinderShopRowTextureSegmented = style.hTile == true
+	end
+	if style.hTile and row then
+		texture:Hide()
+		row.shopRowTextureSegments = row.shopRowTextureSegments or {}
+		local rowWidth = math.max(1, (row:GetWidth() or 0) - 6)
+		local rowHeight = math.max(1, (row:GetHeight() or 0) - 4)
+		local tileWidth = math.max(1, tonumber(style.tileWidth) or rowWidth)
+		local left, right, top, bottom = unpack(style.tileTexCoords or style.texCoords or { 0, 1, 0, 1 })
+		local used = 0
+		local index = 1
+		while used < rowWidth do
+			local segment = row.shopRowTextureSegments[index]
+			if not segment then
+				segment = row:CreateTexture(nil, "BORDER")
+				row.shopRowTextureSegments[index] = segment
+			end
+			local segmentWidth = math.min(tileWidth, rowWidth - used)
+			local segmentRight = left + ((right - left) * (segmentWidth / tileWidth))
+			segment:ClearAllPoints()
+			segment:SetTexture(style.texture)
+			segment:SetPoint("TOPLEFT", row, "TOPLEFT", 2 + used, -2)
+			segment:SetSize(segmentWidth, rowHeight)
+			segment:SetTexCoord(left, segmentRight, top, bottom)
+			if segment.SetHorizTile then
+				segment:SetHorizTile(false)
+			end
+			if segment.SetVertTile then
+				segment:SetVertTile(style.vTile == true)
+			end
+			segment:SetVertexColor(r or 1, g or 1, b or 1, SHOP_ROW_TEXTURE_ALPHA)
+			segment:Show()
+			used = used + segmentWidth
+			index = index + 1
+		end
+		for i = index, #row.shopRowTextureSegments do
+			row.shopRowTextureSegments[i]:Hide()
+		end
+	else
+		HideShopRowTextureSegments(row)
+		AF:ApplyShopRowTextureVisual(texture, rowTextureStyle, hex, "24435d", SHOP_ROW_TEXTURE_ALPHA)
+		texture:Show()
+	end
+	return true
+end
+
+local function SetCustomerRowCosmetics(row, cosmetics)
+	cosmetics = AF:GetShopCosmetics({ shopCosmetics = cosmetics })
+	row.artisanFinderShopCosmetics = cosmetics
+	local hasRowColor = cosmetics and SetColorTexture(row.shopRowColor, cosmetics.rowColor, nil, SHOP_ROW_COLOR_ALPHA)
+	local hasTabard = cosmetics and (cosmetics.iconColor or cosmetics.emblemStyle)
+	local hasRowTexture = cosmetics and SetShopRowTexture(row.shopRowTexture, cosmetics.rowTextureStyle, cosmetics.rowColor)
+	SetTextureShown(row.shopRowColor, hasRowColor)
+	SetTextureShown(row.shopRowTexture, hasRowTexture and not row.artisanFinderShopRowTextureSegmented)
+	SetTextureShown(row.shopTabardEmblem, hasTabard)
+	if not hasRowTexture then
+		row.artisanFinderShopRowTextureSegmented = nil
+		HideShopRowTextureSegments(row)
+	end
+	if not hasTabard then
+		return
+	end
+	row.shopTabardEmblem:SetTexture("Interface\\GuildFrame\\GuildEmblemsLG_01")
+	row.shopTabardEmblem:SetTexCoord(AF:GetShopTabardEmblemTexCoords(cosmetics.emblemStyle))
+	SetColorTexture(row.shopTabardEmblem, cosmetics.iconColor, "f0c35a", SHOP_TABARD_EMBLEM_ALPHA)
+end
 
 local function GetUTF8EndForCharCount(text, count)
 	text = tostring(text or "")
@@ -177,8 +293,8 @@ function AF:BuildCustomerRowViewModel(entry)
 		}
 	end
 
-	local displayNameSource = entry.displayName or entry.name or "?"
-	local displayName = self:GetDisplayPlayerName(displayNameSource)
+	local displayNameSource = entry.displayName or entry.orderTarget or entry.name or "?"
+	local displayName = self:GetShopDisplayName(entry, displayNameSource)
 	local statusTooltipText
 	local isOnline = self:IsCustomerEntryOnline(entry)
 	local availabilityState = entry.availabilityState
@@ -257,6 +373,7 @@ function AF:BuildCustomerRowViewModel(entry)
 		whoPending = self:IsCustomerEntryWhoPending(entry),
 		statusTooltipText = statusTooltipText,
 		availabilityState = availabilityState,
+		shopCosmetics = self:GetShopCosmetics(entry),
 	}
 end
 
@@ -271,6 +388,7 @@ function AF:ApplyCustomerRowViewModel(row, viewModel, minimumHeight, bottomPaddi
 	end
 	row.certified:SetShown(viewModel.certified)
 	row.favorite:SetShown(viewModel.favorite)
+	SetCustomerRowCosmetics(row, viewModel.shopCosmetics)
 	row.artisanFinderWhoName = viewModel.whoName
 	row.name:SetText(viewModel.displayName or "")
 	row.nameStatusTooltipText = nil

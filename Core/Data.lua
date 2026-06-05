@@ -21,6 +21,107 @@ local REALM_CONNECTION_CACHE_MAX_AGE = 30 * 24 * 60 * 60
 local MIN_COMPATIBLE_SCAN_SIGNATURE_VERSION = 33
 local ApplyDBDefaults
 local legacyReagentDisplayCache = {}
+local DEFAULT_SHOP_COSMETICS = {
+	rowColor = "24435d",
+	iconColor = "f0c35a",
+	emblemStyle = 0,
+	rowTextureStyle = 1,
+}
+local SHOP_ROW_TEXTURE_STYLES = {
+	[1] = {
+		key = "parchment",
+		labelKey = "SHOP_ROW_TEXTURE_PARCHMENT",
+		texture = "Interface\\ACHIEVEMENTFRAME\\UI-Achievement-Parchment-Horizontal",
+		texCoords = { 0, 1, 0, 1 },
+	},
+	[2] = {
+		key = "guild",
+		labelKey = "SHOP_ROW_TEXTURE_GUILD",
+		texture = "Interface\\GuildFrame\\GuildFrame",
+		texCoords = { 0.00195313, 0.62109375, 0.00195313, 0.28906250 },
+	},
+	[3] = {
+		key = "soft",
+		labelKey = "SHOP_ROW_TEXTURE_SOFT",
+		texture = "Interface\\Buttons\\WHITE8x8",
+		texCoords = { 0, 1, 0, 1 },
+		hTile = true,
+		vTile = true,
+		tileWidth = 32,
+		tileHeight = 32,
+	},
+	[4] = {
+		key = "quest",
+		labelKey = "SHOP_ROW_TEXTURE_QUEST",
+		texture = "Interface\\QuestFrame\\UI-QuestLogTitleHighlight",
+		texCoords = { 0, 1, 0, 1 },
+	},
+	[5] = {
+		key = "marble",
+		labelKey = "SHOP_ROW_TEXTURE_MARBLE",
+		texture = "Interface\\FrameGeneral\\UI-Background-Marble",
+		texCoords = { 0, 1, 0, 1 },
+		hTile = true,
+		vTile = true,
+		tileWidth = 128,
+		tileHeight = 128,
+	},
+	[6] = {
+		key = "rock",
+		labelKey = "SHOP_ROW_TEXTURE_ROCK",
+		texture = "Interface\\FrameGeneral\\UI-Background-Rock",
+		texCoords = { 0, 1, 0, 1 },
+		hTile = true,
+		vTile = true,
+		tileWidth = 128,
+		tileHeight = 128,
+	},
+	[7] = {
+		key = "blackmarket",
+		labelKey = "SHOP_ROW_TEXTURE_BLACKMARKET",
+		texture = "Interface\\BlackMarket\\BlackMarketBackground-Tile",
+		texCoords = { 0, 1, 0, 1 },
+		hTile = true,
+		vTile = true,
+		tileWidth = 128,
+		tileHeight = 128,
+	},
+	[8] = {
+		key = "dialog",
+		labelKey = "SHOP_ROW_TEXTURE_DIALOG",
+		texture = "Interface\\DialogFrame\\UI-DialogBox-Background",
+		texCoords = { 0, 1, 0, 1 },
+		hTile = true,
+		vTile = true,
+		tileWidth = 32,
+		tileHeight = 32,
+	},
+	[9] = {
+		key = "darkdialog",
+		labelKey = "SHOP_ROW_TEXTURE_DARK_DIALOG",
+		texture = "Interface\\DialogFrame\\UI-DialogBox-Background-Dark",
+		texCoords = { 0, 1, 0, 1 },
+		hTile = true,
+		vTile = true,
+		tileWidth = 32,
+		tileHeight = 32,
+	},
+	[10] = {
+		key = "tooltip",
+		labelKey = "SHOP_ROW_TEXTURE_TOOLTIP",
+		texture = "Interface\\Tooltips\\UI-Tooltip-Background",
+		texCoords = { 0, 1, 0, 1 },
+		hTile = true,
+		vTile = true,
+		tileWidth = 32,
+		tileHeight = 32,
+	},
+}
+local SHOP_TABARD_EMBLEM_PICKER_MAX_STYLE = 191
+local SHOP_TABARD_EMBLEM_OPTIONS = {}
+for emblemStyle = 0, SHOP_TABARD_EMBLEM_PICKER_MAX_STYLE do
+	SHOP_TABARD_EMBLEM_OPTIONS[#SHOP_TABARD_EMBLEM_OPTIONS + 1] = emblemStyle
+end
 local BASE_PROFESSION_SPELLS = {
 	[164] = 2018, -- Blacksmithing
 	[165] = 2108, -- Leatherworking
@@ -95,6 +196,226 @@ local function EnsureProfileContainers(profile)
 	profile.items = profile.items or {}
 	profile.professionPrices = profile.professionPrices or {}
 	return profile
+end
+
+local function NormalizeHexColor(value, fallback)
+	value = tostring(value or ""):match("^%s*#?(%x%x%x%x%x%x)%s*$")
+	if not value or value == "" then
+		return fallback
+	end
+	return value:lower()
+end
+
+local function NormalizeInteger(value, minimum, maximum, fallback)
+	if value == nil or value == "" then
+		return fallback
+	end
+	local number = math.floor(tonumber(value) or -1)
+	if number < minimum or number > maximum then
+		return fallback
+	end
+	return number
+end
+
+local function HasShopCosmeticValue(cosmetics)
+	return type(cosmetics) == "table"
+		and (
+			cosmetics.shopName ~= nil
+			or cosmetics.rowColor ~= nil
+			or cosmetics.iconColor ~= nil
+			or cosmetics.emblemStyle ~= nil
+			or cosmetics.rowTextureStyle ~= nil
+		)
+end
+
+function AF:GetDefaultShopCosmetics()
+	return {
+		rowColor = DEFAULT_SHOP_COSMETICS.rowColor,
+		iconColor = DEFAULT_SHOP_COSMETICS.iconColor,
+		emblemStyle = DEFAULT_SHOP_COSMETICS.emblemStyle,
+		rowTextureStyle = DEFAULT_SHOP_COSMETICS.rowTextureStyle,
+	}
+end
+
+function AF:NormalizeShopTabardEmblemStyle(value, fallback)
+	return NormalizeInteger(value, 0, self.MAX_SHOP_TABARD_EMBLEM_STYLE or 255, fallback)
+end
+
+function AF:NormalizeShopRowTextureStyle(value, fallback)
+	local number = NormalizeInteger(value, 1, self.MAX_SHOP_ROW_TEXTURE_STYLE or 10, nil)
+	if not number or not SHOP_ROW_TEXTURE_STYLES[number] then
+		return fallback
+	end
+	return number
+end
+
+function AF:GetShopRowTextureStyle(rowTextureStyle)
+	rowTextureStyle = self:NormalizeShopRowTextureStyle(rowTextureStyle, DEFAULT_SHOP_COSMETICS.rowTextureStyle) or DEFAULT_SHOP_COSMETICS.rowTextureStyle
+	return SHOP_ROW_TEXTURE_STYLES[rowTextureStyle] or SHOP_ROW_TEXTURE_STYLES[DEFAULT_SHOP_COSMETICS.rowTextureStyle]
+end
+
+function AF:GetShopRowTextureOptions()
+	local options = {}
+	for index = 1, self.MAX_SHOP_ROW_TEXTURE_STYLE or 10 do
+		local style = SHOP_ROW_TEXTURE_STYLES[index]
+		if style then
+			options[#options + 1] = {
+				value = index,
+				key = style.key,
+				labelKey = style.labelKey,
+				texture = style.texture,
+				texCoords = style.texCoords,
+				hTile = style.hTile,
+				vTile = style.vTile,
+				tileWidth = style.tileWidth,
+				tileHeight = style.tileHeight,
+				tileTexCoords = style.tileTexCoords,
+			}
+		end
+	end
+	return options
+end
+
+function AF:GetShopTabardEmblemPickerMaxStyle()
+	return math.min(self.MAX_SHOP_TABARD_EMBLEM_STYLE or SHOP_TABARD_EMBLEM_PICKER_MAX_STYLE, SHOP_TABARD_EMBLEM_PICKER_MAX_STYLE)
+end
+
+function AF:GetShopTabardEmblemOptions()
+	local options = {}
+	local maximum = self:GetShopTabardEmblemPickerMaxStyle()
+	for _, emblemStyle in ipairs(SHOP_TABARD_EMBLEM_OPTIONS) do
+		if emblemStyle <= maximum then
+			options[#options + 1] = emblemStyle
+		end
+	end
+	return options
+end
+
+function AF:GetShopTabardEmblemTexCoords(emblemStyle)
+	emblemStyle = self:NormalizeShopTabardEmblemStyle(emblemStyle, DEFAULT_SHOP_COSMETICS.emblemStyle) or DEFAULT_SHOP_COSMETICS.emblemStyle
+	local emblemSize = 64 / 1024
+	local xCoord = (emblemStyle % 16) * emblemSize
+	local yCoord = math.floor(emblemStyle / 16) * emblemSize
+	return xCoord, xCoord + emblemSize, yCoord, yCoord + emblemSize
+end
+
+function AF:NormalizeShopColor(value, fallback)
+	return NormalizeHexColor(value, fallback)
+end
+
+function AF:GetShopColorRGB(value, fallback)
+	local hex = NormalizeHexColor(value, fallback)
+	if not hex then
+		return nil
+	end
+	return tonumber(hex:sub(1, 2), 16) / 255,
+		tonumber(hex:sub(3, 4), 16) / 255,
+		tonumber(hex:sub(5, 6), 16) / 255
+end
+
+function AF:ApplyShopRowTextureVisual(texture, rowTextureStyle, hex, fallback, alpha, options)
+	local style = self:GetShopRowTextureStyle(rowTextureStyle)
+	if not texture or not style then
+		return nil
+	end
+
+	options = type(options) == "table" and options or {}
+	texture:SetTexture(style.texture)
+
+	local width = tonumber(options.width) or (texture.GetWidth and texture:GetWidth()) or nil
+	local height = tonumber(options.height) or (texture.GetHeight and texture:GetHeight()) or nil
+	local parent = texture.GetParent and texture:GetParent() or nil
+	if (not width or width <= 0) and parent and parent.GetWidth then
+		width = parent:GetWidth()
+	end
+	if (not height or height <= 0) and parent and parent.GetHeight then
+		height = parent:GetHeight()
+	end
+
+	local hTile = style.hTile == true
+	local vTile = style.vTile == true
+	if texture.SetHorizTile then
+		texture:SetHorizTile(hTile)
+	end
+	if texture.SetVertTile then
+		texture:SetVertTile(vTile)
+	end
+
+	if (hTile or vTile) and width and height and width > 0 and height > 0 then
+		local repeatX = hTile and math.max(1, width / (tonumber(style.tileWidth) or width)) or 1
+		local repeatY = vTile and math.max(1, height / (tonumber(style.tileHeight) or height)) or 1
+		texture:SetTexCoord(0, repeatX, 0, repeatY)
+	elseif style.texCoords then
+		texture:SetTexCoord(unpack(style.texCoords))
+	else
+		texture:SetTexCoord(0, 1, 0, 1)
+	end
+
+	local r, g, b = self:GetShopColorRGB(hex, fallback or "24435d")
+	texture:SetVertexColor(r or 1, g or 1, b or 1, alpha or 1)
+	return style
+end
+
+function AF:NormalizeShopName(value)
+	value = tostring(value or ""):match("^%s*(.-)%s*$")
+	value = value:gsub("[%c|]", " ")
+	value = value:gsub("%s+", " ")
+	if value == "" then
+		return nil
+	end
+	if self.EncodeField then
+		return self:EncodeField(value, self.MAX_SHOP_NAME_BYTES or 128)
+	end
+	return value:sub(1, self.MAX_SHOP_NAME_BYTES or 128)
+end
+
+function AF:NormalizeShopCosmetics(cosmetics)
+	if type(cosmetics) ~= "table" then
+		return nil
+	end
+	local normalized = {}
+	normalized.shopName = self:NormalizeShopName(cosmetics.shopName)
+	normalized.rowColor = NormalizeHexColor(cosmetics.rowColor)
+	normalized.iconColor = NormalizeHexColor(cosmetics.iconColor)
+	normalized.emblemStyle = self:NormalizeShopTabardEmblemStyle(cosmetics.emblemStyle, HasShopCosmeticValue(normalized) and DEFAULT_SHOP_COSMETICS.emblemStyle or nil)
+	normalized.rowTextureStyle = self:NormalizeShopRowTextureStyle(cosmetics.rowTextureStyle, HasShopCosmeticValue(normalized) and DEFAULT_SHOP_COSMETICS.rowTextureStyle or nil)
+	return HasShopCosmeticValue(normalized) and normalized or nil
+end
+
+function AF:GetShopCosmetics(profileOrEntry)
+	local cosmetics = type(profileOrEntry) == "table" and profileOrEntry.shopCosmetics or nil
+	return self:NormalizeShopCosmetics(cosmetics)
+end
+
+function AF:SetShopCosmetics(profile, cosmetics)
+	profile = self:NormalizeArtisanProfile(profile or (self.db and self.db.artisanProfile))
+	if not profile then
+		return nil
+	end
+	profile.shopCosmetics = self:NormalizeShopCosmetics(cosmetics)
+	profile.updatedAt = self:Now()
+	if self.RefreshCustomerResults then
+		self:RefreshCustomerResults()
+	end
+	return profile.shopCosmetics
+end
+
+function AF:ApplyShopCosmeticsToEntry(entry, cosmetics)
+	if type(entry) ~= "table" then
+		return entry
+	end
+	entry.shopCosmetics = self:NormalizeShopCosmetics(cosmetics)
+	return entry
+end
+
+function AF:GetShopDisplayName(entry, fallbackName)
+	local characterName = fallbackName or (entry and (entry.orderTarget or entry.name or entry.target)) or "?"
+	local displayCharacter = self:GetDisplayPlayerName(characterName)
+	local cosmetics = self:GetShopCosmetics(entry)
+	if cosmetics and cosmetics.shopName then
+		return cosmetics.shopName .. " - " .. displayCharacter
+	end
+	return displayCharacter
 end
 
 local function InvalidateScannedProfileData(profile)
@@ -565,6 +886,30 @@ local function NormalizeIDOnlyCraftData(db)
 	db.responseThrottle = nil
 end
 
+local function RemapLegacyShopTextureStyle(cosmetics)
+	if type(cosmetics) ~= "table" then
+		return
+	end
+	local rowTextureStyle = math.floor(tonumber(cosmetics.rowTextureStyle) or 0)
+	if rowTextureStyle >= 2 and rowTextureStyle <= 11 then
+		cosmetics.rowTextureStyle = rowTextureStyle - 1
+	end
+end
+
+local function RemapLegacyShopTextureStyles(db)
+	RemapLegacyShopTextureStyle(db.artisanProfile and db.artisanProfile.shopCosmetics)
+	for _, profile in pairs(db.artisanCharacters or {}) do
+		RemapLegacyShopTextureStyle(type(profile) == "table" and profile.shopCosmetics or nil)
+	end
+	for _, itemCache in pairs(db.customerCache or {}) do
+		if type(itemCache) == "table" then
+			for _, entry in pairs(itemCache) do
+				RemapLegacyShopTextureStyle(type(entry) == "table" and entry.shopCosmetics or nil)
+			end
+		end
+	end
+end
+
 function ApplyDBDefaults(db)
 	db.artisanProfile = EnsureProfileContainers(db.artisanProfile)
 	db.artisanCharacters = db.artisanCharacters or {}
@@ -805,6 +1150,64 @@ MIGRATIONS[16] = function(db)
 	StripQualityAtlasFieldsFromDB(db)
 end
 
+MIGRATIONS[17] = function(db)
+	ApplyDBDefaults(db)
+	db.artisanProfile.shopCosmetics = AF:NormalizeShopCosmetics(db.artisanProfile.shopCosmetics)
+	for _, profile in pairs(db.artisanCharacters or {}) do
+		if type(profile) == "table" then
+			profile.shopCosmetics = AF:NormalizeShopCosmetics(profile.shopCosmetics)
+		end
+	end
+	for _, itemCache in pairs(db.customerCache or {}) do
+		if type(itemCache) == "table" then
+			for _, entry in pairs(itemCache) do
+				if type(entry) == "table" then
+					entry.shopCosmetics = AF:NormalizeShopCosmetics(entry.shopCosmetics)
+				end
+			end
+		end
+	end
+end
+
+MIGRATIONS[18] = function(db)
+	ApplyDBDefaults(db)
+	db.artisanProfile.shopCosmetics = AF:NormalizeShopCosmetics(db.artisanProfile.shopCosmetics)
+	for _, profile in pairs(db.artisanCharacters or {}) do
+		if type(profile) == "table" then
+			profile.shopCosmetics = AF:NormalizeShopCosmetics(profile.shopCosmetics)
+		end
+	end
+	for _, itemCache in pairs(db.customerCache or {}) do
+		if type(itemCache) == "table" then
+			for _, entry in pairs(itemCache) do
+				if type(entry) == "table" then
+					entry.shopCosmetics = AF:NormalizeShopCosmetics(entry.shopCosmetics)
+				end
+			end
+		end
+	end
+end
+
+MIGRATIONS[19] = function(db)
+	ApplyDBDefaults(db)
+	RemapLegacyShopTextureStyles(db)
+	db.artisanProfile.shopCosmetics = AF:NormalizeShopCosmetics(db.artisanProfile.shopCosmetics)
+	for _, profile in pairs(db.artisanCharacters or {}) do
+		if type(profile) == "table" then
+			profile.shopCosmetics = AF:NormalizeShopCosmetics(profile.shopCosmetics)
+		end
+	end
+	for _, itemCache in pairs(db.customerCache or {}) do
+		if type(itemCache) == "table" then
+			for _, entry in pairs(itemCache) do
+				if type(entry) == "table" then
+					entry.shopCosmetics = AF:NormalizeShopCosmetics(entry.shopCosmetics)
+				end
+			end
+		end
+	end
+end
+
 function AF:MigrateDB(db)
 	local version = tonumber(db.schemaVersion) or 0
 	while version < self.SCHEMA_VERSION do
@@ -898,6 +1301,7 @@ function AF:NormalizeArtisanProfile(profile, characterName)
 	profile.professions = profile.professions or {}
 	profile.items = profile.items or {}
 	profile.professionPrices = profile.professionPrices or {}
+	profile.shopCosmetics = self:NormalizeShopCosmetics(profile.shopCosmetics)
 	return profile
 end
 

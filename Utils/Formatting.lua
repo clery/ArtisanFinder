@@ -658,7 +658,7 @@ function AF:AddCustomerEntryTooltipLines(tooltip, entry, options)
 	options = options or {}
 
 	if options.title ~= false then
-		tooltip:SetText(options.titleText or self:GetDisplayPlayerName(entry.name or "?"), 1, 0.82, 0)
+		tooltip:SetText(options.titleText or self:GetShopDisplayName(entry, entry.orderTarget or entry.name or "?"), 1, 0.82, 0)
 	end
 	if options.profession ~= false then
 		local professionName = entry.professionID and self:GetProfessionName(entry.professionID) or entry.professionName

@@ -5,7 +5,7 @@ ArtisanFinder helps players find available crafters directly from the Crafting O
 ## Features
 
 *   Live artisan search from the Crafting Orders form.
-*   Crafter profiles with commissions, notes, quality data, and suggested reagents.
+*   Crafter profiles with commissions, notes, shop identity cosmetics, quality data, and suggested reagents.
 *   Multi-character advertising for scanned professions from your alts.
 *   Guild and trade-chat crafter discovery.
 *   Favorites, search, sorting, online checks, and personal order helpers.
@@ -36,6 +36,8 @@ ArtisanFinder does not place orders for you. It only helps fill or open the righ
 ArtisanFinder adds lightweight controls to the Professions UI for item-specific and profession-default commissions, notes, and availability. It stores scanned profession data and can advertise scanned professions from your other characters while you are online. The crafter panel also includes a customer preview tooltip so you can check what customers will see.
 
 Availability is session-based and resets after login or reload by default. You can cycle between unavailable, current-character availability, and account-wide availability from the minimap button, optionally remember your last manual availability between sessions, or let automatic availability enable it in trade-chat areas and disable it in selected instance types. Profession scans can refresh automatically by default, or you can disable automatic scans in options and press Rescan in the Professions UI when you want to refresh stored craft data.
+
+The Professions UI also has a Shop identity section where artisans can set an optional shop name, choose row and emblem colors with square color swatches, pick a real guild-tabard emblem from a grid, and choose a rectangular or repeatable row-wide background texture. Customer rows keep the character name visible as "Shop name - Player" and render the emblem as a right-side watermark above the row texture.
 
 ![ArtisanFinder crafter view](Images/CrafterView.png)
 

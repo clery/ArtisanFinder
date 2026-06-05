@@ -552,63 +552,79 @@ function AF:HandleQuery(parts, sender, channel)
 		local crafterName = match.characterName
 		local throttleKey = table.concat({ sender, crafterName, itemID, professionID, queryToken }, ":")
 		self.responseThrottle = self.responseThrottle or {}
-		local lastSent = self.responseThrottle[throttleKey]
-		if not lastSent or self:Now() - lastSent >= self.RESPONSE_THROTTLE then
-			local priceCopper, freeCommission, note = self:GetItemPriceForProfile(match.profile, itemID, item.professionID)
-			local encodedNote = self:EncodeNote(note)
-			local encodedLink = self:EncodeField(item.professionLink)
-			local responseProfessionID = self:GetSupportedProfessionID(item.professionID, item)
-			local payloadParts = {
-				"R",
-				self.PROTOCOL_VERSION,
-				itemID,
-				tonumber(responseProfessionID) or tonumber(item.professionID) or 0,
-				tonumber(priceCopper) or 0,
-				freeCommission and 1 or 0,
-				encodedNote,
-				tonumber(item.recipeID) or 0,
-				self:Now(),
-				tonumber(item.recipeDifficulty) or "",
-				tonumber(item.totalSkill) or "",
-				tonumber(item.quality) or "",
-				tonumber(item.concentrationQuality) or "",
-				tonumber(item.concentrationCost) or "",
-				encodedLink,
-				queryToken,
-				tonumber(item.bestQuality) or "",
-				tonumber(item.bestConcentrationQuality) or "",
-				tonumber(item.bestTotalSkill) or "",
-				tonumber(item.bestConcentrationCost) or "",
-				item.bestReagentTruncated and 1 or 0,
-				item.bestReagents and 1 or 0,
-				self:EncodeField(crafterName, 48),
-				tonumber(item.optionalDifficultyDelta) or "",
-				tonumber(item.optionalQuality) or "",
-				tonumber(item.optionalConcentrationQuality) or "",
-				tonumber(item.optionalSlotCount) or "",
-				channel == "GUILD" and self:EncodeField(requesterName, 48) or "",
-				self:EncodeField(self:EncodeReagentEntries(item.bestReagents)),
-				UnitIsAFK and UnitIsAFK("player") and 1 or 0,
-				tonumber(item.bestOutputItemLevel) or "",
-				tonumber(item.optionalOutputItemLevel) or "",
-			}
+			local lastSent = self.responseThrottle[throttleKey]
+			if not lastSent or self:Now() - lastSent >= self.RESPONSE_THROTTLE then
+				local priceCopper, freeCommission, note = self:GetItemPriceForProfile(match.profile, itemID, item.professionID)
+				local encodedNote = self:EncodeNote(note)
+				local encodedLink = self:EncodeField(item.professionLink)
+				local responseProfessionID = self:GetSupportedProfessionID(item.professionID, item)
+				local cosmetics = self:GetShopCosmetics(match.profile) or {}
+				local payloadParts = {
+					"R",
+					self.PROTOCOL_VERSION,
+					itemID,
+					tonumber(responseProfessionID) or tonumber(item.professionID) or 0,
+					tonumber(priceCopper) or 0,
+					freeCommission and 1 or 0,
+					encodedNote,
+					tonumber(item.recipeID) or 0,
+					self:Now(),
+					tonumber(item.recipeDifficulty) or "",
+					tonumber(item.totalSkill) or "",
+					tonumber(item.quality) or "",
+					tonumber(item.concentrationQuality) or "",
+					tonumber(item.concentrationCost) or "",
+					encodedLink,
+					queryToken,
+					tonumber(item.bestQuality) or "",
+					tonumber(item.bestConcentrationQuality) or "",
+					tonumber(item.bestTotalSkill) or "",
+					tonumber(item.bestConcentrationCost) or "",
+					item.bestReagentTruncated and 1 or 0,
+					item.bestReagents and 1 or 0,
+					self:EncodeField(crafterName, 48),
+					tonumber(item.optionalDifficultyDelta) or "",
+					tonumber(item.optionalQuality) or "",
+					tonumber(item.optionalConcentrationQuality) or "",
+					tonumber(item.optionalSlotCount) or "",
+					channel == "GUILD" and self:EncodeField(requesterName, 48) or "",
+					self:EncodeField(self:EncodeReagentEntries(item.bestReagents)),
+					UnitIsAFK and UnitIsAFK("player") and 1 or 0,
+					tonumber(item.bestOutputItemLevel) or "",
+					tonumber(item.optionalOutputItemLevel) or "",
+					self:EncodeField(cosmetics.shopName, self.MAX_SHOP_NAME_BYTES or 128),
+					cosmetics.rowColor or "",
+					cosmetics.iconColor or "",
+					"",
+					cosmetics.emblemStyle or "",
+					cosmetics.rowTextureStyle or "",
+				}
 			local responseChannel = channel == "GUILD" and "GUILD" or "WHISPER"
 			local responseTarget = responseChannel == "WHISPER" and sender or nil
 			local sent = self:SendPayloadParts(payloadParts, responseChannel, responseTarget, "NORMAL", "R:" .. tostring(sender))
 			if sent then
 				self.responseThrottle[throttleKey] = self:Now()
-			else
-				payloadParts[29] = self:EncodeField(self:EncodeReagentEntries(item.bestReagents), 160)
-				local payload = BuildPayload(payloadParts)
-				if #payload > 255 then
-					payloadParts[29] = ""
-					payloadParts[22] = 0
-					payload = BuildPayload(payloadParts)
-				end
-				if #payload > 255 then
-					payloadParts[15] = ""
-					payload = BuildPayload(payloadParts)
-				end
+				else
+					payloadParts[29] = self:EncodeField(self:EncodeReagentEntries(item.bestReagents), 160)
+					local payload = BuildPayload(payloadParts)
+					if #payload > 255 then
+						payloadParts[29] = ""
+						payloadParts[22] = 0
+						payload = BuildPayload(payloadParts)
+					end
+					if #payload > 255 then
+						payloadParts[33] = ""
+						payloadParts[34] = ""
+						payloadParts[35] = ""
+						payloadParts[36] = ""
+						payloadParts[37] = ""
+						payloadParts[38] = ""
+						payload = BuildPayload(payloadParts)
+					end
+					if #payload > 255 then
+						payloadParts[15] = ""
+						payload = BuildPayload(payloadParts)
+					end
 				if #payload > 255 then
 					payloadParts[7] = self:EncodeField(note, 32)
 					payload = BuildPayload(payloadParts)
@@ -809,10 +825,17 @@ function AF:HandleResponse(parts, sender)
 	local responseTarget = self:NormalizeName(self:DecodeField(parts[28]))
 	local responseSupportsReagentDetails = parts[29] ~= nil
 	local responseReagents = self:DecodeReagentEntries(self:DecodeField(parts[29]))
-	local afk = tonumber(parts[30]) == 1
-	local bestOutputItemLevel = tonumber(parts[31])
-	local optionalOutputItemLevel = tonumber(parts[32])
-	local cacheKey = crafterName
+		local afk = tonumber(parts[30]) == 1
+		local bestOutputItemLevel = tonumber(parts[31])
+		local optionalOutputItemLevel = tonumber(parts[32])
+		local shopCosmetics = self:NormalizeShopCosmetics({
+			shopName = self:DecodeField(parts[33]),
+			rowColor = parts[34],
+			iconColor = parts[35],
+			emblemStyle = parts[37] ~= "" and parts[37] or parts[36],
+			rowTextureStyle = parts[38],
+		})
+		local cacheKey = crafterName
 
 	if not itemID then
 		return
@@ -886,10 +909,11 @@ function AF:HandleResponse(parts, sender)
 		lastQueryAt = verifiedForCurrentQuery and self.lastQueryAt or nil,
 		guildMember = validGuildResponse or nil,
 		guildOnline = validGuildResponse and true or nil,
-		guildMemberGUID = guildRosterEntry and guildRosterEntry.guid or nil,
-		guildKey = guildKey,
-		afk = afk or nil,
-	}
+			guildMemberGUID = guildRosterEntry and guildRosterEntry.guid or nil,
+			guildKey = guildKey,
+			afk = afk or nil,
+			shopCosmetics = shopCosmetics,
+		}
 	if responseReagents then
 		self.db.customerCache[itemKey][cacheKey].bestReagentSummaryUpdatedAt = self:Now()
 		self.db.customerCache[itemKey][cacheKey].reagentDetailRequested = nil

@@ -610,6 +610,13 @@
 				</Texture>
 				<FontString parentKey="advertisingHeader" inherits="GameFontNormalSmall" justifyH="LEFT">
 				</FontString>
+				<Texture parentKey="shopDivider" atlas="Options_HorizontalDivider">
+					<Size y="2"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="12" y="-272"/>
+						<Anchor point="TOPRIGHT" x="-12" y="-272"/>
+					</Anchors>
+				</Texture>
 			</Layer>
 		</Layers>
 		<Frames>
@@ -649,6 +656,7 @@
 			<Button parentKey="itemSectionToggle" inherits="ArtisanFinderSectionToggleTemplate"/>
 			<Button parentKey="scanSectionToggle" inherits="ArtisanFinderSectionToggleTemplate"/>
 			<Button parentKey="advertisingSectionToggle" inherits="ArtisanFinderSectionToggleTemplate"/>
+			<Button parentKey="shopSectionToggle" inherits="ArtisanFinderSectionToggleTemplate"/>
 			<Button parentKey="save" inherits="UIPanelButtonTemplate">
 				<Size x="72" y="22"/>
 			</Button>

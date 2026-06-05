@@ -9,6 +9,8 @@ local COMMISSION_FIELD_LEFT = 92
 local COMMISSION_FIELD_RIGHT_MARGIN = 42
 local CRAFTER_REOPEN_ICON = 7548932 -- inv-12-profession-blacksmithing-repairhammer-purple
 local CUSTOMER_PREVIEW_TEXTURE = 4675733
+local SHOP_ROW_PREVIEW_WIDTH = 154
+local SHOP_ROW_PREVIEW_HEIGHT = 72
 local CopyTable = AF.CopyTable
 local SECTION_GAP = 28
 local SECTION_BOTTOM_GAP = 6
@@ -323,10 +325,459 @@ local function IsDefaultsSaveDirty(defaults)
 		or (defaults.note:GetText() or "") ~= defaults.artisanFinderLoadedNoteText
 end
 
+local function IsShopSaveDirty(defaults)
+	if not defaults
+		or not defaults.shopName
+		or not defaults.shopRowColorButton
+		or not defaults.shopIconColorButton
+		or not defaults.shopEmblemStyle
+		or not defaults.shopRowTextureStyle
+	then
+		return false
+	end
+	if defaults.artisanFinderLoadedShopName == nil then
+		return defaults.artisanFinderShopDirty == true
+	end
+	return (defaults.shopName:GetText() or "") ~= defaults.artisanFinderLoadedShopName
+		or (defaults.shopRowColorButton.artisanFinderColorHex or "") ~= defaults.artisanFinderLoadedShopRowColor
+		or (defaults.shopIconColorButton.artisanFinderColorHex or "") ~= defaults.artisanFinderLoadedShopIconColor
+		or (defaults.shopEmblemStyle:GetText() or "") ~= defaults.artisanFinderLoadedShopEmblemStyle
+		or (defaults.shopRowTextureStyle:GetText() or "") ~= defaults.artisanFinderLoadedShopRowTextureStyle
+end
+
+local function SetShopError(defaults, message)
+	if defaults and defaults.shopErrorText then
+		defaults.shopErrorText:SetText(message or "")
+		defaults.shopErrorText:SetShown(message ~= nil and message ~= "")
+	end
+end
+
+local function HasShopError(defaults)
+	return defaults and defaults.shopErrorText and defaults.shopErrorText:IsShown()
+end
+
+local function GetHexFromRGB(r, g, b)
+	return string.format(
+		"%02x%02x%02x",
+		math.max(0, math.min(255, math.floor((tonumber(r) or 0) * 255 + 0.5))),
+		math.max(0, math.min(255, math.floor((tonumber(g) or 0) * 255 + 0.5))),
+		math.max(0, math.min(255, math.floor((tonumber(b) or 0) * 255 + 0.5)))
+	)
+end
+
+local function SetShopColorButtonHex(button, hex, fallback)
+	if not button then
+		return
+	end
+	hex = AF:NormalizeShopColor(hex, fallback)
+	button.artisanFinderColorHex = hex
+	local r, g, b = AF:GetShopColorRGB(hex, fallback)
+	if button.Swatch and r then
+		button.Swatch:SetVertexColor(r, g, b, 1)
+	end
+end
+
+local function OpenShopColorPicker(button, fallback, onChanged)
+	if not button or not ColorPickerFrame then
+		return
+	end
+	local r, g, b = AF:GetShopColorRGB(button.artisanFinderColorHex, fallback)
+	local apply = function(red, green, blue)
+		SetShopColorButtonHex(button, GetHexFromRGB(red, green, blue), fallback)
+		if onChanged then
+			onChanged()
+		end
+	end
+	ColorPickerFrame:SetupColorPickerAndShow({
+		r = r or 1,
+		g = g or 1,
+		b = b or 1,
+		swatch = button,
+		swatchFunc = function()
+			apply(ColorPickerFrame:GetColorRGB())
+		end,
+		cancelFunc = function()
+			apply(ColorPickerFrame:GetPreviousValues())
+		end,
+	})
+end
+
+local function CreatePlainBorder(parent, thickness, r, g, b, alpha)
+	local border = CreateFrame("Frame", nil, parent)
+	border:EnableMouse(false)
+	border.Top = border:CreateTexture(nil, "OVERLAY")
+	border.Top:SetTexture("Interface\\Buttons\\WHITE8x8")
+	border.Top:SetPoint("TOPLEFT")
+	border.Top:SetPoint("TOPRIGHT")
+	border.Top:SetHeight(thickness or 1)
+	border.Bottom = border:CreateTexture(nil, "OVERLAY")
+	border.Bottom:SetTexture("Interface\\Buttons\\WHITE8x8")
+	border.Bottom:SetPoint("BOTTOMLEFT")
+	border.Bottom:SetPoint("BOTTOMRIGHT")
+	border.Bottom:SetHeight(thickness or 1)
+	border.Left = border:CreateTexture(nil, "OVERLAY")
+	border.Left:SetTexture("Interface\\Buttons\\WHITE8x8")
+	border.Left:SetPoint("TOPLEFT")
+	border.Left:SetPoint("BOTTOMLEFT")
+	border.Left:SetWidth(thickness or 1)
+	border.Right = border:CreateTexture(nil, "OVERLAY")
+	border.Right:SetTexture("Interface\\Buttons\\WHITE8x8")
+	border.Right:SetPoint("TOPRIGHT")
+	border.Right:SetPoint("BOTTOMRIGHT")
+	border.Right:SetWidth(thickness or 1)
+	border.SetBorderColor = function(self, red, green, blue, opacity)
+		for _, line in ipairs({ self.Top, self.Bottom, self.Left, self.Right }) do
+			line:SetVertexColor(red or 1, green or 1, blue or 1, opacity or 1)
+		end
+	end
+	border:SetBorderColor(r or 0.58, g or 0.47, b or 0.24, alpha or 0.9)
+	return border
+end
+
+local function CreateShopColorButton(parent, anchor, fallback, onChanged)
+	local button = CreateFrame("Button", nil, parent)
+	button:SetSize(24, 24)
+	button:SetPoint(unpack(anchor))
+	button.Background = button:CreateTexture(nil, "BACKGROUND")
+	button.Background:SetTexture("Interface\\Buttons\\WHITE8x8")
+	button.Background:SetAllPoints()
+	button.Background:SetVertexColor(0.02, 0.02, 0.02, 1)
+	button.Swatch = button:CreateTexture(nil, "ARTWORK")
+	button.Swatch:SetTexture("Interface\\Buttons\\WHITE8x8")
+	button.Swatch:SetPoint("TOPLEFT", 4, -4)
+	button.Swatch:SetPoint("BOTTOMRIGHT", -4, 4)
+	button.Border = CreatePlainBorder(button, 1, 0.78, 0.63, 0.28, 0.85)
+	button.Border:SetPoint("TOPLEFT", -1, 1)
+	button.Border:SetPoint("BOTTOMRIGHT", 1, -1)
+	button.SetColorRGB = function(self, r, g, b)
+		SetShopColorButtonHex(self, GetHexFromRGB(r, g, b), fallback)
+	end
+	button:SetScript("OnEnter", function(self)
+		if self.Border then
+			self.Border:SetBorderColor(1, 0.82, 0, 1)
+		end
+	end)
+	button:SetScript("OnLeave", function(self)
+		if self.Border then
+			self.Border:SetBorderColor(0.78, 0.63, 0.28, 0.85)
+		end
+	end)
+	button:SetScript("OnClick", function(self)
+		OpenShopColorPicker(self, fallback, onChanged or self.artisanFinderOnChanged)
+	end)
+	SetShopColorButtonHex(button, fallback, fallback)
+	return button
+end
+
+local function ApplyShopRowTextureVisual(texture, rowTextureStyle, hex, fallback, alpha)
+	return AF:ApplyShopRowTextureVisual(texture, rowTextureStyle, hex, fallback, alpha)
+end
+
+local function SetShopPreviewTexture(defaults, cosmetics)
+	if not defaults or not defaults.shopPreviewBackground then
+		return
+	end
+	local rowTextureStyle = ApplyShopRowTextureVisual(defaults.shopPreviewBackground, cosmetics.rowTextureStyle, cosmetics.rowColor, "24435d", 1)
+	if rowTextureStyle then
+		if defaults.shopRowTextureButton then
+			ApplyShopRowTextureVisual(defaults.shopRowTextureButton.Sample, cosmetics.rowTextureStyle, cosmetics.rowColor, "24435d", 1)
+			defaults.shopRowTextureButton.artisanFinderTooltipText = AF:Text(rowTextureStyle.labelKey)
+		end
+	end
+	local r, g, b = AF:GetShopColorRGB(cosmetics.rowColor, "24435d")
+	defaults.shopPreviewBackground:SetVertexColor(r or 0.14, g or 0.26, b or 0.36, 1)
+	defaults.shopPreviewEmblem:SetTexture("Interface\\GuildFrame\\GuildEmblemsLG_01")
+	defaults.shopPreviewEmblem:SetTexCoord(AF:GetShopTabardEmblemTexCoords(cosmetics.emblemStyle))
+	r, g, b = AF:GetShopColorRGB(cosmetics.iconColor, "f0c35a")
+	defaults.shopPreviewEmblem:SetVertexColor(r or 0.94, g or 0.76, b or 0.35, 1)
+	if defaults.shopEmblemButton then
+		defaults.shopEmblemButton.Icon:SetTexture("Interface\\GuildFrame\\GuildEmblemsLG_01")
+		defaults.shopEmblemButton.Icon:SetTexCoord(AF:GetShopTabardEmblemTexCoords(cosmetics.emblemStyle))
+		defaults.shopEmblemButton.Icon:SetVertexColor(r or 0.94, g or 0.76, b or 0.35, 1)
+	end
+end
+
+local function UpdateShopPreview(defaults)
+	if not defaults or not defaults.shopPreviewBackground then
+		return
+	end
+	local cosmetics = AF:NormalizeShopCosmetics({
+		rowColor = defaults.shopRowColorButton and defaults.shopRowColorButton.artisanFinderColorHex or "24435d",
+		iconColor = defaults.shopIconColorButton and defaults.shopIconColorButton.artisanFinderColorHex or "f0c35a",
+		emblemStyle = AF:NormalizeShopTabardEmblemStyle(defaults.shopEmblemStyle and defaults.shopEmblemStyle:GetText(), 0),
+		rowTextureStyle = AF:NormalizeShopRowTextureStyle(defaults.shopRowTextureStyle and defaults.shopRowTextureStyle:GetText(), 1),
+	}) or AF:GetDefaultShopCosmetics()
+	SetShopPreviewTexture(defaults, cosmetics)
+end
+
+local function SetShopSelectionText(box, value)
+	SetEditBoxText(box, tostring(value or ""), false)
+	box.artisanFinderDirty = true
+end
+
+local function CreateShopSelectButton(parent, anchor, width)
+	local button = CreateFrame("Button", nil, parent)
+	button:SetSize(width or 42, 28)
+	button:SetPoint(unpack(anchor))
+	button.Background = button:CreateTexture(nil, "BACKGROUND")
+	button.Background:SetTexture("Interface\\Buttons\\WHITE8x8")
+	button.Background:SetAllPoints()
+	button.Background:SetVertexColor(0.025, 0.022, 0.018, 0.92)
+	button.Border = CreatePlainBorder(button, 1, 0.58, 0.47, 0.24, 0.9)
+	button.Border:SetPoint("TOPLEFT", -1, 1)
+	button.Border:SetPoint("BOTTOMRIGHT", 1, -1)
+	button:SetScript("OnEnter", function(self)
+		self.Border:SetBorderColor(1, 0.82, 0, 1)
+	end)
+	button:SetScript("OnLeave", function(self)
+		self.Border:SetBorderColor(0.58, 0.47, 0.24, 0.9)
+	end)
+	return button
+end
+
+local function CreateShopEmblemButton(parent, anchor)
+	local button = CreateShopSelectButton(parent, anchor, 38)
+	button.Icon = button:CreateTexture(nil, "ARTWORK")
+	button.Icon:SetPoint("CENTER")
+	button.Icon:SetSize(25, 25)
+	return button
+end
+
+local function CreateShopRowTextureButton(parent, anchor)
+	local button = CreateShopSelectButton(parent, anchor, 84)
+	button.Sample = button:CreateTexture(nil, "ARTWORK")
+	button.Sample:SetPoint("TOPLEFT", 4, -4)
+	button.Sample:SetPoint("BOTTOMRIGHT", -4, 4)
+	button:SetScript("OnEnter", function(self)
+		self.Border:SetBorderColor(1, 0.82, 0, 1)
+		if self.artisanFinderTooltipText then
+			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+			GameTooltip:SetText(self.artisanFinderTooltipText, 1, 0.82, 0)
+			GameTooltip:Show()
+		end
+	end)
+	button:SetScript("OnLeave", function(self)
+		self.Border:SetBorderColor(0.58, 0.47, 0.24, 0.9)
+		GameTooltip:Hide()
+	end)
+	return button
+end
+
+local function GetShopPickerPopup()
+	if ArtisanFinderShopPickerPopup then
+		return ArtisanFinderShopPickerPopup
+	end
+	local popup = CreateFrame("Frame", "ArtisanFinderShopPickerPopup", UIParent, "BackdropTemplate")
+	popup:SetFrameStrata("DIALOG")
+	popup:SetClampedToScreen(true)
+	popup:EnableMouse(true)
+	popup:SetMovable(true)
+	popup:RegisterForDrag("LeftButton")
+	popup:SetScript("OnDragStart", popup.StartMoving)
+	popup:SetScript("OnDragStop", popup.StopMovingOrSizing)
+	popup:SetBackdrop({
+		bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background-Dark",
+		edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+		tile = true,
+		tileSize = 32,
+		edgeSize = 32,
+		insets = { left = 11, right = 12, top = 12, bottom = 11 },
+	})
+	popup:Hide()
+	popup.Title = popup:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	popup.Title:SetPoint("TOP", 0, -16)
+	popup.Close = CreateFrame("Button", nil, popup, "UIPanelCloseButton")
+	popup.Close:SetPoint("TOPRIGHT", -4, -4)
+	popup.ScrollFrame = CreateFrame("ScrollFrame", nil, popup, "UIPanelScrollFrameTemplate")
+	popup.ScrollFrame:SetPoint("TOPLEFT", 24, -42)
+	popup.ScrollFrame:SetPoint("BOTTOMRIGHT", -34, 44)
+	popup.ScrollChild = CreateFrame("Frame", nil, popup.ScrollFrame)
+	popup.ScrollFrame:SetScrollChild(popup.ScrollChild)
+	popup.Cancel = CreateFrame("Button", nil, popup, "UIPanelButtonTemplate")
+	popup.Cancel:SetSize(76, 22)
+	popup.Cancel:SetPoint("BOTTOMRIGHT", -16, 14)
+	popup.Cancel:SetText(AF:Text("CANCEL"))
+	popup.Cancel:SetScript("OnClick", function(self)
+		self:GetParent():Hide()
+	end)
+	popup.Buttons = {}
+	tinsert(UISpecialFrames, "ArtisanFinderShopPickerPopup")
+	return popup
+end
+
+local function ResetShopPickerPopup(popup, title, width, height, scrollWidth, scrollHeight, childHeight)
+	popup:SetSize(width, height)
+	popup:ClearAllPoints()
+	popup:SetPoint("CENTER")
+	popup.Title:SetText(title)
+	popup.Cancel:SetText(AF:Text("CANCEL"))
+	popup.ScrollFrame:ClearAllPoints()
+	popup.ScrollFrame:SetPoint("TOPLEFT", 24, -42)
+	popup.ScrollFrame:SetPoint("BOTTOMRIGHT", -34, 44)
+	popup.ScrollChild:SetSize(scrollWidth or math.max(1, width - 58), childHeight or scrollHeight or math.max(1, height - 86))
+	popup.ScrollFrame:SetVerticalScroll(0)
+	for _, button in ipairs(popup.Buttons) do
+		button:Hide()
+	end
+end
+
+local function GetShopPickerButton(popup, index, width, height)
+	local button = popup.Buttons[index]
+	if not button then
+		button = CreateFrame("Button", nil, popup.ScrollChild)
+		button.Background = button:CreateTexture(nil, "BACKGROUND")
+		button.Background:SetTexture("Interface\\Buttons\\WHITE8x8")
+		button.Background:SetAllPoints()
+		button.Background:SetVertexColor(0.02, 0.018, 0.014, 0.82)
+		button.Icon = button:CreateTexture(nil, "ARTWORK")
+		button.Icon:SetPoint("CENTER")
+		button.Highlight = button:CreateTexture(nil, "HIGHLIGHT")
+		button.Highlight:SetTexture("Interface\\Buttons\\ButtonHilight-Square")
+		button.Highlight:SetBlendMode("ADD")
+		button.Highlight:SetAllPoints()
+		button.Selected = CreatePlainBorder(button, 2, 1, 0.82, 0, 1)
+		button.Label = button:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+		button.Label:SetJustifyH("CENTER")
+		popup.Buttons[index] = button
+	end
+	button:SetParent(popup.ScrollChild)
+	button:SetSize(width, height)
+	button.Icon:SetSize(width - 10, height - 10)
+	button.Selected:ClearAllPoints()
+	button.Selected:SetPoint("TOPLEFT", button.Icon, "TOPLEFT", -3, 3)
+	button.Selected:SetPoint("BOTTOMRIGHT", button.Icon, "BOTTOMRIGHT", 3, -3)
+	button.Label:Hide()
+	button.artisanFinderTooltipText = nil
+	button:SetScript("OnEnter", nil)
+	button:SetScript("OnLeave", nil)
+	button:Show()
+	return button
+end
+
+local function OpenShopEmblemPicker(defaults, onChanged)
+	local popup = GetShopPickerPopup()
+	local cols = 8
+	local size = 48
+	local gap = 2
+	local options = AF:GetShopTabardEmblemOptions()
+	local rows = math.ceil(#options / cols)
+	local contentWidth = cols * size + (cols - 1) * gap
+	local contentHeight = rows * size + (rows - 1) * gap
+	ResetShopPickerPopup(popup, AF:Text("SHOP_TABARD_EMBLEM"), 468, 470, contentWidth, 380, contentHeight)
+	local selected = AF:NormalizeShopTabardEmblemStyle(defaults.shopEmblemStyle:GetText(), 0) or 0
+	for index, value in ipairs(options) do
+		local selectedValue = value
+		local offset = index - 1
+		local button = GetShopPickerButton(popup, index, size, size)
+		button:ClearAllPoints()
+		button:SetPoint("TOPLEFT", popup.ScrollChild, "TOPLEFT", (offset % cols) * (size + gap), -math.floor(offset / cols) * (size + gap))
+		button.Icon:ClearAllPoints()
+		button.Icon:SetPoint("CENTER")
+		button.Icon:SetSize(40, 40)
+		button.Icon:SetTexture("Interface\\GuildFrame\\GuildEmblemsLG_01")
+		button.Icon:SetTexCoord(AF:GetShopTabardEmblemTexCoords(value))
+		local r, g, b = AF:GetShopColorRGB(defaults.shopIconColorButton and defaults.shopIconColorButton.artisanFinderColorHex, "f0c35a")
+		button.Icon:SetVertexColor(r or 1, g or 0.82, b or 0, 1)
+		button.Selected:SetShown(selectedValue == selected)
+		button:SetScript("OnClick", function()
+			SetShopSelectionText(defaults.shopEmblemStyle, selectedValue)
+			popup:Hide()
+			if onChanged then
+				onChanged()
+			end
+		end)
+	end
+	popup:Show()
+end
+
+local function OpenShopRowTexturePicker(defaults, onChanged)
+	local popup = GetShopPickerPopup()
+	local selected = AF:NormalizeShopRowTextureStyle(defaults.shopRowTextureStyle:GetText(), 1) or 1
+	local options = AF:GetShopRowTextureOptions()
+	local cols = 3
+	local width = 88
+	local height = 42
+	local gap = 10
+	local rows = math.max(1, math.ceil(#options / cols))
+	local contentHeight = rows * height + (rows - 1) * gap
+	ResetShopPickerPopup(popup, AF:Text("SHOP_ROW_TEXTURE"), 334, contentHeight + 86, 286, contentHeight, contentHeight)
+	for index, option in ipairs(options) do
+		local optionValue = option.value
+		local button = GetShopPickerButton(popup, index, width, height)
+		button:ClearAllPoints()
+		button:SetPoint("TOPLEFT", popup.ScrollChild, "TOPLEFT", ((index - 1) % cols) * (width + gap), -math.floor((index - 1) / cols) * (height + gap))
+		button.Icon:ClearAllPoints()
+		button.Icon:SetPoint("TOPLEFT", 5, -5)
+		button.Icon:SetPoint("BOTTOMRIGHT", -5, 5)
+		ApplyShopRowTextureVisual(button.Icon, optionValue, defaults.shopRowColorButton and defaults.shopRowColorButton.artisanFinderColorHex, "24435d", 1)
+		button.artisanFinderTooltipText = AF:Text(option.labelKey)
+		button.Selected:SetShown(optionValue == selected)
+		button:SetScript("OnEnter", function(self)
+			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+			GameTooltip:SetText(self.artisanFinderTooltipText or "", 1, 0.82, 0)
+			GameTooltip:Show()
+		end)
+		button:SetScript("OnLeave", function()
+			GameTooltip:Hide()
+		end)
+		button:SetScript("OnClick", function()
+			SetShopSelectionText(defaults.shopRowTextureStyle, optionValue)
+			popup:Hide()
+			if onChanged then
+				onChanged()
+			end
+		end)
+	end
+	popup:Show()
+end
+
+local function ValidateShopInputs(defaults)
+	local emblemStyle = AF:NormalizeShopTabardEmblemStyle(defaults.shopEmblemStyle and defaults.shopEmblemStyle:GetText(), nil)
+	local rowTextureStyle = AF:NormalizeShopRowTextureStyle(defaults.shopRowTextureStyle and defaults.shopRowTextureStyle:GetText(), nil)
+	if emblemStyle ~= nil and rowTextureStyle ~= nil then
+		SetShopError(defaults, nil)
+		return true
+	end
+	SetShopError(defaults, AF:Text("SHOP_IDENTITY_INVALID"))
+	return false
+end
+
+local function SetShopLoadedState(AF, defaults)
+	local cosmetics = AF:GetShopCosmetics(AF.db and AF.db.artisanProfile) or AF:GetDefaultShopCosmetics()
+	local shopName = cosmetics.shopName or ""
+	local rowColor = cosmetics.rowColor or ""
+	local iconColor = cosmetics.iconColor or ""
+	local emblemStyle = cosmetics.emblemStyle ~= nil and tostring(cosmetics.emblemStyle) or ""
+	local rowTextureStyle = cosmetics.rowTextureStyle ~= nil and tostring(cosmetics.rowTextureStyle) or ""
+	defaults.artisanFinderLoadedShopName = shopName
+	defaults.artisanFinderLoadedShopRowColor = rowColor
+	defaults.artisanFinderLoadedShopIconColor = iconColor
+	defaults.artisanFinderLoadedShopEmblemStyle = emblemStyle
+	defaults.artisanFinderLoadedShopRowTextureStyle = rowTextureStyle
+	defaults.artisanFinderShopDirty = false
+	SetEditBoxText(defaults.shopName, shopName)
+	SetShopColorButtonHex(defaults.shopRowColorButton, rowColor, "24435d")
+	SetShopColorButtonHex(defaults.shopIconColorButton, iconColor, "f0c35a")
+	SetEditBoxText(defaults.shopEmblemStyle, emblemStyle)
+	SetEditBoxText(defaults.shopRowTextureStyle, rowTextureStyle)
+	UpdateShopPreview(defaults)
+	SetShopError(defaults, nil)
+end
+
+local function RefreshShopTextIfClean(AF, defaults)
+	if not IsShopSaveDirty(defaults) then
+		SetShopLoadedState(AF, defaults)
+	end
+end
+
 local function ShouldEnableDefaultsSave(AF, defaults)
 	return IsDefaultsSaveDirty(defaults)
 		and (defaults.artisanFinderLoadedProfessionID or AF:GetCurrentSupportedProfessionID()) ~= nil
 		and not HasPanelError(defaults)
+end
+
+local function ShouldEnableShopSave(defaults)
+	return IsShopSaveDirty(defaults) and not HasShopError(defaults)
 end
 
 local function GetDefaultsRefreshProfessionID(AF, defaults, currentProfessionID)
@@ -413,15 +864,29 @@ function AF:RefreshCrafterLocale()
 		defaults.itemSectionHeader:SetText(self:Text("CRAFTER_PANEL_ITEM_SECTION"))
 		defaults.scanHeader:SetText(self:Text("CRAFTER_PANEL_SCAN_SECTION"))
 		defaults.advertisingHeader:SetText(self:Text("CRAFTER_PANEL_ADVERTISING_SECTION"))
+		defaults.shopHeader:SetText(self:Text("SHOP_COSMETICS"))
 		defaults.priceLabel:SetText(self:Text("COMMISSION"))
 		defaults.noteLabel:SetText(self:Text("NOTE"))
+		defaults.shopNameLabel:SetText(self:Text("SHOP_NAME"))
+		defaults.shopRowColorLabel:SetText(self:Text("SHOP_ROW_COLOR"))
+		defaults.shopIconColorLabel:SetText(self:Text("SHOP_ICON_COLOR"))
+		defaults.shopEmblemStyleLabel:SetText(self:Text("SHOP_TABARD_EMBLEM"))
+		defaults.shopRowTextureStyleLabel:SetText(self:Text("SHOP_ROW_TEXTURE"))
 		defaults.price.Placeholder:SetText(self:Text("COMMISSION_PLACEHOLDER"))
 		defaults.note.Placeholder:SetText(self:Text("NOTE_PLACEHOLDER"))
+		defaults.shopName.Placeholder:SetText(self:Text("SHOP_NAME_PLACEHOLDER"))
+		defaults.shopEmblemStyle.Placeholder:SetText("0-" .. tostring(self:GetShopTabardEmblemPickerMaxStyle()))
+		defaults.shopRowTextureStyle.Placeholder:SetText(self:Text("SHOP_ROW_TEXTURE_PLACEHOLDER"))
 		defaults.advertiseCheck.Text:SetText(self:Text("CRAFTER_PANEL_ADVERTISE_PROFESSION"))
+		defaults.shopSave:SetText(self:Text("SAVE"))
 		UpdatePlaceholder(defaults.price)
 		UpdatePlaceholder(defaults.note)
 		FitStackedDefaultNoteAndSave(defaults, defaults.noteLabel, defaults.note, defaults.save, defaults.discard)
 		FitCrafterCommissionFields(defaults, frame)
+		UpdatePlaceholder(defaults.shopName)
+		UpdatePlaceholder(defaults.shopEmblemStyle)
+		UpdatePlaceholder(defaults.shopRowTextureStyle)
+		UpdateShopPreview(defaults)
 		if defaults.errorText and defaults.errorText:IsShown() then
 			defaults.errorText:SetText(self:Text("COMMISSION_INVALID"))
 		end
@@ -553,7 +1018,46 @@ function AF:LayoutCrafterSections()
 		defaults.advertisingHeader:SetPoint("TOPLEFT", defaults, "TOPLEFT", 14, -(y + COLLAPSED_TITLE_OFFSET))
 		y = y + COLLAPSED_SECTION_HEIGHT
 	end
+
+	local shopCollapsed = states.shop ~= false
+	defaults.shopDivider:ClearAllPoints()
+	defaults.shopDivider:SetPoint("TOPLEFT", defaults, "TOPLEFT", 12, -y)
+	defaults.shopDivider:SetPoint("TOPRIGHT", defaults, "TOPRIGHT", -12, -y)
+	placeToggle(defaults.shopSectionToggle, shopCollapsed, true)
+	defaults.shopHeader:ClearAllPoints()
+	defaults.shopHeader:SetPoint("TOPLEFT", defaults, "TOPLEFT", 14, -(y + (shopCollapsed and COLLAPSED_TITLE_OFFSET or SECTION_GAP)))
+	defaults.shopHeader:Show()
+	for _, region in ipairs({
+		defaults.shopNameLabel, defaults.shopNameField, defaults.shopRowColorLabel, defaults.shopRowColorButton,
+		defaults.shopIconColorLabel, defaults.shopIconColorButton, defaults.shopEmblemStyleLabel,
+		defaults.shopEmblemButton, defaults.shopRowTextureStyleLabel, defaults.shopRowTextureButton,
+		defaults.shopPreview, defaults.shopSave,
+	}) do
+		region:SetShown(not shopCollapsed)
+	end
+	defaults.shopErrorText:SetShown(not shopCollapsed and (defaults.shopErrorText:GetText() or "") ~= "")
+	if not shopCollapsed then
+		local contentY = y + SECTION_GAP + 28
+		defaults.shopNameLabel:ClearAllPoints()
+		defaults.shopRowColorLabel:ClearAllPoints()
+		defaults.shopIconColorLabel:ClearAllPoints()
+		defaults.shopEmblemStyleLabel:ClearAllPoints()
+		defaults.shopRowTextureStyleLabel:ClearAllPoints()
+		defaults.shopPreview:ClearAllPoints()
+		defaults.shopSave:ClearAllPoints()
+		defaults.shopNameLabel:SetPoint("TOPLEFT", defaults, "TOPLEFT", 14, -contentY)
+		defaults.shopRowColorLabel:SetPoint("TOPLEFT", defaults, "TOPLEFT", 14, -(contentY + 34))
+		defaults.shopIconColorLabel:SetPoint("TOPLEFT", defaults, "TOPLEFT", 14, -(contentY + 68))
+		defaults.shopEmblemStyleLabel:SetPoint("TOPLEFT", defaults, "TOPLEFT", 14, -(contentY + 102))
+		defaults.shopRowTextureStyleLabel:SetPoint("TOPLEFT", defaults, "TOPLEFT", 14, -(contentY + 136))
+		defaults.shopPreview:SetPoint("TOPLEFT", defaults, "TOPLEFT", 214, -contentY)
+		defaults.shopSave:SetPoint("TOPLEFT", defaults, "TOPLEFT", 108, -(contentY + 168))
+		y = contentY + 198
+	else
+		y = y + COLLAPSED_SECTION_HEIGHT
+	end
 	defaults:SetHeight(math.max(120, y))
+	self:PositionCrafterUI()
 end
 
 function AF:ApplyCrafterDefaultsCollapsed(collapsed)
@@ -1014,27 +1518,144 @@ function AF:AttachCrafterUI()
 	ConfigureSectionToggle(defaults.itemSectionToggle, "item", "ITEM_SPECIFIC_COMMISSION")
 	ConfigureSectionToggle(defaults.scanSectionToggle, "scan", "CRAFTER_PANEL_SCAN_SECTION")
 	ConfigureSectionToggle(defaults.advertisingSectionToggle, "advertising", "CRAFTER_PANEL_ADVERTISING_SECTION")
+	ConfigureSectionToggle(defaults.shopSectionToggle, "shop", "SHOP_COSMETICS")
 
-	local markItemDirty = function()
-		ClampCommissionEditBox(frame.price)
-		ValidateCommissionInput(frame.price, frame)
-		frame.artisanFinderDirty = IsEditBoxDirty(frame.price) or IsEditBoxDirty(frame.note)
-		AF:UpdateCrafterDirtyState()
-	end
-	local markDefaultDirty = function()
-		ClampCommissionEditBox(defaults.price)
-		ValidateCommissionInput(defaults.price, defaults)
-		defaults.artisanFinderDirty = IsDefaultsSaveDirty(defaults)
-		AF:UpdateCrafterDirtyState()
-	end
-	WatchEditBox(frame.price, markItemDirty)
-	WatchEditBox(frame.note, markItemDirty)
-	WatchEditBox(defaults.price, markDefaultDirty)
-	WatchEditBox(defaults.note, markDefaultDirty)
-	SaveOnEnter(frame.price, frame.save)
-	SaveOnEnter(frame.note, frame.save)
-	SaveOnEnter(defaults.price, defaults.save)
-	SaveOnEnter(defaults.note, defaults.save)
+		defaults.shopHeader = defaults:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+		defaults.shopHeader:SetPoint("TOPLEFT", defaults, "TOPLEFT", 14, -282)
+		defaults.shopHeader:SetText(self:Text("SHOP_COSMETICS"))
+
+		defaults.shopNameLabel = defaults:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+		defaults.shopNameLabel:SetPoint("TOPLEFT", defaults, "TOPLEFT", 14, -310)
+		defaults.shopNameLabel:SetSize(88, 20)
+		defaults.shopNameLabel:SetJustifyH("LEFT")
+		defaults.shopNameLabel:SetText(self:Text("SHOP_NAME"))
+
+		defaults.shopNameField = CreateFrame("Frame", nil, defaults, "ArtisanFinderInsetEditBoxTemplate")
+		defaults.shopName = PrepareInsetEditBox(defaults.shopNameField, 96, "SHOP_NAME_PLACEHOLDER")
+		SetFieldPoint(defaults.shopName, "LEFT", defaults.shopNameLabel, "RIGHT", 6, 0)
+		defaults.shopName:SetMaxLetters(AF.MAX_SHOP_NAME_CHARS or 32)
+
+		defaults.shopRowColorLabel = defaults:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+		defaults.shopRowColorLabel:SetPoint("TOPLEFT", defaults, "TOPLEFT", 14, -344)
+		defaults.shopRowColorLabel:SetSize(88, 20)
+		defaults.shopRowColorLabel:SetJustifyH("LEFT")
+		defaults.shopRowColorLabel:SetText(self:Text("SHOP_ROW_COLOR"))
+
+		defaults.shopRowColorButton = CreateShopColorButton(defaults, { "LEFT", defaults.shopRowColorLabel, "RIGHT", 6, 0 }, "24435d")
+
+		defaults.shopIconColorLabel = defaults:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+		defaults.shopIconColorLabel:SetPoint("TOPLEFT", defaults, "TOPLEFT", 14, -378)
+		defaults.shopIconColorLabel:SetSize(88, 20)
+		defaults.shopIconColorLabel:SetJustifyH("LEFT")
+		defaults.shopIconColorLabel:SetText(self:Text("SHOP_ICON_COLOR"))
+
+		defaults.shopIconColorButton = CreateShopColorButton(defaults, { "LEFT", defaults.shopIconColorLabel, "RIGHT", 6, 0 }, "f0c35a")
+
+		defaults.shopEmblemStyleLabel = defaults:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+		defaults.shopEmblemStyleLabel:SetPoint("TOPLEFT", defaults, "TOPLEFT", 14, -412)
+		defaults.shopEmblemStyleLabel:SetSize(88, 20)
+		defaults.shopEmblemStyleLabel:SetJustifyH("LEFT")
+		defaults.shopEmblemStyleLabel:SetText(self:Text("SHOP_TABARD_EMBLEM"))
+
+		defaults.shopEmblemStyleField = CreateFrame("Frame", nil, defaults, "ArtisanFinderInsetEditBoxTemplate")
+		defaults.shopEmblemStyle = PrepareInsetEditBox(defaults.shopEmblemStyleField, 52, "SHOP_TABARD_EMBLEM_PLACEHOLDER")
+		SetFieldPoint(defaults.shopEmblemStyle, "LEFT", defaults.shopEmblemStyleLabel, "RIGHT", 6, 0)
+		defaults.shopEmblemStyle:SetMaxLetters(3)
+		defaults.shopEmblemStyleField:Hide()
+
+		defaults.shopEmblemButton = CreateShopEmblemButton(defaults, { "LEFT", defaults.shopEmblemStyleLabel, "RIGHT", 6, 0 })
+
+		defaults.shopRowTextureStyleLabel = defaults:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+		defaults.shopRowTextureStyleLabel:SetPoint("TOPLEFT", defaults, "TOPLEFT", 14, -446)
+		defaults.shopRowTextureStyleLabel:SetSize(88, 20)
+		defaults.shopRowTextureStyleLabel:SetJustifyH("LEFT")
+		defaults.shopRowTextureStyleLabel:SetText(self:Text("SHOP_ROW_TEXTURE"))
+
+		defaults.shopRowTextureStyleField = CreateFrame("Frame", nil, defaults, "ArtisanFinderInsetEditBoxTemplate")
+		defaults.shopRowTextureStyle = PrepareInsetEditBox(defaults.shopRowTextureStyleField, 38, "SHOP_ROW_TEXTURE_PLACEHOLDER")
+		SetFieldPoint(defaults.shopRowTextureStyle, "LEFT", defaults.shopRowTextureStyleLabel, "RIGHT", 6, 0)
+		defaults.shopRowTextureStyle:SetMaxLetters(2)
+		defaults.shopRowTextureStyleField:Hide()
+
+		defaults.shopRowTextureButton = CreateShopRowTextureButton(defaults, { "LEFT", defaults.shopRowTextureStyleLabel, "RIGHT", 6, 0 })
+
+		defaults.shopPreview = CreateFrame("Frame", nil, defaults)
+		defaults.shopPreview:SetSize(SHOP_ROW_PREVIEW_WIDTH, SHOP_ROW_PREVIEW_HEIGHT)
+		defaults.shopPreview:SetPoint("TOPLEFT", defaults, "TOPLEFT", 214, -310)
+		defaults.shopPreviewBackground = defaults.shopPreview:CreateTexture(nil, "BACKGROUND")
+		defaults.shopPreviewBackground:SetAllPoints()
+		defaults.shopPreviewEmblem = defaults.shopPreview:CreateTexture(nil, "ARTWORK")
+		defaults.shopPreviewEmblem:SetPoint("RIGHT", defaults.shopPreview, "RIGHT", -10, 0)
+		defaults.shopPreviewEmblem:SetSize(52, 58)
+
+		defaults.shopSave = CreateFrame("Button", nil, defaults, "UIPanelButtonTemplate")
+		defaults.shopSave:SetSize(54, 22)
+		defaults.shopSave:SetPoint("TOPLEFT", defaults, "TOPLEFT", 108, -478)
+		defaults.shopSave:SetText(self:Text("SAVE"))
+		defaults.shopSave:Disable()
+		defaults.shopErrorText = defaults:CreateFontString(nil, "OVERLAY", "GameFontRedSmall")
+		defaults.shopErrorText:SetPoint("LEFT", defaults.shopSave, "RIGHT", 8, 0)
+		defaults.shopErrorText:SetPoint("RIGHT", defaults, "RIGHT", -14, 0)
+		defaults.shopErrorText:SetHeight(20)
+		defaults.shopErrorText:SetJustifyH("LEFT")
+		defaults.shopErrorText:Hide()
+		defaults.shopSave:SetScript("OnClick", function()
+			if not ValidateShopInputs(defaults) then
+				AF:UpdateCrafterDirtyState()
+				return
+			end
+			AF:SetShopCosmetics(AF.db.artisanProfile, {
+				shopName = defaults.shopName:GetText(),
+				rowColor = defaults.shopRowColorButton.artisanFinderColorHex,
+				iconColor = defaults.shopIconColorButton.artisanFinderColorHex,
+				emblemStyle = AF:NormalizeShopTabardEmblemStyle(defaults.shopEmblemStyle:GetText(), 0),
+				rowTextureStyle = AF:NormalizeShopRowTextureStyle(defaults.shopRowTextureStyle:GetText(), 1),
+			})
+			SetShopLoadedState(AF, defaults)
+			AF:RefreshCrafterUI()
+		end)
+
+		local markItemDirty = function()
+			ClampCommissionEditBox(frame.price)
+			ValidateCommissionInput(frame.price, frame)
+			frame.artisanFinderDirty = IsEditBoxDirty(frame.price) or IsEditBoxDirty(frame.note)
+			AF:UpdateCrafterDirtyState()
+		end
+		local markDefaultDirty = function()
+			ClampCommissionEditBox(defaults.price)
+			ValidateCommissionInput(defaults.price, defaults)
+			defaults.artisanFinderDirty = IsDefaultsSaveDirty(defaults)
+			AF:UpdateCrafterDirtyState()
+		end
+		local markShopDirty = function()
+			ValidateShopInputs(defaults)
+			UpdateShopPreview(defaults)
+			defaults.artisanFinderShopDirty = IsShopSaveDirty(defaults)
+			AF:UpdateCrafterDirtyState()
+		end
+		WatchEditBox(frame.price, markItemDirty)
+		WatchEditBox(frame.note, markItemDirty)
+		WatchEditBox(defaults.price, markDefaultDirty)
+		WatchEditBox(defaults.note, markDefaultDirty)
+		WatchEditBox(defaults.shopName, markShopDirty)
+		WatchEditBox(defaults.shopEmblemStyle, markShopDirty)
+		WatchEditBox(defaults.shopRowTextureStyle, markShopDirty)
+		defaults.shopRowColorButton.artisanFinderOnChanged = markShopDirty
+		defaults.shopIconColorButton.artisanFinderOnChanged = markShopDirty
+		defaults.shopEmblemButton:SetScript("OnClick", function()
+			OpenShopEmblemPicker(defaults, markShopDirty)
+		end)
+		defaults.shopRowTextureButton:SetScript("OnClick", function()
+			OpenShopRowTexturePicker(defaults, markShopDirty)
+		end)
+		SaveOnEnter(frame.price, frame.save)
+		SaveOnEnter(frame.note, frame.save)
+		SaveOnEnter(defaults.price, defaults.save)
+		SaveOnEnter(defaults.note, defaults.save)
+		SaveOnEnter(defaults.shopName, defaults.shopSave)
+		SaveOnEnter(defaults.shopEmblemStyle, defaults.shopSave)
+		SaveOnEnter(defaults.shopRowTextureStyle, defaults.shopSave)
+		SetShopLoadedState(self, defaults)
 
 	self.crafterFrame = frame
 	self.crafterDefaultsFrame = defaults
@@ -1066,6 +1687,22 @@ function AF:AttachCrafterUI()
 		defaults.scanProgressText,
 		defaults.errorText,
 		defaults.advertiseCheck,
+		defaults.shopDivider,
+		defaults.shopSectionToggle,
+		defaults.shopHeader,
+		defaults.shopNameLabel,
+		defaults.shopNameField,
+		defaults.shopRowColorLabel,
+		defaults.shopRowColorButton,
+		defaults.shopIconColorLabel,
+		defaults.shopIconColorButton,
+		defaults.shopEmblemStyleLabel,
+		defaults.shopEmblemButton,
+		defaults.shopRowTextureStyleLabel,
+		defaults.shopRowTextureButton,
+		defaults.shopPreview,
+		defaults.shopSave,
+		defaults.shopErrorText,
 	}
 
 	if form.RegisterCallback and ProfessionsRecipeSchematicFormMixin then
@@ -1103,7 +1740,7 @@ function AF:PositionCrafterUI()
 	end
 
 	defaults:ClearAllPoints()
-	defaults:SetPoint("BOTTOMLEFT", ProfessionsFrame, "BOTTOMRIGHT", -5, 24)
+	defaults:SetPoint("LEFT", ProfessionsFrame, "RIGHT", -5, 0)
 end
 
 function AF:UpdateCrafterScanProgressText()
@@ -1209,6 +1846,13 @@ function AF:UpdateCrafterDirtyState()
 		defaults.save:Disable()
 		defaults.discard:Disable()
 	end
+	if defaults.shopSave then
+		if ShouldEnableShopSave(defaults) then
+			defaults.shopSave:Enable()
+		else
+			defaults.shopSave:Disable()
+		end
+	end
 end
 
 function AF:RefreshCrafterUI()
@@ -1306,6 +1950,7 @@ function AF:RefreshCrafterUI()
 			self:MaybeShowCrafterTutorial()
 		end
 		defaults.advertiseCheck:SetChecked(self:IsProfessionAdvertised(self.playerName, defaultsProfessionID))
+		RefreshShopTextIfClean(self, defaults)
 		local sourceKey = RefreshDefaultsTextForProfession(self, defaults, defaultsProfessionID)
 		if defaults.artisanFinderErrorSource ~= sourceKey then
 			defaults.artisanFinderErrorSource = sourceKey

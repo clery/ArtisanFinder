@@ -112,6 +112,7 @@ local function EntryMatchesCustomerFilter(AF, entry, filterText)
 		return true
 	end
 	local haystack = table.concat({
+		entry.shopCosmetics and entry.shopCosmetics.shopName or "",
 		entry.displayName or "",
 		entry.name or "",
 		entry.professionName or "",
@@ -334,12 +335,13 @@ function AF:GetOwnAltRows(itemID, professionID, filterText, seenNames, recipeID)
 			optionalBestReagentTruncated = item.optionalBestReagentTruncated,
 			professionLink = professionLink,
 			updatedAt = item.updatedAt or profile.updatedAt or self:Now(),
-			verifiedAt = self:Now(),
-			certified = true,
-			tradeLead = false,
-			ownAlt = true,
-			ownSelf = isCurrentCharacter,
-		}
+				verifiedAt = self:Now(),
+				certified = true,
+				tradeLead = false,
+				ownAlt = true,
+				ownSelf = isCurrentCharacter,
+				shopCosmetics = self:GetShopCosmetics(profile),
+			}
 		if EntryMatchesCustomerFilter(self, entry, filterText) then
 			local seenKey = GetSeenKey(self, entry)
 			if seenKey and not seenNames[seenKey] and self:IsCustomerEntryOrderEligible(entry) then

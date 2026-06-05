@@ -469,6 +469,22 @@ local function ConfigureCustomerRow(row)
 	row:EnableMouse(true)
 	row:RegisterForClicks("LeftButtonUp")
 
+	row.shopRowColor = row:CreateTexture(nil, "BACKGROUND")
+	row.shopRowColor:SetTexture("Interface\\Buttons\\WHITE8x8")
+	row.shopRowColor:SetPoint("TOPLEFT", 2, -2)
+	row.shopRowColor:SetPoint("BOTTOMRIGHT", -4, 2)
+	row.shopRowColor:Hide()
+
+	row.shopRowTexture = row:CreateTexture(nil, "BORDER")
+	row.shopRowTexture:SetPoint("TOPLEFT", 2, -2)
+	row.shopRowTexture:SetPoint("BOTTOMRIGHT", -4, 2)
+	row.shopRowTexture:Hide()
+
+	row.shopTabardEmblem = row:CreateTexture(nil, "ARTWORK")
+	row.shopTabardEmblem:SetTexture("Interface\\GuildFrame\\GuildEmblemsLG_01")
+	row.shopTabardEmblem:SetPoint("RIGHT", row, "RIGHT", -58, 0)
+	row.shopTabardEmblem:Hide()
+
 	if not TrySetTextureAtlas(row.favorite, "PetJournal-FavoritesIcon", false)
 		and not TrySetTextureAtlas(row.favorite, "communities-icon-heart", false) then
 		row.favorite:SetTexture("Interface\\Common\\FavoritesIcon")
@@ -591,8 +607,22 @@ local function ResetCustomerRow(_, row)
 	row:SetScript("OnUpdate", nil)
 	row.entry = nil
 	row.artisanFinderWhoName = nil
+	row.artisanFinderShopCosmetics = nil
+	row.artisanFinderShopRowTextureSegmented = nil
 	row.nameStatusTooltipText = nil
 	row.noteTooltipText = nil
+	for _, texture in ipairs({
+		row.shopRowColor,
+		row.shopRowTexture,
+		row.shopTabardEmblem,
+	}) do
+		if texture then
+			texture:Hide()
+		end
+	end
+	for _, texture in ipairs(row.shopRowTextureSegments or {}) do
+		texture:Hide()
+	end
 	if row.whoSpinner then
 		row.whoSpinner:Hide()
 		row.artisanFinderWhoSpinnerName = nil
@@ -1602,6 +1632,9 @@ function AF:RefreshCustomerResults(statusOverride)
 			rowHeight = rowHeight + self:RefreshCustomerOptionalPrepRow(row, entry)
 		end
 		row:SetHeight(rowHeight)
+		if self.UpdateCustomerRowTabardSize then
+			self:UpdateCustomerRowTabardSize(row, rowHeight)
+		end
 		contentHeight = contentHeight + rowHeight
 	end
 	frame.content:SetHeight(math.max(1, contentHeight))
