@@ -913,4 +913,7 @@ function AF:OnItemDataLoaded(...)
 	if refreshCustomerResults and self.RefreshCustomerResults then
 		self:RefreshCustomerResults()
 	end
+	if self.RefreshCrafterUI then
+		self:RefreshCrafterUI()
+	end
 end

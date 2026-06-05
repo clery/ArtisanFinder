@@ -584,6 +584,7 @@ function ApplyDBDefaults(db)
 	db.minimap = db.minimap or { angle = 225, hide = false }
 	db.autoAvailabilityDisable = db.autoAvailabilityDisable or {}
 	db.tutorial = db.tutorial or {}
+	db.crafterSections = db.crafterSections or {}
 
 	if db.debugSelfResults == true then
 		db.debugEnabled = true

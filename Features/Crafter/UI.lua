@@ -1,14 +1,19 @@
 local _, AF = ...
 
 local DEFAULT_COMMISSION_PANEL_WIDTH = 392
-local DEFAULT_COMMISSION_PANEL_HEIGHT = 316
 local CRAFTER_COLLAPSE_BUTTON_LEVEL_OFFSET = 1000
 local COMMISSION_PRICE_FIELD_WIDTH = 150
 local COMMISSION_FIELD_HEIGHT = 36
 local COMMISSION_PRICE_MAX_LETTERS = 9
+local COMMISSION_FIELD_LEFT = 92
+local COMMISSION_FIELD_RIGHT_MARGIN = 42
 local CRAFTER_REOPEN_ICON = 7548932 -- inv-12-profession-blacksmithing-repairhammer-purple
 local CUSTOMER_PREVIEW_TEXTURE = 4675733
 local CopyTable = AF.CopyTable
+local SECTION_GAP = 28
+local SECTION_BOTTOM_GAP = 6
+local COLLAPSED_SECTION_HEIGHT = 30
+local COLLAPSED_TITLE_OFFSET = 4
 
 local function UpdatePlaceholder(box)
 	box.Placeholder:SetShown((box:GetText() or "") == "")
@@ -173,13 +178,40 @@ local function FitNoteAndSave(container, noteLabel, noteBox, saveButton, totalWi
 	container:SetWidth(fittedWidth)
 end
 
-local function FitStackedDefaultNoteAndSave(container, noteLabel, noteBox, saveButton)
-	local noteWidth = DEFAULT_COMMISSION_PANEL_WIDTH - 14 - noteLabel:GetWidth() - 4 - 14
-	SetFieldWidth(noteBox, noteWidth)
-	SizeButtonForText(saveButton, AF:Text("SAVE"), 54, noteWidth)
+local function FitActionButtons(noteBox, saveButton, discardButton)
+	local availableWidth = noteBox.Field:GetWidth()
+	local gap = 6
+	local saveWidth = SizeButtonForText(saveButton, AF:Text("SAVE"), 72, math.floor((availableWidth - gap) / 2))
+	local discardWidth = SizeButtonForText(discardButton, AF:Text("DISCARD"), 72, math.floor((availableWidth - gap) / 2))
+	local totalWidth = saveWidth + gap + discardWidth
+	if totalWidth > availableWidth then
+		local buttonWidth = math.floor((availableWidth - gap) / 2)
+		saveButton:SetWidth(buttonWidth)
+		discardButton:SetWidth(buttonWidth)
+	end
 	saveButton:ClearAllPoints()
-	saveButton:SetPoint("TOPLEFT", noteBox.Field, "BOTTOMLEFT", 0, -8)
-	container:SetSize(DEFAULT_COMMISSION_PANEL_WIDTH, DEFAULT_COMMISSION_PANEL_HEIGHT)
+	saveButton:SetPoint("TOPLEFT", noteBox.Field, "BOTTOMLEFT", 0, -6)
+	discardButton:ClearAllPoints()
+	discardButton:SetPoint("LEFT", saveButton, "RIGHT", gap, 0)
+end
+
+local function FitStackedDefaultNoteAndSave(container, noteLabel, noteBox, saveButton, discardButton)
+	SetFieldWidth(noteBox, DEFAULT_COMMISSION_PANEL_WIDTH - COMMISSION_FIELD_LEFT - COMMISSION_FIELD_RIGHT_MARGIN)
+	FitActionButtons(noteBox, saveButton, discardButton)
+	container:SetWidth(DEFAULT_COMMISSION_PANEL_WIDTH)
+end
+
+local function FitCrafterCommissionFields(defaults, frame)
+	local panelWidth = defaults:GetWidth()
+	if not panelWidth or panelWidth <= 28 then
+		panelWidth = DEFAULT_COMMISSION_PANEL_WIDTH
+	end
+	local fieldWidth = math.max(COMMISSION_PRICE_FIELD_WIDTH, panelWidth - COMMISSION_FIELD_LEFT - COMMISSION_FIELD_RIGHT_MARGIN)
+	for _, box in ipairs({ defaults.price, defaults.note, frame.price, frame.note }) do
+		SetFieldWidth(box, fieldWidth)
+	end
+	FitActionButtons(defaults.note, defaults.save, defaults.discard)
+	FitActionButtons(frame.note, frame.save, frame.discard)
 end
 
 local function ConfigureInfoButton(button, tooltipTitle, tooltipText)
@@ -232,10 +264,39 @@ local function ConfigureCustomerPreviewButton(button, getEntry)
 	return button
 end
 
+local function ConfigureSectionToggle(button, sectionKey, labelKey)
+	button:SetSize(24, 20)
+	button.sectionKey = sectionKey
+	button.labelKey = labelKey
+	button:SetScript("OnClick", function()
+		AF.db.crafterSections[sectionKey] = not AF.db.crafterSections[sectionKey]
+		AF:RefreshCrafterUI()
+	end)
+	button:SetScript("OnEnter", function(self)
+		self.arrow:SetAlpha(1)
+		self.arrow:SetVertexColor(1, 1, 1)
+		local collapsed = AF.db.crafterSections[self.sectionKey] == true
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		GameTooltip:SetText(AF:Text(collapsed and "EXPAND_SECTION" or "COLLAPSE_SECTION", AF:Text(self.labelKey)), 1, 0.82, 0)
+		GameTooltip:Show()
+	end)
+	button:SetScript("OnLeave", function()
+		button.arrow:SetAlpha(1)
+		button.arrow:SetVertexColor(0.72, 0.72, 0.72)
+		GameTooltip:Hide()
+	end)
+end
+
 local function SetPanelError(panel, message)
 	if panel and panel.errorText then
-		panel.errorText:SetText(message or "")
-		panel.errorText:SetShown(message ~= nil and message ~= "")
+		message = tostring(message or "")
+		local wasVisible = panel.errorText:IsShown() and (panel.errorText:GetText() or "") ~= ""
+		panel.errorText:SetText(message)
+		panel.errorText:SetShown(message ~= "")
+		local isVisible = panel.errorText:IsShown() and (panel.errorText:GetText() or "") ~= ""
+		if wasVisible ~= isVisible and AF.LayoutCrafterSections then
+			AF:LayoutCrafterSections()
+		end
 	end
 end
 
@@ -244,7 +305,11 @@ local function ClearPanelError(panel)
 end
 
 local function HasPanelError(panel)
-	return panel and panel.errorText and panel.errorText:IsShown()
+	return panel
+		and panel.errorText
+		and panel.errorText:IsShown()
+		and (panel.errorText:GetText() or "") ~= ""
+		or false
 end
 
 local function IsDefaultsSaveDirty(defaults)
@@ -330,13 +395,13 @@ function AF:RefreshCrafterLocale()
 	local frame = self.crafterFrame
 	local defaults = self.crafterDefaultsFrame
 	if frame then
+		frame.discard:SetText(self:Text("DISCARD"))
 		frame.priceLabel:SetText(self:Text("COMMISSION"))
 		frame.noteLabel:SetText(self:Text("NOTE"))
 		frame.price.Placeholder:SetText(self:Text("COMMISSION_PLACEHOLDER"))
 		frame.note.Placeholder:SetText(self:Text("NOTE_PLACEHOLDER"))
 		UpdatePlaceholder(frame.price)
 		UpdatePlaceholder(frame.note)
-		FitNoteAndSave(frame, frame.noteLabel, frame.note, frame.save, 326, 120)
 		MatchFieldWidth(frame.price, frame.note)
 		if frame.errorText and frame.errorText:IsShown() then
 			frame.errorText:SetText(self:Text("COMMISSION_INVALID"))
@@ -345,6 +410,7 @@ function AF:RefreshCrafterLocale()
 	if defaults then
 		defaults.title:SetText("ArtisanFinder")
 		defaults.defaultsHeader:SetText(self:Text("DEFAULT_COMMISSION"))
+		defaults.itemSectionHeader:SetText(self:Text("CRAFTER_PANEL_ITEM_SECTION"))
 		defaults.scanHeader:SetText(self:Text("CRAFTER_PANEL_SCAN_SECTION"))
 		defaults.advertisingHeader:SetText(self:Text("CRAFTER_PANEL_ADVERTISING_SECTION"))
 		defaults.priceLabel:SetText(self:Text("COMMISSION"))
@@ -354,16 +420,139 @@ function AF:RefreshCrafterLocale()
 		defaults.advertiseCheck.Text:SetText(self:Text("CRAFTER_PANEL_ADVERTISE_PROFESSION"))
 		UpdatePlaceholder(defaults.price)
 		UpdatePlaceholder(defaults.note)
-		FitStackedDefaultNoteAndSave(defaults, defaults.noteLabel, defaults.note, defaults.save)
-		if frame then
-			MatchFieldWidth(defaults.note, frame.note)
-		end
-		MatchFieldWidth(defaults.price, defaults.note)
+		FitStackedDefaultNoteAndSave(defaults, defaults.noteLabel, defaults.note, defaults.save, defaults.discard)
+		FitCrafterCommissionFields(defaults, frame)
 		if defaults.errorText and defaults.errorText:IsShown() then
 			defaults.errorText:SetText(self:Text("COMMISSION_INVALID"))
 		end
 		self:UpdateScanControls()
 	end
+end
+
+function AF:LayoutCrafterSections()
+	local defaults = self.crafterDefaultsFrame
+	local frame = self.crafterFrame
+	if not defaults or not frame or self.crafterDefaultsCollapsed then
+		return
+	end
+	local states = self.db.crafterSections
+	local y = 33
+	local function boundaryAfter(region, fallback)
+		local panelTop = defaults:GetTop()
+		local regionBottom = region and region:IsShown() and region:GetBottom()
+		if panelTop and regionBottom then
+			return math.ceil(panelTop - regionBottom + SECTION_BOTTOM_GAP)
+		end
+		return fallback
+	end
+	local function placeDividerAfterActionRow(divider, actionPanel, fallback)
+		local boundary = HasPanelError(actionPanel) and actionPanel.errorText or actionPanel.save
+		divider:ClearAllPoints()
+		divider:SetPoint("TOPLEFT", boundary, "BOTTOMLEFT", actionPanel == defaults and -80 or -78, -SECTION_BOTTOM_GAP)
+		divider:SetPoint("RIGHT", defaults, "RIGHT", -12, 0)
+		return fallback
+	end
+	local function placeToggle(button, collapsed, belowSeparator)
+		button:ClearAllPoints()
+		button:SetPoint("TOP", defaults, "TOP", 0, belowSeparator and -(y + 2) or -(y - 8))
+		button:SetShown(true)
+		if collapsed then
+			button.arrow:SetAtlas("minimal-scrollbar-arrow-bottom", true)
+		else
+			button.arrow:SetAtlas("minimal-scrollbar-arrow-top", true)
+		end
+		button.arrow:SetAlpha(1)
+		button.arrow:SetVertexColor(0.72, 0.72, 0.72)
+	end
+
+	local defaultCollapsed = states.defaults == true
+	placeToggle(defaults.defaultSectionToggle, defaultCollapsed)
+	defaults.defaultsHeader:ClearAllPoints()
+	defaults.defaultsHeader:SetPoint("TOPLEFT", defaults, "TOPLEFT", 14, -y)
+	defaults.defaultsHeader:Show()
+	for _, region in ipairs({ defaults.priceLabel, defaults.noteLabel, defaults.info, defaults.priceField, defaults.noteField, defaults.save, defaults.discard }) do
+		region:SetShown(not defaultCollapsed)
+	end
+	defaults.errorText:SetShown(not defaultCollapsed and defaults.errorText:GetText() ~= "")
+	if not defaultCollapsed then
+		defaults.priceLabel:ClearAllPoints()
+		defaults.noteLabel:ClearAllPoints()
+		defaults.priceLabel:SetPoint("TOPLEFT", defaults, "TOPLEFT", 14, -(y + 28))
+		defaults.noteLabel:SetPoint("TOPLEFT", defaults, "TOPLEFT", 14, -(y + 69))
+		defaults.price.Field:ClearAllPoints()
+		defaults.note.Field:ClearAllPoints()
+		defaults.price.Field:SetPoint("TOPLEFT", defaults, "TOPLEFT", COMMISSION_FIELD_LEFT, -(y + 20))
+		defaults.note.Field:SetPoint("TOPLEFT", defaults, "TOPLEFT", COMMISSION_FIELD_LEFT, -(y + 61))
+		y = y + (HasPanelError(defaults) and 162 or 131)
+	else
+		y = y + COLLAPSED_SECTION_HEIGHT
+	end
+
+	local itemDirty = frame.artisanFinderDirty == true or IsEditBoxDirty(frame.price) or IsEditBoxDirty(frame.note)
+	local itemCollapsed = states.item == true and not itemDirty
+	defaults.itemDivider:ClearAllPoints()
+	if not defaultCollapsed then
+		y = placeDividerAfterActionRow(defaults.itemDivider, defaults, y)
+	else
+		defaults.itemDivider:SetPoint("TOPLEFT", defaults, "TOPLEFT", 12, -y)
+		defaults.itemDivider:SetPoint("TOPRIGHT", defaults, "TOPRIGHT", -12, -y)
+	end
+	placeToggle(defaults.itemSectionToggle, itemCollapsed, true)
+	defaults.itemSectionHeader:ClearAllPoints()
+	defaults.itemSectionHeader:SetPoint("TOPLEFT", defaults, "TOPLEFT", 14, -(y + COLLAPSED_TITLE_OFFSET))
+	defaults.itemSectionHeader:SetShown(itemCollapsed or frame.artisanFinderHasContext ~= true)
+	frame:SetShown(frame.artisanFinderHasContext == true and not itemCollapsed)
+	frame.errorText:SetShown(frame:IsShown() and (frame.errorText:GetText() or "") ~= "")
+	if frame.artisanFinderHasContext and not itemCollapsed then
+		frame:ClearAllPoints()
+		frame:SetPoint("TOPLEFT", defaults, "TOPLEFT", 14, -(y + SECTION_GAP))
+		frame:SetHeight(HasPanelError(frame) and 161 or 130)
+		y = y + SECTION_GAP + (HasPanelError(frame) and 161 or 130)
+	else
+		y = y + COLLAPSED_SECTION_HEIGHT
+	end
+
+	local scanCollapsed = states.scan == true
+	if frame.artisanFinderHasContext and not itemCollapsed then
+		y = placeDividerAfterActionRow(defaults.scanDivider, frame, y)
+	else
+		defaults.scanDivider:ClearAllPoints()
+		defaults.scanDivider:SetPoint("TOPLEFT", defaults, "TOPLEFT", 12, -y)
+		defaults.scanDivider:SetPoint("TOPRIGHT", defaults, "TOPRIGHT", -12, -y)
+	end
+	placeToggle(defaults.scanSectionToggle, scanCollapsed, true)
+	defaults.scanHeader:ClearAllPoints()
+	defaults.scanHeader:SetPoint("TOPLEFT", defaults, "TOPLEFT", 14, -(y + (scanCollapsed and COLLAPSED_TITLE_OFFSET or SECTION_GAP)))
+	defaults.scanHeader:Show()
+	defaults.forceRescanButton:SetShown(not scanCollapsed)
+	defaults.scanProgressText:SetShown(not scanCollapsed and defaults.scanProgressText:GetText() ~= "")
+	if not scanCollapsed then
+		defaults.forceRescanButton:ClearAllPoints()
+		defaults.forceRescanButton:SetPoint("TOPLEFT", defaults, "TOPLEFT", 92, -(y + 23))
+		y = boundaryAfter(defaults.forceRescanButton, y + 51)
+	else
+		y = y + COLLAPSED_SECTION_HEIGHT
+	end
+
+	local advertisingCollapsed = states.advertising == true
+	defaults.advertisingDivider:ClearAllPoints()
+	defaults.advertisingDivider:SetPoint("TOPLEFT", defaults, "TOPLEFT", 12, -y)
+	defaults.advertisingDivider:SetPoint("TOPRIGHT", defaults, "TOPRIGHT", -12, -y)
+	placeToggle(defaults.advertisingSectionToggle, advertisingCollapsed, true)
+	defaults.advertisingHeader:Show()
+	defaults.advertiseCheck:SetShown(not advertisingCollapsed)
+	if not advertisingCollapsed then
+		defaults.advertisingHeader:ClearAllPoints()
+		defaults.advertiseCheck:ClearAllPoints()
+		defaults.advertisingHeader:SetPoint("TOPLEFT", defaults, "TOPLEFT", 14, -(y + SECTION_GAP))
+		defaults.advertiseCheck:SetPoint("TOPLEFT", defaults, "TOPLEFT", 10, -(y + 45))
+		y = boundaryAfter(defaults.advertiseCheck, y + 75)
+	else
+		defaults.advertisingHeader:ClearAllPoints()
+		defaults.advertisingHeader:SetPoint("TOPLEFT", defaults, "TOPLEFT", 14, -(y + COLLAPSED_TITLE_OFFSET))
+		y = y + COLLAPSED_SECTION_HEIGHT
+	end
+	defaults:SetHeight(math.max(120, y))
 end
 
 function AF:ApplyCrafterDefaultsCollapsed(collapsed)
@@ -636,10 +825,20 @@ function AF:AttachCrafterUI()
 		return
 	end
 
-	local frame = CreateFrame("Frame", "ArtisanFinderCrafterFrame", form, "ArtisanFinderCrafterItemTemplate")
+	local defaults = CreateFrame("Frame", "ArtisanFinderProfessionDefaultsFrame", ProfessionsFrame, "ArtisanFinderProfessionDefaultsTemplate")
+	self:ApplyCustomerSidePanel(defaults)
+	defaults.title = defaults.TitleContainer.TitleText
+	defaults.title:SetText("ArtisanFinder")
+	defaults.collapseButton:Hide()
+	if self.SetupCrafterTutorialButton then
+		self:SetupCrafterTutorialButton(defaults)
+	end
+
+	local frame = CreateFrame("Frame", "ArtisanFinderCrafterFrame", defaults, "ArtisanFinderCrafterItemTemplate")
+	frame:SetPoint("TOPLEFT", defaults.itemSection, "TOPLEFT", 0, 0)
 	frame.info = ConfigureInfoButton(frame.info, "ITEM_SPECIFIC_COMMISSION", "ITEM_SPECIFIC_TOOLTIP")
 	frame.customerPreview = ConfigureCustomerPreviewButton(CreateCustomerPreviewButton(frame), function()
-		local context = AF:GetCurrentCraftingRecipeContext()
+		local context = frame.artisanFinderLoadedContext
 		local item = context and AF.db.artisanProfile.items[tostring(context.itemID or "")]
 		local defaultEntry = context and context.professionID and AF:GetProfessionPriceEntry(AF.db.artisanProfile, context.professionID)
 		if context and item and not AF:IsRecipeEntryScanComplete(context, item) then
@@ -648,6 +847,22 @@ function AF:AttachCrafterUI()
 		return item, defaultEntry
 	end)
 	frame.customerPreview:SetPoint("RIGHT", frame.info, "LEFT", -2, 0)
+	frame.headerButton:SetScript("OnEnter", function(self)
+		local link = frame.artisanFinderItemLink
+		if link then
+			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+			GameTooltip:SetHyperlink(link)
+			GameTooltip:Show()
+		end
+	end)
+	frame.headerButton:SetScript("OnLeave", function()
+		GameTooltip:Hide()
+	end)
+	frame.headerButton:SetScript("OnClick", function()
+		if frame.artisanFinderItemLink and HandleModifiedItemClick then
+			HandleModifiedItemClick(frame.artisanFinderItemLink)
+		end
+	end)
 	frame.priceLabel:SetJustifyH("LEFT")
 	frame.priceLabel:SetText(self:Text("COMMISSION"))
 
@@ -662,16 +877,13 @@ function AF:AttachCrafterUI()
 	SetFieldPoint(frame.note, "LEFT", frame.noteLabel, "RIGHT", 4, 0)
 	frame.note:SetMaxLetters(AF.MAX_NOTE_CHARS or 256)
 
-	frame.save:SetPoint("LEFT", frame.note, "RIGHT", 8, 0)
-	FitNoteAndSave(frame, frame.noteLabel, frame.note, frame.save, 326, 120)
-	MatchFieldWidth(frame.price, frame.note)
 	frame.errorText:ClearAllPoints()
-	frame.errorText:SetPoint("TOPLEFT", frame.note.Field, "BOTTOMLEFT", 0, -3)
+	frame.errorText:SetPoint("TOPLEFT", frame.save, "BOTTOMLEFT", 0, -3)
 	frame.errorText:SetPoint("RIGHT", frame, "RIGHT", -2, 0)
 	frame.errorText:SetHeight(28)
 	frame.save:Disable()
 	frame.save:SetScript("OnClick", function()
-		local context = AF:GetCurrentCraftingRecipeContext()
+		local context = frame.artisanFinderLoadedContext
 		local item = AF:EnsureCurrentRecipeEntry(context)
 		if not item or not context or context.learned == false then
 			AF:Print(AF:Text("SELECT_LEARNED_CRAFT"))
@@ -691,15 +903,20 @@ function AF:AttachCrafterUI()
 		frame.artisanFinderDirty = false
 		AF:RefreshCrafterUI()
 	end)
-
-	local defaults = CreateFrame("Frame", "ArtisanFinderProfessionDefaultsFrame", ProfessionsFrame, "ArtisanFinderProfessionDefaultsTemplate")
-	self:ApplyCustomerSidePanel(defaults)
-	defaults.title = defaults.TitleContainer.TitleText
-	defaults.title:SetText("ArtisanFinder")
-	defaults.collapseButton:Hide()
-	if self.SetupCrafterTutorialButton then
-		self:SetupCrafterTutorialButton(defaults)
-	end
+	frame.discard:SetScript("OnClick", function()
+		local context = frame.artisanFinderLoadedContext
+		local item = context and AF.db.artisanProfile.items[tostring(context.itemID or "")]
+		SetEditBoxText(frame.price, item and AF:FormatCommissionInput(item) or "")
+		SetEditBoxText(frame.note, item and item.note or "")
+		frame.artisanFinderDirty = false
+		frame.price.artisanFinderDirty = false
+		frame.note.artisanFinderDirty = false
+		frame.artisanFinderInputSource = nil
+		frame.artisanFinderLoadedContext = nil
+		frame.artisanFinderErrorSource = nil
+		ClearPanelError(frame)
+		AF:RefreshCrafterUI()
+	end)
 
 	local collapseButton = CreateFrame("Frame", "ArtisanFinderCrafterDefaultsCollapseButton", ProfessionsFrame, "MaximizeMinimizeButtonFrameTemplate")
 	collapseButton:SetSize(24, 24)
@@ -715,7 +932,9 @@ function AF:AttachCrafterUI()
 	defaults.collapsedRail:SetFrameLevel(defaults:GetFrameLevel() + 5)
 	self:ApplyProfessionPanel(defaults.collapsedRail)
 	defaults.collapsedRail:Hide()
+	defaults.defaultsDivider:Hide()
 	defaults.defaultsHeader:SetText(self:Text("DEFAULT_COMMISSION"))
+	defaults.itemSectionHeader:SetText(self:Text("CRAFTER_PANEL_ITEM_SECTION"))
 	defaults.scanHeader:SetText(self:Text("CRAFTER_PANEL_SCAN_SECTION"))
 	defaults.advertisingHeader:SetText(self:Text("CRAFTER_PANEL_ADVERTISING_SECTION"))
 	defaults.info = ConfigureInfoButton(defaults.info, "DEFAULT_COMMISSION", "DEFAULT_COMMISSION_TOOLTIP")
@@ -733,14 +952,14 @@ function AF:AttachCrafterUI()
 	SetFieldPoint(defaults.note, "LEFT", defaults.noteLabel, "RIGHT", 4, 0)
 	defaults.note:SetMaxLetters(AF.MAX_NOTE_CHARS or 256)
 
-	FitStackedDefaultNoteAndSave(defaults, defaults.noteLabel, defaults.note, defaults.save)
-	MatchFieldWidth(defaults.note, frame.note)
-	MatchFieldWidth(defaults.price, defaults.note)
+	FitStackedDefaultNoteAndSave(defaults, defaults.noteLabel, defaults.note, defaults.save, defaults.discard)
+	FitCrafterCommissionFields(defaults, frame)
 	defaults.errorText:ClearAllPoints()
-	defaults.errorText:SetPoint("LEFT", defaults.save, "RIGHT", 8, 0)
+	defaults.errorText:SetPoint("TOPLEFT", defaults.save, "BOTTOMLEFT", 0, -3)
 	defaults.errorText:SetPoint("RIGHT", defaults, "RIGHT", -14, 0)
 	defaults.errorText:SetHeight(28)
 	defaults.save:Disable()
+	defaults.discard:Disable()
 	defaults.save:SetScript("OnClick", function()
 		local professionID = defaults.artisanFinderLoadedProfessionID or AF:GetCurrentSupportedProfessionID()
 		if not professionID then
@@ -756,6 +975,14 @@ function AF:AttachCrafterUI()
 		AF:SetProfessionPrice(professionID, copper, free, defaults.note:GetText(), state)
 		local savedDefault = AF:GetProfessionPriceEntry(AF.db.artisanProfile, professionID)
 		SetDefaultsLoadedState(AF, defaults, professionID, savedDefault)
+		AF:RefreshCrafterUI()
+	end)
+	defaults.discard:SetScript("OnClick", function()
+		local professionID = defaults.artisanFinderLoadedProfessionID or AF:GetCurrentSupportedProfessionID()
+		local savedDefault = professionID and AF:GetProfessionPriceEntry(AF.db.artisanProfile, professionID)
+		SetPanelInputSource(defaults, "profession:" .. tostring(professionID or ""))
+		SetDefaultsLoadedState(AF, defaults, professionID, savedDefault)
+		ClearPanelError(defaults)
 		AF:RefreshCrafterUI()
 	end)
 
@@ -782,6 +1009,10 @@ function AF:AttachCrafterUI()
 			AF:SetProfessionAdvertised(AF.playerName, professionID, self:GetChecked() == true)
 		end
 	end)
+	ConfigureSectionToggle(defaults.defaultSectionToggle, "defaults", "DEFAULT_COMMISSION")
+	ConfigureSectionToggle(defaults.itemSectionToggle, "item", "ITEM_SPECIFIC_COMMISSION")
+	ConfigureSectionToggle(defaults.scanSectionToggle, "scan", "CRAFTER_PANEL_SCAN_SECTION")
+	ConfigureSectionToggle(defaults.advertisingSectionToggle, "advertising", "CRAFTER_PANEL_ADVERTISING_SECTION")
 
 	local markItemDirty = function()
 		ClampCommissionEditBox(frame.price)
@@ -812,9 +1043,16 @@ function AF:AttachCrafterUI()
 	defaults.collapsibleRegions = {
 		defaults.tutorialButton,
 		defaults.defaultsHeader,
+		defaults.itemSectionHeader,
 		defaults.priceLabel,
 		defaults.noteLabel,
-		defaults.defaultsDivider,
+		defaults.itemDivider,
+		defaults.advertisingDivider,
+		defaults.defaultSectionToggle,
+		defaults.itemSectionToggle,
+		defaults.scanSectionToggle,
+		defaults.advertisingSectionToggle,
+		frame,
 		defaults.scanHeader,
 		defaults.scanDivider,
 		defaults.advertisingHeader,
@@ -822,6 +1060,7 @@ function AF:AttachCrafterUI()
 		defaults.priceField,
 		defaults.noteField,
 		defaults.save,
+		defaults.discard,
 		defaults.forceRescanButton,
 		defaults.scanProgressText,
 		defaults.errorText,
@@ -860,30 +1099,6 @@ function AF:PositionCrafterUI()
 	local form = self:GetCraftingSchematicForm()
 	if not frame or not defaults or not form then
 		return
-	end
-
-	frame:ClearAllPoints()
-	local auctionatorFrame = _G["AuctionatorCraftingInfoProfessionsFrame"]
-	if auctionatorFrame and auctionatorFrame:GetParent() == form and auctionatorFrame:IsShown() then
-		frame:SetPoint("TOPLEFT", auctionatorFrame, "BOTTOMLEFT", 0, -8)
-	else
-		local anchor = form.Reagents
-		if form.OptionalReagents and form.OptionalReagents:IsShown() then
-			anchor = form.OptionalReagents
-		end
-		if form.extraSlotFrames then
-			for _, extraFrame in ipairs(form.extraSlotFrames) do
-				if extraFrame:IsShown() and anchor and extraFrame:GetBottom() and anchor:GetBottom() and extraFrame:GetBottom() < anchor:GetBottom() then
-					anchor = extraFrame
-				end
-			end
-		end
-
-		if anchor then
-			frame:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -12)
-		else
-			frame:SetPoint("BOTTOMLEFT", form, "BOTTOMLEFT", 4, 4)
-		end
 	end
 
 	defaults:ClearAllPoints()
@@ -945,21 +1160,17 @@ function AF:UpdateScanControls()
 	local currentProfessionID = self:GetCurrentSupportedProfessionID()
 	if forceRescanButton then
 		SizeButtonForText(forceRescanButton, self:Text("FORCE_RESCAN_BUTTON"), 76, 120)
-		forceRescanButton:ClearAllPoints()
-		forceRescanButton:SetPoint("TOPLEFT", defaults, "TOPLEFT", 92, -190)
 		if currentProfessionID and not active then
 			forceRescanButton:Enable()
 		else
 			forceRescanButton:Disable()
 		end
-		forceRescanButton:SetShown(defaults:IsShown() and not self.crafterDefaultsCollapsed)
+		forceRescanButton:SetShown(defaults:IsShown() and not self.crafterDefaultsCollapsed and self.db.crafterSections.scan ~= true)
 	end
 	if scanProgressText then
-		scanProgressText:ClearAllPoints()
 		if forceRescanButton then
+			scanProgressText:ClearAllPoints()
 			scanProgressText:SetPoint("LEFT", forceRescanButton, "RIGHT", 8, 0)
-		else
-			scanProgressText:SetPoint("TOPLEFT", defaults, "TOPLEFT", 92, -190)
 		end
 		self:UpdateCrafterScanProgressText()
 	end
@@ -984,11 +1195,18 @@ function AF:UpdateCrafterDirtyState()
 	else
 		frame.save:Disable()
 	end
+	if itemDirty then
+		frame.discard:Enable()
+	else
+		frame.discard:Disable()
+	end
 
 	if ShouldEnableDefaultsSave(self, defaults) then
 		defaults.save:Enable()
+		defaults.discard:Enable()
 	else
 		defaults.save:Disable()
+		defaults.discard:Disable()
 	end
 end
 
@@ -1031,11 +1249,30 @@ function AF:RefreshCrafterUI()
 		self:CaptureCurrentProfessionLink(profession or { id = itemProfessionID }, "crafter-ui-refresh")
 	end
 	if not context or context.learned == false or context.isRecraft then
-		frame:Hide()
+		if not (frame.artisanFinderDirty == true or IsEditBoxDirty(frame.price) or IsEditBoxDirty(frame.note)) then
+			frame.artisanFinderHasContext = false
+			frame:Hide()
+		end
 	else
+		local currentSourceKey = table.concat({ "item", tostring(context.itemID or ""), tostring(context.recipeID or ""), tostring(context.professionID or "") }, ":")
+		local dirty = frame.artisanFinderDirty == true or IsEditBoxDirty(frame.price) or IsEditBoxDirty(frame.note)
+		local loadedContext = frame.artisanFinderLoadedContext
+		if dirty and loadedContext and frame.artisanFinderInputSource ~= currentSourceKey then
+			context = loadedContext
+		end
 		local item = self:EnsureCurrentRecipeEntry(context)
 		if item then
-			frame:Show()
+			frame.artisanFinderHasContext = true
+			frame.artisanFinderLoadedContext = CopyTable(context)
+			local itemName, itemLink = C_Item.GetItemInfo(context.itemID)
+			frame.artisanFinderItemLink = itemLink
+			frame.headerButton:SetEnabled(itemLink ~= nil)
+			if itemName and itemLink then
+				frame.header:SetText(self:Text("ITEM_CONTEXT_HEADER", itemLink))
+			else
+				frame.header:SetText(self:Text("ITEM_CONTEXT_LOADING"))
+				pcall(C_Item.RequestLoadItemDataByID, context.itemID)
+			end
 			if frame.customerPreview then
 				if self:IsRecipeEntryScanComplete(context, item) then
 					frame.customerPreview:Enable()
@@ -1055,6 +1292,7 @@ function AF:RefreshCrafterUI()
 			SetEditBoxTextForSource(frame.note, item.note or "", sourceKey)
 		else
 			ClearPanelError(frame)
+			frame.artisanFinderHasContext = false
 			frame:Hide()
 		end
 	end
@@ -1062,6 +1300,7 @@ function AF:RefreshCrafterUI()
 	if defaultsProfessionID then
 		defaults:Show()
 		self:ApplyCrafterDefaultsCollapsed(self.crafterDefaultsCollapsed)
+		self:LayoutCrafterSections()
 		if self.MaybeShowCrafterTutorial then
 			self:MaybeShowCrafterTutorial()
 		end

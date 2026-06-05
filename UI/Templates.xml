@@ -492,20 +492,40 @@
 		</Layers>
 	</Button>
 
+	<Button name="ArtisanFinderSectionToggleTemplate" virtual="true">
+		<Size x="24" y="20"/>
+		<Layers>
+			<Layer level="ARTWORK">
+				<Texture parentKey="arrow" atlas="minimal-scrollbar-arrow-top" useAtlasSize="true">
+					<Color r="0.72" g="0.72" b="0.72" a="1"/>
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+	</Button>
+
 	<Frame name="ArtisanFinderCrafterItemTemplate" virtual="true">
-		<Size x="326" y="82"/>
+		<Size x="364" y="130"/>
 		<Layers>
 			<Layer level="OVERLAY">
+				<FontString parentKey="header" inherits="GameFontNormalSmall" justifyH="LEFT" wordWrap="false">
+					<Size x="310" y="20"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="0" y="0"/>
+					</Anchors>
+				</FontString>
 				<FontString parentKey="priceLabel" inherits="GameFontHighlightSmall" justifyH="LEFT">
 					<Size x="74" y="20"/>
 					<Anchors>
-						<Anchor point="TOPLEFT" x="0" y="-8"/>
+						<Anchor point="TOPLEFT" x="0" y="-26"/>
 					</Anchors>
 				</FontString>
 				<FontString parentKey="noteLabel" inherits="GameFontHighlightSmall" justifyH="LEFT">
 					<Size x="74" y="20"/>
 					<Anchors>
-						<Anchor point="TOPLEFT" x="0" y="-50"/>
+						<Anchor point="TOPLEFT" x="0" y="-68"/>
 					</Anchors>
 				</FontString>
 				<FontString parentKey="errorText" inherits="GameFontRedSmall" justifyH="LEFT" wordWrap="true" hidden="true"/>
@@ -514,29 +534,38 @@
 		<Frames>
 			<Button parentKey="info" inherits="UIPanelInfoButton">
 				<Anchors>
-					<Anchor point="TOPRIGHT" x="-2" y="-2"/>
+					<Anchor point="TOPRIGHT" x="0" y="2"/>
+				</Anchors>
+			</Button>
+			<Button parentKey="headerButton">
+				<Anchors>
+					<Anchor point="TOPLEFT" relativeKey="$parent.header"/>
+					<Anchor point="BOTTOMRIGHT" relativeKey="$parent.header"/>
 				</Anchors>
 			</Button>
 			<Frame parentKey="priceField" inherits="ArtisanFinderInsetEditBoxTemplate">
 				<Size x="150" y="36"/>
 				<Anchors>
-					<Anchor point="TOPLEFT" x="78" y="0"/>
+					<Anchor point="TOPLEFT" x="78" y="-18"/>
 				</Anchors>
 			</Frame>
 			<Frame parentKey="noteField" inherits="ArtisanFinderInsetEditBoxTemplate">
 				<Size x="170" y="36"/>
 				<Anchors>
-					<Anchor point="TOPLEFT" x="78" y="-42"/>
+					<Anchor point="TOPLEFT" x="78" y="-60"/>
 				</Anchors>
 			</Frame>
 			<Button parentKey="save" inherits="UIPanelButtonTemplate">
-				<Size x="54" y="22"/>
+				<Size x="72" y="22"/>
+			</Button>
+			<Button parentKey="discard" inherits="UIPanelButtonTemplate">
+				<Size x="72" y="22"/>
 			</Button>
 		</Frames>
 	</Frame>
 
 	<Frame name="ArtisanFinderProfessionDefaultsTemplate" virtual="true" inherits="DefaultPanelTemplate">
-		<Size x="392" y="316"/>
+		<Size x="392" y="120"/>
 		<Layers>
 			<Layer level="OVERLAY">
 				<FontString parentKey="defaultsHeader" inherits="GameFontNormalSmall" justifyH="LEFT">
@@ -544,6 +573,7 @@
 						<Anchor point="TOPLEFT" x="14" y="-33"/>
 					</Anchors>
 				</FontString>
+				<FontString parentKey="itemSectionHeader" inherits="GameFontNormalSmall" justifyH="LEFT"/>
 				<FontString parentKey="priceLabel" inherits="GameFontHighlightSmall" justifyH="LEFT">
 					<Size x="74" y="20"/>
 					<Anchors>
@@ -564,25 +594,21 @@
 						<Anchor point="TOPRIGHT" x="-12" y="-170"/>
 					</Anchors>
 				</Texture>
+				<Texture parentKey="itemDivider" atlas="Options_HorizontalDivider">
+					<Size y="2"/>
+				</Texture>
 				<FontString parentKey="scanHeader" inherits="GameFontNormalSmall" justifyH="LEFT">
-					<Anchors>
-						<Anchor point="TOPLEFT" x="14" y="-195"/>
-					</Anchors>
 				</FontString>
 				<FontString parentKey="scanProgressText" inherits="GameFontHighlightSmall" justifyH="LEFT" hidden="true">
 					<Size x="46" y="20"/>
 				</FontString>
 				<Texture parentKey="scanDivider" atlas="Options_HorizontalDivider">
 					<Size y="2"/>
-					<Anchors>
-						<Anchor point="TOPLEFT" x="12" y="-222"/>
-						<Anchor point="TOPRIGHT" x="-12" y="-222"/>
-					</Anchors>
+				</Texture>
+				<Texture parentKey="advertisingDivider" atlas="Options_HorizontalDivider">
+					<Size y="2"/>
 				</Texture>
 				<FontString parentKey="advertisingHeader" inherits="GameFontNormalSmall" justifyH="LEFT">
-					<Anchors>
-						<Anchor point="TOPLEFT" x="14" y="-235"/>
-					</Anchors>
 				</FontString>
 			</Layer>
 		</Layers>
@@ -616,20 +642,24 @@
 					<Anchor point="TOPLEFT" x="92" y="-94"/>
 				</Anchors>
 			</Frame>
+			<Frame parentKey="itemSection">
+				<Size x="364" y="130"/>
+			</Frame>
+			<Button parentKey="defaultSectionToggle" inherits="ArtisanFinderSectionToggleTemplate"/>
+			<Button parentKey="itemSectionToggle" inherits="ArtisanFinderSectionToggleTemplate"/>
+			<Button parentKey="scanSectionToggle" inherits="ArtisanFinderSectionToggleTemplate"/>
+			<Button parentKey="advertisingSectionToggle" inherits="ArtisanFinderSectionToggleTemplate"/>
 			<Button parentKey="save" inherits="UIPanelButtonTemplate">
-				<Size x="54" y="22"/>
+				<Size x="72" y="22"/>
+			</Button>
+			<Button parentKey="discard" inherits="UIPanelButtonTemplate">
+				<Size x="72" y="22"/>
 			</Button>
 			<Button parentKey="forceRescanButton" inherits="UIPanelButtonTemplate">
 				<Size x="76" y="22"/>
-				<Anchors>
-					<Anchor point="TOPLEFT" x="92" y="-190"/>
-				</Anchors>
 			</Button>
 			<CheckButton parentKey="advertiseCheck" inherits="UICheckButtonTemplate">
 				<Size x="24" y="24"/>
-				<Anchors>
-					<Anchor point="TOPLEFT" x="10" y="-252"/>
-				</Anchors>
 			</CheckButton>
 		</Frames>
 	</Frame>

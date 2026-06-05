@@ -1,6 +1,6 @@
 # ArtisanFinder
 
-## [v2.0.5](https://github.com/clery/ArtisanFinder/releases/tag/v2.0.5) (2026-06-04)
+## [v2.0.5](https://github.com/clery/ArtisanFinder/releases/tag/v2.0.5) (2026-06-05)
 
 [Full Changelog](https://github.com/clery/ArtisanFinder/compare/v2.0.4...v2.0.5) | [Previous Releases](https://github.com/clery/ArtisanFinder/releases)
 
@@ -12,7 +12,6 @@
 
 ### Changed
 
-* Reagent quality icons are now handled more consistently, required no-quality reagents are included, and compatible recent scans no longer require a rescan only for optional-reagent recommendation updates.
 * The "Personal Order" and "Guild Order" buttons have been removed to let a simple click on an artisan row autofill the form on the left.
 
 ## [v2.0.3](https://github.com/clery/ArtisanFinder/releases/tag/v2.0.3) (2026-06-02)

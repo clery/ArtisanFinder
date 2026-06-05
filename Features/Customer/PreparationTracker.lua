@@ -112,7 +112,7 @@ local function PickFallbackReagent(slot)
 		else
 			local selectedQuality = GetReagentQualityInfo(selected.itemID) or 0
 			local reagentQuality = GetReagentQualityInfo(reagent.itemID) or 0
-			if reagentQuality < selectedQuality then
+			if reagentQuality > selectedQuality then
 				selected = reagent
 			end
 		end

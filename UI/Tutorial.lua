@@ -431,6 +431,9 @@ function AF:BuildCrafterHelpPlateInfo()
 		AddHelpPlateTile(info, parent, self:Text("TUTORIAL_CRAFTER_PREVIEW"), nil, frame.customerPreview)
 	end
 	AddHelpPlateTile(info, parent, self:Text("TUTORIAL_CRAFTER_DEFAULTS"), { leftX = leftX }, defaults.defaultsHeader, defaults.priceField, defaults.noteField, defaults.save)
+	if frame and frame:IsShown() then
+		AddHelpPlateTile(info, parent, self:Text("ITEM_SPECIFIC_TOOLTIP"), { leftX = leftX }, frame.header, frame.priceField, frame.noteField, frame.save)
+	end
 	AddHelpPlateTile(info, parent, self:Text("TUTORIAL_CRAFTER_SCAN"), { leftX = leftX }, defaults.scanHeader, defaults.forceRescanButton)
 	AddHelpPlateTile(info, parent, self:Text("TUTORIAL_CRAFTER_ADVERTISE"), { leftX = leftX }, defaults.advertisingHeader, defaults.advertiseCheck, defaults.advertiseCheck.Text)
 	return #info > 0 and info or nil

@@ -291,15 +291,16 @@ local function UpdateCustomerScrollBar(bar)
 
 	local _, maxValue = scrollBar:GetMinMaxValues()
 	maxValue = tonumber(maxValue) or 0
-	bar:SetShown(maxValue > 0)
-	if maxValue <= 0 then
+	local scrollFrame = bar.ScrollFrame
+	local shown = maxValue > 0 and scrollFrame and scrollFrame:IsShown()
+	bar:SetShown(shown)
+	if not shown then
 		return
 	end
 
 	local track = bar.Track
 	local thumb = bar.Thumb
 	local trackHeight = track:GetHeight()
-	local scrollFrame = bar.ScrollFrame
 	local visibleHeight = scrollFrame and scrollFrame:GetHeight() or trackHeight
 	local contentHeight = visibleHeight + maxValue
 	local thumbHeight = Clamp(math.floor(trackHeight * (visibleHeight / contentHeight)), 23, trackHeight)

@@ -71,7 +71,8 @@
         "ProfessionsFrame_LoadUI",
         "Professions",
         "PROFESSIONS_UNTRACK_RECIPE",
-        "OBJECTIVES_STOP_TRACKING"
+        "OBJECTIVES_STOP_TRACKING",
+        "ColorPickerFrame"
     ],
     "Lua.type.weakUnionCheck": true
 }
