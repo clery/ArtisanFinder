@@ -73,7 +73,7 @@ function AF:PrintDevHelp()
 	self:Print(self:Text("DEV_HELP_FULFILLED"))
 	self:Print(self:Text("DEV_HELP_ORDERS"))
 	self:Print(self:Text("DEV_HELP_SOUND"))
-	self:Print("/af dev orderdump: dump orderable recipe data for maintainer updates.")
+	self:Print(self:Text("DEV_HELP_ORDERDUMP"))
 end
 
 function AF:PrintClearHelp()

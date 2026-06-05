@@ -514,7 +514,7 @@ function AF:GetCustomerTutorialRow()
 		target = "ArtisanFinderTutorial",
 		orderTarget = "ArtisanFinderTutorial",
 		professionID = self.currentCustomerProfessionID or 164,
-		professionName = self.currentCustomerProfessionID and self:GetProfessionName(self.currentCustomerProfessionID) or self:Text("PROFESSION_FALLBACK", "Tutorial"),
+		professionName = self.currentCustomerProfessionID and self:GetProfessionName(self.currentCustomerProfessionID) or self:Text("PROFESSION_FALLBACK", self:Text("TUTORIAL_PROFESSION_NAME")),
 		note = self:Text("TUTORIAL_FAKE_ARTISAN_NOTE"),
 		capabilityText = table.concat({ bestQuality, concentrationQuality }, " - "),
 		quality = 3,

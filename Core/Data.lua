@@ -668,6 +668,12 @@ function ApplyDBDefaults(db)
 	if db.orderNotificationBannerEnabled == nil then
 		db.orderNotificationBannerEnabled = true
 	end
+	if db.hideSelfAltOrderNotifications == nil then
+		db.hideSelfAltOrderNotifications = false
+	end
+	if db.hideSelfAltFulfilledNotifications == nil then
+		db.hideSelfAltFulfilledNotifications = false
+	end
 	if db.orderNotificationChannel == nil then
 		db.orderNotificationChannel = "default"
 	elseif db.orderNotificationChannel == "default" then

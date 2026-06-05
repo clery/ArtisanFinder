@@ -436,7 +436,8 @@ function AF:LayoutCrafterSections()
 		return
 	end
 	local states = self.db.crafterSections
-	local y = 33
+	local defaultCollapsed = states.defaults == true
+	local y = defaultCollapsed and 25 or 33
 	local function boundaryAfter(region, fallback)
 		local panelTop = defaults:GetTop()
 		local regionBottom = region and region:IsShown() and region:GetBottom()
@@ -465,10 +466,10 @@ function AF:LayoutCrafterSections()
 		button.arrow:SetVertexColor(0.72, 0.72, 0.72)
 	end
 
-	local defaultCollapsed = states.defaults == true
-	placeToggle(defaults.defaultSectionToggle, defaultCollapsed)
+	defaults.defaultsDivider:Hide()
+	placeToggle(defaults.defaultSectionToggle, defaultCollapsed, defaultCollapsed)
 	defaults.defaultsHeader:ClearAllPoints()
-	defaults.defaultsHeader:SetPoint("TOPLEFT", defaults, "TOPLEFT", 14, -y)
+	defaults.defaultsHeader:SetPoint("TOPLEFT", defaults, "TOPLEFT", 14, -(y + (defaultCollapsed and COLLAPSED_TITLE_OFFSET or 0)))
 	defaults.defaultsHeader:Show()
 	for _, region in ipairs({ defaults.priceLabel, defaults.noteLabel, defaults.info, defaults.priceField, defaults.noteField, defaults.save, defaults.discard }) do
 		region:SetShown(not defaultCollapsed)

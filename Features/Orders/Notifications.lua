@@ -268,6 +268,17 @@ local function IsOwnOrderCustomer(self, customerName)
 	return self:IsOwnArtisanCharacter(customerName)
 end
 
+local function IsSelfNotificationSender(self, senderName)
+	senderName = self:NormalizeName(senderName)
+	if not senderName then
+		return false
+	end
+	if senderName == self:NormalizeName(self.playerName or self:GetPlayerFullName()) then
+		return true
+	end
+	return self:IsOwnArtisanCharacter(senderName)
+end
+
 local function GetCustomerOrderStateValue(order)
 	return type(order) == "table" and tostring(order.orderState or "") or ""
 end
@@ -430,9 +441,13 @@ function AF:ShowOrderNotification(characterName, count, details)
 	self:ShowOrderNotificationToast(characterName, count, details)
 end
 
-function AF:NotifyCustomerOrderFulfilled(order, details)
+function AF:NotifyCustomerOrderFulfilled(order, details, sender)
 	if IsPatronOrder(order) then
 		self:DebugLog("orders", "skip patron fulfilled order=" .. tostring(order and order.orderID or ""))
+		return
+	end
+	if self.db and self.db.hideSelfAltFulfilledNotifications == true and IsSelfNotificationSender(self, sender) then
+		self:DebugLog("orders", "skip self alt fulfilled notification order=" .. tostring(order and order.orderID or ""))
 		return
 	end
 	details = CopyOrderDetails(details or GetFulfilledOrderDetails(order))
@@ -451,6 +466,10 @@ function AF:NotifyPersonalOrder(characterName, count, sender, details)
 	local playerName = self:NormalizeName(self.playerName or self:GetPlayerFullName())
 	local senderName = self:NormalizeName(sender)
 	if characterName == playerName and senderName == playerName then
+		return
+	end
+	if self.db and self.db.hideSelfAltOrderNotifications == true and characterName ~= playerName and IsSelfNotificationSender(self, sender) then
+		self:DebugLog("orders", "skip self alt order notification character=" .. tostring(characterName))
 		return
 	end
 	count = tonumber(count) or 1
@@ -604,7 +623,7 @@ function AF:HandleFulfilledOrderNotification(parts, sender)
 		itemID = details.itemID,
 		tipAmount = details.commissionCopper,
 		crafterName = details.crafterName,
-	}, details)
+	}, details, sender)
 end
 
 function AF:SendOrderNotification(characterName, count, details)
@@ -661,7 +680,7 @@ function AF:SendFulfilledOrderNotification(order, details)
 	if IsOwnOrderCustomer(self, target) then
 		details.crafterName = details.crafterName or self.playerName or self:GetPlayerFullName()
 		self:DebugLog("orders", "skip own fulfilled whisper target=" .. tostring(target) .. " order=" .. tostring(order.orderID or ""))
-		self:NotifyCustomerOrderFulfilled(order, details)
+		self:NotifyCustomerOrderFulfilled(order, details, self.playerName or self:GetPlayerFullName())
 		return true
 	end
 	if not self.SendAddon then
@@ -856,7 +875,7 @@ function AF:OnOrderPlacementResponse(result)
 	self.pendingPersonalOrderDetails = nil
 	if target then
 		if self:IsOwnArtisanCharacter(target) then
-			self:NotifyPersonalOrder(target, 1, nil, details)
+			self:NotifyPersonalOrder(target, 1, self.playerName or self:GetPlayerFullName(), details)
 		end
 		self:SendOrderNotification(target, 1, details)
 	end
@@ -1434,7 +1453,7 @@ function AF:AddCraftingOrderIndicatorTooltip(owner)
 	self.craftingOrderTooltipOwner = owner or GetCraftingOrderFrame() or UIParent
 	if not GameTooltip:IsShown() then
 		GameTooltip:SetOwner(self.craftingOrderTooltipOwner, "ANCHOR_LEFT")
-		GameTooltip:SetText(PROFESSIONS_CRAFTING_ORDERS or "Crafting Orders", 1, 0.82, 0)
+		GameTooltip:SetText(PROFESSIONS_CRAFTING_ORDERS or self:Text("CRAFTING_ORDERS_TITLE"), 1, 0.82, 0)
 	end
 	GameTooltip_AddBlankLineToTooltip(GameTooltip)
 	GameTooltip_AddNormalLine(GameTooltip, "ArtisanFinder", false)
@@ -1461,7 +1480,7 @@ function AF:RefreshOpenCraftingOrderIndicatorTooltip()
 	end
 	GameTooltip:ClearLines()
 	GameTooltip:SetOwner(self.craftingOrderTooltipOwner, "ANCHOR_LEFT")
-	GameTooltip:SetText(PROFESSIONS_CRAFTING_ORDERS or "Crafting Orders", 1, 0.82, 0)
+	GameTooltip:SetText(PROFESSIONS_CRAFTING_ORDERS or self:Text("CRAFTING_ORDERS_TITLE"), 1, 0.82, 0)
 	self:AddCraftingOrderIndicatorTooltip(self.craftingOrderTooltipOwner)
 end
 

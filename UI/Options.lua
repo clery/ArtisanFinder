@@ -322,7 +322,7 @@ function AF:InitializeOptions()
 	)
 	Settings.CreateCheckbox(category, freezeTradeLeadRows, self:Text("OPTIONS_FREEZE_TRADE_LEAD_ROWS_DESC"))
 
-	AddSection("OPTIONS_SECTION_SOUND")
+	AddSection("OPTIONS_SECTION_NOTIFICATIONS")
 	local orderNotificationSoundEnabled = RegisterProxySetting(
 		"ArtisanFinder_OrderNotificationSoundEnabled",
 		Settings.VarType.Boolean,
@@ -352,6 +352,34 @@ function AF:InitializeOptions()
 		end
 	)
 	Settings.CreateCheckbox(category, orderNotificationBannerEnabled, self:Text("OPTIONS_ORDER_NOTIFICATION_BANNER_ENABLED_DESC"))
+
+	local hideSelfAltOrderNotifications = RegisterProxySetting(
+		"ArtisanFinder_HideSelfAltOrderNotifications",
+		Settings.VarType.Boolean,
+		"OPTIONS_HIDE_SELF_ALT_ORDER_NOTIFICATIONS",
+		false,
+		function()
+			return AF.db.hideSelfAltOrderNotifications == true
+		end,
+		function(value)
+			AF.db.hideSelfAltOrderNotifications = value == true
+		end
+	)
+	Settings.CreateCheckbox(category, hideSelfAltOrderNotifications, self:Text("OPTIONS_HIDE_SELF_ALT_ORDER_NOTIFICATIONS_DESC"))
+
+	local hideSelfAltFulfilledNotifications = RegisterProxySetting(
+		"ArtisanFinder_HideSelfAltFulfilledNotifications",
+		Settings.VarType.Boolean,
+		"OPTIONS_HIDE_SELF_ALT_FULFILLED_NOTIFICATIONS",
+		false,
+		function()
+			return AF.db.hideSelfAltFulfilledNotifications == true
+		end,
+		function(value)
+			AF.db.hideSelfAltFulfilledNotifications = value == true
+		end
+	)
+	Settings.CreateCheckbox(category, hideSelfAltFulfilledNotifications, self:Text("OPTIONS_HIDE_SELF_ALT_FULFILLED_NOTIFICATIONS_DESC"))
 
 	local orderSound = RegisterProxySetting(
 		"ArtisanFinder_OrderNotificationSound",

@@ -511,7 +511,7 @@
 		<Layers>
 			<Layer level="OVERLAY">
 				<FontString parentKey="header" inherits="GameFontNormalSmall" justifyH="LEFT" wordWrap="false">
-					<Size x="310" y="20"/>
+					<Size x="310"/>
 					<Anchors>
 						<Anchor point="TOPLEFT" x="0" y="0"/>
 					</Anchors>
@@ -519,13 +519,13 @@
 				<FontString parentKey="priceLabel" inherits="GameFontHighlightSmall" justifyH="LEFT">
 					<Size x="74" y="20"/>
 					<Anchors>
-						<Anchor point="TOPLEFT" x="0" y="-26"/>
+						<Anchor point="TOPLEFT" x="0" y="-28"/>
 					</Anchors>
 				</FontString>
 				<FontString parentKey="noteLabel" inherits="GameFontHighlightSmall" justifyH="LEFT">
 					<Size x="74" y="20"/>
 					<Anchors>
-						<Anchor point="TOPLEFT" x="0" y="-68"/>
+						<Anchor point="TOPLEFT" x="0" y="-69"/>
 					</Anchors>
 				</FontString>
 				<FontString parentKey="errorText" inherits="GameFontRedSmall" justifyH="LEFT" wordWrap="true" hidden="true"/>
@@ -546,13 +546,13 @@
 			<Frame parentKey="priceField" inherits="ArtisanFinderInsetEditBoxTemplate">
 				<Size x="150" y="36"/>
 				<Anchors>
-					<Anchor point="TOPLEFT" x="78" y="-18"/>
+					<Anchor point="TOPLEFT" x="78" y="-20"/>
 				</Anchors>
 			</Frame>
 			<Frame parentKey="noteField" inherits="ArtisanFinderInsetEditBoxTemplate">
 				<Size x="170" y="36"/>
 				<Anchors>
-					<Anchor point="TOPLEFT" x="78" y="-60"/>
+					<Anchor point="TOPLEFT" x="78" y="-61"/>
 				</Anchors>
 			</Frame>
 			<Button parentKey="save" inherits="UIPanelButtonTemplate">
