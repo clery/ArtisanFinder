@@ -901,6 +901,31 @@ function AF:NormalizeArtisanProfile(profile, characterName)
 	return profile
 end
 
+function AF:PrepareImportedArtisanProfile(profile, characterName)
+	NormalizeCraftProfile(profile)
+	return self:NormalizeArtisanProfile(profile, characterName)
+end
+
+function AF:PrepareImportedProfessionSettings(settings)
+	settings = type(settings) == "table" and settings or {}
+	NormalizeCharacterProfessionSettings(settings)
+	return settings
+end
+
+function AF:GetArtisanProfileEntryCount(profile)
+	local count = 0
+	for _ in pairs(profile and profile.professions or {}) do
+		count = count + 1
+	end
+	for _ in pairs(profile and profile.items or {}) do
+		count = count + 1
+	end
+	for _ in pairs(profile and profile.professionPrices or {}) do
+		count = count + 1
+	end
+	return count
+end
+
 function AF:IsArtisanProfileEmpty(profile)
 	if type(profile) ~= "table" then
 		return true

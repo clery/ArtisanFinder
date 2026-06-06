@@ -255,6 +255,16 @@ function AF:InitializeOptions()
 	end
 
 	AddSection("OPTIONS_SECTION_SCANNING")
+	Settings.RegisterInitializer(category, CreateSettingsButtonInitializer(
+		self:Text("OPTIONS_TRANSFER_ARTISANS"),
+		self:Text("OPTIONS_TRANSFER_OPEN"),
+		function()
+			AF:OpenTransferFrame()
+		end,
+		self:Text("OPTIONS_TRANSFER_ARTISANS_DESC"),
+		true
+	))
+
 	local disableAutomaticScans = RegisterProxySetting(
 		"ArtisanFinder_DisableAutomaticScans",
 		Settings.VarType.Boolean,

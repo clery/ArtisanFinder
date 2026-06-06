@@ -63,6 +63,8 @@ An item-specific commission takes priority over a profession default. If an item
 
 ArtisanFinder has an Options -> AddOns panel ordered around common controls first: minimap/button behavior, availability, scanning, trade-chat leads, order notifications, result sorting, cache behavior and advertised character professions. Blizzard Edit Mode controls the order notification toast and movable ArtisanFinder button placement.
 
+The scanning section includes **Artisan import / export**. It creates a copy/paste payload containing scanned artisan profiles, profession pricing, advertising choices, and profession links. Importing merges newer or missing artisan data without replacing local settings. A profile matching the currently logged-in character is skipped so imported data is never treated as the active character.
+
 ![ArtisanFinder options](Images/Options1.png)
 ![ArtisanFinder options](Images/Options2.png)
 
@@ -88,6 +90,7 @@ Runtime files are loaded from [ArtisanFinder.toc](ArtisanFinder.toc), which pres
 *   `/af auto on`: enable automatic availability in trade-chat areas.
 *   `/af auto off`: disables automatic availability.
 *   `/af auto toggle`: toggles the auto availability mode.
+*   `/af transfer`: opens artisan import/export.
 *   `/af clear`: show clear data commands.
 
 ## Inspiration

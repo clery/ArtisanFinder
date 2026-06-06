@@ -761,6 +761,69 @@
 		</Frames>
 	</Frame>
 
+	<Frame name="ArtisanFinderTransferFrameTemplate" virtual="true" inherits="BasicFrameTemplateWithInset" hidden="true">
+		<Size x="680" y="500"/>
+		<Anchors>
+			<Anchor point="CENTER"/>
+		</Anchors>
+		<Layers>
+			<Layer level="OVERLAY">
+				<FontString parentKey="title" inherits="GameFontHighlight">
+					<Anchors>
+						<Anchor point="LEFT" relativeKey="$parent.TitleBg" x="5" y="0"/>
+					</Anchors>
+				</FontString>
+				<FontString parentKey="description" inherits="GameFontHighlightSmall" justifyH="LEFT" wordWrap="true">
+					<Anchors>
+						<Anchor point="TOPLEFT" x="14" y="-34"/>
+						<Anchor point="TOPRIGHT" x="-14" y="-34"/>
+					</Anchors>
+				</FontString>
+				<FontString parentKey="status" inherits="GameFontHighlightSmall" justifyH="LEFT" wordWrap="true">
+					<Anchors>
+						<Anchor point="BOTTOMLEFT" x="14" y="42"/>
+						<Anchor point="BOTTOMRIGHT" x="-14" y="42"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+		<Frames>
+			<ScrollFrame parentKey="scroll" inherits="UIPanelScrollFrameTemplate">
+				<Anchors>
+					<Anchor point="TOPLEFT" x="12" y="-76"/>
+					<Anchor point="BOTTOMRIGHT" x="-32" y="72"/>
+				</Anchors>
+				<Frames>
+					<EditBox parentKey="editBox" autoFocus="false" multiLine="true">
+						<Size x="620" y="300"/>
+						<Anchors>
+							<Anchor point="TOPLEFT"/>
+						</Anchors>
+						<FontString inherits="ChatFontNormal"/>
+					</EditBox>
+				</Frames>
+			</ScrollFrame>
+			<Button parentKey="export" inherits="UIPanelButtonTemplate">
+				<Size x="120" y="22"/>
+				<Anchors>
+					<Anchor point="BOTTOMLEFT" x="12" y="12"/>
+				</Anchors>
+			</Button>
+			<Button parentKey="import" inherits="UIPanelButtonTemplate">
+				<Size x="120" y="22"/>
+				<Anchors>
+					<Anchor point="LEFT" relativeKey="$parent.export" relativePoint="RIGHT" x="8" y="0"/>
+				</Anchors>
+			</Button>
+			<Button parentKey="clear" inherits="UIPanelButtonTemplate">
+				<Size x="96" y="22"/>
+				<Anchors>
+					<Anchor point="BOTTOMRIGHT" x="-12" y="12"/>
+				</Anchors>
+			</Button>
+		</Frames>
+	</Frame>
+
 	<Button name="ArtisanFinderStandaloneMinimapButtonTemplate" virtual="true" hidden="true">
 		<Size x="42" y="42"/>
 		<Layers>
