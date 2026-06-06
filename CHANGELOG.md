@@ -1,5 +1,11 @@
 # ArtisanFinder
 
+## [v2.0.6](https://github.com/clery/ArtisanFinder/releases/tag/v2.0.6) (2026-06-06)
+
+### Added
+
+* Artisan import/export provides a versioned copy/paste payload for transferring scanned artisans, profession pricing, advertising choices, and profession links between WoW accounts.
+
 ## [v2.0.5](https://github.com/clery/ArtisanFinder/releases/tag/v2.0.5) (2026-06-05)
 
 [Full Changelog](https://github.com/clery/ArtisanFinder/compare/v2.0.4...v2.0.5) | [Previous Releases](https://github.com/clery/ArtisanFinder/releases)

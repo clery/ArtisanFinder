@@ -53,6 +53,7 @@ Locales\zhTW.lua
 Core\Util.lua
 Utils\Formatting.lua
 Core\Data.lua
+Core\Transfer.lua
 Data\OrderableRecipes.lua
 Features\Customer\Cache.lua
 Features\Social\Guild.lua
@@ -62,6 +63,7 @@ Core\Core.lua
 Features\Social\Comms.lua
 Features\Social\TradeChat.lua
 UI\Templates.xml
+UI\Transfer.lua
 Features\Orders\Notifications.lua
 Features\Crafter\RecipeCapability.lua
 Features\Crafter\Scanner.lua

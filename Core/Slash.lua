@@ -47,6 +47,7 @@ function AF:PrintSlashHelp()
 	self:Print(self:Text("SHOW_UNCERTIFIED_HELP_OFF"))
 	self:Print(self:Text("SHOW_UNCERTIFIED_HELP_TOGGLE"))
 	self:Print(self:Text("SHOW_UNCERTIFIED_HELP_STATE"))
+	self:Print(self:Text("TRANSFER_HELP"))
 	self:Print(self:Text("DEBUG_HELP"))
 	self:Print(self:Text("TUTORIAL_HELP_RESET"))
 	self:Print(self:Text("CLEAR_HELP"))
@@ -400,6 +401,8 @@ function AF:HandleSlash(message)
 		else
 			self:Print(self:Text("TUTORIAL_HELP_RESET"))
 		end
+	elseif command == "transfer" then
+		self:OpenTransferFrame()
 	elseif command == "clear" then
 		if rest == "all" then
 			self:ClearAllData()
