@@ -1,10 +1,15 @@
 # ArtisanFinder
 
-## [v2.0.6](https://github.com/clery/ArtisanFinder/releases/tag/v2.0.6) (2026-06-06)
+## [v2.0.6](https://github.com/clery/ArtisanFinder/releases/tag/v2.0.6-beta2) (2026-06-06)
+[Full Changelog](https://github.com/clery/ArtisanFinder/compare/v2.0.5...v2.0.6-beta2) | [Previous Releases](https://github.com/clery/ArtisanFinder/releases)
 
 ### Added
 
 * Artisan import/export provides a versioned copy/paste payload for transferring scanned artisans, profession pricing, advertising choices, and profession links between WoW accounts.
+
+### Fixed
+
+* Opening a profession should no longer significantly cause an FPS drop.
 
 ## [v2.0.5](https://github.com/clery/ArtisanFinder/releases/tag/v2.0.5) (2026-06-05)
 
