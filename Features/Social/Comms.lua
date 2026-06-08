@@ -556,8 +556,15 @@ function AF:HandleQuery(parts, sender, channel)
 		if not lastSent or self:Now() - lastSent >= self.RESPONSE_THROTTLE then
 			local priceCopper, freeCommission, note = self:GetItemPriceForProfile(match.profile, itemID, item.professionID)
 			local encodedNote = self:EncodeNote(note)
-			local encodedLink = self:EncodeField(item.professionLink)
 			local responseProfessionID = self:GetSupportedProfessionID(item.professionID, item)
+			local profession = match.profile.professions and match.profile.professions[tostring(responseProfessionID or "")]
+			local professionLink = (profession and profession.professionLink)
+				or self:GetRememberedProfessionLink(crafterName, responseProfessionID)
+				or item.professionLink
+			if self:IsSecretValue(professionLink) then
+				professionLink = nil
+			end
+			local encodedLink = self:EncodeField(professionLink)
 			local payloadParts = {
 				"R",
 				self.PROTOCOL_VERSION,

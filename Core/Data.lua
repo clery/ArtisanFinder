@@ -1069,7 +1069,7 @@ end
 
 function AF:RememberProfessionLink(characterName, professionID, professionLink)
 	local key = self:GetProfessionLinkKey(characterName, professionID)
-	if not key or type(professionLink) ~= "string" or professionLink == "" or not self.db then
+	if not key or self:IsSecretValue(professionLink) or type(professionLink) ~= "string" or professionLink == "" or not self.db then
 		return
 	end
 	self.db.professionLinks = self.db.professionLinks or {}
@@ -1077,7 +1077,7 @@ function AF:RememberProfessionLink(characterName, professionID, professionLink)
 end
 
 function AF:StoreProfessionLink(characterName, professionID, professionLink)
-	if type(professionLink) ~= "string" or professionLink == "" or not self.db then
+	if self:IsSecretValue(professionLink) or type(professionLink) ~= "string" or professionLink == "" or not self.db then
 		return nil
 	end
 
@@ -1114,6 +1114,7 @@ function AF:StoreProfessionLink(characterName, professionID, professionLink)
 	}
 	profile.professions[professionKey] = profession
 	profession.id = professionID
+	local professionLinkChanged = profession.professionLink ~= professionLink
 	profession.professionLink = professionLink
 	if not profession.icon then
 		local currentProfession = self:GetCurrentProfessionInfo()
@@ -1122,10 +1123,13 @@ function AF:StoreProfessionLink(characterName, professionID, professionLink)
 		end
 	end
 
-	for _, item in pairs(profile.items or {}) do
-		if tonumber(item.professionID) == professionID then
-			item.professionLink = professionLink
-			item.professionIcon = item.professionIcon or profession.icon
+	-- Profession UI refreshes capture this link frequently; only fan it out when it changes.
+	if professionLinkChanged then
+		for _, item in pairs(profile.items or {}) do
+			if GetSupportedProfessionIDForEntry(item.professionID, item) == professionID then
+				item.professionLink = professionLink
+				item.professionIcon = item.professionIcon or profession.icon
+			end
 		end
 	end
 

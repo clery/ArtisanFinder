@@ -364,6 +364,7 @@ function AF:BuildScanProgress(profession, professionEntry, signature, force, mod
 
 	local profile = self.db.artisanProfile
 	local pending = {}
+	local pendingKeys = {}
 	local skippedOrderable = 0
 	for _, recipeID in ipairs(recipeIDs) do
 		local recipeInfo = C_TradeSkillUI.GetRecipeInfo(recipeID)
@@ -389,6 +390,7 @@ function AF:BuildScanProgress(profession, professionEntry, signature, force, mod
 							recipeID = recipeID,
 							itemID = itemID,
 						})
+						pendingKeys[key] = true
 					end
 				end
 			end
@@ -401,6 +403,7 @@ function AF:BuildScanProgress(profession, professionEntry, signature, force, mod
 		professionSignature = signature,
 		mode = mode,
 		pending = pending,
+		pendingKeys = pendingKeys,
 		pendingTotal = #pending,
 		completed = completed,
 		completedCount = completedCount,
@@ -497,6 +500,30 @@ local function GetNextPendingJob(progress)
 	return pending and pending[GetPendingIndex(progress)]
 end
 
+local function GetPendingKeys(progress)
+	if not progress then
+		return nil
+	end
+	if type(progress.pendingKeys) == "table" then
+		return progress.pendingKeys
+	end
+	local pendingKeys = {}
+	for index = GetPendingIndex(progress), GetPendingTotal(progress) do
+		local job = progress.pending and progress.pending[index]
+		if job and job.key then
+			pendingKeys[job.key] = true
+		end
+	end
+	progress.pendingKeys = pendingKeys
+	return pendingKeys
+end
+
+function AF:IsRecipeScanJobPending(progress, recipeID, itemID)
+	local pendingKeys = GetPendingKeys(progress)
+	local jobKey = GetScanJobKey(recipeID, itemID)
+	return pendingKeys and (pendingKeys["full:" .. jobKey] or pendingKeys["probe:" .. jobKey]) == true or false
+end
+
 local function AppendPendingJob(progress, job)
 	if not progress or not progress.pending or not job then
 		return
@@ -504,6 +531,9 @@ local function AppendPendingJob(progress, job)
 	local index = GetPendingTotal(progress) + 1
 	progress.pending[index] = job
 	progress.pendingTotal = index
+	if job.key then
+		GetPendingKeys(progress)[job.key] = true
+	end
 end
 
 local function ClearScanProgressRuntimeState(progress)
@@ -514,6 +544,9 @@ local function ClearScanProgressRuntimeState(progress)
 			job.scanResumeCount = nil
 			job.lastDebugMS = nil
 		end
+	end
+	if progress then
+		progress.pendingKeys = nil
 	end
 end
 
@@ -943,6 +976,9 @@ function AF:ProcessScanQueue()
 			end
 			progress.pendingIndex = pendingIndex + 1
 			progress.pending[pendingIndex] = nil
+			if type(progress.pendingKeys) == "table" then
+				progress.pendingKeys[job.key] = nil
+			end
 			progress.completed[job.key] = true
 			progress.completedCount = (tonumber(progress.completedCount) or 0) + 1
 			if result ~= "skipped" then
@@ -1374,6 +1410,9 @@ function AF:ResumeCurrentProfessionScanIfNeeded()
 		self.activeScan = nil
 		return 0
 	end
+	if self.db and self.db.disableAutomaticScans == true then
+		return 0
+	end
 
 	local profession = self:GetCurrentProfessionInfo()
 	if not profession then
@@ -1386,9 +1425,6 @@ function AF:ResumeCurrentProfessionScanIfNeeded()
 	end
 	if professionEntry and IsResumableScanProgress(professionEntry.scanProgress, currentSignature) then
 		return self:StartOrResumeCurrentProfessionScan(false, true)
-	end
-	if self.db and self.db.disableAutomaticScans == true then
-		return 0
 	end
 	local pendingReason = self.pendingAutoScanReason
 	if pendingReason then

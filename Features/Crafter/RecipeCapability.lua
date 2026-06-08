@@ -665,11 +665,14 @@ function AF:GetProfessionLink()
 	if not okCanLink then
 		return nil, "CanTradeSkillListLink error: " .. tostring(canLink)
 	end
+	if self:IsSecretValue(canLink) then
+		return nil, "CanTradeSkillListLink returned secret value"
+	end
 	if okCanLink and canLink == false then
 		return nil, "CanTradeSkillListLink returned false"
 	end
 	local ok, link = pcall(C_TradeSkillUI.GetTradeSkillListLink)
-	if ok and type(link) == "string" and link ~= "" then
+	if ok and not self:IsSecretValue(link) and type(link) == "string" and link ~= "" then
 		return link
 	end
 	return nil, ok and "GetTradeSkillListLink returned no link" or ("GetTradeSkillListLink error: " .. tostring(link))

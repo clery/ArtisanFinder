@@ -811,11 +811,8 @@ function AF:IsRecipeEntryScanComplete(context, item)
 	end
 	local recipeID = tonumber(context.recipeID) or 0
 	local itemID = tonumber(context.itemID) or 0
-	for index = math.max(1, tonumber(progress.pendingIndex) or 1), #(progress.pending or {}) do
-		local job = progress.pending[index]
-		if tonumber(job and job.recipeID) == recipeID and tonumber(job and job.itemID) == itemID then
-			return false
-		end
+	if self.IsRecipeScanJobPending and self:IsRecipeScanJobPending(progress, recipeID, itemID) then
+		return false
 	end
 	return progress.completed and (progress.completed["full:" .. recipeID .. ":" .. itemID] or progress.completed["probe:" .. recipeID .. ":" .. itemID]) == true
 end
