@@ -184,6 +184,26 @@ local function BuildReagentQualityAtlasCandidates(quality, context)
 	return candidates
 end
 
+local function IsTwoTierReagentQualityAtlas(atlas)
+	return tostring(atlas or ""):find("Quality%-12%-Tier") ~= nil
+end
+
+local function ShouldUpscaleTwoTierReagentQuality(qualityInfo, context)
+	if type(context) ~= "table" or context.upscaleTwoTierReagentQuality ~= true then
+		return false
+	end
+	if tonumber(GetReagentQualityMaxQuality(context)) == 2 then
+		return true
+	end
+	if type(qualityInfo) ~= "table" then
+		return false
+	end
+	return IsTwoTierReagentQualityAtlas(qualityInfo.iconSmall)
+		or IsTwoTierReagentQualityAtlas(qualityInfo.iconChat)
+		or IsTwoTierReagentQualityAtlas(qualityInfo.icon)
+		or IsTwoTierReagentQualityAtlas(qualityInfo.iconInventory)
+end
+
 local function TryCreateQualityAtlasMarkup(atlas, size)
 	size = size or 14
 	if atlas and atlas ~= "" and CreateAtlasMarkup then
@@ -225,6 +245,9 @@ function AF:FormatReagentQuality(quality, size, context)
 	local qualityInfo = GetReagentQualityInfoFromContext(context)
 	if qualityInfo then
 		quality = tonumber(qualityInfo.quality) or quality
+	end
+	if ShouldUpscaleTwoTierReagentQuality(qualityInfo, context) and size < 20 then
+		size = 20
 	end
 	local markup = TryCreateQualityAtlasMarkup(qualityInfo and qualityInfo.iconSmall, size)
 		or TryCreateQualityAtlasMarkup(qualityInfo and qualityInfo.iconChat, size)
@@ -472,6 +495,10 @@ function AF:FormatCapability(entry)
 	if not entry then
 		return ""
 	end
+	local legacyFallback = entry.rescanNeeded and self.HasLegacyScanFallback and self:HasLegacyScanFallback(entry)
+	if entry.rescanNeeded and not legacyFallback then
+		return self:Text("CUSTOMER_RESCAN_NEEDED")
+	end
 
 	local parts = {}
 	local normalQuality = tonumber(entry.quality)
@@ -486,6 +513,9 @@ function AF:FormatCapability(entry)
 	if bestQuality and bestQuality > 0 then
 		local qualityText = self:GetRecipeQualityIconMarkup(entry.recipeID, bestQuality, 16) or ("Q" .. bestQuality)
 		table.insert(parts, self:Text("RECOMMENDED_REAGENTS_QUALITY", qualityText))
+	elseif legacyFallback and normalQuality and normalQuality > 0 then
+		local qualityText = self:GetRecipeQualityIconMarkup(entry.recipeID, normalQuality, 16) or ("Q" .. normalQuality)
+		table.insert(parts, self:Text("BASE_QUALITY", qualityText))
 	end
 
 	local optionalText = self:FormatOptionalReagentImpact(entry, true)
@@ -497,11 +527,18 @@ function AF:FormatCapability(entry)
 	if concentrationQuality and concentrationQuality > (bestQuality or normalQuality or 0) then
 		local concentrationText = self:Text("CONCENTRATION_QUALITY", self:GetRecipeQualityIconMarkup(entry.recipeID, concentrationQuality, 16) or ("Q" .. concentrationQuality))
 		if line == "" then
-			return concentrationText
+			line = concentrationText
+		else
+			line = line .. " - " .. concentrationText
 		end
-		return line .. " - " .. concentrationText
 	end
 
+	if legacyFallback then
+		if line == "" then
+			return self:Text("CUSTOMER_LEGACY_SCAN_FALLBACK")
+		end
+		return self:Text("CUSTOMER_LEGACY_SCAN_FALLBACK") .. " - " .. line
+	end
 	return line
 end
 
@@ -605,16 +642,21 @@ function AF:AddCapabilityTooltipLines(tooltip, entry)
 		return
 	end
 	local legacyReagentDisplay = self:GetLegacyReagentDisplay(entry)
+	local legacyFallback = entry.rescanNeeded and self.HasLegacyScanFallback and self:HasLegacyScanFallback(entry)
 	local hasBestReagents = self:HasDisplayableReagentLines(entry.bestReagents, { hideNoQuality = true })
 	local optionalBestReagents = self:GetDistinctOptionalBestReagents(entry.bestReagents, entry.optionalBestReagents)
 	local hasOptionalBestReagents = self:HasDisplayableReagentLines(optionalBestReagents, { hideNoQuality = true })
+
+	if legacyFallback then
+		AddTooltipLine(tooltip, self:Text("CUSTOMER_LEGACY_SCAN_TOOLTIP"), TOOLTIP_COMMENT_COLOR, true)
+	end
 
 	local optionalText = self:FormatOptionalReagentImpact(entry, false)
 	if optionalText ~= "" then
 		tooltip:AddLine(" ")
 		AddTooltipLine(tooltip, self:Text("OPTIONAL_REAGENTS"), TOOLTIP_SECTION_COLOR)
 		AddTooltipLine(tooltip, optionalText, TOOLTIP_COMMENT_COLOR, true)
-		if entry.optionalReagents and self:AddReagentLines(tooltip, entry.optionalReagents, TOOLTIP_OPTIONAL_COMMENT_COLOR[1], TOOLTIP_OPTIONAL_COMMENT_COLOR[2], TOOLTIP_OPTIONAL_COMMENT_COLOR[3], { slotLabels = true, compactQualityLabels = true }) then
+		if entry.optionalReagents and self:AddReagentLines(tooltip, entry.optionalReagents, TOOLTIP_OPTIONAL_COMMENT_COLOR[1], TOOLTIP_OPTIONAL_COMMENT_COLOR[2], TOOLTIP_OPTIONAL_COMMENT_COLOR[3], { slotLabels = true, compactQualityLabels = true, upscaleTwoTierReagentQuality = true }) then
 			-- Reagent lines added above.
 		elseif tonumber(entry.optionalSlotCount) and tonumber(entry.optionalSlotCount) > 0 then
 			AddTooltipLine(tooltip, self:Text("OPTIONAL_REAGENTS_SLOT_COUNT", entry.optionalSlotCount), TOOLTIP_OPTIONAL_COMMENT_COLOR, true)
@@ -622,7 +664,7 @@ function AF:AddCapabilityTooltipLines(tooltip, entry)
 		if hasOptionalBestReagents then
 			tooltip:AddLine(" ")
 			AddTooltipLine(tooltip, self:Text("OPTIONAL_REAGENTS_SUGGESTED_REAGENTS"), TOOLTIP_SECTION_COLOR)
-			self:AddReagentLines(tooltip, optionalBestReagents, TOOLTIP_OPTIONAL_COMMENT_COLOR[1], TOOLTIP_OPTIONAL_COMMENT_COLOR[2], TOOLTIP_OPTIONAL_COMMENT_COLOR[3], { slotLabels = true, compactQualityLabels = true, hideNoQuality = true })
+			self:AddReagentLines(tooltip, optionalBestReagents, TOOLTIP_OPTIONAL_COMMENT_COLOR[1], TOOLTIP_OPTIONAL_COMMENT_COLOR[2], TOOLTIP_OPTIONAL_COMMENT_COLOR[3], { slotLabels = true, compactQualityLabels = true, hideNoQuality = true, upscaleTwoTierReagentQuality = true })
 		end
 	end
 
@@ -632,7 +674,7 @@ function AF:AddCapabilityTooltipLines(tooltip, entry)
 		tooltip:AddLine(" ")
 		AddTooltipLine(tooltip, self:Text("SUGGESTED_REAGENTS"), TOOLTIP_SECTION_COLOR)
 		if hasBestReagents then
-			self:AddReagentLines(tooltip, entry.bestReagents, 1, 1, 1, { hideNoQuality = true })
+			self:AddReagentLines(tooltip, entry.bestReagents, 1, 1, 1, { hideNoQuality = true, upscaleTwoTierReagentQuality = true })
 		elseif legacyReagentDisplay and legacyReagentDisplay.details and legacyReagentDisplay.details ~= "" then
 			self:AddReagentDetailTooltipLines(tooltip, legacyReagentDisplay.details)
 		elseif legacyReagentDisplay and legacyReagentDisplay.summary and legacyReagentDisplay.summary ~= "" then
@@ -742,7 +784,7 @@ function AF:AddReagentLines(tooltip, reagents, r, g, b, options)
 				local itemID = tonumber(reagent.itemID or reagent.id)
 				if itemID then
 					local quality = GetReagentDisplayQualityInfo(itemID, reagent)
-					local qualityText = self:FormatReagentQuality(quality, 16, { itemID = itemID, reagent = reagent }) or ""
+					local qualityText = self:FormatReagentQuality(quality, 16, { itemID = itemID, reagent = reagent, upscaleTwoTierReagentQuality = options.upscaleTwoTierReagentQuality == true }) or ""
 					local itemName = self:GetItemName(itemID)
 					if options.showItemNames and itemName and itemName ~= "" then
 						local itemIcon = self:GetItemIconMarkup(itemID, 16) or ""
@@ -791,7 +833,7 @@ local function GetLocalReagentQualityMarkup(itemID)
 	if not ok or not qualityInfo then
 		return ""
 	end
-	return (AF:FormatReagentQuality(qualityInfo.quality, 16, { itemID = itemID, qualityInfo = qualityInfo }) or "")
+	return (AF:FormatReagentQuality(qualityInfo.quality, 16, { itemID = itemID, qualityInfo = qualityInfo, upscaleTwoTierReagentQuality = true }) or "")
 end
 
 function AF:AddReagentDetailTooltipLines(tooltip, details)

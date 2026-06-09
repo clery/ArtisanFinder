@@ -2,7 +2,7 @@ local _, AF = ...
 
 local MAX_OPTIONAL_REAGENT_COMBINATIONS = 96
 local HEAVY_JOB_QUALITY_TIER_THRESHOLD = AF.HEAVY_JOB_QUALITY_TIER_THRESHOLD
-local SCAN_SIGNATURE_VERSION = 34
+local SCAN_SIGNATURE_VERSION = 36
 local SKILL_PROBE_SIGNATURE_VERSION = 1
 local FULL_SCAN_SIGNATURE_VERSION = 4
 local GetOperationQuality
@@ -44,28 +44,55 @@ local function GetQuantityRequired(reagentSlotSchematic, reagent)
 	return tonumber(reagentSlotSchematic.quantityRequired) or 1
 end
 
+local function GetQualityTierFromAtlas(atlas)
+	return tonumber(tostring(atlas or ""):match("[Tt]ier(%d+)"))
+end
+
 local function GetReagentQuality(reagent)
 	if not reagent or not reagent.itemID then
 		return 0
 	end
+	if C_TradeSkillUI.GetItemReagentQualityByItemInfo then
+		local okQuality, quality = pcall(C_TradeSkillUI.GetItemReagentQualityByItemInfo, reagent.itemID)
+		if okQuality and not AF:IsSecretValue(quality) then
+			local numericQuality = tonumber(quality)
+			if numericQuality then
+				return numericQuality
+			end
+		end
+	end
 	local ok, qualityInfo = pcall(C_TradeSkillUI.GetItemReagentQualityInfo, reagent.itemID)
 	if ok and qualityInfo then
-		return tonumber(qualityInfo.quality) or 0
+		return tonumber(qualityInfo.quality)
+			or GetQualityTierFromAtlas(qualityInfo.iconInventory)
+			or GetQualityTierFromAtlas(qualityInfo.iconSmall)
+			or GetQualityTierFromAtlas(qualityInfo.icon)
+			or GetQualityTierFromAtlas(qualityInfo.iconChat)
+			or 0
 	end
 	return 0
-end
-
-local function GetQualityTierFromAtlas(atlas)
-	return tonumber(tostring(atlas or ""):match("[Tt]ier(%d+)"))
 end
 
 function GetReagentQualityInfoFromItemID(itemID)
 	if not itemID then
 		return nil
 	end
+	if C_TradeSkillUI.GetItemReagentQualityByItemInfo then
+		local okQuality, quality = pcall(C_TradeSkillUI.GetItemReagentQualityByItemInfo, itemID)
+		if okQuality and not AF:IsSecretValue(quality) then
+			local numericQuality = tonumber(quality)
+			if numericQuality then
+				return numericQuality
+			end
+		end
+	end
 	local ok, reagentQualityInfo = pcall(C_TradeSkillUI.GetItemReagentQualityInfo, itemID)
 	if ok and reagentQualityInfo then
 		return tonumber(reagentQualityInfo.quality)
+			or GetQualityTierFromAtlas(reagentQualityInfo.iconInventory)
+			or GetQualityTierFromAtlas(reagentQualityInfo.iconSmall)
+			or GetQualityTierFromAtlas(reagentQualityInfo.icon)
+			or GetQualityTierFromAtlas(reagentQualityInfo.iconChat)
 	end
 	return nil
 end
@@ -304,6 +331,45 @@ local function AddReagentInfo(tbl, reagentSlotSchematic, reagent)
 		dataSlotIndex = reagentSlotSchematic.dataSlotIndex,
 		quantity = quantity,
 	})
+end
+
+local function IsSameReagent(left, right)
+	if not left or not right then
+		return false
+	end
+	if left.itemID and right.itemID then
+		return tonumber(left.itemID) == tonumber(right.itemID)
+	end
+	if left.currencyID and right.currencyID then
+		return tonumber(left.currencyID) == tonumber(right.currencyID)
+	end
+	return false
+end
+
+local function IsQualityReagentSlot(reagentSlotSchematic)
+	for _, reagent in ipairs(reagentSlotSchematic and reagentSlotSchematic.reagents or {}) do
+		if (GetReagentQuality(reagent) or 0) > 0 then
+			return true
+		end
+	end
+	return false
+end
+
+local function AddReagentInfoForOperation(tbl, reagentSlotSchematic, selectedReagent)
+	if not reagentSlotSchematic or not selectedReagent then
+		return
+	end
+	if IsQualityReagentSlot(reagentSlotSchematic) then
+		for _, reagent in ipairs(reagentSlotSchematic.reagents or {}) do
+			if (GetReagentQuality(reagent) or 0) > 0 then
+				table.insert(tbl, {
+					reagent = reagent,
+					dataSlotIndex = reagentSlotSchematic.dataSlotIndex,
+					quantity = IsSameReagent(reagent, selectedReagent) and GetQuantityRequired(reagentSlotSchematic, selectedReagent) or 0,
+				})
+			end
+		end
+	end
 end
 
 local function IsModifiedReagentSlot(reagentSlotSchematic)
@@ -698,59 +764,291 @@ function AF:CaptureCurrentProfessionLink(profession, reason)
 	return self:StoreProfessionLink(characterName, professionID, link)
 end
 
-function AF:GetRecipeCapability(recipeID, best)
-	local capability = {}
-	local ok, operationInfo = pcall(C_TradeSkillUI.GetCraftingOperationInfo, recipeID, {}, nil, false)
-	if ok and type(operationInfo) == "table" then
-		ApplyOperationInfo(capability, recipeID, operationInfo)
-		capability.outputItemLevel = GetRecipeOutputItemLevel(recipeID, operationInfo, {})
-	end
+local function GetSlotKey(reagentSlotSchematic, fallbackIndex)
+	return tostring(reagentSlotSchematic.slotIndex or reagentSlotSchematic.dataSlotIndex or fallbackIndex or "slot")
+end
 
-	local okConcentration, concentrationInfo = pcall(C_TradeSkillUI.GetCraftingOperationInfo, recipeID, {}, nil, true)
-	if okConcentration and type(concentrationInfo) == "table" then
-		capability.rawConcentrationQuality = GetOperationQuality(concentrationInfo)
-		capability.concentrationQuality = GetRecipeDisplayQualityInfo(recipeID, concentrationInfo, {})
-		capability.concentrationCost = concentrationInfo.concentrationCost
-		capability.recipeDifficulty = capability.recipeDifficulty or concentrationInfo.baseDifficulty
-		if not capability.totalSkill then
-			capability.totalSkill = GetOperationTotalSkill(concentrationInfo)
+local function GetReagentSlotText(reagentSlotSchematic)
+	local slotInfo = reagentSlotSchematic and reagentSlotSchematic.slotInfo
+	local slotText = slotInfo and slotInfo.slotText
+	return slotText and slotText ~= "" and slotText or nil
+end
+
+local function GetReagentIcon(reagent)
+	local itemID = tonumber(reagent and reagent.itemID)
+	if itemID and C_Item and C_Item.GetItemIconByID then
+		local ok, icon = pcall(C_Item.GetItemIconByID, itemID)
+		if ok then
+			return icon
 		end
 	end
+	return nil
+end
 
-	if not best then
-		best = self.recipeCapabilityCache and self.recipeCapabilityCache[recipeID]
-		if not best then
-			best = self:GetBestReagentCapability(recipeID)
-			if self.recipeCapabilityCache then
-				self.recipeCapabilityCache[recipeID] = best
+local function GetReagentLink(reagent)
+	local itemID = tonumber(reagent and reagent.itemID)
+	if itemID and C_Item and C_Item.GetItemInfo then
+		local ok, _, link = pcall(C_Item.GetItemInfo, itemID)
+		if ok and type(link) == "string" then
+			return link
+		end
+	end
+	return nil
+end
+
+local function AddCraftingReagentInfo(reagentInfo, reagentSlotSchematic, reagent)
+	if not reagent then
+		return
+	end
+	AddReagentInfoForOperation(reagentInfo, reagentSlotSchematic, reagent)
+end
+
+local function GetOperationInfoForReagentInfo(recipeID, reagentInfo)
+	local ok, operationInfo = pcall(C_TradeSkillUI.GetCraftingOperationInfo, recipeID, reagentInfo or {}, nil, false)
+	return ok and type(operationInfo) == "table" and operationInfo or nil
+end
+
+local function SelectLowestQualityReagent(reagentSlotSchematic)
+	local selected
+	for _, reagent in ipairs(reagentSlotSchematic and reagentSlotSchematic.reagents or {}) do
+		if IsLowerQualityReagent(reagent, selected) then
+			selected = reagent
+		end
+	end
+	return selected
+end
+
+local function SelectRepresentativeQualityReagent(reagentSlotSchematic, quality)
+	local selected
+	for _, reagent in ipairs(reagentSlotSchematic and reagentSlotSchematic.reagents or {}) do
+		if (GetReagentQuality(reagent) or 0) == quality then
+			if not selected or (tonumber(reagent.itemID) or 0) < (tonumber(selected.itemID) or 0) then
+				selected = reagent
 			end
 		end
 	end
-	if best and type(best) == "table" then
-		capability.bestQuality = best.bestQuality
-		capability.rawBestQuality = best.rawBestQuality
-		capability.bestConcentrationQuality = best.bestConcentrationQuality
-		capability.bestTotalSkill = best.bestTotalSkill
-		capability.bestConcentrationCost = best.bestConcentrationCost
-		capability.bestOutputItemLevel = best.bestOutputItemLevel
-		capability.bestReagents = best.bestReagents
-		capability.bestReagentSignature = best.bestReagentSignature
-		capability.bestReagentTruncated = best.bestReagentTruncated
-		capability.bestReagentPendingNames = false
+	return selected
+end
+
+local function GetRequiredQualityList(reagentSlotSchematic)
+	local qualities = {}
+	local seen = {}
+	for _, reagent in ipairs(reagentSlotSchematic and reagentSlotSchematic.reagents or {}) do
+		local quality = GetReagentQuality(reagent) or 0
+		if quality > 0 and not seen[quality] then
+			seen[quality] = true
+			qualities[#qualities + 1] = quality
+		end
+	end
+	table.sort(qualities)
+	return qualities
+end
+
+local function BuildStoredReagent(reagentSlotSchematic, reagent, slotIndex, optional)
+	local entry = BuildReagentEntry(reagentSlotSchematic, reagent)
+	if not entry then
+		return nil
+	end
+	entry.slotIndex = reagentSlotSchematic.slotIndex or slotIndex
+	entry.slotKey = GetSlotKey(reagentSlotSchematic, slotIndex)
+	entry.icon = GetReagentIcon(reagent)
+	entry.link = GetReagentLink(reagent)
+	entry.optional = optional == true or nil
+	return entry
+end
+
+local function BuildBaselineRequiredReagents(requiredSlots)
+	local reagentInfo = {}
+	local baselineBySlot = {}
+	for slotIndex, slot in ipairs(requiredSlots or {}) do
+		local reagent = SelectLowestQualityReagent(slot)
+		baselineBySlot[slotIndex] = reagent
+		AddCraftingReagentInfo(reagentInfo, slot, reagent)
+	end
+	return reagentInfo, baselineBySlot
+end
+
+function AF:BuildRecipeReagentSkillFacts(recipeID)
+	if self:IsSecretValue(recipeID) then
+		return nil
+	end
+	local recipeInfo = C_TradeSkillUI.GetRecipeInfo(recipeID)
+	local recipeLevel = recipeInfo and recipeInfo.unlockedRecipeLevel
+	local okSchematic, schematic = pcall(C_TradeSkillUI.GetRecipeSchematic, recipeID, false, recipeLevel)
+	if not okSchematic or type(schematic) ~= "table" or type(schematic.reagentSlotSchematics) ~= "table" then
+		return nil
 	end
 
-	local optionalImpact = best and best.optionalImpact or self:GetOptionalReagentImpact(recipeID, best and best.reagentInfo, best and best.normalInfo or operationInfo)
-	if optionalImpact then
-		capability.optionalDifficultyDelta = optionalImpact.difficultyDelta
-		capability.optionalQuality = optionalImpact.quality
-		capability.optionalOutputItemLevel = optionalImpact.outputItemLevel
-		capability.optionalOutputItemLevelDelta = optionalImpact.outputItemLevelDelta
-		capability.optionalConcentrationQuality = optionalImpact.concentrationQuality
-		capability.optionalReagents = optionalImpact.reagents
-		capability.optionalSlotCount = optionalImpact.slotCount
-		capability.optionalBestReagents = optionalImpact.bestReagents
-		capability.optionalBestReagentSignature = optionalImpact.bestReagentSignature
-		capability.optionalBestReagentTruncated = optionalImpact.bestReagentTruncated
+	local requiredSlots = {}
+	local optionalSlots = {}
+	for slotIndex, reagentSlotSchematic in ipairs(schematic.reagentSlotSchematics) do
+		if not reagentSlotSchematic.hiddenInCraftingForm and type(reagentSlotSchematic.reagents) == "table" and #reagentSlotSchematic.reagents > 0 then
+			local reagentType = reagentSlotSchematic.reagentType
+			local isBasic = Enum and Enum.CraftingReagentType and reagentType == Enum.CraftingReagentType.Basic
+			if reagentSlotSchematic.required == true or isBasic then
+				requiredSlots[#requiredSlots + 1] = reagentSlotSchematic
+			elseif IsOptionalDifficultySlot(reagentSlotSchematic) then
+				optionalSlots[#optionalSlots + 1] = reagentSlotSchematic
+			end
+		end
+	end
+
+	local baselineReagentInfo, baselineBySlot = BuildBaselineRequiredReagents(requiredSlots)
+	local baselineOperationInfo = GetOperationInfoForReagentInfo(recipeID, baselineReagentInfo)
+	if not baselineOperationInfo then
+		baselineOperationInfo = GetOperationInfoForReagentInfo(recipeID, {})
+	end
+	if not baselineOperationInfo then
+		return nil
+	end
+
+	local baselineTotalSkill = GetOperationTotalSkill(baselineOperationInfo) or 0
+	local facts = {
+		scanModelVersion = self.SCAN_MODEL_VERSION or 2,
+		recipeID = tonumber(recipeID),
+		baseSkill = baselineTotalSkill,
+		baseRecipeDifficulty = GetOperationDifficulty(baselineOperationInfo) or tonumber(baselineOperationInfo.baseDifficulty) or 0,
+		maxOutputQuality = tonumber(recipeInfo and recipeInfo.maxQuality) or tonumber(GetRecipeDisplayQualityInfo(recipeID, baselineOperationInfo, baselineReagentInfo)) or 1,
+		requiredSlots = {},
+		optionalSlots = {},
+		probeMethod = "GetCraftingOperationInfo reagent quality deltas",
+		operationInfoFields = {
+			"baseDifficulty",
+			"bonusDifficulty",
+			"baseSkill",
+			"bonusSkill",
+			"craftingQuality",
+			"quality",
+			"guaranteedCraftingQualityID",
+		},
+	}
+
+	for slotIndex, reagentSlotSchematic in ipairs(requiredSlots) do
+		local baselineReagent = baselineBySlot[slotIndex]
+		local slotFact = {
+			slotIndex = reagentSlotSchematic.slotIndex or slotIndex,
+			dataSlotIndex = reagentSlotSchematic.dataSlotIndex,
+			slotKey = GetSlotKey(reagentSlotSchematic, slotIndex),
+			slotText = GetReagentSlotText(reagentSlotSchematic),
+			quantity = baselineReagent and GetQuantityRequired(reagentSlotSchematic, baselineReagent) or tonumber(reagentSlotSchematic.quantityRequired) or 1,
+			reagents = {},
+			qualityBonuses = {},
+		}
+		for _, reagent in ipairs(reagentSlotSchematic.reagents or {}) do
+			local entry = BuildStoredReagent(reagentSlotSchematic, reagent, slotIndex, false)
+			if entry then
+				slotFact.reagents[#slotFact.reagents + 1] = entry
+			end
+		end
+		for _, quality in ipairs(GetRequiredQualityList(reagentSlotSchematic)) do
+			local reagent = SelectRepresentativeQualityReagent(reagentSlotSchematic, quality)
+			local probeReagentInfo = {}
+			for baselineSlotIndex, baselineSlot in ipairs(requiredSlots) do
+				AddCraftingReagentInfo(probeReagentInfo, baselineSlot, baselineSlotIndex == slotIndex and reagent or baselineBySlot[baselineSlotIndex])
+			end
+			local operationInfo = GetOperationInfoForReagentInfo(recipeID, probeReagentInfo)
+			local delta = operationInfo and ((GetOperationTotalSkill(operationInfo) or baselineTotalSkill) - baselineTotalSkill) or 0
+			slotFact.qualityBonuses[quality] = delta / math.max(1, tonumber(slotFact.quantity) or 1)
+		end
+		facts.requiredSlots[#facts.requiredSlots + 1] = slotFact
+	end
+
+	for slotIndex, reagentSlotSchematic in ipairs(optionalSlots) do
+		local slotFact = {
+			slotIndex = reagentSlotSchematic.slotIndex or slotIndex,
+			dataSlotIndex = reagentSlotSchematic.dataSlotIndex,
+			slotKey = GetSlotKey(reagentSlotSchematic, slotIndex),
+			slotText = GetReagentSlotText(reagentSlotSchematic),
+			reagents = {},
+		}
+		for _, reagent in ipairs(reagentSlotSchematic.reagents or {}) do
+			local entry = BuildStoredReagent(reagentSlotSchematic, reagent, slotIndex, true)
+			if entry then
+				slotFact.reagents[#slotFact.reagents + 1] = entry
+			end
+		end
+		facts.optionalSlots[#facts.optionalSlots + 1] = slotFact
+	end
+
+	return facts, baselineOperationInfo, baselineReagentInfo
+end
+
+function AF:CreateRecipeReagentSkillFactsCoroutine(recipeID)
+	local state = {
+		recipeID = recipeID,
+		stats = {
+			evaluated = 1,
+			qualityTierCombinations = self:EstimateRecipeQualityTierCombinations(recipeID),
+			normalCalls = 1,
+			concentrationCalls = 0,
+			outputItemLevelCalls = 0,
+			skippedByQuality = 0,
+			skippedConcentration = 0,
+			skippedMaxQualityConcentration = 0,
+			prunedBelowBest = 0,
+			noNormalInfo = 0,
+			endpointShortcut = false,
+			endpointShortcutSaved = 0,
+		},
+	}
+	state.co = coroutine.create(function()
+		local facts = AF:BuildRecipeReagentSkillFacts(recipeID)
+		if not facts then
+			return { debugReason = "recipe skill facts unavailable", debugScanStats = state.stats }
+		end
+		facts.debugScanStats = state.stats
+		return facts
+	end)
+	return state
+end
+
+function AF:ResumeRecipeReagentSkillFactsState(state)
+	if not state or type(state) ~= "table" or not state.co then
+		return nil, "invalid skill facts state"
+	end
+	local ok, result = coroutine.resume(state.co)
+	if not ok then
+		return nil, result
+	end
+	return result
+end
+
+function AF:GetRecipeCapability(recipeID, best)
+	local capability = {}
+	local facts, operationInfo, baselineReagentInfo = self:BuildRecipeReagentSkillFacts(recipeID)
+	if facts then
+		capability.reagentSkillFacts = facts
+		capability.scanModelVersion = facts.scanModelVersion
+	end
+	if not operationInfo then
+		local ok
+		ok, operationInfo = pcall(C_TradeSkillUI.GetCraftingOperationInfo, recipeID, {}, nil, false)
+		if not ok then
+			operationInfo = nil
+		end
+	end
+	if type(operationInfo) == "table" then
+		ApplyOperationInfo(capability, recipeID, operationInfo)
+		capability.outputItemLevel = GetRecipeOutputItemLevel(recipeID, operationInfo, baselineReagentInfo or {})
+	end
+
+	if capability.reagentSkillFacts and self.BuildReagentSuggestion then
+		local suggestionEntry = CopyTable(capability)
+		suggestionEntry.recipeID = recipeID
+		local suggestion = self:BuildReagentSuggestion(suggestionEntry)
+		local outcome = self:ComputeCraftOutcome(suggestionEntry)
+		capability.concentrationQuality = outcome and outcome.concentrationQuality or nil
+		capability.concentrationCost = nil
+		capability.bestQuality = suggestion and suggestion.quality or nil
+		capability.rawBestQuality = capability.bestQuality
+		capability.bestConcentrationQuality = suggestion and suggestion.concentrationQuality or nil
+		capability.bestTotalSkill = suggestion and suggestion.skill or nil
+		capability.bestConcentrationCost = nil
+		capability.bestOutputItemLevel = capability.outputItemLevel
+		capability.bestReagents = suggestion and suggestion.reagents or nil
+		capability.bestReagentSignature = BuildReagentSignature(capability.bestReagents)
+		capability.bestReagentTruncated = false
+		capability.bestReagentPendingNames = false
 	end
 
 	capability.professionLink = self:CaptureCurrentProfessionLink()
@@ -826,10 +1124,7 @@ function AF:ProbeRequiresFullScan(item, recipeID, itemID, probe)
 	if tonumber(item.recipeID) ~= tonumber(recipeID) or tonumber(item.itemID) ~= tonumber(itemID) then
 		return true
 	end
-	if not item.bestReagents or item.bestReagentPendingNames then
-		return true
-	end
-	if not item.bestQuality then
+	if not self:IsCurrentScanModelEntry(item) then
 		return true
 	end
 	if tonumber(item.quality) ~= tonumber(probe.quality) then
@@ -1049,7 +1344,13 @@ function AF:GetCurrentProfessionScanSignature(profession)
 
 	local recipeIDs = C_TradeSkillUI.GetAllRecipeIDs()
 	local recipeCount = type(recipeIDs) == "table" and #recipeIDs or 0
-	return table.concat({ SCAN_SIGNATURE_VERSION, self:GetOrderableRecipeDataVersion(), tonumber(profession.id) or 0, recipeCount }, "|")
+	return table.concat({
+		SCAN_SIGNATURE_VERSION,
+		self.SCAN_MODEL_VERSION or 2,
+		self:GetOrderableRecipeDataVersion(),
+		tonumber(profession.id) or 0,
+		recipeCount,
+	}, "|")
 end
 
 function AF:GetCurrentProfessionScanSignatureVersion()
@@ -1605,15 +1906,52 @@ function AF:ApplyRecipeCapability(item, recipeID, best)
 	if not item or not recipeID then
 		return
 	end
-	local capability = self:GetRecipeCapability(recipeID, best)
+	local capability
+	if type(best) == "table" and tonumber(best.scanModelVersion) == (self.SCAN_MODEL_VERSION or 2) then
+		capability = {}
+		capability.reagentSkillFacts = best
+		capability.scanModelVersion = best.scanModelVersion
+		local ok, operationInfo = pcall(C_TradeSkillUI.GetCraftingOperationInfo, recipeID, {}, nil, false)
+		if ok and type(operationInfo) == "table" then
+			ApplyOperationInfo(capability, recipeID, operationInfo)
+			capability.outputItemLevel = GetRecipeOutputItemLevel(recipeID, operationInfo, {})
+		end
+		if self.BuildReagentSuggestion then
+			local suggestionEntry = CopyTable(capability)
+			suggestionEntry.recipeID = recipeID
+			local suggestion = self:BuildReagentSuggestion(suggestionEntry)
+			local outcome = self:ComputeCraftOutcome(suggestionEntry)
+			capability.recipeDifficulty = best.baseRecipeDifficulty or capability.recipeDifficulty
+			capability.totalSkill = best.baseSkill or capability.totalSkill
+			capability.quality = outcome and outcome.quality or capability.quality
+			capability.rawQuality = capability.quality
+			capability.concentrationQuality = outcome and outcome.concentrationQuality or nil
+			capability.bestQuality = suggestion and suggestion.quality or nil
+			capability.rawBestQuality = capability.bestQuality
+			capability.bestConcentrationQuality = suggestion and suggestion.concentrationQuality or nil
+			capability.bestTotalSkill = suggestion and suggestion.skill or nil
+			capability.bestOutputItemLevel = capability.outputItemLevel
+			capability.bestReagents = suggestion and suggestion.reagents or nil
+			capability.bestReagentSignature = BuildReagentSignature(capability.bestReagents)
+			capability.bestReagentTruncated = false
+			capability.bestReagentPendingNames = false
+		end
+		capability.professionLink = self:CaptureCurrentProfessionLink()
+		capability.skillProbeSignature = self:BuildSkillProbeSignature(recipeID, capability)
+	else
+		capability = self:GetRecipeCapability(recipeID, best)
+	end
+	item.scanModelVersion = capability.scanModelVersion or self.SCAN_MODEL_VERSION or 2
+	item.reagentSkillFacts = capability.reagentSkillFacts
+	item.maxOutputQuality = capability.reagentSkillFacts and capability.reagentSkillFacts.maxOutputQuality or item.maxOutputQuality
 	item.concentrationQuality = capability.concentrationQuality
-	item.concentrationCost = capability.concentrationCost
+	item.concentrationCost = nil
 	item.outputItemLevel = capability.outputItemLevel
 	item.bestQuality = capability.bestQuality
 	item.rawBestQuality = capability.rawBestQuality
 	item.bestConcentrationQuality = capability.bestConcentrationQuality
 	item.bestTotalSkill = capability.bestTotalSkill
-	item.bestConcentrationCost = capability.bestConcentrationCost
+	item.bestConcentrationCost = nil
 	item.bestOutputItemLevel = capability.bestOutputItemLevel
 	item.bestReagents = capability.bestReagents
 	item.bestReagentSignature = capability.bestReagentSignature
@@ -1622,18 +1960,18 @@ function AF:ApplyRecipeCapability(item, recipeID, best)
 	item.bestReagentSummaryUpdatedAt = capability.bestReagents and self:Now() or nil
 	item.bestReagentTruncated = capability.bestReagentTruncated == true
 	item.bestReagentPendingNames = capability.bestReagentPendingNames == true
-	item.optionalDifficultyDelta = capability.optionalDifficultyDelta
-	item.optionalQuality = capability.optionalQuality
-	item.optionalOutputItemLevel = capability.optionalOutputItemLevel
-	item.optionalOutputItemLevelDelta = capability.optionalOutputItemLevelDelta
-	item.optionalConcentrationQuality = capability.optionalConcentrationQuality
-	item.optionalReagents = capability.optionalReagents
+	item.optionalDifficultyDelta = nil
+	item.optionalQuality = nil
+	item.optionalOutputItemLevel = nil
+	item.optionalOutputItemLevelDelta = nil
+	item.optionalConcentrationQuality = nil
+	item.optionalReagents = nil
 	item.optionalReagentSummary = nil
-	item.optionalSlotCount = capability.optionalSlotCount
-	item.optionalBestReagents = self:GetDistinctOptionalBestReagents(capability.bestReagents, capability.optionalBestReagents)
-	item.optionalBestReagentSignature = item.optionalBestReagents and capability.optionalBestReagentSignature or nil
-	item.optionalBestReagentSummaryUpdatedAt = item.optionalBestReagents and self:Now() or nil
-	item.optionalBestReagentTruncated = item.optionalBestReagents and capability.optionalBestReagentTruncated == true
+	item.optionalSlotCount = capability.reagentSkillFacts and #(capability.reagentSkillFacts.optionalSlots or {}) or nil
+	item.optionalBestReagents = nil
+	item.optionalBestReagentSignature = nil
+	item.optionalBestReagentSummaryUpdatedAt = nil
+	item.optionalBestReagentTruncated = nil
 	item.debugBestCandidateSummary = nil
 	item.professionLink = capability.professionLink or item.professionLink
 	self:ApplyRecipeSkillProbe(item, recipeID, capability)

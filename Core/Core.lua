@@ -96,6 +96,7 @@ function AF:OnPlayerLogin()
 	self:CleanupCustomerCache()
 	self:InitializeTutorial()
 	self:InitializeEditMode()
+	self:QueueChangelogPanel()
 
 	if self:GetAvailabilityMode() ~= self.AVAILABILITY_UNAVAILABLE then
 		self:Print(self:Text("ADDON_LOADED_AVAILABILITY_RESTORED", self:GetAvailabilityModeText()))

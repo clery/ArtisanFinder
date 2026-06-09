@@ -202,7 +202,7 @@ local function BuildRequiredReagents(entry, mode)
 	local reagents = {}
 	local seen = {}
 	local schematic = GetRecipeSchematic(entry and entry.recipeID)
-	local recommendations = entry and entry.bestReagents or {}
+	local recommendations = entry and AF:IsCurrentScanModelEntry(entry) and entry.bestReagents or {}
 
 	if schematic then
 		for _, slot in ipairs(schematic.reagentSlotSchematics or {}) do
@@ -304,14 +304,23 @@ function AF:CreatePreparedCraftEntry(entry, mode, optionalReagents)
 	}
 
 	local seen = {}
-	for _, reagent in ipairs(BuildRequiredReagents(entry, mode)) do
-		AddOrMergeReagent(prepared.reagents, seen, reagent)
-	end
-	for _, reagent in ipairs(optionalReagents or {}) do
-		AddOrMergeReagent(prepared.reagents, seen, NormalizeReagent(reagent, {
-			optional = true,
-			source = "optional",
-		}))
+	if mode == "advanced" then
+		for _, reagent in ipairs(optionalReagents or {}) do
+			AddOrMergeReagent(prepared.reagents, seen, NormalizeReagent(reagent, {
+				optional = reagent.optional == true,
+				source = "advanced",
+			}))
+		end
+	else
+		for _, reagent in ipairs(BuildRequiredReagents(entry, mode)) do
+			AddOrMergeReagent(prepared.reagents, seen, reagent)
+		end
+		for _, reagent in ipairs(optionalReagents or {}) do
+			AddOrMergeReagent(prepared.reagents, seen, NormalizeReagent(reagent, {
+				optional = true,
+				source = "optional",
+			}))
+		end
 	end
 
 	table.sort(prepared.reagents, function(left, right)
@@ -882,7 +891,7 @@ function PreparationObjectiveTrackerMixin:AddPreparedCraftBlock(entry, index)
 		missingTotal = missingTotal + missing
 	end
 
-	local modeKey = entry.mode == "optional" and "PREP_TRACKER_MODE_OPTIONAL" or "PREP_TRACKER_MODE_STANDARD"
+	local modeKey = entry.mode == "advanced" and "PREP_TRACKER_MODE_ADVANCED" or entry.mode == "optional" and "PREP_TRACKER_MODE_OPTIONAL" or "PREP_TRACKER_MODE_STANDARD"
 	local summaryText = missingTotal > 0 and AF:Text("PREP_TRACKER_MISSING", missingTotal) or AF:Text("PREP_TRACKER_READY")
 	local modeText = AF:Text(modeKey, entry.target or "")
 	local summaryColor = GetObjectiveTrackerColor(missingTotal > 0 and "Normal" or "Complete")

@@ -6,6 +6,14 @@
 ### Added
 
 * Artisan import/export provides a versioned copy/paste payload for transferring scanned artisans, profession pricing, advertising choices, and profession links between WoW accounts.
+* An account-wide changelog panel now opens once after updating ArtisanFinder, with `/af changelog` available for manual viewing.
+* Prepare order now has an Advanced mode that lets customers choose required reagent qualities and optional reagents before tracking a craft.
+* ArtisanFinder can now estimate expected craft quality from the selected reagent setup and suggest reagent combinations that reach the best known result without always defaulting to the highest-quality materials.
+
+### Changed
+
+* Profession scans now save the reagent skill facts needed for reliable customer-side quality simulation, recommendations, and advanced preparation. Older scan records that cannot support the new model are cleared or marked outdated so players know which characters need a fresh scan.
+* Customer responses now use the new scan facts to rebuild quality and reagent recommendations locally, reducing oversized addon-message payloads and keeping the customer UI responsive while still sharing only craft capability data needed for ArtisanFinder results.
 
 ### Fixed
 

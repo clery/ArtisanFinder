@@ -71,7 +71,7 @@ local function GetCustomerRowOrderType(AF, entry)
 end
 
 local function GetCustomerOrderFillData(AF, entry)
-	if not entry or entry.tutorialFake or entry.ownSelf then
+	if not entry or entry.tutorialFake or (entry.ownSelf and not AF:IsDevEnabled()) then
 		return nil
 	end
 
@@ -97,7 +97,7 @@ local function GetCustomerOrderFillData(AF, entry)
 end
 
 local function IsCustomerRowClickable(entry)
-	return entry and not entry.tutorialFake and not entry.ownSelf
+	return entry and not entry.tutorialFake and (not entry.ownSelf or AF:IsDevEnabled())
 end
 
 local function SetCustomerRowHighlight(row, entry)
@@ -577,7 +577,7 @@ local function ConfigureCustomerRow(row)
 		if IsCustomerRowClickable(buttonFrame.entry) then
 			local context = AF.GetCustomerShoppingContext and AF:GetCustomerShoppingContext()
 			local keepShoppingList = context
-				and context.mode == "optional"
+				and (context.mode == "optional" or context.mode == "advanced")
 				and AF.GetCustomerShoppingEntryKey
 				and context.entryKey == AF:GetCustomerShoppingEntryKey(buttonFrame.entry)
 			AF:FillPersonalOrder(buttonFrame.entry, keepShoppingList and { keepShoppingList = true } or nil)
@@ -821,6 +821,7 @@ function AF:RefreshCustomerLocale()
 	frame.menu.prepare:SetText(self:Text("PREPARE_ORDER"))
 	frame.menu.prepareSubmenu.standard:SetText(self:Text("PREPARE_ORDER_STANDARD"))
 	frame.menu.prepareSubmenu.optional:SetText(self:Text("PREPARE_ORDER_OPTIONAL"))
+	frame.menu.prepareSubmenu.advanced:SetText(self:Text("PREPARE_ORDER_ADVANCED"))
 	frame.menu.link:SetText(self:Text("PROFESSION"))
 	for _, row in ipairs(self.customerRows or {}) do
 		if row.optionalPrep then
@@ -1047,6 +1048,12 @@ function AF:AttachCustomerUI()
 	frame.menu.prepareSubmenu.optional:SetScript("OnClick", function()
 		if frame.menu.entry then
 			AF:PrepareCustomerOrder(frame.menu.entry, "optional")
+		end
+	end)
+	frame.menu.prepareSubmenu.advanced:SetText(self:Text("PREPARE_ORDER_ADVANCED"))
+	frame.menu.prepareSubmenu.advanced:SetScript("OnClick", function()
+		if frame.menu.entry then
+			AF:PrepareCustomerOrder(frame.menu.entry, "advanced")
 		end
 	end)
 
@@ -1276,13 +1283,23 @@ function AF:ShowCustomerMenu(entry, owner)
 		menu.prepare:Disable()
 		menu.prepareSubmenu.standard:Disable()
 		menu.prepareSubmenu.optional:Disable()
+		menu.prepareSubmenu.advanced:Disable()
 		menu.link:Disable()
 		self:SetProfessionButtonTooltip(self:Text("TUTORIAL_FAKE_ACTION_TOOLTIP"))
-	elseif entry.ownSelf then
+	elseif entry.ownSelf and not self:IsDevEnabled() then
 		menu.whisper:Disable()
 		menu.prepare:Disable()
 		menu.prepareSubmenu.standard:Disable()
 		menu.prepareSubmenu.optional:Disable()
+		menu.prepareSubmenu.advanced:Disable()
+		menu.link:Disable()
+		self:ClearProfessionButtonTooltip()
+	elseif entry.ownSelf then
+		menu.whisper:Disable()
+		menu.prepare:Enable()
+		menu.prepareSubmenu.standard:Enable()
+		menu.prepareSubmenu.optional:Enable()
+		menu.prepareSubmenu.advanced:SetEnabled(self:IsCurrentScanModelEntry(entry))
 		menu.link:Disable()
 		self:ClearProfessionButtonTooltip()
 	elseif entry.ownAlt then
@@ -1290,13 +1307,15 @@ function AF:ShowCustomerMenu(entry, owner)
 		menu.prepare:Enable()
 		menu.prepareSubmenu.standard:Enable()
 		menu.prepareSubmenu.optional:Enable()
+		menu.prepareSubmenu.advanced:SetEnabled(self:IsCurrentScanModelEntry(entry))
 	else
 		menu.whisper:Enable()
 		menu.prepare:Enable()
 		menu.prepareSubmenu.standard:Enable()
 		menu.prepareSubmenu.optional:Enable()
+		menu.prepareSubmenu.advanced:SetEnabled(self:IsCurrentScanModelEntry(entry))
 	end
-	if entry.tutorialFake or entry.ownSelf then
+	if entry.tutorialFake or (entry.ownSelf and not self:IsDevEnabled()) then
 		-- Keep Favorite interactive; side-effecting order/profession actions stay disabled.
 	elseif self:CanReliablyOpenProfession(entry) then
 		menu.link:Enable()
@@ -1627,10 +1646,10 @@ function AF:RefreshCustomerResults(statusOverride)
 end
 
 function AF:PrepareCustomerOrder(entry, mode)
-	if mode == "optional" then
+	if mode == "optional" or mode == "advanced" then
 		self:FillPersonalOrder(entry, { keepShoppingList = true })
 		if self.ShowCustomerShoppingListForEntry then
-			self:ShowCustomerShoppingListForEntry(entry)
+			self:ShowCustomerShoppingListForEntry(entry, mode)
 		end
 	else
 		if self.HideCustomerShoppingList then

@@ -48,6 +48,7 @@ function AF:PrintSlashHelp()
 	self:Print(self:Text("SHOW_UNCERTIFIED_HELP_TOGGLE"))
 	self:Print(self:Text("SHOW_UNCERTIFIED_HELP_STATE"))
 	self:Print(self:Text("TRANSFER_HELP"))
+	self:Print(self:Text("CHANGELOG_HELP"))
 	self:Print(self:Text("DEBUG_HELP"))
 	self:Print(self:Text("TUTORIAL_HELP_RESET"))
 	self:Print(self:Text("CLEAR_HELP"))
@@ -100,6 +101,9 @@ function AF:RefreshLocalizedUI()
 	self:RefreshCrafterLocale()
 	if self.RefreshTutorialLocale then
 		self:RefreshTutorialLocale()
+	end
+	if self.RefreshChangelogFrame then
+		self:RefreshChangelogFrame()
 	end
 	self:RefreshMainUI()
 end
@@ -403,6 +407,10 @@ function AF:HandleSlash(message)
 		end
 	elseif command == "transfer" then
 		self:OpenTransferFrame()
+	elseif command == "changelog" then
+		if self.OpenChangelogFrame then
+			self:OpenChangelogFrame()
+		end
 	elseif command == "clear" then
 		if rest == "all" then
 			self:ClearAllData()

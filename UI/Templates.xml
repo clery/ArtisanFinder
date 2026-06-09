@@ -88,6 +88,11 @@
 						<Anchor point="TOPLEFT" x="-3" y="2"/>
 					</Anchors>
 				</Texture>
+				<FontString parentKey="quantity" inherits="NumberFontNormalSmall" justifyH="RIGHT" hidden="true">
+					<Anchors>
+						<Anchor point="BOTTOMRIGHT" x="-4" y="3"/>
+					</Anchors>
+				</FontString>
 				<Texture parentKey="addIcon" atlas="Professions-Slot-Plus" useAtlasSize="true" hidden="true">
 					<Anchors>
 						<Anchor point="BOTTOMRIGHT" x="-4" y="2"/>
@@ -146,6 +151,11 @@
 						<Anchor point="TOPLEFT" x="-3" y="2"/>
 					</Anchors>
 				</Texture>
+				<FontString parentKey="quantity" inherits="NumberFontNormalSmall" justifyH="RIGHT" hidden="true">
+					<Anchors>
+						<Anchor point="BOTTOMRIGHT" x="-4" y="3"/>
+					</Anchors>
+				</FontString>
 			</Layer>
 		</Layers>
 	</Button>
@@ -302,7 +312,7 @@
 				</Anchors>
 			</Button>
 			<Frame parentKey="prepareSubmenu" inherits="BackdropTemplate" hidden="true">
-				<Size x="174" y="76"/>
+				<Size x="174" y="104"/>
 				<Anchors>
 					<Anchor point="TOPLEFT" relativeKey="$parent.prepare" relativePoint="TOPRIGHT" x="2" y="0"/>
 				</Anchors>
@@ -317,6 +327,12 @@
 						<Size x="150" y="23"/>
 						<Anchors>
 							<Anchor point="TOP" x="0" y="-40"/>
+						</Anchors>
+					</Button>
+					<Button parentKey="advanced" inherits="UIPanelButtonTemplate">
+						<Size x="150" y="23"/>
+						<Anchors>
+							<Anchor point="TOP" x="0" y="-68"/>
 						</Anchors>
 					</Button>
 				</Frames>

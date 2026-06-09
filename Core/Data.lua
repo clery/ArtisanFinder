@@ -231,6 +231,113 @@ local function ClearVolatileCraftFields(item)
 	item.fullScanAt = nil
 end
 
+local function HasCurrentScanModel(entry)
+	local facts = type(entry) == "table" and entry.reagentSkillFacts or nil
+	local scanModelVersion = tonumber(AF.SCAN_MODEL_VERSION or 2)
+	return type(entry) == "table"
+		and tonumber(entry.scanModelVersion) == scanModelVersion
+		and type(facts) == "table"
+		and tonumber(facts.scanModelVersion) == scanModelVersion
+		and tonumber(facts.baseSkill) ~= nil
+		and tonumber(facts.baseRecipeDifficulty) ~= nil
+		and tonumber(facts.maxOutputQuality) ~= nil
+		and type(facts.requiredSlots) == "table"
+		and type(facts.optionalSlots) == "table"
+end
+
+local STALE_SCAN_COMPUTED_FIELDS = {
+	"recipeDifficulty",
+	"totalSkill",
+	"quality",
+	"rawQuality",
+	"concentrationQuality",
+	"concentrationCost",
+	"outputItemLevel",
+	"bestQuality",
+	"rawBestQuality",
+	"bestConcentrationQuality",
+	"bestTotalSkill",
+	"bestConcentrationCost",
+	"bestOutputItemLevel",
+	"bestReagents",
+	"bestReagentSummary",
+	"bestReagentDetails",
+	"bestReagentSummaryUpdatedAt",
+	"bestReagentSignature",
+	"bestReagentTruncated",
+	"bestReagentPendingNames",
+	"hasReagentSummary",
+	"optionalDifficultyDelta",
+	"optionalQuality",
+	"optionalOutputItemLevel",
+	"optionalOutputItemLevelDelta",
+	"optionalConcentrationQuality",
+	"optionalReagents",
+	"optionalSlotCount",
+	"optionalBestReagents",
+	"optionalBestReagentSummaryUpdatedAt",
+	"optionalBestReagentTruncated",
+	"optionalBestReagentSignature",
+}
+
+local function HasNonEmptyTable(value)
+	return type(value) == "table" and next(value) ~= nil
+end
+
+local function HasNonEmptyString(value)
+	return type(value) == "string" and value ~= ""
+end
+
+local function HasPositiveNumber(value)
+	value = tonumber(value)
+	return value and value > 0
+end
+
+local function HasLegacyScanFallback(entry)
+	return type(entry) == "table"
+		and (
+			HasPositiveNumber(entry.quality)
+			or HasPositiveNumber(entry.bestQuality)
+			or HasPositiveNumber(entry.concentrationQuality)
+			or HasPositiveNumber(entry.bestConcentrationQuality)
+			or HasNonEmptyTable(entry.bestReagents)
+			or HasNonEmptyTable(entry.optionalBestReagents)
+			or HasNonEmptyTable(entry.optionalReagents)
+			or HasNonEmptyString(entry.bestReagentSummary)
+			or HasNonEmptyString(entry.bestReagentDetails)
+		)
+end
+
+local function MarkScanModelRescanNeeded(entry)
+	if type(entry) ~= "table" then
+		return entry
+	end
+	local legacyFallback = HasLegacyScanFallback(entry)
+	if not legacyFallback then
+		for _, fieldName in ipairs(STALE_SCAN_COMPUTED_FIELDS) do
+			entry[fieldName] = nil
+		end
+	end
+	entry.rescanNeeded = true
+	entry.outdatedScan = true
+	entry.legacyFallback = legacyFallback or nil
+	entry.missingData = entry.missingData or {}
+	entry.missingData.reagentSkillFacts = true
+	return entry
+end
+
+function AF:IsCurrentScanModelEntry(entry)
+	return HasCurrentScanModel(entry)
+end
+
+function AF:HasLegacyScanFallback(entry)
+	return HasLegacyScanFallback(entry)
+end
+
+function AF:MarkScanModelRescanNeeded(entry)
+	return MarkScanModelRescanNeeded(entry)
+end
+
 local function NormalizeOptionalBestReagents(entry)
 	if type(entry) ~= "table" then
 		return
@@ -424,10 +531,14 @@ local function NormalizeCraftProfile(profile)
 				or GetSupportedProfessionIDForEntry(item.professionID, item)
 			if supportedID then
 				item.professionID = supportedID
-				ClearLocalizedCraftFields(item)
-				ClearVolatileCraftFields(item)
-				NormalizeOptionalBestReagents(item)
-				StripQualityAtlasFields(item)
+				if not HasCurrentScanModel(item) then
+					MarkScanModelRescanNeeded(item)
+				else
+					ClearLocalizedCraftFields(item)
+					ClearVolatileCraftFields(item)
+					NormalizeOptionalBestReagents(item)
+					StripQualityAtlasFields(item)
+				end
 			else
 				profile.items[itemKey] = nil
 			end
@@ -469,6 +580,10 @@ local function NormalizeCustomerCacheEntry(entry)
 		return nil
 	end
 	entry.professionID = supportedID
+	if not HasCurrentScanModel(entry) then
+		MarkScanModelRescanNeeded(entry)
+		return entry
+	end
 	PreserveLegacyReagentDisplay(entry)
 	ClearLocalizedCraftFields(entry)
 	ClearVolatileCraftFields(entry)
@@ -584,6 +699,7 @@ function ApplyDBDefaults(db)
 	db.minimap = db.minimap or { angle = 225, hide = false }
 	db.autoAvailabilityDisable = db.autoAvailabilityDisable or {}
 	db.tutorial = db.tutorial or {}
+	db.changelog = db.changelog or {}
 	db.crafterSections = db.crafterSections or {}
 
 	if db.debugSelfResults == true then
@@ -821,10 +937,14 @@ end
 function AF:EnsureDB()
 	ArtisanFinderDB = ArtisanFinderDB or {}
 	local db = ArtisanFinderDB
+	local hadPersistedState = next(db) ~= nil
 	self:MigrateDB(db)
 
 	ApplyDBDefaults(db)
 	db.schemaVersion = self.SCHEMA_VERSION
+	if self.PrepareChangelogState then
+		self:PrepareChangelogState(db, hadPersistedState)
+	end
 
 	self.db = db
 	self.available = false
@@ -1408,7 +1528,7 @@ function AF:IsScannedProfessionCoreDataUsable(profile, professionID)
 	for itemKey, item in pairs(profile.items or {}) do
 		if type(item) == "table" and self:GetSupportedProfessionID(item.professionID, item) == self:GetSupportedProfessionID(professionID) then
 			found = true
-			if not tonumber(item.itemID or itemKey) or not tonumber(item.recipeID) then
+			if not tonumber(item.itemID or itemKey) or not tonumber(item.recipeID) or not HasCurrentScanModel(item) then
 				return false
 			end
 		end

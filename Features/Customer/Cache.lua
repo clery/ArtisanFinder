@@ -3,6 +3,9 @@ local _, AF = ...
 local CopyTable = AF.CopyTable
 
 local function GetSortQuality(entry)
+	if entry and entry.rescanNeeded and not entry.legacyFallback then
+		return 0
+	end
 	return tonumber(entry and entry.bestQuality)
 		or tonumber(entry and entry.quality)
 		or 0
@@ -149,6 +152,9 @@ local OFFLINE_CACHE_ROW_OPTIONS = { offlineCached = true, offlineFallback = true
 
 local function PrepareCachedCustomerEntry(AF, entry, options)
 	local copy = CopyTable(entry)
+	if not AF:IsCurrentScanModelEntry(copy) and AF.MarkScanModelRescanNeeded then
+		AF:MarkScanModelRescanNeeded(copy)
+	end
 	copy.certified = true
 	copy.tradeLead = false
 	copy.unavailableFavorite = options and options.unavailableFavorite or nil
@@ -306,28 +312,31 @@ function AF:GetOwnAltRows(itemID, professionID, filterText, seenNames, recipeID)
 			note = note,
 			recipeID = item.recipeID,
 			recipeDifficulty = item.recipeDifficulty,
-				totalSkill = item.totalSkill,
-				quality = item.quality,
-				rawQuality = item.rawQuality,
-				concentrationQuality = item.concentrationQuality,
-				concentrationCost = item.concentrationCost,
-				outputItemLevel = item.outputItemLevel,
-				bestQuality = item.bestQuality,
-				rawBestQuality = item.rawBestQuality,
-				bestConcentrationQuality = item.bestConcentrationQuality,
-				bestTotalSkill = item.bestTotalSkill,
-				bestConcentrationCost = item.bestConcentrationCost,
-				bestOutputItemLevel = item.bestOutputItemLevel,
+			totalSkill = item.totalSkill,
+			quality = item.quality,
+			rawQuality = item.rawQuality,
+			concentrationQuality = item.concentrationQuality,
+			concentrationCost = item.concentrationCost,
+			outputItemLevel = item.outputItemLevel,
+			bestQuality = item.bestQuality,
+			rawBestQuality = item.rawBestQuality,
+			bestConcentrationQuality = item.bestConcentrationQuality,
+			bestTotalSkill = item.bestTotalSkill,
+			bestConcentrationCost = item.bestConcentrationCost,
+			bestOutputItemLevel = item.bestOutputItemLevel,
 			bestReagents = item.bestReagents,
 			bestReagentSummaryUpdatedAt = item.bestReagentSummaryUpdatedAt,
 			bestReagentTruncated = item.bestReagentTruncated,
 			bestReagentPendingNames = item.bestReagentPendingNames,
-				optionalDifficultyDelta = item.optionalDifficultyDelta,
-				optionalQuality = item.optionalQuality,
-				optionalOutputItemLevel = item.optionalOutputItemLevel,
-				optionalOutputItemLevelDelta = item.optionalOutputItemLevelDelta,
-				optionalConcentrationQuality = item.optionalConcentrationQuality,
-				optionalReagents = item.optionalReagents,
+			scanModelVersion = item.scanModelVersion,
+			reagentSkillFacts = item.reagentSkillFacts,
+			maxOutputQuality = item.maxOutputQuality,
+			optionalDifficultyDelta = item.optionalDifficultyDelta,
+			optionalQuality = item.optionalQuality,
+			optionalOutputItemLevel = item.optionalOutputItemLevel,
+			optionalOutputItemLevelDelta = item.optionalOutputItemLevelDelta,
+			optionalConcentrationQuality = item.optionalConcentrationQuality,
+			optionalReagents = item.optionalReagents,
 			optionalSlotCount = item.optionalSlotCount,
 			optionalBestReagents = item.optionalBestReagents,
 			optionalBestReagentSummaryUpdatedAt = item.optionalBestReagentSummaryUpdatedAt,
@@ -340,6 +349,9 @@ function AF:GetOwnAltRows(itemID, professionID, filterText, seenNames, recipeID)
 			ownAlt = true,
 			ownSelf = isCurrentCharacter,
 		}
+		if not self:IsCurrentScanModelEntry(entry) and self.MarkScanModelRescanNeeded then
+			self:MarkScanModelRescanNeeded(entry)
+		end
 		if EntryMatchesCustomerFilter(self, entry, filterText) then
 			local seenKey = GetSeenKey(self, entry)
 			if seenKey and not seenNames[seenKey] and self:IsCustomerEntryOrderEligible(entry) then

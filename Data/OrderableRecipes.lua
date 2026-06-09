@@ -149,7 +149,7 @@ end
 
 function AF:BuildOrderableRecipeDataDump()
 	if not C_CraftingOrders or not C_CraftingOrders.GetCustomerOptions then
-		return nil, "C_CraftingOrders.GetCustomerOptions unavailable"
+		return nil, self:Text("ORDERABLE_DUMP_ERROR_API_UNAVAILABLE")
 	end
 
 	local ok, results = pcall(C_CraftingOrders.GetCustomerOptions, GetCustomerOrderSearchParams())
@@ -157,7 +157,7 @@ function AF:BuildOrderableRecipeDataDump()
 		return nil, tostring(results)
 	end
 	if type(results) ~= "table" or type(results.options) ~= "table" then
-		return nil, "customer options unavailable; open the Crafting Order customer panel and try again"
+		return nil, self:Text("ORDERABLE_DUMP_ERROR_CUSTOMER_OPTIONS_UNAVAILABLE")
 	end
 
 	local byProfession = {}
@@ -226,7 +226,7 @@ end
 function AF:DumpOrderableRecipeData()
 	local dump, err, stats = self:BuildOrderableRecipeDataDump()
 	if not dump then
-		self:Print("Orderable recipe dump failed: " .. tostring(err))
+		self:Print(self:Text("ORDERABLE_DUMP_FAILED", tostring(err)))
 		return
 	end
 
@@ -245,13 +245,10 @@ function AF:DumpOrderableRecipeData()
 		self:RefreshDebugLogFrame()
 	end
 	if stats and stats.changed == false then
-		self:Print(string.format(
-			"Orderable recipe dump ready: no recipe changes, version line only, build %s. Copy ArtisanFinderOrderableRecipeDump or open /af debug logs.",
-			tostring(stats.build or "")
-		))
+		self:Print(self:Text("ORDERABLE_DUMP_READY_UNCHANGED", tostring(stats.build or "")))
 	else
-		self:Print(string.format(
-			"Orderable recipe dump ready: recipe changes found, %d options, %d professions, build %s. Copy ArtisanFinderOrderableRecipeDump or open /af debug logs.",
+		self:Print(self:Text(
+			"ORDERABLE_DUMP_READY_CHANGED",
 			tonumber(stats and stats.options) or 0,
 			tonumber(stats and stats.professions) or 0,
 			tostring(stats and stats.build or "")

@@ -1,12 +1,19 @@
 local _, AF = ...
 
 local PREP_HEIGHT = 78
+local PREP_ADVANCED_HEIGHT = 174
+local PREP_ADVANCED_NO_OPTIONAL_HEIGHT = 116
 local INLINE_SLOT_SIZE = 39
 local INLINE_SLOT_SPACING = 3
+local INLINE_ROW_SPACING = 9
+local INLINE_ADVANCED_OPTIONAL_OFFSET = 67
 local PICKER_SLOT_SIZE = 37
 local PICKER_SLOT_SPACING = 3
 local PICKER_PADDING = 3
 local PICKER_STRIDE = 6
+local NORMAL_FONT_COLOR_R = 1
+local NORMAL_FONT_COLOR_G = 0.82
+local NORMAL_FONT_COLOR_B = 0
 
 local function Wipe(tbl)
 	if table.wipe then
@@ -16,6 +23,20 @@ local function Wipe(tbl)
 			tbl[key] = nil
 		end
 	end
+end
+
+local function GetAdvancedPrepHeight(optionalSlotCount)
+	return optionalSlotCount and optionalSlotCount > 0 and PREP_ADVANCED_HEIGHT or PREP_ADVANCED_NO_OPTIONAL_HEIGHT
+end
+
+local function CountOptionalSlots(slots)
+	local count = 0
+	for _, slotData in ipairs(slots or {}) do
+		if slotData.optional then
+			count = count + 1
+		end
+	end
+	return count
 end
 
 local function MatchesItem(reagent, itemID)
@@ -56,6 +77,33 @@ local function GetReagentQualityInfo(itemID)
 		return qualityInfo
 	end
 	return nil
+end
+
+local function GetQualityTierFromAtlas(atlas)
+	return tonumber(tostring(atlas or ""):match("[Tt]ier(%d+)"))
+end
+
+local function GetReagentQualityValue(itemID)
+	if not itemID then
+		return nil
+	end
+	if C_TradeSkillUI.GetItemReagentQualityByItemInfo then
+		local ok, quality = pcall(C_TradeSkillUI.GetItemReagentQualityByItemInfo, itemID)
+		if ok and not AF:IsSecretValue(quality) then
+			local numericQuality = tonumber(quality)
+			if numericQuality then
+				return numericQuality
+			end
+		end
+	end
+	local qualityInfo = GetReagentQualityInfo(itemID)
+	return qualityInfo
+		and (tonumber(qualityInfo.quality)
+			or GetQualityTierFromAtlas(qualityInfo.iconInventory)
+			or GetQualityTierFromAtlas(qualityInfo.iconSmall)
+			or GetQualityTierFromAtlas(qualityInfo.icon)
+			or GetQualityTierFromAtlas(qualityInfo.iconChat))
+		or nil
 end
 
 local function GetReagentIcon(candidate)
@@ -112,6 +160,9 @@ local function IsShoppingOptionalSlot(slot)
 end
 
 local function GetSlotText(slot, fallback)
+	if slot and slot.slotText and slot.slotText ~= "" then
+		return slot.slotText
+	end
 	local slotInfo = slot and slot.slotInfo
 	local slotText = slotInfo and slotInfo.slotText
 	if slotText and slotText ~= "" then
@@ -121,7 +172,7 @@ local function GetSlotText(slot, fallback)
 end
 
 local function GetSlotKey(slot)
-	return tostring(slot and (slot.dataSlotIndex or slot.slotIndex) or "slot")
+	return tostring(slot and (slot.slotKey or slot.dataSlotIndex or slot.slotIndex) or "slot")
 end
 
 local function GetCandidateKey(candidate)
@@ -170,6 +221,27 @@ local function BuildOptionalSlotIndex(recipeID)
 	return slots, byDataSlotIndex
 end
 
+local function BuildAdvancedSlotsFromFacts(facts)
+	local slots = {}
+	for _, slot in ipairs(facts and facts.requiredSlots or {}) do
+		slots[#slots + 1] = {
+			slotKey = slot.slotKey or tostring(slot.dataSlotIndex or slot.slotIndex or #slots + 1),
+			slotText = slot.slotText,
+			required = true,
+			reagents = slot.reagents or {},
+		}
+	end
+	for _, slot in ipairs(facts and facts.optionalSlots or {}) do
+		slots[#slots + 1] = {
+			slotKey = slot.slotKey or tostring(slot.dataSlotIndex or slot.slotIndex or #slots + 1),
+			slotText = slot.slotText,
+			optional = true,
+			reagents = slot.reagents or {},
+		}
+	end
+	return slots
+end
+
 local function FindOptionalSlotForEntry(slots, byDataSlotIndex, reagentEntry)
 	local itemID = tonumber(reagentEntry and (reagentEntry.itemID or reagentEntry.id))
 	if not itemID then
@@ -203,9 +275,8 @@ local function BuildCandidate(slot, reagent, suggested)
 		return nil
 	end
 	local quality = tonumber(reagent.quality)
-	if not quality then
-		local qualityInfo = GetReagentQualityInfo(itemID)
-		quality = qualityInfo and tonumber(qualityInfo.quality)
+	if not quality or quality <= 0 then
+		quality = GetReagentQualityValue(itemID)
 	end
 	local slotKey = GetSlotKey(slot)
 	return {
@@ -216,6 +287,9 @@ local function BuildCandidate(slot, reagent, suggested)
 		dataSlotIndex = slot.dataSlotIndex,
 		slotText = GetSlotText(slot),
 		slotKey = slotKey,
+		optional = slot and slot.optional == true or reagent.optional == true,
+		required = slot and slot.required == true or reagent.required == true,
+		difficultyAdjustment = reagent.difficultyAdjustment,
 		source = suggested and "recommendation" or "schematic",
 		suggested = suggested == true,
 	}
@@ -252,13 +326,15 @@ end
 
 local function AddRecommendationCandidates(candidates, seen, entries, slots, byDataSlotIndex)
 	for _, entry in ipairs(entries or {}) do
-		for _, reagent in ipairs(entry.optionalReagents or {}) do
-			local slot = FindOptionalSlotForEntry(slots, byDataSlotIndex, reagent)
-			AddCandidate(candidates, seen, BuildCandidate(slot, reagent, true))
-		end
-		for _, reagent in ipairs(entry.optionalBestReagents or {}) do
-			local slot = FindOptionalSlotForEntry(slots, byDataSlotIndex, reagent)
-			AddCandidate(candidates, seen, BuildCandidate(slot, reagent, true))
+		if AF:IsCurrentScanModelEntry(entry) then
+			for _, reagent in ipairs(entry.optionalReagents or {}) do
+				local slot = FindOptionalSlotForEntry(slots, byDataSlotIndex, reagent)
+				AddCandidate(candidates, seen, BuildCandidate(slot, reagent, true))
+			end
+			for _, reagent in ipairs(entry.optionalBestReagents or {}) do
+				local slot = FindOptionalSlotForEntry(slots, byDataSlotIndex, reagent)
+				AddCandidate(candidates, seen, BuildCandidate(slot, reagent, true))
+			end
 		end
 	end
 end
@@ -321,14 +397,32 @@ function AF:BuildCustomerShoppingCandidates(context, entries)
 		return {}
 	end
 
-	local slots, byDataSlotIndex = BuildOptionalSlotIndex(context.recipeID)
 	local candidates = {}
 	local seen = {}
-	AddRecommendationCandidates(candidates, seen, entries, slots, byDataSlotIndex)
+	if context.mode == "advanced" then
+		if not self:IsCurrentScanModelEntry(context.entry) then
+			return candidates
+		end
+		local suggestedSignature = self:GetReagentDisplaySignature(context.entry and context.entry.bestReagents)
+		for _, slot in ipairs(BuildAdvancedSlotsFromFacts(context.entry and context.entry.reagentSkillFacts)) do
+			for _, reagent in ipairs(slot.reagents or {}) do
+				local candidate = BuildCandidate(slot, reagent, false)
+				if candidate then
+					local candidateSignature = self:GetReagentDisplaySignature({ candidate })
+					candidate.suggested = suggestedSignature ~= "" and suggestedSignature:find(candidateSignature, 1, true) ~= nil
+					candidate.source = candidate.suggested and "recommendation" or candidate.source
+					AddCandidate(candidates, seen, candidate)
+				end
+			end
+		end
+	else
+		local slots, byDataSlotIndex = BuildOptionalSlotIndex(context.recipeID)
+		AddRecommendationCandidates(candidates, seen, entries, slots, byDataSlotIndex)
 
-	for _, slot in ipairs(slots) do
-		for _, reagent in ipairs(slot.reagents or {}) do
-			AddCandidate(candidates, seen, BuildCandidate(slot, reagent, false))
+		for _, slot in ipairs(slots) do
+			for _, reagent in ipairs(slot.reagents or {}) do
+				AddCandidate(candidates, seen, BuildCandidate(slot, reagent, false))
+			end
 		end
 	end
 
@@ -347,6 +441,8 @@ function AF:BuildCustomerShoppingSlots(context, entries)
 			slot = {
 				key = slotKey,
 				slotText = candidate.slotText or self:Text("OPTIONAL_REAGENTS"),
+				required = candidate.required == true,
+				optional = candidate.optional == true,
 				candidates = {},
 			}
 			bySlot[slotKey] = slot
@@ -355,6 +451,12 @@ function AF:BuildCustomerShoppingSlots(context, entries)
 		table.insert(slot.candidates, candidate)
 	end
 	table.sort(slots, function(left, right)
+		if left.required ~= right.required then
+			return left.required == true
+		end
+		if left.optional ~= right.optional then
+			return left.optional ~= true
+		end
 		return tostring(left.slotText or "") < tostring(right.slotText or "")
 	end)
 	self.customerShoppingCandidates = candidates
@@ -376,6 +478,34 @@ function AF:GetCustomerShoppingSelectedCandidates()
 		end
 	end
 	return selected
+end
+
+function AF:PrimeAdvancedShoppingSelections(context)
+	if not context or context.mode ~= "advanced" then
+		return
+	end
+	local state = self:GetCustomerShoppingState(context)
+	if not state or state.primed then
+		return
+	end
+	for _, slotData in ipairs(self.customerShoppingSlots or {}) do
+		local selected
+		for _, candidate in ipairs(slotData.candidates or {}) do
+			if candidate.suggested then
+				selected = candidate
+				break
+			end
+			if slotData.required and (not selected or (tonumber(candidate.quality) or 0) < (tonumber(selected.quality) or 0)) then
+				selected = candidate
+			end
+		end
+		if selected and selected.slotKey then
+			if selected.suggested or slotData.required then
+				state.selections[selected.slotKey] = selected.key
+			end
+		end
+	end
+	state.primed = true
 end
 
 function AF:GetCustomerShoppingMissingTotals(selected)
@@ -488,8 +618,25 @@ end
 local function ResetInlineSlot(_, button)
 	button.slotData = nil
 	button.candidate = nil
+	if button.quantity then
+		button.quantity:Hide()
+	end
 	button:ClearAllPoints()
 	button:Hide()
+end
+
+local function SetReagentQuantityText(text, candidate)
+	if not text then
+		return
+	end
+	local quantity = tonumber(candidate and candidate.quantity) or 1
+	if quantity > 1 then
+		text:SetText(quantity)
+		text:Show()
+	else
+		text:SetText("")
+		text:Hide()
+	end
 end
 
 local function ShowCandidateTooltip(owner, candidate, includeSafeLine)
@@ -554,6 +701,9 @@ local function ResetPickerButton(_, button)
 	if button.iconBorder then
 		button.iconBorder:Hide()
 	end
+	if button.quantity then
+		button.quantity:Hide()
+	end
 	button:ClearAllPoints()
 	button:Hide()
 end
@@ -584,6 +734,74 @@ local function SetSlotButtonDisplay(button, slotData, candidate)
 	button.addIcon:SetShown(candidate == nil)
 	button.addIconHighlight:Hide()
 	SetQualityOverlay(button.qualityOverlay, candidate)
+	SetReagentQuantityText(button.quantity, candidate)
+end
+
+local function EnsurePrepText(prep, key, fontObject)
+	if prep[key] then
+		return prep[key]
+	end
+	local text = prep:CreateFontString(nil, "OVERLAY", fontObject or "GameFontDisableSmall")
+	text:SetJustifyH("LEFT")
+	text:SetWordWrap(false)
+	prep[key] = text
+	return text
+end
+
+local function EnsureAdvancedPrepRegions(prep)
+	EnsurePrepText(prep, "expectedQuality", "GameFontNormal")
+	EnsurePrepText(prep, "concentrationQuality", "GameFontNormal")
+	EnsurePrepText(prep, "requiredLabel", "GameFontNormalSmall")
+	EnsurePrepText(prep, "optionalLabel", "GameFontNormalSmall")
+end
+
+local function HideAdvancedPrepRegions(prep)
+	for _, key in ipairs({ "expectedQuality", "concentrationQuality", "requiredLabel", "optionalLabel" }) do
+		if prep[key] then
+			prep[key]:Hide()
+		end
+	end
+end
+
+local function BuildAdvancedOutcomeSelections(candidates, selectedBySlot)
+	local selections = {
+		requiredQualities = {},
+		optionalReagents = {},
+	}
+	for _, candidate in ipairs(candidates or {}) do
+		if selectedBySlot and selectedBySlot[candidate.slotKey] == candidate.key then
+			if candidate.required then
+				selections.requiredQualities[candidate.slotKey] = {
+					itemID = tonumber(candidate.itemID),
+					quality = tonumber(candidate.quality),
+				}
+			elseif candidate.optional then
+				table.insert(selections.optionalReagents, candidate)
+			end
+		end
+	end
+	return selections
+end
+
+local function FormatAdvancedExpectedQuality(AF, entry, candidates, selectedBySlot)
+	if not AF.ComputeCraftOutcome then
+		return nil
+	end
+	local outcome = AF:ComputeCraftOutcome(entry, BuildAdvancedOutcomeSelections(candidates, selectedBySlot))
+	if not outcome or outcome.rescanNeeded then
+		if outcome and outcome.missingData and not outcome.missingData.reagentSkillFacts then
+			return AF:Text("ADVANCED_EXPECTED_SELECT_REQUIRED"), nil
+		end
+		return AF:Text("ADVANCED_EXPECTED_RESCAN"), nil
+	end
+	local qualityText = AF:GetRecipeQualityIconMarkup(entry.recipeID, outcome.quality, 16) or ("Q" .. tostring(outcome.quality or 0))
+	local concentrationText = AF:GetRecipeQualityIconMarkup(entry.recipeID, outcome.concentrationQuality, 16) or ("Q" .. tostring(outcome.concentrationQuality or 0))
+	local expectedLine = AF:Text("ADVANCED_EXPECTED_QUALITY", qualityText)
+	local concentrationLine
+	if tonumber(outcome.concentrationQuality) and tonumber(outcome.concentrationQuality) > tonumber(outcome.quality or 0) then
+		concentrationLine = AF:Text("CONCENTRATION_QUALITY", concentrationText)
+	end
+	return expectedLine, concentrationLine
 end
 
 local function EnsureOptionalPicker()
@@ -623,7 +841,7 @@ function AF:ConfigureCustomerOptionalPrepRow(row)
 	row.optionalPrep.track:SetScript("OnClick", function()
 		local context = AF:GetCustomerShoppingContext()
 		if context and context.entry then
-			AF:AddPreparedCraftToTracker(context.entry, "optional", AF:GetCustomerShoppingSelectedCandidates())
+			AF:AddPreparedCraftToTracker(context.entry, context.mode or "optional", AF:GetCustomerShoppingSelectedCandidates())
 			AF:HideCustomerShoppingList()
 		end
 	end)
@@ -679,6 +897,7 @@ function AF:OpenCustomerShoppingPicker(slotData, owner)
 		button.icon:SetTexture(GetReagentIcon(candidate))
 		SetItemQualityBorder(button, candidate)
 		SetQualityOverlay(button.qualityOverlay, candidate)
+		SetReagentQuantityText(button.quantity, candidate)
 		local column = (i - 1) % PICKER_STRIDE
 		local row = math.floor((i - 1) / PICKER_STRIDE)
 		button:SetPoint("TOPLEFT", PICKER_PADDING + (column * (PICKER_SLOT_SIZE + PICKER_SLOT_SPACING)), -(PICKER_PADDING + (row * (PICKER_SLOT_SIZE + PICKER_SLOT_SPACING))))
@@ -703,12 +922,13 @@ function AF:SetCustomerShoppingListShown(shown)
 	end
 end
 
-function AF:ShowCustomerShoppingListForEntry(entry)
-	local context = self:SetCustomerShoppingContext(entry, "optional")
+function AF:ShowCustomerShoppingListForEntry(entry, mode)
+	local context = self:SetCustomerShoppingContext(entry, mode or "optional")
 	if not context then
 		return
 	end
 	self:BuildCustomerShoppingSlots(context, { entry })
+	self:PrimeAdvancedShoppingSelections(context)
 	if self.RefreshCustomerResults then
 		self:RefreshCustomerResults()
 	end
@@ -716,7 +936,7 @@ end
 
 function AF:RefreshCustomerShoppingList(entries)
 	local context = self:GetCustomerShoppingContext()
-	if not context or context.mode ~= "optional" then
+	if not context or (context.mode ~= "optional" and context.mode ~= "advanced") then
 		self.customerShoppingCandidates = nil
 		self.customerShoppingSlots = nil
 		return 0
@@ -724,14 +944,16 @@ function AF:RefreshCustomerShoppingList(entries)
 
 	if entries then
 		self:BuildCustomerShoppingSlots(context, context.entry and { context.entry } or entries)
+		self:PrimeAdvancedShoppingSelections(context)
 	elseif not self.customerShoppingSlots then
 		self:BuildCustomerShoppingSlots(context, context.entry and { context.entry } or {})
+		self:PrimeAdvancedShoppingSelections(context)
 	end
 
 	if self.RefreshCustomerResults then
 		self:RefreshCustomerResults()
 	end
-	return PREP_HEIGHT
+	return context.mode == "advanced" and GetAdvancedPrepHeight(CountOptionalSlots(self.customerShoppingSlots)) or PREP_HEIGHT
 end
 
 function AF:RefreshCustomerOptionalPrepRow(row, entry)
@@ -741,7 +963,7 @@ function AF:RefreshCustomerOptionalPrepRow(row, entry)
 	self:ConfigureCustomerOptionalPrepRow(row)
 
 	local context = self:GetCustomerShoppingContext()
-	if not context or context.mode ~= "optional" or context.entryKey ~= GetEntryContextKey(entry) then
+	if not context or (context.mode ~= "optional" and context.mode ~= "advanced") or context.entryKey ~= GetEntryContextKey(entry) then
 		row.optionalPrep:Hide()
 		if row.optionalPrep.slotPool then
 			row.optionalPrep.slotPool:ReleaseAll()
@@ -751,12 +973,26 @@ function AF:RefreshCustomerOptionalPrepRow(row, entry)
 
 	if not self.customerShoppingSlots then
 		self:BuildCustomerShoppingSlots(context, { entry })
+		self:PrimeAdvancedShoppingSelections(context)
 	end
 	local slots = self.customerShoppingSlots or {}
 	local candidates = self.customerShoppingCandidates or {}
 	local state = self:GetCustomerShoppingState(context)
 	local selectedBySlot = state and state.selections or {}
 	local selectedCount = 0
+	local requiredSlotCount = 0
+	local optionalSlotCount = 0
+	local selectedRequiredCount = 0
+	for _, slotData in ipairs(slots) do
+		if slotData.required then
+			requiredSlotCount = requiredSlotCount + 1
+			if GetSelectedCandidateForSlot(slotData, selectedBySlot) then
+				selectedRequiredCount = selectedRequiredCount + 1
+			end
+		elseif slotData.optional then
+			optionalSlotCount = optionalSlotCount + 1
+		end
+	end
 	for _, candidate in ipairs(candidates) do
 		if selectedBySlot[candidate.slotKey] == candidate.key then
 			selectedCount = selectedCount + 1
@@ -764,19 +1000,84 @@ function AF:RefreshCustomerOptionalPrepRow(row, entry)
 	end
 
 	local prep = row.optionalPrep
+	local advanced = context.mode == "advanced"
+	local advancedHeight = GetAdvancedPrepHeight(optionalSlotCount)
 	prep:SetWidth(math.max(280, row:GetWidth() or 280))
+	prep:SetHeight(advanced and advancedHeight or PREP_HEIGHT)
+	prep.label:SetText(advanced and self:Text("ADVANCED_REAGENTS") or self:Text("OPTIONAL_REAGENTS"))
+	prep.empty:SetText(advanced and self:Text("ADVANCED_REAGENTS_EMPTY") or self:Text("CUSTOMER_SHOPPING_EMPTY"))
+	prep.label:ClearAllPoints()
+	prep.label:SetPoint("TOPLEFT", prep, "TOPLEFT", 27, -10)
+	prep.label:SetShown(not advanced)
+	prep.empty:ClearAllPoints()
+	if advanced then
+		prep.empty:SetPoint("TOPLEFT", prep, "TOPLEFT", 27, -8)
+	else
+		prep.empty:SetPoint("TOPLEFT", prep.label, "BOTTOMLEFT", 0, -7)
+	end
+	prep.empty:SetPoint("RIGHT", prep, "RIGHT", -128, 0)
+	prep.slots:ClearAllPoints()
+	prep.track:ClearAllPoints()
+	HideAdvancedPrepRegions(prep)
+	if advanced then
+		EnsureAdvancedPrepRegions(prep)
+		local expectedLine, concentrationLine = FormatAdvancedExpectedQuality(self, entry, candidates, selectedBySlot)
+		local qualityTopOffset = optionalSlotCount > 0 and -136 or -72
+		prep.expectedQuality:ClearAllPoints()
+		prep.expectedQuality:SetPoint("TOPLEFT", prep, "TOPLEFT", 27, qualityTopOffset)
+		prep.expectedQuality:SetPoint("RIGHT", prep, "RIGHT", -65, 0)
+		prep.expectedQuality:SetTextColor(NORMAL_FONT_COLOR_R, NORMAL_FONT_COLOR_G, NORMAL_FONT_COLOR_B)
+		prep.expectedQuality:SetText(expectedLine or "")
+		prep.expectedQuality:Show()
+		prep.concentrationQuality:ClearAllPoints()
+		prep.concentrationQuality:SetPoint("TOPLEFT", prep.expectedQuality, "BOTTOMLEFT", 0, -2)
+		prep.concentrationQuality:SetPoint("RIGHT", prep, "RIGHT", -65, 0)
+		prep.concentrationQuality:SetTextColor(NORMAL_FONT_COLOR_R, NORMAL_FONT_COLOR_G, NORMAL_FONT_COLOR_B)
+		prep.concentrationQuality:SetText(concentrationLine or "")
+		prep.concentrationQuality:SetShown(concentrationLine ~= nil and concentrationLine ~= "")
+		prep.requiredLabel:ClearAllPoints()
+		prep.requiredLabel:SetPoint("TOPLEFT", prep, "TOPLEFT", 27, -8)
+		prep.requiredLabel:SetTextColor(NORMAL_FONT_COLOR_R, NORMAL_FONT_COLOR_G, NORMAL_FONT_COLOR_B)
+		prep.requiredLabel:SetText(self:Text("REQUIRED_REAGENTS"))
+		prep.requiredLabel:SetShown(requiredSlotCount > 0)
+		prep.optionalLabel:ClearAllPoints()
+		prep.optionalLabel:SetPoint("TOPLEFT", prep, "TOPLEFT", 27, -75)
+		prep.optionalLabel:SetTextColor(NORMAL_FONT_COLOR_R, NORMAL_FONT_COLOR_G, NORMAL_FONT_COLOR_B)
+		prep.optionalLabel:SetText(self:Text("OPTIONAL_REAGENTS"))
+		prep.optionalLabel:SetShown(optionalSlotCount > 0)
+		prep.slots:SetPoint("TOPLEFT", prep, "TOPLEFT", 27, -23)
+		prep.track:SetPoint("TOPRIGHT", prep, "TOPRIGHT", -65, optionalSlotCount > 0 and -139 or -76)
+	else
+		prep.slots:SetPoint("TOPLEFT", prep, "TOPLEFT", 27, -28)
+		prep.track:SetPoint("TOPRIGHT", prep, "TOPRIGHT", -65, -31)
+	end
 	prep.empty:SetShown(#slots == 0)
 	prep.slots:SetShown(#slots > 0)
-	prep.track:SetEnabled(selectedCount > 0)
+	prep.track:SetEnabled(advanced and (requiredSlotCount > 0 and selectedRequiredCount >= requiredSlotCount) or (not advanced and selectedCount > 0))
 	prep.slotPool:ReleaseAll()
-	for i, slotData in ipairs(slots) do
+	local requiredIndex = 0
+	local optionalIndex = 0
+	local singleIndex = 0
+	for _, slotData in ipairs(slots) do
 		local button = prep.slotPool:Acquire()
 		button:SetParent(prep.slots)
 		SetSlotButtonDisplay(button, slotData, GetSelectedCandidateForSlot(slotData, selectedBySlot))
-		button:SetPoint("TOPLEFT", (i - 1) * (INLINE_SLOT_SIZE + INLINE_SLOT_SPACING), 0)
+		if advanced and slotData.optional then
+			button:SetPoint("TOPLEFT", optionalIndex * (INLINE_SLOT_SIZE + INLINE_SLOT_SPACING), -INLINE_ADVANCED_OPTIONAL_OFFSET)
+			optionalIndex = optionalIndex + 1
+		elseif advanced then
+			button:SetPoint("TOPLEFT", requiredIndex * (INLINE_SLOT_SIZE + INLINE_SLOT_SPACING), 0)
+			requiredIndex = requiredIndex + 1
+		else
+			button:SetPoint("TOPLEFT", singleIndex * (INLINE_SLOT_SIZE + INLINE_SLOT_SPACING), 0)
+			singleIndex = singleIndex + 1
+		end
 		button:Show()
 	end
-	prep.slots:SetWidth(math.max(1, (#slots * INLINE_SLOT_SIZE) + (math.max(0, #slots - 1) * INLINE_SLOT_SPACING)))
+	local maxRowCount = advanced and math.max(requiredIndex, optionalIndex) or singleIndex
+	local slotRows = advanced and ((optionalIndex > 0 and 2 or 1)) or 1
+	prep.slots:SetWidth(math.max(1, (maxRowCount * INLINE_SLOT_SIZE) + (math.max(0, maxRowCount - 1) * INLINE_SLOT_SPACING)))
+	prep.slots:SetHeight(advanced and (INLINE_ADVANCED_OPTIONAL_OFFSET + INLINE_SLOT_SIZE) or ((slotRows * INLINE_SLOT_SIZE) + (math.max(0, slotRows - 1) * INLINE_ROW_SPACING)))
 	prep:Show()
-	return PREP_HEIGHT
+	return advanced and advancedHeight or PREP_HEIGHT
 end

@@ -354,7 +354,7 @@ function AF:BuildScanProgress(profession, professionEntry, signature, force, mod
 	end
 
 	mode = force and "full" or (mode or "probe")
-	local progressSignature = table.concat({ signature, mode }, "|")
+	local progressSignature = table.concat({ signature, mode, tostring(self.SCAN_MODEL_VERSION or 2) }, "|")
 	local previous = professionEntry.scanProgress
 	local completed = {}
 	if not force and previous and previous.signature == progressSignature and type(previous.completed) == "table" then
@@ -381,9 +381,9 @@ function AF:BuildScanProgress(profession, professionEntry, signature, force, mod
 						or not existing
 						or tonumber(existing.recipeID) ~= tonumber(recipeID)
 						or tonumber(existing.professionID) ~= tonumber(profession.id)
-						or not existing.bestReagents
+						or not self:IsCurrentScanModelEntry(existing)
 						or existing.bestReagentPendingNames == true
-					if force or not completed[key] then
+					if needsFull or not completed[key] then
 						table.insert(pending, {
 							key = key,
 							kind = needsFull and "full" or mode,
@@ -649,7 +649,7 @@ function AF:ScanJob(profession, professionEntry, job)
 			professionEntry.scanProgress.total = professionEntry.scanProgress.total + 1
 			return true
 		end
-	else
+		else
 		local cachedBest = self.recipeCapabilityCache and self.recipeCapabilityCache[job.recipeID]
 		if cachedBest then
 			local beforeRecommendation = GetRecommendationSnapshot(existing)
@@ -675,7 +675,7 @@ function AF:ScanJob(profession, professionEntry, job)
 		end
 		local jobState = job.scanState
 		if not jobState then
-			jobState = self:CreateBestReagentCapabilityCoroutine(job.recipeID, nil, false)
+			jobState = self:CreateRecipeReagentSkillFactsCoroutine(job.recipeID)
 			job.scanState = jobState
 			job.scanStartedMS = GetScanTimeMS()
 			job.scanResumeCount = 0
@@ -690,7 +690,7 @@ function AF:ScanJob(profession, professionEntry, job)
 		end
 		job.scanResumeCount = (tonumber(job.scanResumeCount) or 0) + 1
 		local budget = SCAN_FULL_JOB_CHUNK_MS
-		local best, err = self:ResumeBestReagentCapabilityState(jobState, budget)
+		local best, err = self:ResumeRecipeReagentSkillFactsState(jobState, budget)
 		if not best and err then
 			self:DebugLog("scan", string.format(
 				"full failed recipe=%s item=%s name=%s resumes=%d ms=%.1f %s error=%s",

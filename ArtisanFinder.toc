@@ -56,6 +56,7 @@ Core\Data.lua
 Core\Transfer.lua
 Data\OrderableRecipes.lua
 Features\Customer\Cache.lua
+Features\Customer\Recommendation.lua
 Features\Social\Guild.lua
 Features\Social\WhoStatus.lua
 UI\Options.lua
@@ -64,6 +65,7 @@ Features\Social\Comms.lua
 Features\Social\TradeChat.lua
 UI\Templates.xml
 UI\Transfer.lua
+UI\Changelog.lua
 Features\Orders\Notifications.lua
 Features\Crafter\RecipeCapability.lua
 Features\Crafter\Scanner.lua
