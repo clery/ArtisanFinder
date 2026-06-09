@@ -16,3 +16,6 @@
     [] When clicking a row, prefill the Crafting order like the current "Personal Order" and "Guild Order" buttons do, and add information to the Crafting Order panel with suggested reagent and optional reagent for best results (with or without each optional reagent)
 
 [] Explore EditModeExpanded
+
+
+[] Guild members are sometimes showing missing data, even though the character is logged in and available

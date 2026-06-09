@@ -362,7 +362,8 @@ AF.frame:SetScript("OnEvent", function(_, event, ...)
 		end
 	elseif event == "GUILD_ROSTER_UPDATE" then
 		if AF.QueueGuildRosterCacheRefresh then
-			AF:QueueGuildRosterCacheRefresh(false)
+			local canRequestRosterUpdate = ...
+			AF:QueueGuildRosterCacheRefresh(canRequestRosterUpdate == true)
 		end
 	elseif event == "GUILD_TRADESKILL_UPDATE" then
 		AF.guildTradeSkillParsedAt = nil
