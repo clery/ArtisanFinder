@@ -808,7 +808,8 @@ function AF:HandleQuery(parts, sender, channel)
 			local encodedLink = self:EncodeField(professionLink)
 			local responseTimestamp = self:Now()
 			local afk = UnitIsAFK and UnitIsAFK("player")
-			local wireFacts = self:BuildWireReagentSkillFacts(item.reagentSkillFacts)
+			local wireFacts = type(item.wireReagentSkillFacts) == "table" and item.wireReagentSkillFacts
+				or self:BuildWireReagentSkillFacts(item.reagentSkillFacts)
 			local payloadParts = {
 				"R",
 				self.PROTOCOL_VERSION,

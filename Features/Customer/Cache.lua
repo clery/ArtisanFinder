@@ -330,6 +330,7 @@ function AF:GetOwnAltRows(itemID, professionID, filterText, seenNames, recipeID)
 			bestReagentPendingNames = item.bestReagentPendingNames,
 			scanModelVersion = item.scanModelVersion,
 			reagentSkillFacts = item.reagentSkillFacts,
+			wireReagentSkillFacts = item.wireReagentSkillFacts,
 			maxOutputQuality = item.maxOutputQuality,
 			compactOptionalReagentDeltas = item.compactOptionalReagentDeltas,
 			optionalDifficultyDelta = item.optionalDifficultyDelta,

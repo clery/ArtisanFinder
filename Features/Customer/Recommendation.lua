@@ -11,8 +11,13 @@ local function HasCurrentReagentSkillFacts(facts)
 		and tonumber(facts.baseSkill) ~= nil
 		and tonumber(facts.baseRecipeDifficulty) ~= nil
 		and tonumber(facts.maxOutputQuality) ~= nil
-		and type(facts.requiredSlots) == "table"
-		and type(facts.optionalSlots) == "table"
+		and (
+			facts.compact == true
+			or (
+				type(facts.requiredSlots) == "table"
+				and type(facts.optionalSlots) == "table"
+			)
+		)
 end
 
 local function CopyTable(source)

@@ -18,3 +18,4 @@
 [] Explore EditModeExpanded
 
 [] Export too large and pasting may cause large freeze
+[] When alt is imported from different account, they show up twice in the customer view. Keep only the latest, but always show it as "Your alt" once they've been imported and as long as they are not cleared away. If `/af clear scans` is called for an alt from a different account, move their data to artisan cache instead of wiping it completely.

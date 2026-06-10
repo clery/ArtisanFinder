@@ -16,6 +16,6 @@ externals:
   Libs/LibEditMode: https://github.com/p3lim-wow/LibEditMode.git
 
 ignore:
-  - .githooks
   - README.md
   - Images
+  - Tests
