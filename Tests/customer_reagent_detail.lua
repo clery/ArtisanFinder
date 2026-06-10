@@ -554,6 +554,110 @@ local exactAdvancedOutcome = AF:GetCustomerShoppingOutcome(exactEntry, exactAdva
 	end
 	Check(not hasBaseLowerQuality, "optional tracker should not keep lower base recommendation after +73 difficulty")
 	Check(hasAdjustedQuality, "optional tracker should choose adjusted sufficient reagent quality after +73 difficulty")
+
+	local oldCustomerOrdersFrame = ProfessionsCustomerOrdersFrame
+	local oldInCombatLockdown = InCombatLockdown
+	local orderSchematic = C_TradeSkillUI.GetRecipeSchematic(374498)
+	local allocations = {}
+	local activeSlots = {}
+	local formUpdated = 0
+	local listButtonUpdated = 0
+	local clearedSlots = {}
+
+	local function NewOrderSlot(schematic)
+		return {
+			schematic = schematic,
+			GetReagentSlotSchematic = function(self)
+				return self.schematic
+			end,
+			SetReagent = function(self, reagent)
+				self.reagent = reagent
+			end,
+			ClearReagent = function(self)
+				self.reagent = nil
+				self.cleared = true
+			end,
+			SetHighlightShown = function(self, shown)
+				self.highlight = shown
+			end,
+		}
+	end
+
+	for _, slot in ipairs(orderSchematic.reagentSlotSchematics or {}) do
+		activeSlots[#activeSlots + 1] = NewOrderSlot(slot)
+	end
+
+	local fakeTransaction = {
+		GetRecipeID = function()
+			return 374498
+		end,
+		GetRecipeSchematic = function()
+			return orderSchematic
+		end,
+		OverwriteAllocation = function(_, slotIndex, reagent, quantity)
+			allocations[slotIndex] = {
+				reagent = reagent,
+				quantity = quantity,
+			}
+		end,
+		ClearAllocations = function(_, slotIndex)
+			allocations[slotIndex] = nil
+			clearedSlots[slotIndex] = true
+		end,
+	}
+
+	ProfessionsCustomerOrdersFrame = {
+		Form = {
+			transaction = fakeTransaction,
+			reagentSlotPool = {
+				EnumerateActive = function()
+					local index = 0
+					return function()
+						index = index + 1
+						return activeSlots[index]
+					end
+				end,
+			},
+			UpdateReagentSlots = function()
+				formUpdated = formUpdated + 1
+			end,
+			UpdateListOrderButton = function()
+				listButtonUpdated = listButtonUpdated + 1
+			end,
+		},
+	}
+	InCombatLockdown = function()
+		return false
+	end
+
+	AF.db.preparedCrafts = { preparedOptional }
+	Check(AF:FindPreparedCraftForCustomerEntry(logEntry) == preparedOptional, "customer row should find matching tracked prepared craft")
+	local applied, matchedPrepared, appliedCount = AF:ApplyTrackedCraftToCustomerOrder(logEntry)
+	Check(applied == true, "tracked prepared craft should apply to current customer order")
+	Check(matchedPrepared == preparedOptional, "tracked apply should return matched prepared craft")
+	Check(appliedCount == 3, "tracked apply should set required and optional reagents")
+	Check(allocations[1] and allocations[1].reagent.itemID == 1003, "tracked apply should set first required reagent")
+	Check(allocations[2] and allocations[2].reagent.itemID == 2003, "tracked apply should set adjusted second required reagent")
+	Check(allocations[3] and allocations[3].reagent.itemID == 219898, "tracked apply should set selected optional reagent")
+	Check(activeSlots[1].reagent and activeSlots[1].reagent.itemID == 1003, "tracked apply should update active required slot display")
+	Check(activeSlots[3].reagent and activeSlots[3].reagent.itemID == 219898, "tracked apply should update active optional slot display")
+	Check(formUpdated == 1, "tracked apply should refresh form slots before applying tracked reagents")
+	Check(listButtonUpdated == 1, "tracked apply should refresh list order button")
+
+	local preparedStandard = AF:CreatePreparedCraftEntry(logEntry, "standard")
+	preparedStandard.createdAt = 200
+	AF.db.preparedCrafts = { preparedStandard }
+	allocations[3] = { reagent = { itemID = 219898 }, quantity = 1 }
+	activeSlots[3].reagent = { itemID = 219898 }
+	activeSlots[3].cleared = nil
+	local standardApplied = AF:ApplyTrackedCraftToCustomerOrder(logEntry)
+	Check(standardApplied == true, "standard tracked craft should apply to current customer order")
+	Check(allocations[3] == nil, "standard tracked craft should clear stale optional order reagent")
+	Check(clearedSlots[3] == true, "standard tracked craft should clear optional transaction slot")
+	Check(activeSlots[3].reagent == nil and activeSlots[3].cleared == true, "standard tracked craft should clear active optional slot display")
+
+	ProfessionsCustomerOrdersFrame = oldCustomerOrdersFrame
+	InCombatLockdown = oldInCombatLockdown
 	C_TradeSkillUI = oldLogTradeSkillUI
 	Enum = oldLogEnum
 	C_Item = oldLogItem

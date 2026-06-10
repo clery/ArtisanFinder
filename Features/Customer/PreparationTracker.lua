@@ -400,6 +400,62 @@ local function GetPreparationCount()
 	return #GetPreparationEntries()
 end
 
+local function ToSafeNumber(value)
+	if AF.IsSecretValue and AF:IsSecretValue(value) then
+		return nil
+	end
+	return tonumber(value)
+end
+
+local function GetPreparedCraftEntryTarget(entry)
+	return AF:NormalizeName(entry and (entry.orderTarget or entry.name or entry.target)) or entry and entry.target
+end
+
+local function GetPreparedCraftRecipeID(entry)
+	local recipeID = ToSafeNumber(entry and (entry.recipeID or entry.spellID))
+	if recipeID and recipeID > 0 then
+		return recipeID
+	end
+	return nil
+end
+
+local function PreparedCraftMatchesCustomerEntry(prepared, entry)
+	if not prepared or not entry then
+		return false
+	end
+	local target = GetPreparedCraftEntryTarget(entry)
+	local preparedTarget = GetPreparedCraftEntryTarget(prepared)
+	if target and preparedTarget and target ~= preparedTarget then
+		return false
+	end
+
+	local recipeID = ToSafeNumber(entry.recipeID) or ToSafeNumber(AF.currentCustomerRecipeID)
+	local preparedRecipeID = GetPreparedCraftRecipeID(prepared)
+	if recipeID and preparedRecipeID and recipeID ~= preparedRecipeID then
+		return false
+	end
+
+	local itemID = ToSafeNumber(entry.itemID) or ToSafeNumber(AF.currentCustomerItemID)
+	local preparedItemID = ToSafeNumber(prepared.itemID)
+	if itemID and preparedItemID and itemID ~= preparedItemID then
+		return false
+	end
+
+	return recipeID ~= nil or itemID ~= nil
+end
+
+function AF:FindPreparedCraftForCustomerEntry(entry)
+	local best
+	for _, prepared in ipairs(GetPreparationEntries()) do
+		if PreparedCraftMatchesCustomerEntry(prepared, entry) then
+			if not best or (tonumber(prepared.createdAt) or 0) > (tonumber(best.createdAt) or 0) then
+				best = prepared
+			end
+		end
+	end
+	return best
+end
+
 local function FindPreparedCraftEntry(block)
 	if not block then
 		return nil
@@ -432,14 +488,6 @@ local function FindPreparedCraftEntry(block)
 	return nil
 end
 
-local function GetPreparedCraftRecipeID(entry)
-	local recipeID = tonumber(entry and (entry.recipeID or entry.spellID))
-	if recipeID and recipeID > 0 then
-		return recipeID
-	end
-	return nil
-end
-
 local function OpenPreparedCraftRecipe(entry)
 	local recipeID = GetPreparedCraftRecipeID(entry)
 	if not recipeID or not C_TradeSkillUI then
@@ -468,6 +516,238 @@ local function OpenPreparedCraftRecipe(entry)
 		return pcall(ProfessionsUtil.OpenProfessionFrameToRecipe, recipeID)
 	end
 	return false
+end
+
+local function GetCustomerOrderFormRecipeID(form)
+	local transaction = form and form.transaction
+	local recipeID
+	if transaction and transaction.GetRecipeID then
+		local ok, value = pcall(transaction.GetRecipeID, transaction)
+		if ok then
+			recipeID = value
+		end
+	end
+	recipeID = recipeID or transaction and transaction.recipeID
+	if not recipeID and transaction and transaction.GetRecipeSchematic then
+		local ok, schematic = pcall(transaction.GetRecipeSchematic, transaction)
+		if ok and type(schematic) == "table" then
+			recipeID = schematic.recipeID
+		end
+	end
+	if not recipeID and form and form.order then
+		recipeID = form.order.spellID
+	end
+	if not recipeID and form and form.GetRecipeInfo then
+		local ok, recipeInfo = pcall(form.GetRecipeInfo, form)
+		if ok and type(recipeInfo) == "table" then
+			recipeID = recipeInfo.recipeID
+		end
+	end
+	return ToSafeNumber(recipeID)
+end
+
+local function GetCustomerOrderFormSchematic(form, recipeID)
+	local transaction = form and form.transaction
+	if transaction and transaction.GetRecipeSchematic then
+		local ok, schematic = pcall(transaction.GetRecipeSchematic, transaction)
+		if ok and type(schematic) == "table" and type(schematic.reagentSlotSchematics) == "table" then
+			return schematic
+		end
+	end
+	if C_TradeSkillUI and C_TradeSkillUI.GetRecipeSchematic and recipeID then
+		local recipeInfo
+		if C_TradeSkillUI.GetRecipeInfo then
+			local ok, value = pcall(C_TradeSkillUI.GetRecipeInfo, recipeID)
+			if ok then
+				recipeInfo = value
+			end
+		end
+		local recipeLevel = recipeInfo and recipeInfo.unlockedRecipeLevel
+		local ok, schematic = pcall(C_TradeSkillUI.GetRecipeSchematic, recipeID, false, recipeLevel)
+		if ok and type(schematic) == "table" and type(schematic.reagentSlotSchematics) == "table" then
+			return schematic
+		end
+	end
+	return nil
+end
+
+local function FindPreparedReagentSlot(schematic, preparedReagent)
+	local preparedSlotIndex = ToSafeNumber(preparedReagent and preparedReagent.slotIndex)
+	local preparedDataSlotIndex = ToSafeNumber(preparedReagent and preparedReagent.dataSlotIndex)
+	if preparedSlotIndex or preparedDataSlotIndex then
+		for _, slot in ipairs(schematic and schematic.reagentSlotSchematics or {}) do
+			local slotMatches = not preparedSlotIndex or ToSafeNumber(slot.slotIndex) == preparedSlotIndex
+			local dataSlotMatches = not preparedDataSlotIndex or ToSafeNumber(slot.dataSlotIndex) == preparedDataSlotIndex
+			if slotMatches and dataSlotMatches then
+				local slotReagent = FindMatchingSlotReagent(slot, preparedReagent)
+				if slotReagent then
+					return slot, slotReagent
+				end
+			end
+		end
+	end
+
+	local matchedSlot
+	local matchedReagent
+	for _, slot in ipairs(schematic and schematic.reagentSlotSchematics or {}) do
+		local slotReagent = FindMatchingSlotReagent(slot, preparedReagent)
+		if slotReagent then
+			if matchedSlot then
+				return nil
+			end
+			matchedSlot = slot
+			matchedReagent = slotReagent
+		end
+	end
+	return matchedSlot, matchedReagent
+end
+
+local function GetPreparedAllocationQuantity(slot, slotReagent, preparedReagent)
+	local quantity = ToSafeNumber(preparedReagent and preparedReagent.quantity)
+	if not quantity or quantity <= 0 then
+		quantity = GetQuantityRequired(slot, slotReagent)
+	end
+	return ToSafeNumber(quantity) or 1
+end
+
+local function OverwriteTransactionAllocation(transaction, slotIndex, reagent, quantity)
+	if not transaction or not slotIndex or not reagent then
+		return false
+	end
+	if transaction.OverwriteAllocation then
+		local ok = pcall(transaction.OverwriteAllocation, transaction, slotIndex, reagent, quantity)
+		return ok
+	end
+	if transaction.GetAllocations then
+		local ok, allocations = pcall(transaction.GetAllocations, transaction, slotIndex)
+		if ok and allocations and allocations.Clear and allocations.Allocate then
+			allocations:Clear()
+			allocations:Allocate(reagent, quantity)
+			return true
+		end
+	end
+	return false
+end
+
+local function ClearTransactionAllocation(transaction, slotIndex)
+	if not transaction or not slotIndex then
+		return false
+	end
+	if transaction.ClearAllocations then
+		local ok = pcall(transaction.ClearAllocations, transaction, slotIndex)
+		return ok
+	end
+	if transaction.GetAllocations then
+		local ok, allocations = pcall(transaction.GetAllocations, transaction, slotIndex)
+		if ok and allocations and allocations.Clear then
+			allocations:Clear()
+			return true
+		end
+	end
+	return false
+end
+
+local function ApplyPreparedCraftActiveSlotChange(slot, change)
+	if not slot or not change then
+		return
+	end
+	if change.reagent then
+		if slot.SetReagent then
+			pcall(slot.SetReagent, slot, change.reagent)
+		end
+		if slot.SetHighlightShown then
+			pcall(slot.SetHighlightShown, slot, true)
+		end
+	else
+		if slot.ClearReagent then
+			pcall(slot.ClearReagent, slot)
+		end
+		if slot.SetHighlightShown then
+			pcall(slot.SetHighlightShown, slot, false)
+		end
+	end
+end
+
+local function RefreshPreparedCraftOrderSlots(form, changedSlots)
+	local pool = form and form.reagentSlotPool
+	if not pool or not pool.EnumerateActive then
+		return
+	end
+	for slot in pool:EnumerateActive() do
+		local schematic
+		if slot.GetReagentSlotSchematic then
+			local ok, value = pcall(slot.GetReagentSlotSchematic, slot)
+			if ok then
+				schematic = value
+			end
+		end
+		local slotIndex = ToSafeNumber(schematic and schematic.slotIndex)
+		ApplyPreparedCraftActiveSlotChange(slot, slotIndex and changedSlots[slotIndex])
+	end
+end
+
+function AF:ApplyTrackedCraftToCustomerOrder(entry)
+	if InCombatLockdown and InCombatLockdown() then
+		return false
+	end
+
+	local prepared = self:FindPreparedCraftForCustomerEntry(entry)
+	if not prepared or type(prepared.reagents) ~= "table" or #prepared.reagents == 0 then
+		return false
+	end
+
+	local form = ProfessionsCustomerOrdersFrame and ProfessionsCustomerOrdersFrame.Form
+	local transaction = form and form.transaction
+	if not transaction then
+		return false
+	end
+
+	local formRecipeID = GetCustomerOrderFormRecipeID(form)
+	if not formRecipeID or formRecipeID ~= GetPreparedCraftRecipeID(prepared) then
+		return false
+	end
+
+	local schematic = GetCustomerOrderFormSchematic(form, formRecipeID)
+	if not schematic then
+		return false
+	end
+
+	if form.UpdateReagentSlots then
+		pcall(form.UpdateReagentSlots, form)
+	end
+
+	local changedSlots = {}
+	local appliedCount = 0
+	for _, preparedReagent in ipairs(prepared.reagents or {}) do
+		local slot, slotReagent = FindPreparedReagentSlot(schematic, preparedReagent)
+		local slotIndex = ToSafeNumber(slot and slot.slotIndex)
+		if slotIndex and slotReagent then
+			local quantity = GetPreparedAllocationQuantity(slot, slotReagent, preparedReagent)
+			if OverwriteTransactionAllocation(transaction, slotIndex, slotReagent, quantity) then
+				changedSlots[slotIndex] = { reagent = slotReagent }
+				appliedCount = appliedCount + 1
+			end
+		end
+	end
+
+	if appliedCount == 0 then
+		return false
+	end
+
+	for _, slot in ipairs(schematic.reagentSlotSchematics or {}) do
+		local slotIndex = ToSafeNumber(slot.slotIndex)
+		if slotIndex and IsOptionalSlot(slot) and not changedSlots[slotIndex] then
+			if ClearTransactionAllocation(transaction, slotIndex) then
+				changedSlots[slotIndex] = { cleared = true }
+			end
+		end
+	end
+
+	RefreshPreparedCraftOrderSlots(form, changedSlots)
+	if form.UpdateListOrderButton then
+		pcall(form.UpdateListOrderButton, form)
+	end
+	return true, prepared, appliedCount
 end
 
 local function GetUntrackText()

@@ -630,6 +630,9 @@ local function ConfigureCustomerRow(row)
 				and AF.GetCustomerShoppingEntryKey
 				and context.entryKey == AF:GetCustomerShoppingEntryKey(buttonFrame.entry)
 			AF:FillPersonalOrder(buttonFrame.entry, keepShoppingList and { keepShoppingList = true } or nil)
+			if AF.ApplyTrackedCraftToCustomerOrder then
+				AF:ApplyTrackedCraftToCustomerOrder(buttonFrame.entry)
+			end
 		end
 	end)
 
