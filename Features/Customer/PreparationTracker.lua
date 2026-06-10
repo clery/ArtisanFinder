@@ -837,6 +837,11 @@ function PreparationObjectiveTrackerMixin:OnEvent(eventName, eventData)
 		end
 		return
 	end
+	-- Bag/item/currency events fire constantly; they only matter while
+	-- prepared crafts are displayed.
+	if GetPreparationCount() == 0 then
+		return
+	end
 	self:MarkDirty()
 end
 
