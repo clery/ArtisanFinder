@@ -300,7 +300,93 @@ end
 --   b = array of required slots with non-zero quality skill bonuses (skill-neutral
 --       slots are omitted entirely): i = slotIndex, x = dataSlotIndex,
 --       n = quantity, t = { [reagentQuality] = skillBonusPerUnit }
-local WIRE_FACTS_FORMAT = 1
+--   o = array of optional reagents that shift recipe difficulty/skill (reagents
+--       with no net effect are omitted): m = itemID, d = difficultyDelta (added
+--       to recipe difficulty when selected), k = skillDelta (added to total skill
+--       when selected). The customer rebuilds optional slot structure locally and
+--       matches these deltas onto its schematic reagents by itemID.
+local WIRE_FACTS_FORMAT = 2
+
+local function EncodeCompactDeltaNumber(value)
+	value = tonumber(value)
+	if not value or value == 0 then
+		return nil
+	end
+	if value == math.floor(value) then
+		return tostring(value)
+	end
+	local text = string.format("%.3f", value)
+	text = text:gsub("0+$", ""):gsub("%.$", "")
+	return text
+end
+
+local function DecodeCompactDeltaNumber(value)
+	if value == nil or value == "" then
+		return nil
+	end
+	return tonumber(value)
+end
+
+local function AddOptionalDeltaToMap(map, itemID, difficultyDelta, skillDelta)
+	itemID = tonumber(itemID)
+	difficultyDelta = tonumber(difficultyDelta)
+	skillDelta = tonumber(skillDelta)
+	if not itemID or ((not difficultyDelta or difficultyDelta == 0) and (not skillDelta or skillDelta == 0)) then
+		return map
+	end
+	map = map or {}
+	map[itemID] = {
+		difficultyDelta = difficultyDelta and difficultyDelta ~= 0 and difficultyDelta or nil,
+		skillDelta = skillDelta and skillDelta ~= 0 and skillDelta or nil,
+	}
+	return map
+end
+
+local function BuildOptionalDeltaMapFromWire(wire)
+	local map
+	for _, reagent in ipairs(type(wire) == "table" and type(wire.o) == "table" and wire.o or {}) do
+		map = AddOptionalDeltaToMap(map, reagent.m, reagent.d, reagent.k)
+	end
+	return map
+end
+
+function AF:EncodeCompactOptionalReagentDeltas(facts)
+	local entries
+	for _, slot in ipairs(type(facts) == "table" and facts.optionalSlots or {}) do
+		for _, reagent in ipairs(type(slot.reagents) == "table" and slot.reagents or {}) do
+			local itemID = tonumber(reagent.itemID)
+			local difficultyDelta = EncodeCompactDeltaNumber(reagent.difficultyDelta)
+			local skillDelta = EncodeCompactDeltaNumber(reagent.skillDelta)
+			if itemID and (difficultyDelta or skillDelta) then
+				entries = entries or {}
+				local text = tostring(itemID) .. ":" .. (difficultyDelta or "")
+				if skillDelta then
+					text = text .. ":" .. skillDelta
+				end
+				entries[#entries + 1] = text
+			end
+		end
+	end
+	return entries and table.concat(entries, ",") or ""
+end
+
+function AF:DecodeCompactOptionalReagentDeltas(encoded)
+	encoded = tostring(encoded or "")
+	if encoded == "" then
+		return nil
+	end
+	local map
+	for token in encoded:gmatch("[^,]+") do
+		local itemID, difficultyText, skillText = token:match("^(%d+):([^:]*):?([^:]*)$")
+		map = AddOptionalDeltaToMap(
+			map,
+			itemID,
+			DecodeCompactDeltaNumber(difficultyText),
+			DecodeCompactDeltaNumber(skillText)
+		)
+	end
+	return map
+end
 
 function AF:BuildWireReagentSkillFacts(facts)
 	if type(facts) ~= "table" or type(facts.requiredSlots) ~= "table" then
@@ -333,6 +419,23 @@ function AF:BuildWireReagentSkillFacts(facts)
 		end
 	end
 	wire.b = bonusSlots
+	local optionalReagents
+	for _, slot in ipairs(facts.optionalSlots or {}) do
+		for _, reagent in ipairs(type(slot.reagents) == "table" and slot.reagents or {}) do
+			local itemID = tonumber(reagent.itemID)
+			local difficultyDelta = tonumber(reagent.difficultyDelta) or 0
+			local skillDelta = tonumber(reagent.skillDelta) or 0
+			if itemID and (difficultyDelta ~= 0 or skillDelta ~= 0) then
+				optionalReagents = optionalReagents or {}
+				optionalReagents[#optionalReagents + 1] = {
+					m = itemID,
+					d = difficultyDelta ~= 0 and difficultyDelta or nil,
+					k = skillDelta ~= 0 and skillDelta or nil,
+				}
+			end
+		end
+	end
+	wire.o = optionalReagents
 	return wire
 end
 
@@ -371,7 +474,7 @@ function AF:SendPayloadParts(payloadParts, chatType, target, priority, queueName
 	return false
 end
 
-function AF:BuildCompactResponsePayloadParts(item, itemID, responseProfessionID, priceCopper, freeCommission, encodedNote, recipeID, timestamp, encodedLink, queryToken, crafterName, responseTarget, afk)
+function AF:BuildCompactResponsePayloadParts(item, itemID, responseProfessionID, priceCopper, freeCommission, encodedNote, recipeID, timestamp, encodedLink, queryToken, crafterName, responseTarget, afk, optionalDeltaText)
 	return {
 		"R",
 		self.PROTOCOL_VERSION,
@@ -398,6 +501,7 @@ function AF:BuildCompactResponsePayloadParts(item, itemID, responseProfessionID,
 		tonumber(item and item.maxOutputQuality) or 0,
 		tonumber(item and item.optionalSlotCount) or 0,
 		item and item.hasReagentSummary and 1 or ((item and item.bestReagents) and 1 or 0),
+		optionalDeltaText or self:EncodeCompactOptionalReagentDeltas(item and item.reagentSkillFacts),
 	}
 end
 
@@ -405,10 +509,15 @@ function AF:SendCompactResponse(item, itemID, responseProfessionID, priceCopper,
 	local encodedNote = self:EncodeNote(note)
 	local encodedLink = self:EncodeField(professionLink)
 	local responseTargetName = responseChannel == "GUILD" and responseTarget or nil
-	local payloadParts = self:BuildCompactResponsePayloadParts(item, itemID, responseProfessionID, priceCopper, freeCommission, encodedNote, recipeID, timestamp, encodedLink, queryToken, crafterName, responseTargetName, afk)
+	local optionalDeltaText = self:EncodeCompactOptionalReagentDeltas(item and item.reagentSkillFacts)
+	local payloadParts = self:BuildCompactResponsePayloadParts(item, itemID, responseProfessionID, priceCopper, freeCommission, encodedNote, recipeID, timestamp, encodedLink, queryToken, crafterName, responseTargetName, afk, optionalDeltaText)
 	local payload = BuildPayload(payloadParts)
 	if #payload > 255 then
-		payloadParts = self:BuildCompactResponsePayloadParts(item, itemID, responseProfessionID, priceCopper, freeCommission, "", recipeID, timestamp, "", queryToken, crafterName, responseTargetName, afk)
+		payloadParts = self:BuildCompactResponsePayloadParts(item, itemID, responseProfessionID, priceCopper, freeCommission, "", recipeID, timestamp, "", queryToken, crafterName, responseTargetName, afk, optionalDeltaText)
+		payload = BuildPayload(payloadParts)
+	end
+	if #payload > 255 and optionalDeltaText ~= "" then
+		payloadParts = self:BuildCompactResponsePayloadParts(item, itemID, responseProfessionID, priceCopper, freeCommission, "", recipeID, timestamp, "", queryToken, crafterName, responseTargetName, afk, "")
 		payload = BuildPayload(payloadParts)
 	end
 	if #payload <= 255 then
@@ -896,6 +1005,7 @@ function AF:HandleResponse(parts, sender)
 	local compactResponse = IsCompactResponse(parts)
 	local reagentSkillFacts = type(parts[15]) == "table" and parts[15] or nil
 	local wireFacts
+	local compactOptionalReagentDeltas
 	local factsMode
 	local cacheKey = crafterName
 
@@ -904,6 +1014,7 @@ function AF:HandleResponse(parts, sender)
 	end
 	if compactResponse then
 		reagentSkillFacts = nil
+		compactOptionalReagentDeltas = self:DecodeCompactOptionalReagentDeltas(parts[26])
 		factsMode = "compact"
 	elseif reagentSkillFacts and reagentSkillFacts.w ~= nil then
 		wireFacts = reagentSkillFacts
@@ -911,6 +1022,7 @@ function AF:HandleResponse(parts, sender)
 			return
 		end
 		reagentSkillFacts = self.RehydrateWireReagentSkillFacts and self:RehydrateWireReagentSkillFacts(wireFacts, recipeID) or nil
+		compactOptionalReagentDeltas = BuildOptionalDeltaMapFromWire(wireFacts)
 		factsMode = reagentSkillFacts and "wire" or "wire-rehydrate-failed"
 	elseif reagentSkillFacts then
 		if not self:IsCurrentScanModelEntry({
@@ -939,6 +1051,7 @@ function AF:HandleResponse(parts, sender)
 	local itemKey = tostring(itemID)
 	self.db.customerCache[itemKey] = self.db.customerCache[itemKey] or {}
 	local previous = self.db.customerCache[itemKey][cacheKey]
+	compactOptionalReagentDeltas = compactOptionalReagentDeltas or (previous and previous.compactOptionalReagentDeltas)
 	if not reagentSkillFacts then
 		-- Compact response or failed wire rehydration: never downgrade valid
 		-- cached detailed facts to synthetic empty ones.
@@ -1011,6 +1124,7 @@ function AF:HandleResponse(parts, sender)
 		bestReagents = savedReagents,
 		bestReagentSummaryUpdatedAt = savedReagents and self:Now() or nil,
 		hasReagentSummary = hasReagentSummary,
+		compactOptionalReagentDeltas = compactOptionalReagentDeltas,
 		optionalDifficultyDelta = nil,
 		optionalQuality = nil,
 		optionalOutputItemLevel = nil,
@@ -1166,14 +1280,17 @@ function AF:ApplyPendingReagentDetail(sender, itemID, recipeID, queryToken, craf
 			self.pendingReagentDetails[key] = nil
 			return
 		end
-		entry.bestReagents = pending.reagents or entry.bestReagents
-		entry.bestReagentSummaryUpdatedAt = self:Now()
-		entry.optionalBestReagents = self:GetDistinctOptionalBestReagents(entry.bestReagents, pending.optionalBestReagents or entry.optionalBestReagents)
-		entry.optionalBestReagentSummaryUpdatedAt = entry.optionalBestReagents and self:Now() or nil
-		entry.reagentDetailRequested = nil
-		self.pendingReagentDetails[key] = nil
+			entry.bestReagents = pending.reagents or entry.bestReagents
+			entry.bestReagentSummaryUpdatedAt = self:Now()
+			entry.optionalBestReagents = self:GetDistinctOptionalBestReagents(entry.bestReagents, pending.optionalBestReagents or entry.optionalBestReagents)
+			entry.optionalBestReagentSummaryUpdatedAt = entry.optionalBestReagents and self:Now() or nil
+			if self.HasAdvancedReagentFacts then
+				self:HasAdvancedReagentFacts(entry)
+			end
+			entry.reagentDetailRequested = nil
+			self.pendingReagentDetails[key] = nil
+		end
 	end
-end
 
 function AF:HandleReagentDetail(parts, sender)
 	local itemID = tonumber(parts[3])

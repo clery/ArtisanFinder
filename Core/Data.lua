@@ -273,6 +273,7 @@ local STALE_SCAN_COMPUTED_FIELDS = {
 	"optionalOutputItemLevelDelta",
 	"optionalConcentrationQuality",
 	"optionalReagents",
+	"compactOptionalReagentDeltas",
 	"optionalSlotCount",
 	"optionalBestReagents",
 	"optionalBestReagentSummaryUpdatedAt",
@@ -332,15 +333,22 @@ end
 
 -- True when the entry carries real per-slot reagent facts usable by the
 -- Advanced prepare flow. Synthetic facts built from compact responses (or
--- failed wire rehydration) are tagged compact = true; retry rehydration here
--- when the original wire payload is still cached.
+-- failed wire rehydration) are tagged compact = true; retry wire rehydration
+-- first, then fall back to local recipe probes when the order form can supply
+-- the schematic and operation info.
 function AF:HasAdvancedReagentFacts(entry)
 	if not HasCurrentScanModel(entry) then
 		return false
 	end
 	local facts = entry.reagentSkillFacts
-	if facts.compact == true and entry.wireReagentSkillFacts and self.RehydrateWireReagentSkillFacts then
-		local rehydrated = self:RehydrateWireReagentSkillFacts(entry.wireReagentSkillFacts, entry.recipeID)
+	if facts.compact == true then
+		local rehydrated
+		if entry.wireReagentSkillFacts and self.RehydrateWireReagentSkillFacts then
+			rehydrated = self:RehydrateWireReagentSkillFacts(entry.wireReagentSkillFacts, entry.recipeID)
+		end
+		if not rehydrated and self.RehydrateCompactReagentSkillFacts then
+			rehydrated = self:RehydrateCompactReagentSkillFacts(entry)
+		end
 		if rehydrated then
 			local function ApplyRehydratedFacts(target)
 				target.reagentSkillFacts = rehydrated

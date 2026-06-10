@@ -198,11 +198,29 @@ local function FindRecommendedForSlot(recommendations, slot)
 	return nil
 end
 
-local function BuildRequiredReagents(entry, mode)
+local function BuildRequiredRecommendations(entry, optionalReagents)
+	local recommendations = entry and AF:IsCurrentScanModelEntry(entry) and entry.bestReagents or {}
+	if type(optionalReagents) ~= "table" or #optionalReagents == 0 or not AF.BuildReagentSuggestion then
+		return recommendations
+	end
+	if AF.HasAdvancedReagentFacts then
+		AF:HasAdvancedReagentFacts(entry)
+	end
+	if not AF:IsCurrentScanModelEntry(entry) then
+		return recommendations
+	end
+	local suggestion = AF:BuildReagentSuggestion(entry, { optionalReagents = optionalReagents })
+	if suggestion and not suggestion.rescanNeeded and type(suggestion.reagents) == "table" and #suggestion.reagents > 0 then
+		return suggestion.reagents
+	end
+	return recommendations
+end
+
+local function BuildRequiredReagents(entry, mode, optionalReagents)
 	local reagents = {}
 	local seen = {}
 	local schematic = GetRecipeSchematic(entry and entry.recipeID)
-	local recommendations = entry and AF:IsCurrentScanModelEntry(entry) and entry.bestReagents or {}
+	local recommendations = BuildRequiredRecommendations(entry, mode == "optional" and optionalReagents or nil)
 
 	if schematic then
 		for _, slot in ipairs(schematic.reagentSlotSchematics or {}) do
@@ -312,7 +330,7 @@ function AF:CreatePreparedCraftEntry(entry, mode, optionalReagents)
 			}))
 		end
 	else
-		for _, reagent in ipairs(BuildRequiredReagents(entry, mode)) do
+		for _, reagent in ipairs(BuildRequiredReagents(entry, mode, optionalReagents)) do
 			AddOrMergeReagent(prepared.reagents, seen, reagent)
 		end
 		for _, reagent in ipairs(optionalReagents or {}) do

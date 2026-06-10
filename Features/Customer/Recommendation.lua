@@ -209,7 +209,15 @@ end
 local function GetOptionalDifficulty(selections)
 	local total = 0
 	for _, reagent in ipairs(selections and selections.optionalReagents or {}) do
-		total = total + (tonumber(reagent.difficultyAdjustment or reagent.bonusDifficulty or reagent.difficultyDelta) or 0)
+		total = total + (tonumber(reagent.difficultyDelta or reagent.difficultyAdjustment or reagent.bonusDifficulty) or 0)
+	end
+	return total
+end
+
+local function GetOptionalSkill(selections)
+	local total = 0
+	for _, reagent in ipairs(selections and selections.optionalReagents or {}) do
+		total = total + (tonumber(reagent.skillDelta or reagent.bonusSkill) or 0)
 	end
 	return total
 end
@@ -251,6 +259,7 @@ function AF:ComputeCraftOutcome(entry, selections)
 		totalSkill = totalSkill + GetRequiredSlotSkill(slot, quality)
 	end
 	totalDifficulty = totalDifficulty + GetOptionalDifficulty(selections)
+	totalSkill = totalSkill + GetOptionalSkill(selections)
 
 	local maxQuality = tonumber(facts.maxOutputQuality) or tonumber(entry and entry.maxOutputQuality) or 1
 	local quality = GetThresholdQuality(totalSkill, totalDifficulty, maxQuality)
@@ -357,7 +366,9 @@ function AF:BuildReagentSuggestion(entry, selections)
 		}
 	end
 
-	local highestOutcome = self:ComputeCraftOutcome(entry, BuildRequiredQualitySelection(facts, true))
+	local highestSelections = BuildRequiredQualitySelection(facts, true)
+	highestSelections.optionalReagents = selections and selections.optionalReagents or nil
+	local highestOutcome = self:ComputeCraftOutcome(entry, highestSelections)
 	local targetQuality = highestOutcome.quality or 1
 	local slots = facts.requiredSlots or {}
 	local choicesBySlot = {}

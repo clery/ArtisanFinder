@@ -2,7 +2,7 @@ local _, AF = ...
 
 local MAX_OPTIONAL_REAGENT_COMBINATIONS = 96
 local HEAVY_JOB_QUALITY_TIER_THRESHOLD = AF.HEAVY_JOB_QUALITY_TIER_THRESHOLD
-local SCAN_SIGNATURE_VERSION = 36
+local SCAN_SIGNATURE_VERSION = 37
 local SKILL_PROBE_SIGNATURE_VERSION = 1
 local FULL_SCAN_SIGNATURE_VERSION = 4
 local GetOperationQuality
@@ -811,14 +811,14 @@ local function BuildReagentFactsSkeleton(recipeID)
 		facts.optionalSlots[#facts.optionalSlots + 1] = slotFact
 	end
 
-	return facts, requiredSlots, baselineReagentInfo, baselineBySlot, recipeInfo
+	return facts, requiredSlots, baselineReagentInfo, baselineBySlot, recipeInfo, optionalSlots
 end
 
 function AF:BuildRecipeReagentSkillFacts(recipeID)
 	if self:IsSecretValue(recipeID) then
 		return nil
 	end
-	local facts, requiredSlots, baselineReagentInfo, baselineBySlot, recipeInfo = BuildReagentFactsSkeleton(recipeID)
+	local facts, requiredSlots, baselineReagentInfo, baselineBySlot, recipeInfo, optionalSlots = BuildReagentFactsSkeleton(recipeID)
 	if not facts then
 		return nil
 	end
@@ -861,7 +861,73 @@ function AF:BuildRecipeReagentSkillFacts(recipeID)
 		end
 	end
 
+	-- Optional/finishing reagents change recipe difficulty (and sometimes skill).
+	-- The static schematic carries no reliable difficultyAdjustment field, so we
+	-- probe each optional reagent against the required baseline and capture the
+	-- net deltas. The customer applies these when the reagent is selected.
+	local baselineDifficulty = facts.baseRecipeDifficulty
+	for slotIndex, reagentSlotSchematic in ipairs(optionalSlots or {}) do
+		local slotFact = facts.optionalSlots[slotIndex]
+		for reagentIndex, reagent in ipairs(reagentSlotSchematic.reagents or {}) do
+			YieldSkillFactsBuildIfNeeded()
+			local storedReagent = slotFact and slotFact.reagents[reagentIndex]
+			if storedReagent then
+				local probeReagentInfo = {}
+				for baselineSlotIndex, baselineSlot in ipairs(requiredSlots) do
+					AddCraftingReagentInfo(probeReagentInfo, baselineSlot, baselineBySlot[baselineSlotIndex])
+				end
+				probeReagentInfo[#probeReagentInfo + 1] = {
+					reagent = reagent,
+					dataSlotIndex = reagentSlotSchematic.dataSlotIndex,
+					quantity = GetQuantityRequired(reagentSlotSchematic, reagent),
+				}
+				local operationInfo = GetOperationInfoForReagentInfo(recipeID, probeReagentInfo)
+				if operationInfo then
+					local skillDelta = (GetOperationTotalSkill(operationInfo) or baselineTotalSkill) - baselineTotalSkill
+					local difficultyDelta = (GetOperationDifficulty(operationInfo) or baselineDifficulty) - baselineDifficulty
+					storedReagent.skillDelta = skillDelta ~= 0 and skillDelta or nil
+					storedReagent.difficultyDelta = difficultyDelta ~= 0 and difficultyDelta or nil
+					-- Keep difficultyAdjustment populated for legacy consumers/UI.
+					if storedReagent.difficultyDelta and (tonumber(storedReagent.difficultyAdjustment) or 0) == 0 then
+						storedReagent.difficultyAdjustment = storedReagent.difficultyDelta
+					end
+				end
+			end
+		end
+	end
+
 	return facts, baselineOperationInfo, baselineReagentInfo
+end
+
+local function ApplyOptionalDeltasToFacts(facts, optionalDeltas)
+	if type(facts) ~= "table" or type(optionalDeltas) ~= "table" then
+		return
+	end
+	local optionalByItemID = {}
+	for _, slotFact in ipairs(facts.optionalSlots or {}) do
+		for _, reagent in ipairs(slotFact.reagents or {}) do
+			local itemID = tonumber(reagent.itemID)
+			if itemID then
+				optionalByItemID[itemID] = reagent
+			end
+		end
+	end
+	for itemID, effect in pairs(optionalDeltas) do
+		local reagent = optionalByItemID[tonumber(itemID)]
+		if reagent and type(effect) == "table" then
+			local difficultyDelta = tonumber(effect.difficultyDelta)
+			local skillDelta = tonumber(effect.skillDelta)
+			if difficultyDelta ~= nil then
+				reagent.difficultyDelta = difficultyDelta
+				if difficultyDelta ~= 0 and (tonumber(reagent.difficultyAdjustment) or 0) == 0 then
+					reagent.difficultyAdjustment = difficultyDelta
+				end
+			end
+			if skillDelta ~= nil then
+				reagent.skillDelta = skillDelta
+			end
+		end
+	end
 end
 
 -- Customer-side: rebuilds full reagent skill facts from the lean wire format
@@ -912,6 +978,51 @@ function AF:RehydrateWireReagentSkillFacts(wire, recipeID)
 			end
 		end
 	end
+
+	-- Apply transmitted optional-reagent difficulty/skill deltas onto the locally
+	-- rebuilt optional slots, matched by itemID. The schematic carries no reliable
+	-- per-reagent difficulty field, so these crafter-probed deltas are the only
+	-- correct source for the customer's outcome math.
+	local optionalDeltas
+	for _, wireReagent in ipairs(type(wire.o) == "table" and wire.o or {}) do
+		local itemID = tonumber(wireReagent.m)
+		if itemID then
+			optionalDeltas = optionalDeltas or {}
+			optionalDeltas[itemID] = {
+				difficultyDelta = tonumber(wireReagent.d),
+				skillDelta = tonumber(wireReagent.k),
+			}
+		end
+	end
+	ApplyOptionalDeltasToFacts(facts, optionalDeltas)
+	return facts
+end
+
+function AF:RehydrateCompactReagentSkillFacts(entry)
+	local compactFacts = type(entry) == "table" and entry.reagentSkillFacts or nil
+	if type(compactFacts) ~= "table" or compactFacts.compact ~= true then
+		return nil
+	end
+	local recipeID = tonumber(entry.recipeID or compactFacts.recipeID)
+	if not recipeID or (self.IsSecretValue and self:IsSecretValue(recipeID)) then
+		return nil
+	end
+	if not C_TradeSkillUI
+		or not C_TradeSkillUI.GetRecipeInfo
+		or not C_TradeSkillUI.GetRecipeSchematic
+		or not C_TradeSkillUI.GetCraftingOperationInfo then
+		return nil
+	end
+	local facts = self:BuildRecipeReagentSkillFacts(recipeID)
+	if not facts then
+		return nil
+	end
+	facts.baseSkill = tonumber(compactFacts.baseSkill) or tonumber(entry.totalSkill) or tonumber(facts.baseSkill) or 0
+	facts.baseRecipeDifficulty = tonumber(compactFacts.baseRecipeDifficulty) or tonumber(entry.recipeDifficulty) or tonumber(facts.baseRecipeDifficulty) or 0
+	facts.maxOutputQuality = tonumber(compactFacts.maxOutputQuality) or tonumber(entry.maxOutputQuality) or tonumber(facts.maxOutputQuality) or 1
+	facts.rehydrated = true
+	facts.localProbe = true
+	ApplyOptionalDeltasToFacts(facts, entry.compactOptionalReagentDeltas)
 	return facts
 end
 

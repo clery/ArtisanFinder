@@ -19,7 +19,7 @@ local function NewEntry(baseSkill, baseDifficulty, maxQuality, requiredSlots)
 	return {
 		recipeID = 100,
 		reagentSkillFacts = {
-			scanModelVersion = 4,
+			scanModelVersion = AF.SCAN_MODEL_VERSION,
 			recipeID = 100,
 			baseSkill = baseSkill,
 			baseRecipeDifficulty = baseDifficulty,
@@ -61,6 +61,40 @@ local optionalOutcome = AF:ComputeCraftOutcome(optional, {
 })
 Check(optionalOutcome.totalDifficulty == 120, "optional reagent difficulty should add before thresholds")
 Check(optionalOutcome.quality == 3, "optional difficulty should lower threshold result")
+
+-- difficultyDelta (crafter-probed) takes precedence over the static schematic
+-- difficultyAdjustment, and optional skillDelta adds to total skill.
+local deltaEntry = NewEntry(80, 100, 5)
+local deltaOutcome = AF:ComputeCraftOutcome(deltaEntry, {
+	optionalReagents = {
+		{ difficultyAdjustment = 20, difficultyDelta = 40, skillDelta = 10 },
+	},
+})
+Check(deltaOutcome.totalDifficulty == 140, "difficultyDelta should override static difficultyAdjustment")
+Check(deltaOutcome.totalSkill == 90, "optional skillDelta should add to total skill")
+
+-- Regression: an embellishment that raises difficulty by 73 must drop the
+-- result below max instead of reporting full quality (the reported bug).
+local embellished = NewEntry(500, 500, 5)
+Check(AF:ComputeCraftOutcome(embellished, { optionalReagents = {} }).quality == 5, "100 percent with no optional should be max quality")
+local missing73 = AF:ComputeCraftOutcome(embellished, {
+	optionalReagents = {
+		{ difficultyDelta = 73 },
+	},
+})
+Check(missing73.totalDifficulty == 573, "optional embellishment difficulty should raise total difficulty")
+Check(missing73.quality < 5, "missing 73 skill should drop below max quality")
+Check(missing73.quality == 4, "500/573 is 87 percent which is q4")
+
+local logLike = NewEntry(315, 250, 5)
+local logLikeOutcome = AF:ComputeCraftOutcome(logLike, {
+	optionalReagents = {
+		{ difficultyDelta = 73 },
+	},
+})
+Check(AF:ComputeCraftOutcome(logLike, { optionalReagents = {} }).quality == 5, "315 skill over 250 base difficulty should be compact max quality")
+Check(logLikeOutcome.totalDifficulty == 323, "log-like optional reagent should raise final difficulty to 323")
+Check(logLikeOutcome.quality == 4, "315 skill into 323 difficulty should not remain q5")
 
 local capped = NewEntry(130, 100, 5)
 local cappedOutcome = AF:ComputeCraftOutcome(capped)
@@ -171,7 +205,7 @@ local missing = AF:BuildReagentSuggestion({ recipeID = 100 })
 Check(missing.rescanNeeded == true and missing.missingData.reagentSkillFacts == true, "missing facts should require rescan")
 
 local oldModelEntry = NewEntry(100, 100, 5)
-oldModelEntry.reagentSkillFacts.scanModelVersion = 3
+oldModelEntry.reagentSkillFacts.scanModelVersion = AF.SCAN_MODEL_VERSION - 1
 Check(AF:ComputeCraftOutcome(oldModelEntry).rescanNeeded == true, "old scan model should require rescan")
 oldModelEntry.bestQuality = 5
 oldModelEntry.bestReagents = {

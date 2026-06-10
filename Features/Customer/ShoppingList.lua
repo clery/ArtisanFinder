@@ -205,6 +205,137 @@ local function GetRecipeSchematic(recipeID)
 	return nil
 end
 
+local AddOptionalEffect
+
+local function GetOperationTotalSkill(operationInfo)
+	if type(operationInfo) ~= "table" then
+		return nil
+	end
+	local totalSkill = (tonumber(operationInfo.baseSkill) or 0) + (tonumber(operationInfo.bonusSkill) or 0)
+	return totalSkill > 0 and totalSkill or nil
+end
+
+local function GetOperationDifficulty(operationInfo)
+	if type(operationInfo) ~= "table" then
+		return nil
+	end
+	local difficulty = (tonumber(operationInfo.baseDifficulty) or 0) + (tonumber(operationInfo.bonusDifficulty) or 0)
+	return difficulty > 0 and difficulty or nil
+end
+
+local function IsBaselineRequiredSlot(slot)
+	local isBasic = Enum and Enum.CraftingReagentType and slot.reagentType == Enum.CraftingReagentType.Basic
+	return slot and not slot.hiddenInCraftingForm and (slot.required == true or isBasic)
+end
+
+local function IsLowerQualityReagent(left, right)
+	if not right then
+		return true
+	end
+	if not left then
+		return false
+	end
+	local leftQuality = GetReagentQualityValue(left.itemID) or 0
+	local rightQuality = GetReagentQualityValue(right.itemID) or 0
+	if leftQuality ~= rightQuality then
+		return leftQuality < rightQuality
+	end
+	return (tonumber(left.itemID) or 0) < (tonumber(right.itemID) or 0)
+end
+
+local function SelectBaselineReagent(slot)
+	local selected
+	for _, reagent in ipairs(slot and slot.reagents or {}) do
+		if IsLowerQualityReagent(reagent, selected) then
+			selected = reagent
+		end
+	end
+	return selected
+end
+
+local function AddCraftingReagentInfo(reagentInfo, slot, reagent)
+	if not slot or not reagent then
+		return
+	end
+	reagentInfo[#reagentInfo + 1] = {
+		reagent = reagent,
+		dataSlotIndex = slot.dataSlotIndex,
+		quantity = GetQuantityRequired(slot, reagent),
+	}
+end
+
+local function CopyCraftingReagentInfo(reagentInfo)
+	local copy = {}
+	for index, info in ipairs(reagentInfo or {}) do
+		copy[index] = {
+			reagent = info.reagent,
+			dataSlotIndex = info.dataSlotIndex,
+			quantity = info.quantity,
+		}
+	end
+	return copy
+end
+
+local function BuildBaselineCraftingReagentInfo(schematic)
+	local reagentInfo = {}
+	for _, slot in ipairs(schematic and schematic.reagentSlotSchematics or {}) do
+		if IsBaselineRequiredSlot(slot) then
+			AddCraftingReagentInfo(reagentInfo, slot, SelectBaselineReagent(slot))
+		end
+	end
+	return reagentInfo
+end
+
+local function GetCraftingOperationInfo(recipeID, reagentInfo)
+	if not C_TradeSkillUI or not C_TradeSkillUI.GetCraftingOperationInfo then
+		return nil
+	end
+	local ok, operationInfo = pcall(C_TradeSkillUI.GetCraftingOperationInfo, recipeID, reagentInfo or {}, nil, false)
+	return ok and type(operationInfo) == "table" and operationInfo or nil
+end
+
+local function ProbeOptionalEffectMap(entry)
+	local recipeID = tonumber(entry and entry.recipeID)
+	if not recipeID or not C_TradeSkillUI or not C_TradeSkillUI.GetCraftingOperationInfo then
+		return nil
+	end
+	local schematic = GetRecipeSchematic(recipeID)
+	if not schematic then
+		return nil
+	end
+	local baselineReagentInfo = BuildBaselineCraftingReagentInfo(schematic)
+	local baselineOperationInfo = GetCraftingOperationInfo(recipeID, baselineReagentInfo)
+		or GetCraftingOperationInfo(recipeID, {})
+	local facts = entry and entry.reagentSkillFacts
+	local baselineDifficulty = GetOperationDifficulty(baselineOperationInfo)
+		or tonumber(entry and entry.recipeDifficulty)
+		or tonumber(facts and facts.baseRecipeDifficulty)
+	local baselineSkill = GetOperationTotalSkill(baselineOperationInfo)
+	if not baselineDifficulty and not baselineSkill then
+		return nil
+	end
+
+	local effects
+	for _, slot in ipairs(schematic.reagentSlotSchematics or {}) do
+		if IsShoppingOptionalSlot(slot) then
+			for _, reagent in ipairs(slot.reagents or {}) do
+				local itemID = tonumber(reagent and reagent.itemID)
+				if itemID then
+					local probeReagentInfo = CopyCraftingReagentInfo(baselineReagentInfo)
+					AddCraftingReagentInfo(probeReagentInfo, slot, reagent)
+					local operationInfo = GetCraftingOperationInfo(recipeID, probeReagentInfo)
+					local difficulty = GetOperationDifficulty(operationInfo)
+					local skill = GetOperationTotalSkill(operationInfo)
+					local difficultyDelta = difficulty and baselineDifficulty and (difficulty - baselineDifficulty) or nil
+					local skillDelta = skill and baselineSkill and (skill - baselineSkill) or nil
+					effects = AddOptionalEffect(effects, itemID, difficultyDelta, skillDelta)
+				end
+			end
+		end
+	end
+	return effects
+end
+
 local function BuildOptionalSlotIndex(recipeID)
 	local slots = {}
 	local byDataSlotIndex = {}
@@ -287,12 +418,68 @@ local function BuildCandidate(slot, reagent, suggested)
 		dataSlotIndex = slot.dataSlotIndex,
 		slotText = GetSlotText(slot),
 		slotKey = slotKey,
-		optional = slot and slot.optional == true or reagent.optional == true,
+		optional = slot and (slot.optional == true or IsShoppingOptionalSlot(slot)) or reagent.optional == true,
 		required = slot and slot.required == true or reagent.required == true,
 		difficultyAdjustment = reagent.difficultyAdjustment,
+		difficultyDelta = reagent.difficultyDelta,
+		skillDelta = reagent.skillDelta,
 		source = suggested and "recommendation" or "schematic",
 		suggested = suggested == true,
 	}
+end
+
+function AddOptionalEffect(effects, itemID, difficultyDelta, skillDelta)
+	itemID = tonumber(itemID)
+	difficultyDelta = tonumber(difficultyDelta)
+	skillDelta = tonumber(skillDelta)
+	if not itemID or ((not difficultyDelta or difficultyDelta == 0) and (not skillDelta or skillDelta == 0)) then
+		return effects
+	end
+	effects = effects or {}
+	effects[itemID] = {
+		difficultyDelta = difficultyDelta and difficultyDelta ~= 0 and difficultyDelta or nil,
+		skillDelta = skillDelta and skillDelta ~= 0 and skillDelta or nil,
+	}
+	return effects
+end
+
+local function BuildEntryOptionalEffectMap(entry)
+	local effects
+	for itemID, effect in pairs(type(entry and entry.compactOptionalReagentDeltas) == "table" and entry.compactOptionalReagentDeltas or {}) do
+		effects = AddOptionalEffect(effects, itemID, effect.difficultyDelta, effect.skillDelta)
+	end
+	local facts = entry and entry.reagentSkillFacts
+	for _, slot in ipairs(type(facts) == "table" and facts.optionalSlots or {}) do
+		for _, reagent in ipairs(type(slot.reagents) == "table" and slot.reagents or {}) do
+			effects = AddOptionalEffect(effects, reagent.itemID, reagent.difficultyDelta, reagent.skillDelta)
+		end
+	end
+	if not effects then
+		for itemID, effect in pairs(ProbeOptionalEffectMap(entry) or {}) do
+			effects = AddOptionalEffect(effects, itemID, effect.difficultyDelta, effect.skillDelta)
+		end
+		if effects and type(entry) == "table" then
+			entry.compactOptionalReagentDeltas = effects
+		end
+	end
+	return effects
+end
+
+local function ApplyOptionalEffect(candidate, effects)
+	if not candidate or candidate.optional ~= true or not effects then
+		return candidate
+	end
+	local effect = effects[tonumber(candidate.itemID)] or effects[tostring(candidate.itemID or "")]
+	if not effect then
+		return candidate
+	end
+	if effect.difficultyDelta ~= nil then
+		candidate.difficultyDelta = effect.difficultyDelta
+	end
+	if effect.skillDelta ~= nil then
+		candidate.skillDelta = effect.skillDelta
+	end
+	return candidate
 end
 
 local function CandidateSort(left, right)
@@ -317,6 +504,15 @@ local function AddCandidate(candidates, seen, candidate)
 	if existing then
 		existing.suggested = existing.suggested or candidate.suggested
 		existing.source = existing.suggested and "recommendation" or existing.source
+		if candidate.difficultyDelta ~= nil then
+			existing.difficultyDelta = candidate.difficultyDelta
+		end
+		if candidate.difficultyAdjustment ~= nil then
+			existing.difficultyAdjustment = candidate.difficultyAdjustment
+		end
+		if candidate.skillDelta ~= nil then
+			existing.skillDelta = candidate.skillDelta
+		end
 		return
 	end
 	candidate.key = key
@@ -324,16 +520,16 @@ local function AddCandidate(candidates, seen, candidate)
 	table.insert(candidates, candidate)
 end
 
-local function AddRecommendationCandidates(candidates, seen, entries, slots, byDataSlotIndex)
+local function AddRecommendationCandidates(candidates, seen, entries, slots, byDataSlotIndex, optionalEffects)
 	for _, entry in ipairs(entries or {}) do
 		if AF:IsCurrentScanModelEntry(entry) then
 			for _, reagent in ipairs(entry.optionalReagents or {}) do
 				local slot = FindOptionalSlotForEntry(slots, byDataSlotIndex, reagent)
-				AddCandidate(candidates, seen, BuildCandidate(slot, reagent, true))
+				AddCandidate(candidates, seen, ApplyOptionalEffect(BuildCandidate(slot, reagent, true), optionalEffects))
 			end
 			for _, reagent in ipairs(entry.optionalBestReagents or {}) do
 				local slot = FindOptionalSlotForEntry(slots, byDataSlotIndex, reagent)
-				AddCandidate(candidates, seen, BuildCandidate(slot, reagent, true))
+				AddCandidate(candidates, seen, ApplyOptionalEffect(BuildCandidate(slot, reagent, true), optionalEffects))
 			end
 		end
 	end
@@ -358,6 +554,7 @@ function AF:SetCustomerShoppingContext(entry, mode)
 	local recipeID = tonumber(entry and entry.recipeID) or tonumber(self.currentCustomerRecipeID)
 	if not itemID or not recipeID then
 		self.customerShoppingContext = nil
+		self.customerShoppingSlotsContextKey = nil
 		return nil
 	end
 
@@ -399,6 +596,7 @@ function AF:BuildCustomerShoppingCandidates(context, entries)
 
 	local candidates = {}
 	local seen = {}
+	local optionalEffects = BuildEntryOptionalEffectMap(context.entry)
 	if context.mode == "advanced" then
 		if not self:IsCurrentScanModelEntry(context.entry) then
 			return candidates
@@ -406,7 +604,7 @@ function AF:BuildCustomerShoppingCandidates(context, entries)
 		local suggestedSignature = self:GetReagentDisplaySignature(context.entry and context.entry.bestReagents)
 		for _, slot in ipairs(BuildAdvancedSlotsFromFacts(context.entry and context.entry.reagentSkillFacts)) do
 			for _, reagent in ipairs(slot.reagents or {}) do
-				local candidate = BuildCandidate(slot, reagent, false)
+				local candidate = ApplyOptionalEffect(BuildCandidate(slot, reagent, false), optionalEffects)
 				if candidate then
 					local candidateSignature = self:GetReagentDisplaySignature({ candidate })
 					candidate.suggested = suggestedSignature ~= "" and suggestedSignature:find(candidateSignature, 1, true) ~= nil
@@ -417,11 +615,11 @@ function AF:BuildCustomerShoppingCandidates(context, entries)
 		end
 	else
 		local slots, byDataSlotIndex = BuildOptionalSlotIndex(context.recipeID)
-		AddRecommendationCandidates(candidates, seen, entries, slots, byDataSlotIndex)
+		AddRecommendationCandidates(candidates, seen, entries, slots, byDataSlotIndex, optionalEffects)
 
 		for _, slot in ipairs(slots) do
 			for _, reagent in ipairs(slot.reagents or {}) do
-				AddCandidate(candidates, seen, BuildCandidate(slot, reagent, false))
+				AddCandidate(candidates, seen, ApplyOptionalEffect(BuildCandidate(slot, reagent, false), optionalEffects))
 			end
 		end
 	end
@@ -461,6 +659,7 @@ function AF:BuildCustomerShoppingSlots(context, entries)
 	end)
 	self.customerShoppingCandidates = candidates
 	self.customerShoppingSlots = slots
+	self.customerShoppingSlotsContextKey = context and context.key or nil
 	return slots
 end
 
@@ -783,6 +982,79 @@ local function BuildAdvancedOutcomeSelections(candidates, selectedBySlot)
 	return selections
 end
 
+local function GetOptionalAdjustments(optionalReagents)
+	local difficultyDelta = 0
+	local skillDelta = 0
+	for _, reagent in ipairs(optionalReagents or {}) do
+		local reagentDifficulty = tonumber(reagent.difficultyDelta)
+		if reagentDifficulty == nil then
+			reagentDifficulty = tonumber(reagent.difficultyAdjustment or reagent.bonusDifficulty)
+		end
+		difficultyDelta = difficultyDelta + (reagentDifficulty or 0)
+		skillDelta = skillDelta + (tonumber(reagent.skillDelta or reagent.bonusSkill) or 0)
+	end
+	return difficultyDelta, skillDelta
+end
+
+local function ComputeOptionalShoppingOutcome(AF, entry, selections)
+	local optionalReagents = selections and selections.optionalReagents or nil
+	local difficultyDelta, skillDelta = GetOptionalAdjustments(optionalReagents)
+	if difficultyDelta == 0 and skillDelta == 0 then
+		return nil
+	end
+	local facts = entry and entry.reagentSkillFacts
+	local totalSkill = tonumber(entry and entry.bestTotalSkill)
+		or tonumber(entry and entry.totalSkill)
+		or tonumber(facts and facts.baseSkill)
+		or 0
+	local totalDifficulty = tonumber(entry and entry.recipeDifficulty)
+		or tonumber(facts and facts.baseRecipeDifficulty)
+		or 0
+	local maxQuality = tonumber(entry and entry.maxOutputQuality)
+		or tonumber(facts and facts.maxOutputQuality)
+		or tonumber(entry and entry.bestQuality)
+		or 1
+	if totalSkill <= 0 or totalDifficulty <= 0 or maxQuality <= 0 or not AF.GetCraftQualityForSkill then
+		return nil
+	end
+	totalSkill = totalSkill + skillDelta
+	totalDifficulty = totalDifficulty + difficultyDelta
+	local quality = AF:GetCraftQualityForSkill(totalSkill, totalDifficulty, maxQuality)
+	return {
+		totalSkill = totalSkill,
+		totalDifficulty = totalDifficulty,
+		quality = quality,
+		concentrationQuality = math.min(quality + 1, maxQuality),
+		maxQuality = maxQuality,
+		optionalDifficultyDelta = difficultyDelta,
+		optionalSkillDelta = skillDelta,
+	}
+end
+
+function AF:GetCustomerShoppingOutcome(entry, context)
+	context = context or self:GetCustomerShoppingContext()
+	if not context or (context.mode ~= "optional" and context.mode ~= "advanced") or not entry then
+		return nil
+	end
+	if context.entryKey ~= GetEntryContextKey(entry) then
+		return nil
+	end
+	context.entry = entry
+	local state = self:GetCustomerShoppingState(context)
+	if not state then
+		return nil
+	end
+	if self.customerShoppingSlotsContextKey ~= context.key then
+		self:BuildCustomerShoppingSlots(context, { entry })
+		self:PrimeAdvancedShoppingSelections(context)
+	end
+	local selections = BuildAdvancedOutcomeSelections(self.customerShoppingCandidates or {}, state.selections or {})
+	if context.mode == "optional" then
+		return ComputeOptionalShoppingOutcome(self, entry, selections)
+	end
+	return self.ComputeCraftOutcome and self:ComputeCraftOutcome(entry, selections) or nil
+end
+
 local function FormatAdvancedExpectedQuality(AF, entry, candidates, selectedBySlot)
 	if not AF.ComputeCraftOutcome then
 		return nil
@@ -862,6 +1134,7 @@ function AF:HideCustomerShoppingList()
 	self.customerShoppingContext = nil
 	self.customerShoppingCandidates = nil
 	self.customerShoppingSlots = nil
+	self.customerShoppingSlotsContextKey = nil
 	self:HideCustomerShoppingPicker()
 	for _, row in ipairs(self.customerRows or {}) do
 		if row.optionalPrep then
@@ -944,6 +1217,7 @@ function AF:RefreshCustomerShoppingList(entries)
 	if not context or (context.mode ~= "optional" and context.mode ~= "advanced") then
 		self.customerShoppingCandidates = nil
 		self.customerShoppingSlots = nil
+		self.customerShoppingSlotsContextKey = nil
 		return 0
 	end
 

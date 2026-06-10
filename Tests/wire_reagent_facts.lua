@@ -103,6 +103,7 @@ C_TradeSkillUI = {
 	end,
 	GetCraftingOperationInfo = function(_, reagentInfo)
 		local bonus = 0
+		local bonusDifficulty = 0
 		for _, info in ipairs(reagentInfo or {}) do
 			if info.quantity and info.quantity > 0 then
 				local itemID = info.reagent and info.reagent.itemID
@@ -111,9 +112,13 @@ C_TradeSkillUI = {
 				if quality and slotSkill then
 					bonus = bonus + (slotSkill[quality] or 0)
 				end
+				-- Optional embellishment reagents raise recipe difficulty by 73.
+				if itemID == 219898 or itemID == 219899 then
+					bonusDifficulty = bonusDifficulty + 73
+				end
 			end
 		end
-		return { baseSkill = 425, bonusSkill = bonus, baseDifficulty = 400, bonusDifficulty = 0 }
+		return { baseSkill = 425, bonusSkill = bonus, baseDifficulty = 400, bonusDifficulty = bonusDifficulty }
 	end,
 }
 
@@ -145,13 +150,22 @@ Check(crafterFacts, "crafter facts should build from stubbed schematic")
 Check(#crafterFacts.requiredSlots == 3, "crafter facts should keep all required slots")
 Check(crafterFacts.requiredSlots[1].qualityBonuses[3] == 0.5, "per-unit quality bonus should divide by quantity")
 
+-- Crafter probe should capture the optional reagent's real difficulty shift.
+Check(crafterFacts.optionalSlots[1].reagents[1].difficultyDelta == 73, "optional reagent difficulty delta should be probed")
+
 local wire = AF:BuildWireReagentSkillFacts(crafterFacts)
-Check(wire and wire.w == 1, "wire facts should carry format marker")
+Check(wire and wire.w == 2, "wire facts should carry format marker")
 Check(wire.v == AF.SCAN_MODEL_VERSION and wire.s == 425 and wire.d == 400 and wire.q == 5, "wire facts should carry probe scalars")
 Check(#wire.b == 2, "skill-neutral slots should not be transmitted")
 Check(wire.b[1].t[1] == nil, "zero quality bonuses should not be transmitted")
 Check(wire.b[1].t[3] == 0.5 and wire.b[2].t[3] == 25, "wire facts should keep non-zero per-unit bonuses")
 Check(wire.requiredSlots == nil and wire.optionalSlots == nil, "wire facts should not embed slot tables")
+Check(type(wire.o) == "table" and #wire.o == 2, "wire facts should transmit optional difficulty deltas")
+Check(wire.o[1].d == 73 and wire.o[1].k == nil, "optional wire entry should carry difficulty delta only")
+local compactOptionalDeltas = AF:EncodeCompactOptionalReagentDeltas(crafterFacts)
+Check(compactOptionalDeltas:find("219898:73", 1, true) ~= nil, "compact response should encode optional difficulty deltas")
+local decodedCompactOptionalDeltas = AF:DecodeCompactOptionalReagentDeltas(compactOptionalDeltas)
+Check(decodedCompactOptionalDeltas[219898].difficultyDelta == 73, "compact optional deltas should decode by itemID")
 
 -- 2. Customer side: rehydrate from the local schematic.
 local rehydrated = AF:RehydrateWireReagentSkillFacts(wire, 441052)
@@ -162,6 +176,7 @@ Check(#rehydrated.optionalSlots == 1, "rehydration should restore optional slots
 Check(rehydrated.requiredSlots[1].qualityBonuses[2] == 0.25, "rehydration should merge wire quality bonuses")
 Check(next(rehydrated.requiredSlots[3].qualityBonuses) == nil, "skill-neutral slot should rebuild without bonuses")
 Check(rehydrated.optionalSlots[1].reagents[1].difficultyAdjustment == 30, "optional difficulty should rebuild from schematic")
+Check(rehydrated.optionalSlots[1].reagents[1].difficultyDelta == 73, "optional difficulty delta should rehydrate from wire onto schematic reagent")
 Check(rehydrated.baseSkill == 425 and rehydrated.baseRecipeDifficulty == 400 and rehydrated.maxOutputQuality == 5, "scalars should come from wire data")
 
 for slotIndex, slot in ipairs(crafterFacts.requiredSlots) do

@@ -501,9 +501,13 @@ function AF:FormatCapability(entry)
 	end
 
 	local parts = {}
+	local shoppingOutcome = self.GetCustomerShoppingOutcome and self:GetCustomerShoppingOutcome(entry) or nil
+	if shoppingOutcome and shoppingOutcome.rescanNeeded then
+		shoppingOutcome = nil
+	end
 	local normalQuality = tonumber(entry.quality)
-	local bestQuality = tonumber(entry.bestQuality)
-	local bestConcentrationQuality = tonumber(entry.bestConcentrationQuality)
+	local bestQuality = tonumber(shoppingOutcome and shoppingOutcome.quality) or tonumber(entry.bestQuality)
+	local bestConcentrationQuality = tonumber(shoppingOutcome and shoppingOutcome.concentrationQuality) or tonumber(entry.bestConcentrationQuality)
 	local baseConcentrationQuality = tonumber(entry.concentrationQuality)
 	local concentrationQuality = bestConcentrationQuality
 	if baseConcentrationQuality and baseConcentrationQuality > (concentrationQuality or 0) then

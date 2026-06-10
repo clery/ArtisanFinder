@@ -18,6 +18,8 @@
 
 ### Fixed
 
+* Expected craft quality in Advanced prepare now accounts for the added recipe difficulty of optional reagents (such as embellishments), so it no longer overstates the result as maximum quality when the selected reagents fall short.
+* Compact artisan responses now carry optional reagent difficulty deltas, so "With optional reagents" can adjust the displayed expected quality even when the full reagent-facts payload falls back to `C1`.
 * Opening a profession should no longer significantly cause an FPS drop.
 * Advanced prepare order no longer opens an empty panel claiming "No reagent choices were found" when detailed reagent data has not been received from a crafter; the Advanced action is disabled and a clear message is shown until the data is available.
 * A compact (summary-only) response no longer wipes previously received detailed reagent data for the same crafter and item.

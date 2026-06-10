@@ -38,8 +38,13 @@ local function NewRegion()
 	}
 end
 
+LoadAddonFile("Core/Bootstrap.lua")
 LoadAddonFile("Utils/Formatting.lua")
+LoadAddonFile("Core/Data.lua")
+LoadAddonFile("Features/Customer/Recommendation.lua")
+LoadAddonFile("Features/Crafter/RecipeCapability.lua")
 LoadAddonFile("Features/Social/Comms.lua")
+LoadAddonFile("Features/Customer/PreparationTracker.lua")
 LoadAddonFile("Features/Customer/ShoppingList.lua")
 
 AF.db = {
@@ -110,7 +115,7 @@ Check(AF.refreshed == 1, "stale requested detail should refresh customer results
 
 local capturedPayload
 AF.PROTOCOL_VERSION = "5"
-AF.SCAN_MODEL_VERSION = 4
+AF.SCAN_MODEL_VERSION = 5
 AF.RESPONSE_THROTTLE = 5
 AF.responseThrottle = {}
 AF.currentCustomerQueryToken = 2000
@@ -199,7 +204,13 @@ Check(compactEntry.hasReagentSummary == true, "compact response should keep reag
 Check(compactEntry.bestQuality == 5, "compact response should preserve best quality")
 Check(compactEntry.reagentSkillFacts and compactEntry.reagentSkillFacts.scanModelVersion == AF.SCAN_MODEL_VERSION, "compact response should create minimal current facts")
 
-function AF:Text(key)
+function AF:Text(key, ...)
+	if key == "RECOMMENDED_REAGENTS_QUALITY" then
+		return "Recommended " .. tostring(select(1, ...))
+	end
+	if key == "CONCENTRATION_QUALITY" then
+		return "With concentration " .. tostring(select(1, ...))
+	end
 	return key
 end
 
@@ -207,8 +218,348 @@ function AF:GetDisplayItemName(itemID)
 	return tostring(itemID)
 end
 
-local builtWithEntry
-function AF:BuildCustomerShoppingSlots(context, entries)
+function AF:GetRecipeQualityIconMarkup(_, quality)
+	return "Q" .. tostring(quality or 0)
+end
+
+function AF:IsCurrentScanModelEntry(entry)
+	local facts = type(entry) == "table" and entry.reagentSkillFacts or nil
+	return type(facts) == "table"
+		and tonumber(entry.scanModelVersion) == AF.SCAN_MODEL_VERSION
+		and tonumber(facts.scanModelVersion) == AF.SCAN_MODEL_VERSION
+		and type(facts.requiredSlots) == "table"
+		and type(facts.optionalSlots) == "table"
+end
+
+local advancedEntry = {
+	name = "Megamanexe-Dalaran",
+	target = "Megamanexe-Dalaran",
+	orderTarget = "Megamanexe-Dalaran",
+	itemID = 244571,
+	professionID = 165,
+	recipeID = 1237510,
+	scanModelVersion = AF.SCAN_MODEL_VERSION,
+	reagentSkillFacts = {
+		scanModelVersion = AF.SCAN_MODEL_VERSION,
+		baseSkill = 500,
+		baseRecipeDifficulty = 500,
+		maxOutputQuality = 5,
+		requiredSlots = {},
+		optionalSlots = {
+			{
+				slotKey = "embellishment",
+				slotText = "Embellishment",
+				reagents = {
+					{ itemID = 219898, quantity = 1, quality = 1, difficultyAdjustment = 30, difficultyDelta = 73 },
+				},
+			},
+		},
+	},
+}
+local advancedContext = AF:SetCustomerShoppingContext(advancedEntry, "advanced")
+local advancedCandidates = AF:BuildCustomerShoppingCandidates(advancedContext, { advancedEntry })
+Check(#advancedCandidates == 1, "advanced shopping should expose optional reagent candidate")
+Check(advancedCandidates[1].difficultyDelta == 73, "advanced candidate should preserve probed optional difficulty")
+local advancedOutcome = AF:ComputeCraftOutcome(advancedEntry, { optionalReagents = { advancedCandidates[1] } })
+Check(advancedOutcome.totalDifficulty == 573, "selected advanced optional reagent should raise expected difficulty")
+Check(advancedOutcome.quality == 4, "selected advanced optional reagent should lower expected quality")
+local advancedState = AF:GetCustomerShoppingState(advancedContext)
+advancedState.selections[advancedCandidates[1].slotKey] = advancedCandidates[1].key
+local advancedShoppingOutcome = AF:GetCustomerShoppingOutcome(advancedEntry, advancedContext)
+Check(advancedShoppingOutcome.totalDifficulty == 573, "advanced shopping outcome should apply selected optional difficulty")
+Check(advancedShoppingOutcome.quality == 4, "advanced shopping outcome should lower selected optional quality")
+
+local oldTradeSkillUI = C_TradeSkillUI
+local oldEnum = Enum
+Enum = {
+	CraftingReagentType = { Modifying = 1, Optional = 2, Finishing = 3 },
+	TradeskillSlotDataType = { ModifiedReagent = 1 },
+}
+C_TradeSkillUI = {
+	GetRecipeInfo = function()
+		return { maxQuality = 5 }
+	end,
+	GetRecipeSchematic = function()
+		return {
+			reagentSlotSchematics = {
+				{
+					slotIndex = 1,
+					dataSlotIndex = 10,
+					required = false,
+					hiddenInCraftingForm = false,
+					reagentType = Enum.CraftingReagentType.Modifying,
+					dataSlotType = Enum.TradeskillSlotDataType.ModifiedReagent,
+					quantityRequired = 1,
+					slotInfo = { slotText = "Embellishment" },
+					reagents = {
+						{ itemID = 219898, difficultyAdjustment = 30 },
+					},
+				},
+			},
+		}
+	end,
+	GetItemReagentQualityByItemInfo = function()
+		return 1
+	end,
+	GetItemReagentQualityInfo = function()
+		return nil
+	end,
+	GetCraftingOperationInfo = function(_, reagentInfo)
+		local bonusDifficulty = 0
+		for _, info in ipairs(reagentInfo or {}) do
+			local itemID = info.reagent and info.reagent.itemID
+			if itemID == 219898 and (tonumber(info.quantity) or 0) > 0 then
+				bonusDifficulty = bonusDifficulty + 73
+			end
+		end
+		return { baseSkill = 250, bonusSkill = 0, baseDifficulty = 250, bonusDifficulty = bonusDifficulty }
+	end,
+}
+
+AF.currentCustomerQueryToken = 3000
+AF.currentCustomerQueryItemID = 244572
+AF.db.customerCache["244572"] = nil
+local compactOptionalParts = {
+	"R", AF.PROTOCOL_VERSION, "244572", "165", "0", "0", "note",
+	"1237511", "101", "", "3000", "Megamanexe-Dalaran", "", "0", "C1",
+	"250", "315", "5", "5", "5", "5", "315", "5", "1", "1", "219898:73",
+}
+AF:HandleResponse(compactOptionalParts, "Megamanexe-Dalaran")
+local compactOptionalEntry = AF.db.customerCache["244572"] and AF.db.customerCache["244572"]["Megamanexe-Dalaran"]
+Check(compactOptionalEntry, "compact optional response should create customer cache entry")
+Check(compactOptionalEntry.bestQuality == 5, "compact optional response should preserve base compact max quality")
+Check(compactOptionalEntry.compactOptionalReagentDeltas[219898].difficultyDelta == 73, "compact response should store optional reagent delta facts")
+local optionalContext = AF:SetCustomerShoppingContext(compactOptionalEntry, "optional")
+local optionalCandidates = AF:BuildCustomerShoppingCandidates(optionalContext, { compactOptionalEntry })
+Check(#optionalCandidates == 1, "optional shopping should expose compact optional reagent candidate")
+Check(optionalCandidates[1].difficultyDelta == 73, "optional candidate should receive compact optional difficulty delta")
+local optionalState = AF:GetCustomerShoppingState(optionalContext)
+optionalState.selections[optionalCandidates[1].slotKey] = optionalCandidates[1].key
+local optionalOutcome = AF:GetCustomerShoppingOutcome(compactOptionalEntry, optionalContext)
+Check(optionalOutcome.totalSkill == 315, "compact optional outcome should use artisan effective skill")
+Check(optionalOutcome.totalDifficulty == 323, "compact optional outcome should add selected optional difficulty to base difficulty")
+Check(optionalOutcome.quality == 4, "compact optional outcome should no longer stay max quality")
+local optionalCapability = AF:FormatCapability(compactOptionalEntry)
+Check(optionalCapability:find("Q4", 1, true) ~= nil, "optional row capability should display adjusted selected quality")
+
+AF.currentCustomerQueryToken = 1781115037
+AF.currentCustomerQueryItemID = 193000
+AF.currentCustomerQueryProfessionID = 755
+AF.db.customerCache["193000"] = {
+	["Rakhnar-Dalaran"] = {
+		name = "Rakhnar-Dalaran",
+		target = "Rakhnar-Dalaran",
+		orderTarget = "Rakhnar-Dalaran",
+		itemID = 193000,
+		professionID = 755,
+		recipeID = 374498,
+		scanModelVersion = AF.SCAN_MODEL_VERSION,
+		reagentSkillFacts = {
+			scanModelVersion = AF.SCAN_MODEL_VERSION,
+			baseSkill = 317,
+			baseRecipeDifficulty = 315,
+			maxOutputQuality = 5,
+			requiredSlots = {},
+			optionalSlots = {
+				{
+					slotKey = "embellishment",
+					slotText = "Embellishment",
+					reagents = {
+						{ itemID = 219898, quantity = 1, quality = 1, difficultyAdjustment = 30 },
+					},
+				},
+			},
+		},
+	},
+}
+C_TradeSkillUI.GetCraftingOperationInfo = function(_, reagentInfo)
+	local bonusDifficulty = 0
+	for _, info in ipairs(reagentInfo or {}) do
+		local itemID = info.reagent and info.reagent.itemID
+		if itemID == 219898 and (tonumber(info.quantity) or 0) > 0 then
+			bonusDifficulty = bonusDifficulty + 73
+		end
+	end
+	return { baseSkill = 317, bonusSkill = 0, baseDifficulty = 315, bonusDifficulty = bonusDifficulty }
+end
+local exactCompactParts = {
+	"R", AF.PROTOCOL_VERSION, "193000", "755", "0", "1", "",
+	"374498", "1781115038", "", "1781115037", "Rakhnar-Dalaran", "", "1", "C1",
+	"315", "250", "3", "4", "5", "5", "317", "5", "3", "1", "",
+}
+AF:HandleResponse(exactCompactParts, "Rakhnar-Dalaran")
+local exactEntry = AF.db.customerCache["193000"] and AF.db.customerCache["193000"]["Rakhnar-Dalaran"]
+Check(exactEntry, "exact compact response should create customer cache entry")
+Check(exactEntry.reagentSkillFacts.compact == nil, "exact compact response should reuse cached detailed facts")
+Check(exactEntry.compactOptionalReagentDeltas == nil, "empty trailing compact optional field should decode as no wire deltas")
+
+local exactOptionalContext = AF:SetCustomerShoppingContext(exactEntry, "optional")
+local exactOptionalCandidates = AF:BuildCustomerShoppingCandidates(exactOptionalContext, { exactEntry })
+Check(#exactOptionalCandidates == 1, "exact optional compact response should expose optional candidate")
+Check(exactOptionalCandidates[1].difficultyDelta == 73, "empty compact field should fall back to customer-side optional probe")
+local exactOptionalState = AF:GetCustomerShoppingState(exactOptionalContext)
+exactOptionalState.selections[exactOptionalCandidates[1].slotKey] = exactOptionalCandidates[1].key
+local exactOptionalOutcome = AF:GetCustomerShoppingOutcome(exactEntry, exactOptionalContext)
+Check(exactOptionalOutcome.totalSkill == 317, "exact optional outcome should use compact best skill")
+Check(exactOptionalOutcome.totalDifficulty == 388, "exact optional outcome should add probed optional difficulty")
+Check(exactOptionalOutcome.quality == 4, "exact optional outcome should not stay q5")
+
+local exactAdvancedContext = AF:SetCustomerShoppingContext(exactEntry, "advanced")
+local exactAdvancedCandidates = AF:BuildCustomerShoppingCandidates(exactAdvancedContext, { exactEntry })
+Check(#exactAdvancedCandidates == 1, "exact advanced response should expose cached optional candidate")
+Check(exactAdvancedCandidates[1].difficultyDelta == 73, "advanced candidate should receive customer-side optional probe")
+local exactAdvancedState = AF:GetCustomerShoppingState(exactAdvancedContext)
+exactAdvancedState.selections[exactAdvancedCandidates[1].slotKey] = exactAdvancedCandidates[1].key
+local exactAdvancedOutcome = AF:GetCustomerShoppingOutcome(exactEntry, exactAdvancedContext)
+	Check(exactAdvancedOutcome.totalDifficulty == 388, "exact advanced outcome should add probed optional difficulty")
+	Check(exactAdvancedOutcome.quality == 4, "exact advanced outcome should not stay q5")
+	C_TradeSkillUI = oldTradeSkillUI
+	Enum = oldEnum
+
+	local oldLogTradeSkillUI = C_TradeSkillUI
+	local oldLogEnum = Enum
+	local oldLogItem = C_Item
+	Enum = {
+		CraftingReagentType = { Basic = 0, Modifying = 1, Optional = 2, Finishing = 3 },
+		TradeskillSlotDataType = { Reagent = 0, ModifiedReagent = 1 },
+	}
+	local LOG_REAGENT_QUALITIES = {
+		[1001] = 1, [1002] = 2, [1003] = 3,
+		[2001] = 1, [2002] = 2, [2003] = 3,
+	}
+	C_Item = {
+		GetItemIconByID = function()
+			return 134400
+		end,
+		GetItemInfo = function(itemID)
+			return "item " .. tostring(itemID), "|Hitem:" .. tostring(itemID) .. "|h[item]|h"
+		end,
+	}
+	C_TradeSkillUI = {
+		GetRecipeInfo = function()
+			return { maxQuality = 5 }
+		end,
+		GetRecipeSchematic = function(recipeID)
+			Check(recipeID == 374498, "log schematic requested for unexpected recipe")
+			return {
+				reagentSlotSchematics = {
+					{
+						slotIndex = 1,
+						dataSlotIndex = 1,
+						required = true,
+						hiddenInCraftingForm = false,
+						reagentType = Enum.CraftingReagentType.Basic,
+						dataSlotType = Enum.TradeskillSlotDataType.Reagent,
+						quantityRequired = 1,
+						slotInfo = { slotText = "Gem A" },
+						reagents = {
+							{ itemID = 1001 },
+							{ itemID = 1002 },
+							{ itemID = 1003 },
+						},
+					},
+					{
+						slotIndex = 2,
+						dataSlotIndex = 2,
+						required = true,
+						hiddenInCraftingForm = false,
+						reagentType = Enum.CraftingReagentType.Basic,
+						dataSlotType = Enum.TradeskillSlotDataType.Reagent,
+						quantityRequired = 1,
+						slotInfo = { slotText = "Gem B" },
+						reagents = {
+							{ itemID = 2001 },
+							{ itemID = 2002 },
+							{ itemID = 2003 },
+						},
+					},
+					{
+						slotIndex = 3,
+						dataSlotIndex = 5,
+						required = false,
+						hiddenInCraftingForm = false,
+						reagentType = Enum.CraftingReagentType.Modifying,
+						dataSlotType = Enum.TradeskillSlotDataType.ModifiedReagent,
+						quantityRequired = 1,
+						slotInfo = { slotText = "Embellishment" },
+						reagents = {
+							{ itemID = 219898, difficultyAdjustment = 30 },
+						},
+					},
+				},
+			}
+		end,
+		GetItemReagentQualityByItemInfo = function(itemID)
+			return LOG_REAGENT_QUALITIES[itemID] or 1
+		end,
+		GetItemReagentQualityInfo = function(itemID)
+			return { quality = LOG_REAGENT_QUALITIES[itemID] or 1 }
+		end,
+		GetCraftingOperationInfo = function(_, reagentInfo)
+			local bonusSkill = 0
+			local bonusDifficulty = 0
+			for _, info in ipairs(reagentInfo or {}) do
+				local itemID = info.reagent and info.reagent.itemID
+				local quality = LOG_REAGENT_QUALITIES[itemID]
+				if quality and (tonumber(info.quantity) or 0) > 0 then
+					bonusSkill = bonusSkill + ({ [1] = 0, [2] = 40, [3] = 80 })[quality]
+				elseif itemID == 219898 and (tonumber(info.quantity) or 0) > 0 then
+					bonusDifficulty = bonusDifficulty + 73
+				end
+			end
+			return { baseSkill = 250, bonusSkill = bonusSkill, baseDifficulty = 315, bonusDifficulty = bonusDifficulty }
+		end,
+	}
+
+	AF.currentCustomerQueryToken = 1781115734
+	AF.currentCustomerQueryItemID = 193000
+	AF.currentCustomerQueryProfessionID = 755
+	AF.db.customerCache["193000"] = nil
+	local logCompactParts = {
+		"R", AF.PROTOCOL_VERSION, "193000", "755", "0", "1", "",
+		"374498", "1781115734", "", "1781115734", "Rakhnar-Dalaran", "", "1", "C1",
+		"315", "250", "3", "4", "5", "5", "330", "5", "1", "1", "",
+	}
+	AF:HandleResponse(logCompactParts, "Rakhnar-Dalaran")
+	local logEntry = AF.db.customerCache["193000"] and AF.db.customerCache["193000"]["Rakhnar-Dalaran"]
+	Check(logEntry and logEntry.reagentSkillFacts.compact == true, "log compact response should start with synthetic facts")
+	Check(logEntry.compactOptionalReagentDeltas == nil, "log compact response should have empty optional delta field")
+	AF:HandleReagentDetail({
+		"D",
+		AF.PROTOCOL_VERSION,
+		"193000",
+		"374498",
+		"1781115734",
+		"1",
+		"1",
+		"R3:i:1003:1:3:1;i:2001:1:1:2",
+		"Rakhnar-Dalaran",
+	}, "Rakhnar-Dalaran")
+	Check(logEntry.bestReagents and #logEntry.bestReagents == 2, "log R3 detail should store required reagent details")
+	Check(logEntry.reagentSkillFacts.compact == nil, "log R3 detail should rehydrate compact facts for advanced mode")
+	Check(AF:HasAdvancedReagentFacts(logEntry) == true, "log compact plus R3 detail should keep advanced mode enabled")
+	local logOptionalContext = AF:SetCustomerShoppingContext(logEntry, "optional")
+	local logOptionalCandidates = AF:BuildCustomerShoppingCandidates(logOptionalContext, { logEntry })
+	Check(#logOptionalCandidates == 1, "log optional mode should expose selected optional reagent")
+	Check(logOptionalCandidates[1].difficultyDelta == 73, "log optional mode should probe missing optional difficulty delta")
+	local preparedOptional = AF:CreatePreparedCraftEntry(logEntry, "optional", { logOptionalCandidates[1] })
+	local hasBaseLowerQuality = false
+	local hasAdjustedQuality = false
+	for _, reagent in ipairs(preparedOptional.reagents or {}) do
+		if tonumber(reagent.itemID) == 2001 then
+			hasBaseLowerQuality = true
+		elseif tonumber(reagent.itemID) == 2003 then
+			hasAdjustedQuality = true
+		end
+	end
+	Check(not hasBaseLowerQuality, "optional tracker should not keep lower base recommendation after +73 difficulty")
+	Check(hasAdjustedQuality, "optional tracker should choose adjusted sufficient reagent quality after +73 difficulty")
+	C_TradeSkillUI = oldLogTradeSkillUI
+	Enum = oldLogEnum
+	C_Item = oldLogItem
+
+	local builtWithEntry
+	function AF:BuildCustomerShoppingSlots(context, entries)
 	builtWithEntry = entries and entries[1]
 	self.customerShoppingSlots = {}
 	self.customerShoppingCandidates = {}
