@@ -523,6 +523,91 @@ local function GetItemName(itemID)
 	return nil
 end
 
+local function IsSecret(value)
+	return AF.IsSecretValue and AF:IsSecretValue(value)
+end
+
+local function GetBindOnPickupItemBind()
+	return Enum and Enum.ItemBind and Enum.ItemBind.OnAcquire or 1
+end
+
+local function IsBindOnPickupBindType(bindType)
+	if bindType == nil or IsSecret(bindType) then
+		return false
+	end
+	return tonumber(bindType) == tonumber(GetBindOnPickupItemBind())
+end
+
+local function IsBindOnPickupFromItemInfo(itemID)
+	if not C_Item or not C_Item.GetItemInfo then
+		return nil
+	end
+	local result = { pcall(C_Item.GetItemInfo, itemID) }
+	if not result[1] then
+		return nil
+	end
+	local bindType = result[15]
+	if bindType == nil then
+		return nil
+	end
+	return IsBindOnPickupBindType(bindType)
+end
+
+local function IsTooltipBindOnPickupArg(arg, bindOnPickup)
+	if type(arg) ~= "table" then
+		return false
+	end
+	local intVal = arg.intVal
+	if intVal ~= nil and not IsSecret(intVal) and tonumber(intVal) == tonumber(bindOnPickup) then
+		return true
+	end
+	return false
+end
+
+local function IsTooltipBindOnPickupLine(line)
+	if type(line) ~= "table" or not Enum or not Enum.TooltipDataLineType then
+		return false
+	end
+	local lineType = line.type
+	if lineType == nil or IsSecret(lineType) or tonumber(lineType) ~= tonumber(Enum.TooltipDataLineType.ItemBinding) then
+		return false
+	end
+
+	local bindOnPickup = Enum.TooltipDataItemBinding and Enum.TooltipDataItemBinding.BindOnPickup
+	for _, arg in ipairs(type(line.args) == "table" and line.args or {}) do
+		if bindOnPickup ~= nil and IsTooltipBindOnPickupArg(arg, bindOnPickup) then
+			return true
+		end
+	end
+
+	local leftText = line.leftText
+	return ITEM_BIND_ON_PICKUP and leftText ~= nil and not IsSecret(leftText) and leftText == ITEM_BIND_ON_PICKUP
+end
+
+local function IsBindOnPickupFromTooltip(itemID)
+	if not C_TooltipInfo or not C_TooltipInfo.GetItemByID then
+		return false
+	end
+	local ok, tooltipData = pcall(C_TooltipInfo.GetItemByID, itemID)
+	if not ok or type(tooltipData) ~= "table" or type(tooltipData.lines) ~= "table" then
+		return false
+	end
+	for _, line in ipairs(tooltipData.lines) do
+		if IsTooltipBindOnPickupLine(line) then
+			return true
+		end
+	end
+	return false
+end
+
+local function IsItemBindOnPickup(itemID)
+	local itemInfoResult = IsBindOnPickupFromItemInfo(itemID)
+	if itemInfoResult ~= nil then
+		return itemInfoResult
+	end
+	return IsBindOnPickupFromTooltip(itemID)
+end
+
 local function AddItemContinuable(container, itemID)
 	if not container or not itemID or not Item or not Item.CreateFromItemID then
 		return
@@ -549,7 +634,7 @@ local function BuildAuctionatorSearchEntries()
 	for _, entry in ipairs(GetPreparationEntries()) do
 		for _, reagent in ipairs(entry and entry.reagents or {}) do
 			local itemID = tonumber(reagent.itemID)
-			if itemID and itemID > 0 then
+			if itemID and itemID > 0 and not IsItemBindOnPickup(itemID) then
 				local needed = tonumber(reagent.quantity) or 1
 				if needed > 0 then
 					local quality = tonumber(reagent.quality) or 0

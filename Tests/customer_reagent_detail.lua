@@ -608,4 +608,68 @@ AF:RefreshCustomerOptionalPrepRow(row, freshEntry)
 Check(AF.customerShoppingContext.entry == freshEntry, "shopping context should adopt fresh rendered row entry")
 Check(builtWithEntry == freshEntry, "shopping slots should rebuild from fresh rendered row entry")
 
+local oldAuctionHouseFrame = AuctionHouseFrame
+local oldAuctionator = Auctionator
+local oldAuctionCItem = C_Item
+local oldAuctionEnum = Enum
+local oldAuctionTimer = C_Timer
+local oldAuctionContinuableContainer = ContinuableContainer
+local oldAuctionPrint = AF.Print
+local auctionatorSearchTerms
+
+AuctionHouseFrame = {
+	IsShown = function()
+		return true
+	end,
+}
+Auctionator = {
+	API = {
+		v1 = {
+			MultiSearchAdvanced = function(_, searchTerms)
+				auctionatorSearchTerms = searchTerms
+			end,
+		},
+	},
+}
+Enum = {
+	ItemBind = {
+		OnAcquire = 1,
+		OnEquip = 2,
+	},
+}
+C_Timer = nil
+ContinuableContainer = nil
+C_Item = {
+	GetItemCount = function()
+		return 0
+	end,
+	GetItemInfo = function(itemID)
+		local bindType = itemID == 9001 and Enum.ItemBind.OnAcquire or Enum.ItemBind.OnEquip
+		return "item " .. tostring(itemID), "|Hitem:" .. tostring(itemID) .. "|h[item]|h", 1, 1, 1, "", "", 200, "", 134400, 0, 7, 11, bindType, 10, nil, true, ""
+	end,
+}
+function AF:Print()
+end
+AF.db.preparedCrafts = {
+	{
+		key = "auctionator-bop-filter",
+		reagents = {
+			{ itemID = 9001, quantity = 3 },
+			{ itemID = 9002, quantity = 2 },
+		},
+	},
+}
+Check(AF:SearchAuctionatorPreparationReagents() == true, "auctionator search should start in auction house")
+Check(auctionatorSearchTerms and #auctionatorSearchTerms == 1, "auctionator search should skip bind-on-pickup reagents")
+Check(auctionatorSearchTerms[1].searchString == "item 9002", "auctionator search should keep auctionable reagents")
+Check(auctionatorSearchTerms[1].quantity == 2, "auctionator search should keep missing quantity for auctionable reagents")
+
+AuctionHouseFrame = oldAuctionHouseFrame
+Auctionator = oldAuctionator
+C_Item = oldAuctionCItem
+Enum = oldAuctionEnum
+C_Timer = oldAuctionTimer
+ContinuableContainer = oldAuctionContinuableContainer
+AF.Print = oldAuctionPrint
+
 print("customer reagent detail tests: PASS")
