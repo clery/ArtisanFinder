@@ -878,8 +878,8 @@ MIGRATIONS[6] = function(db)
 	db.advertisingKnown = db.advertisingKnown or {}
 end
 
-MIGRATIONS[7] = function(db)
-end
+-- Migration 7 seeded the fastScan default, retired with the setting;
+-- the version number stays reserved and MigrateDB skips missing entries.
 
 MIGRATIONS[8] = function(db)
 	db.professionLinks = db.professionLinks or {}
