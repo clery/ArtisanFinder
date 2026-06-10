@@ -971,10 +971,9 @@ function AF:RefreshCustomerOptionalPrepRow(row, entry)
 		return 0
 	end
 
-	if not self.customerShoppingSlots then
-		self:BuildCustomerShoppingSlots(context, { entry })
-		self:PrimeAdvancedShoppingSelections(context)
-	end
+	context.entry = entry
+	self:BuildCustomerShoppingSlots(context, { entry })
+	self:PrimeAdvancedShoppingSelections(context)
 	local slots = self.customerShoppingSlots or {}
 	local candidates = self.customerShoppingCandidates or {}
 	local state = self:GetCustomerShoppingState(context)

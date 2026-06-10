@@ -33,7 +33,11 @@ function AF:GetJoinedTradeChannelID()
 	local channels = { GetChannelList() }
 	for index, value in ipairs(channels) do
 		if type(value) == "string" and value ~= self.CHANNEL_NAME and self:IsTradeChannelName(value) then
-			return tonumber(channels[index - 1]) or GetChannelName(value)
+			-- GetChannelName returns 0 (not nil) when the channel is unknown
+			local id = tonumber(channels[index - 1]) or tonumber(GetChannelName(value))
+			if id and id > 0 then
+				return id
+			end
 		end
 	end
 	return nil
@@ -184,6 +188,10 @@ local function IsOnlineGuildWhisperTarget(AF, target)
 	return rosterEntry and rosterEntry.online == true
 end
 
+local function IsCompactResponse(parts)
+	return parts and parts[15] == "C1"
+end
+
 function AF:CleanupResponseThrottle(now)
 	if not self.responseThrottle then
 		return 0
@@ -191,7 +199,19 @@ function AF:CleanupResponseThrottle(now)
 	now = tonumber(now) or self:Now()
 	local cleanupInterval = tonumber(self.RESPONSE_THROTTLE_CLEANUP_INTERVAL) or 60
 	if self.responseThrottleCleanedAt and now - self.responseThrottleCleanedAt < cleanupInterval then
-		return 0
+		-- Throttle keys embed per-query tokens, so the table only shrinks on
+		-- cleanup; bypass the interval if it has grown past the cap.
+		local maxEntries = tonumber(self.RESPONSE_THROTTLE_MAX_ENTRIES) or 500
+		local size = 0
+		for _ in pairs(self.responseThrottle) do
+			size = size + 1
+			if size > maxEntries then
+				break
+			end
+		end
+		if size <= maxEntries then
+			return 0
+		end
 	end
 	self.responseThrottleCleanedAt = now
 
@@ -300,6 +320,52 @@ function AF:SendPayloadParts(payloadParts, chatType, target, priority, queueName
 	local compressedPayload = self:EncodeCompressedPayloadParts(payloadParts)
 	if compressedPayload then
 		return self:SendAddon(compressedPayload, chatType, target, priority, queueName)
+	end
+	return false
+end
+
+function AF:BuildCompactResponsePayloadParts(item, itemID, responseProfessionID, priceCopper, freeCommission, encodedNote, recipeID, timestamp, encodedLink, queryToken, crafterName, responseTarget, afk)
+	return {
+		"R",
+		self.PROTOCOL_VERSION,
+		itemID,
+		tonumber(responseProfessionID) or tonumber(item and item.professionID) or 0,
+		tonumber(priceCopper) or 0,
+		freeCommission and 1 or 0,
+		encodedNote,
+		tonumber(recipeID) or 0,
+		timestamp,
+		encodedLink,
+		queryToken,
+		self:EncodeField(crafterName, 48),
+		responseTarget and self:EncodeField(responseTarget, 48) or "",
+		afk and 1 or 0,
+		"C1",
+		tonumber(item and item.recipeDifficulty) or 0,
+		tonumber(item and item.totalSkill) or 0,
+		tonumber(item and item.quality) or 0,
+		tonumber(item and item.concentrationQuality) or 0,
+		tonumber(item and item.bestQuality) or 0,
+		tonumber(item and item.bestConcentrationQuality) or 0,
+		tonumber(item and item.bestTotalSkill) or 0,
+		tonumber(item and item.maxOutputQuality) or 0,
+		tonumber(item and item.optionalSlotCount) or 0,
+		item and item.hasReagentSummary and 1 or ((item and item.bestReagents) and 1 or 0),
+	}
+end
+
+function AF:SendCompactResponse(item, itemID, responseProfessionID, priceCopper, freeCommission, note, recipeID, timestamp, professionLink, queryToken, crafterName, responseChannel, responseTarget, afk, queueName)
+	local encodedNote = self:EncodeNote(note)
+	local encodedLink = self:EncodeField(professionLink)
+	local responseTargetName = responseChannel == "GUILD" and responseTarget or nil
+	local payloadParts = self:BuildCompactResponsePayloadParts(item, itemID, responseProfessionID, priceCopper, freeCommission, encodedNote, recipeID, timestamp, encodedLink, queryToken, crafterName, responseTargetName, afk)
+	local payload = BuildPayload(payloadParts)
+	if #payload > 255 then
+		payloadParts = self:BuildCompactResponsePayloadParts(item, itemID, responseProfessionID, priceCopper, freeCommission, "", recipeID, timestamp, "", queryToken, crafterName, responseTargetName, afk)
+		payload = BuildPayload(payloadParts)
+	end
+	if #payload <= 255 then
+		return self:SendAddon(payload, responseChannel, responseChannel == "WHISPER" and responseTarget or nil, "NORMAL", queueName)
 	end
 	return false
 end
@@ -584,6 +650,8 @@ function AF:HandleQuery(parts, sender, channel)
 				professionLink = nil
 			end
 			local encodedLink = self:EncodeField(professionLink)
+			local responseTimestamp = self:Now()
+			local afk = UnitIsAFK and UnitIsAFK("player")
 			local payloadParts = {
 				"R",
 				self.PROTOCOL_VERSION,
@@ -593,17 +661,23 @@ function AF:HandleQuery(parts, sender, channel)
 				freeCommission and 1 or 0,
 				encodedNote,
 				tonumber(item.recipeID) or 0,
-				self:Now(),
+				responseTimestamp,
 				encodedLink,
 				queryToken,
 				self:EncodeField(crafterName, 48),
 				channel == "GUILD" and self:EncodeField(requesterName, 48) or "",
-				UnitIsAFK and UnitIsAFK("player") and 1 or 0,
+				afk and 1 or 0,
 				item.reagentSkillFacts,
 			}
 			local responseChannel = channel == "GUILD" and "GUILD" or "WHISPER"
 			local responseTarget = responseChannel == "WHISPER" and sender or nil
 			local sent = self:SendPayloadParts(payloadParts, responseChannel, responseTarget, "NORMAL", "R:" .. tostring(sender))
+			if not sent then
+				sent = self:SendCompactResponse(item, itemID, responseProfessionID, priceCopper, freeCommission, note, item.recipeID, responseTimestamp, professionLink, queryToken, crafterName, responseChannel, responseChannel == "GUILD" and requesterName or sender, afk, "R:" .. tostring(sender) .. ":compact")
+				if not sent and self:IsDevTrafficLogsEnabled() then
+					self:DebugLog("response", string.format("send failed crafter=%s target=%s item=%s profession=%s compact=true", tostring(crafterName or ""), tostring(sender or ""), tostring(itemID or ""), tostring(responseProfessionID or "")))
+				end
+			end
 			if sent then
 				self.responseThrottle[throttleKey] = self:Now()
 			end
@@ -768,13 +842,23 @@ function AF:HandleResponse(parts, sender)
 	local crafterName = self:NormalizeName(self:DecodeField(parts[12])) or sender
 	local responseTarget = self:NormalizeName(self:DecodeField(parts[13]))
 	local afk = tonumber(parts[14]) == 1
+	local compactResponse = IsCompactResponse(parts)
 	local reagentSkillFacts = type(parts[15]) == "table" and parts[15] or nil
 	local cacheKey = crafterName
 
 	if not itemID then
 		return
 	end
-	if not self:IsCurrentScanModelEntry({
+	if compactResponse then
+		reagentSkillFacts = {
+			scanModelVersion = self.SCAN_MODEL_VERSION,
+			baseRecipeDifficulty = tonumber(parts[16]) or 0,
+			baseSkill = tonumber(parts[17]) or 0,
+			maxOutputQuality = tonumber(parts[23]) or 0,
+			requiredSlots = {},
+			optionalSlots = {},
+		}
+	elseif not self:IsCurrentScanModelEntry({
 		scanModelVersion = reagentSkillFacts and reagentSkillFacts.scanModelVersion,
 		reagentSkillFacts = reagentSkillFacts,
 	}) then
@@ -802,18 +886,18 @@ function AF:HandleResponse(parts, sender)
 		scanModelVersion = reagentSkillFacts.scanModelVersion,
 		reagentSkillFacts = reagentSkillFacts,
 	}
-	local suggestion = self.BuildReagentSuggestion and self:BuildReagentSuggestion(suggestionEntry) or nil
-	local outcome = self.ComputeCraftOutcome and self:ComputeCraftOutcome(suggestionEntry) or nil
+	local suggestion = not compactResponse and self.BuildReagentSuggestion and self:BuildReagentSuggestion(suggestionEntry) or nil
+	local outcome = not compactResponse and self.ComputeCraftOutcome and self:ComputeCraftOutcome(suggestionEntry) or nil
 	local savedReagents = suggestion and suggestion.reagents or nil
-	local bestQuality = suggestion and suggestion.quality or nil
-	local bestConcentrationQuality = suggestion and suggestion.concentrationQuality or nil
-	local bestTotalSkill = suggestion and suggestion.skill or nil
-	local concentrationQuality = outcome and outcome.concentrationQuality or nil
-	local quality = outcome and outcome.quality or nil
-	local recipeDifficulty = tonumber(reagentSkillFacts.baseRecipeDifficulty)
-	local totalSkill = tonumber(reagentSkillFacts.baseSkill)
-	local optionalSlotCount = #(reagentSkillFacts.optionalSlots or {})
-	local hasReagentSummary = savedReagents ~= nil
+	local bestQuality = compactResponse and tonumber(parts[20]) or (suggestion and suggestion.quality or nil)
+	local bestConcentrationQuality = compactResponse and tonumber(parts[21]) or (suggestion and suggestion.concentrationQuality or nil)
+	local bestTotalSkill = compactResponse and tonumber(parts[22]) or (suggestion and suggestion.skill or nil)
+	local concentrationQuality = compactResponse and tonumber(parts[19]) or (outcome and outcome.concentrationQuality or nil)
+	local quality = compactResponse and tonumber(parts[18]) or (outcome and outcome.quality or nil)
+	local recipeDifficulty = compactResponse and tonumber(parts[16]) or tonumber(reagentSkillFacts.baseRecipeDifficulty)
+	local totalSkill = compactResponse and tonumber(parts[17]) or tonumber(reagentSkillFacts.baseSkill)
+	local optionalSlotCount = compactResponse and tonumber(parts[24]) or #(reagentSkillFacts.optionalSlots or {})
+	local hasReagentSummary = compactResponse and tonumber(parts[25]) == 1 or savedReagents ~= nil
 	if professionLink ~= "" then
 		self:RememberProfessionLink(crafterName, professionID, professionLink)
 	elseif previous and previous.professionLink then
@@ -871,14 +955,15 @@ function AF:HandleResponse(parts, sender)
 		afk = afk or nil,
 	}
 	self:DebugLog("response", string.format(
-		"stored crafter=%s sender=%s item=%s profession=%s queryMatch=%s guild=%s reagents=%s",
+		"stored crafter=%s sender=%s item=%s profession=%s queryMatch=%s guild=%s reagents=%s compact=%s",
 		tostring(crafterName or ""),
 		tostring(sender or ""),
 		tostring(itemID or ""),
 		tostring(professionID or ""),
 		tostring(verifiedForCurrentQuery == true),
 		tostring(validGuildResponse == true),
-		tostring(savedReagents ~= nil)
+		tostring(savedReagents ~= nil),
+		tostring(compactResponse == true)
 	))
 	self:ApplyPendingReagentDetail(sender, itemID, recipeID, queryToken, crafterName)
 
@@ -887,6 +972,42 @@ end
 
 function AF:GetReagentDetailKey(sender, itemID, recipeID, queryToken, crafterName)
 	return table.concat({ sender, crafterName or "", itemID or 0, recipeID or 0, queryToken or 0 }, ":")
+end
+
+local function CustomerCacheEntryMatchesDetail(AF, entry, sender, recipeID, queryToken, crafterName)
+	if not entry then
+		return false
+	end
+	local entryRecipeID = tonumber(entry.recipeID) or 0
+	if tonumber(entry.lastQueryToken) ~= tonumber(queryToken) or entryRecipeID ~= (tonumber(recipeID) or 0) then
+		return false
+	end
+	local normalizedCrafter = AF:NormalizeName(crafterName)
+	local normalizedSender = AF:NormalizeName(sender)
+	for _, name in ipairs({ entry.orderTarget, entry.name, entry.target }) do
+		local normalizedName = AF:NormalizeName(name)
+		if normalizedName and (normalizedName == normalizedCrafter or normalizedName == normalizedSender) then
+			return true
+		end
+	end
+	return false
+end
+
+local function FindCustomerCacheEntryForDetail(AF, itemID, sender, recipeID, queryToken, crafterName)
+	local itemCache = AF.db and AF.db.customerCache and AF.db.customerCache[tostring(itemID)]
+	if not itemCache then
+		return nil
+	end
+	local direct = itemCache[crafterName]
+	if CustomerCacheEntryMatchesDetail(AF, direct, sender, recipeID, queryToken, crafterName) then
+		return direct
+	end
+	for _, entry in pairs(itemCache) do
+		if CustomerCacheEntryMatchesDetail(AF, entry, sender, recipeID, queryToken, crafterName) then
+			return entry
+		end
+	end
+	return nil
 end
 
 function AF:IsReagentDetailCacheFresh(entry)
@@ -954,10 +1075,8 @@ function AF:ApplyPendingReagentDetail(sender, itemID, recipeID, queryToken, craf
 	if not pending or (not pending.reagents and not pending.unsupported) then
 		return
 	end
-	local itemCache = self.db.customerCache[tostring(itemID)]
-	local entry = itemCache and itemCache[crafterName]
-	local entryRecipeID = tonumber(entry and entry.recipeID) or 0
-	if entry and tonumber(entry.lastQueryToken) == tonumber(queryToken) and entryRecipeID == (tonumber(recipeID) or 0) then
+	local entry = FindCustomerCacheEntryForDetail(self, itemID, sender, recipeID, queryToken, crafterName)
+	if entry then
 		if pending.unsupported then
 			entry.hasReagentSummary = nil
 			entry.reagentDetailRequested = nil
@@ -984,7 +1103,11 @@ function AF:HandleReagentDetail(parts, sender)
 	if not itemID or not queryToken or not seq or not total or not payload then
 		return
 	end
-	if queryToken ~= tonumber(self.currentCustomerQueryToken) or itemID ~= tonumber(self.currentCustomerQueryItemID) then
+	local key = self:GetReagentDetailKey(sender, itemID, recipeID, queryToken, crafterName)
+	local expectedCurrentQuery = queryToken == tonumber(self.currentCustomerQueryToken)
+		and itemID == tonumber(self.currentCustomerQueryItemID)
+	local expectedRequestedDetail = self.reagentDetailRequests and self.reagentDetailRequests[key] ~= nil
+	if not expectedCurrentQuery and not expectedRequestedDetail then
 		return
 	end
 	if seq < 1 or total < 1 or seq > total or total > 8 then
@@ -992,7 +1115,6 @@ function AF:HandleReagentDetail(parts, sender)
 	end
 
 	self.pendingReagentDetails = self.pendingReagentDetails or {}
-	local key = self:GetReagentDetailKey(sender, itemID, recipeID, queryToken, crafterName)
 	local pending = self.pendingReagentDetails[key]
 	if not pending or pending.total ~= total then
 		pending = { total = total, chunks = {}, received = 0 }
@@ -1036,6 +1158,9 @@ function AF:HandleReagentDetail(parts, sender)
 			tostring(pending.unsupported == true)
 		))
 		self:ApplyPendingReagentDetail(sender, itemID, recipeID, queryToken, crafterName)
+		if self.reagentDetailRequests then
+			self.reagentDetailRequests[key] = nil
+		end
 		self:RefreshCustomerResults()
 	end
 end
