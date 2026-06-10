@@ -48,6 +48,11 @@ function AF:GetChangelogEntries()
 					title = self:Text("CHANGELOG_FIXED"),
 					items = {
 						self:Text("CHANGELOG_ENTRY_SCAN_PERFORMANCE"),
+						self:Text("CHANGELOG_ENTRY_REAGENT_DETAIL_FALLBACK"),
+						self:Text("CHANGELOG_ENTRY_GUILD_CRAFTER_ONLINE"),
+						self:Text("CHANGELOG_ENTRY_TRADE_CHANNEL_RU"),
+						self:Text("CHANGELOG_ENTRY_FULL_SCAN_SMOOTHNESS"),
+						self:Text("CHANGELOG_ENTRY_BACKGROUND_SMOOTHNESS"),
 					},
 				},
 			},

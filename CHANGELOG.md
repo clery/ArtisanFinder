@@ -1,7 +1,7 @@
 # ArtisanFinder
 
-## [v2.0.6](https://github.com/clery/ArtisanFinder/releases/tag/v2.0.6-beta2) (2026-06-06)
-[Full Changelog](https://github.com/clery/ArtisanFinder/compare/v2.0.5...v2.0.6-beta2) | [Previous Releases](https://github.com/clery/ArtisanFinder/releases)
+## [v2.0.6](https://github.com/clery/ArtisanFinder/releases/tag/v2.0.6-beta4) (2026-06-06)
+[Full Changelog](https://github.com/clery/ArtisanFinder/compare/v2.0.5...v2.0.6-beta4) | [Previous Releases](https://github.com/clery/ArtisanFinder/releases)
 
 ### Added
 
@@ -18,6 +18,11 @@
 ### Fixed
 
 * Opening a profession should no longer significantly cause an FPS drop.
+* Suggested reagent details now reach customers even for crafts with many reagent options; a compact summary arrives when the full details are too large to send.
+* Guild members who can craft an item now show their real online status instead of always appearing offline.
+* Trade chat features now work on Russian game clients.
+* Full profession scans now spread their work more evenly, with less freezing and stuttering on large professions.
+* Opening a profession is smoother, and ArtisanFinder does less background work while no crafts are being prepared.
 
 ## [v2.0.5](https://github.com/clery/ArtisanFinder/releases/tag/v2.0.5) (2026-06-05)
 
