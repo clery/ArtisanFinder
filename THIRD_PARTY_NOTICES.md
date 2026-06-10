@@ -9,6 +9,7 @@ available under its own upstream license or notice terms.
 | Library | License / notice | Source |
 | --- | --- | --- |
 | LibStub | Public Domain | Bundled header notice in `Libs/LibStub/LibStub.lua` |
+| LibMarkdown | MIT License, see `Libs/LibMarkdown/LICENSE.MD` | https://www.curseforge.com/wow/addons/libmarkdown |
 | CallbackHandler-1.0 | BSD-2-Clause, per upstream project metadata | https://www.curseforge.com/wow/addons/callbackhandler |
 | LibDataBroker-1.1 | All Rights Reserved, per upstream project metadata | https://www.wowace.com/projects/libdatabroker-1-1 |
 | LibDBIcon-1.0 | Ace3 Style BSD, per upstream project metadata | https://www.wowace.com/projects/libdbicon-1-0 |

@@ -241,20 +241,50 @@ L.CHANGELOG_DESCRIPTION = "Recent changes for this version."
 L.CHANGELOG_ACKNOWLEDGE = "Got It"
 L.CHANGELOG_VERSION = "Version %s"
 L.CHANGELOG_UNRELEASED = "Next update"
-L.CHANGELOG_ADDED = "Added"
-L.CHANGELOG_CHANGED = "Changed"
-L.CHANGELOG_FIXED = "Fixed"
-L.CHANGELOG_ENTRY_PANEL = "Account-wide update notes now open once after ArtisanFinder is updated."
-L.CHANGELOG_ENTRY_TRANSFER = "Artisan import/export can transfer scanned artisans, profession pricing, advertising choices, and profession links between WoW accounts."
-L.CHANGELOG_ENTRY_ADVANCED_PREP = "Prepare order now has an Advanced mode for choosing required reagent qualities and optional reagents before tracking a craft."
-L.CHANGELOG_ENTRY_REAGENT_RECOMMENDATIONS = "ArtisanFinder can estimate expected quality from those choices and suggest reagent combinations that reach the best known result without always defaulting to the highest-quality materials."
-L.CHANGELOG_ENTRY_SCAN_REWORK = "Scanning was rebuilt so each crafter saves the reagent skill facts needed to simulate craft quality from real reagent choices. This was necessary because the old scan data stored a finished recommendation, but it could not reliably answer new customer questions like \"what happens if I use rank 2 materials plus this optional reagent?\" Older scans that cannot support the new model are now cleared or marked outdated, so you may need to reopen affected professions once. After that rescan, customers get more honest quality estimates, better reagent suggestions, smaller live responses, and less UI slowdown while ArtisanFinder still shares only craft capability data needed for addon results."
-L.CHANGELOG_ENTRY_SCAN_PERFORMANCE = "Opening a profession should no longer cause a significant FPS drop."
-L.CHANGELOG_ENTRY_REAGENT_DETAIL_FALLBACK = "Suggested reagent details now reach customers even for crafts with many reagent options; a compact summary arrives when the full details are too large to send."
-L.CHANGELOG_ENTRY_GUILD_CRAFTER_ONLINE = "Guild members who can craft an item now show their real online status instead of always appearing offline."
-L.CHANGELOG_ENTRY_TRADE_CHANNEL_RU = "Trade chat features now work on Russian game clients."
-L.CHANGELOG_ENTRY_FULL_SCAN_SMOOTHNESS = "Full profession scans now spread their work more evenly, with less freezing and stuttering on large professions."
-L.CHANGELOG_ENTRY_BACKGROUND_SMOOTHNESS = "Opening a profession is smoother, and ArtisanFinder does less background work while no crafts are being prepared."
+L.CHANGELOG_ENTRY_2_1_0 = [[### Added
+
+* Artisan import/export provides a way to advertise another account's artisans as well as your main account.
+* Prepare order now has an Advanced mode that lets customers choose required reagent qualities and optional reagents before tracking a craft.
+* ArtisanFinder can now estimate expected craft quality from the selected reagent setup and suggest reagent combinations that reach the best known result without always defaulting to the highest-quality materials.
+
+### Changed
+
+* Profession scans now save the reagent skill facts needed for reliable customer-side quality simulation, recommendations, and advanced preparation. Older scan records that cannot support the new model are cleared or marked outdated so players know which characters need a fresh scan.
+* Clicking a matching customer row can now apply tracked craft materials from the Objective Tracker into the Crafting Order form.
+
+### Fixed
+
+* Opening a profession should no longer significantly cause an FPS drop.
+* Guild members who can craft an item now show their real online status instead of always appearing offline.
+* Trade chat features now work on Russian game clients.
+* Full profession scans now spread their work more evenly, with less freezing and stuttering on large professions.]]
+L.CHANGELOG_ENTRY_2_0_5 = [[### Added
+
+* Customer rows now include Prepare order actions for standard crafts and crafts with optional reagents.
+* Prepared crafts are tracked in the Objective Tracker with required components, selected optional reagents, needed quantities, owned and missing counts, and quality markers.
+* Auction House searches from prepared crafts now use Auctionator temporary multi-searches when Auctionator is enabled.
+
+### Changed
+
+* The "Personal Order" and "Guild Order" buttons have been removed to let a simple click on an artisan row autofill the form on the left.]]
+L.CHANGELOG_ENTRY_2_0_3 = [[### Fixed
+
+* Whisper tentative on Patron Order NPC or alt characters on Crafting Order completion.]]
+L.CHANGELOG_ENTRY_2_0_2 = [[### Added
+
+* Notifications for customers when a crafting order has been fulfilled.]]
+L.CHANGELOG_ENTRY_2_0_1 = [[### Added
+
+* Localization for simplified Chinese, Latin America Spanish, Portuguese, and Brazilian Portuguese.
+
+### Changed
+
+* Small communication optimizations.
+* Addon message communication is now compressed.
+
+### Fixed
+
+* Small memory leak for long sessions.]]
 L.DEBUG_CHANGED = "debug mode %s."
 L.DEBUG_STATE = "debug mode is %s."
 L.DEBUG_UNKNOWN = "unknown debug command: %s"

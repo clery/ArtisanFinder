@@ -410,6 +410,8 @@ L.ADVANCED_REAGENTS_EMPTY = "未找到此配方的材料選擇。"
 L.ADVANCED_REAGENTS_PENDING = "尚未收到該工匠的詳細材料資料。"
 L.REQUIRED_REAGENTS = "必要材料"
 L.CUSTOMER_RESCAN_NEEDED = "需要重新掃描"
+L.CUSTOMER_LEGACY_SCAN_FALLBACK = "Outdated scan - Rescan recommended"
+L.CUSTOMER_LEGACY_SCAN_TOOLTIP = "This result comes from an outdated scan. It is shown as a customer fallback only; rescan this profession for current recommendations."
 L.PREPARE_ORDER_ADVANCED = "進階"
 L.PREP_TRACKER_MODE_ADVANCED = "%s 的進階模式"
 L.ORDERABLE_DUMP_ERROR_API_UNAVAILABLE = "C_CraftingOrders.GetCustomerOptions 無法使用。"
@@ -421,19 +423,49 @@ L.CHANGELOG_HELP = "/af changelog - 開啟 ArtisanFinder 最近變更"
 L.CHANGELOG_TITLE = "ArtisanFinder 變更"
 L.CHANGELOG_DESCRIPTION = "此版本的最近變更。"
 L.CHANGELOG_ACKNOWLEDGE = "知道了"
-L.CHANGELOG_VERSION = "版本 %s"
+L.CHANGELOG_ENTRY_2_1_0版本 %s"
 L.CHANGELOG_UNRELEASED = "下次更新"
-L.CHANGELOG_ADDED = "新增"
-L.CHANGELOG_CHANGED = "已變更"
-L.CHANGELOG_FIXED = "已修正"
-L.CHANGELOG_ENTRY_PANEL = "ArtisanFinder 更新後，帳號範圍的更新說明現在會開啟一次。"
-L.CHANGELOG_ENTRY_TRANSFER = "工匠匯入/匯出可以在 WoW 帳號之間傳輸已掃描工匠、專業技能價格、宣傳選擇和專業技能連結。"
-L.CHANGELOG_ENTRY_ADVANCED_PREP = "準備訂單現在有進階模式，可在追蹤製作前選擇必要材料品質和可選材料。"
-L.CHANGELOG_ENTRY_REAGENT_RECOMMENDATIONS = "ArtisanFinder 可以根據這些選擇估算預期品質，並建議能達到已知最佳結果的材料組合，而不是總是預設使用最高品質材料。"
-L.CHANGELOG_ENTRY_SCAN_REWORK = "掃描已重做，現在每個工匠都會儲存根據真實材料選擇模擬製作品質所需的材料技能資料。這是必要的，因為舊掃描資料只儲存最終建議，無法可靠回答新的客戶問題，例如「如果我使用 2 級材料再加這個可選材料會怎樣？」無法支援新模型的舊掃描現在會被清除或標記為過期，因此你可能需要重新開啟受影響的專業技能一次。重新掃描後，客戶會獲得更真實的品質估算、更好的材料建議、更小的即時回應，並減少介面卡頓，同時 ArtisanFinder 仍只共享插件結果所需的製作能力資料。"
-L.CHANGELOG_ENTRY_SCAN_PERFORMANCE = "開啟專業技能時不應再造成明顯 FPS 下降。"
-L.CHANGELOG_ENTRY_REAGENT_DETAIL_FALLBACK = "即使製作擁有大量材料選項，建議材料詳情現在也能送達顧客；當完整詳情過大無法傳送時，會改為送達精簡摘要。"
-L.CHANGELOG_ENTRY_GUILD_CRAFTER_ONLINE = "能製作某件物品的公會成員現在會顯示真實的上線狀態，而不再總是顯示為離線。"
-L.CHANGELOG_ENTRY_TRADE_CHANNEL_RU = "交易頻道功能現在可在俄語遊戲用戶端上正常運作。"
-L.CHANGELOG_ENTRY_FULL_SCAN_SMOOTHNESS = "完整專業技能掃描現在能更均勻地分配工作，大型專業技能的卡頓更少。"
-L.CHANGELOG_ENTRY_BACKGROUND_SMOOTHNESS = "開啟專業技能更加流暢，且在沒有已準備製作時 ArtisanFinder 的背景工作更少。"
+L.CHANGELOG_ENTRY_2_0_6 = [[### 新增
+
+* 工匠匯入/匯出現在可同時宣傳另一個帳號的工匠和你主帳號的工匠。
+* 準備訂單現在有進階模式，讓客戶能在追蹤製作前選擇必要材料品質和可選材料。
+* ArtisanFinder 現在可根據所選材料配置估算預期製作品質，並建議能達到已知最佳結果的材料組合，而不是總是預設使用最高品質材料。
+
+### 已變更
+
+* 專業技能掃描現在會儲存材料技能資料，以便在客戶端可靠模擬品質、提供建議並支援進階準備。無法支援新模型的舊掃描記錄會被清除或標記為過期，讓玩家知道哪些角色需要重新掃描。
+* 點擊符合條件的客戶列現在可將 Objective Tracker 中追蹤的製作材料套用到製造訂單表單中。
+
+### 已修正
+
+* 開啟專業技能時不應再造成明顯 FPS 下降。
+* 能製作某件物品的公會成員現在會顯示真實的上線狀態，而不再總是顯示為離線。
+* 交易頻道功能現在可在俄語遊戲用戶端上正常運作。
+* 完整專業技能掃描現在能更均勻地分配工作，大型專業技能的卡頓更少。]]
+L.CHANGELOG_ENTRY_2_0_5 = [[### 新增
+
+* 客戶列現在為標準製作和帶可選材料的製作提供「準備訂單」操作。
+* 已準備製作會在 Objective Tracker 中追蹤必要元件、已選可選材料、所需數量、擁有和缺少數量，以及品質標記。
+* 當啟用 Auctionator 時，已準備製作的拍賣場搜尋現在會使用 Auctionator 臨時多重搜尋。
+
+### 已變更
+
+* 「個人訂單」和「公會訂單」按鈕已移除，現在只需點擊工匠列即可自動填入左側表單。]]
+L.CHANGELOG_ENTRY_2_0_3 = [[### 已修正
+
+* 完成製作訂單時，對贊助訂單 NPC 或分身角色的悄悄話嘗試。]]
+L.CHANGELOG_ENTRY_2_0_2 = [[### 新增
+
+* 當製作訂單完成時向客戶發送通知。]]
+L.CHANGELOG_ENTRY_2_0_1 = [[### 新增
+
+* 簡體中文、拉美西班牙語、葡萄牙語和巴西葡萄牙語本地化。
+
+### 已變更
+
+* 小幅通訊最佳化。
+* 插件訊息通訊現在會被壓縮。
+
+### 已修正
+
+* 修正長時間工作階段中的小型記憶體洩漏。]]

@@ -411,6 +411,8 @@ L.ADVANCED_REAGENTS_EMPTY = "Nenhuma opção de reagente foi encontrada para est
 L.ADVANCED_REAGENTS_PENDING = "Os dados detalhados de reagentes ainda não foram recebidos deste artesão."
 L.REQUIRED_REAGENTS = "Reagentes obrigatórios"
 L.CUSTOMER_RESCAN_NEEDED = "Nova varredura necessária"
+L.CUSTOMER_LEGACY_SCAN_FALLBACK = "Outdated scan - Rescan recommended"
+L.CUSTOMER_LEGACY_SCAN_TOOLTIP = "This result comes from an outdated scan. It is shown as a customer fallback only; rescan this profession for current recommendations."
 L.PREPARE_ORDER_ADVANCED = "Avançado"
 L.PREP_TRACKER_MODE_ADVANCED = "Avançado para %s"
 L.ORDERABLE_DUMP_ERROR_API_UNAVAILABLE = "C_CraftingOrders.GetCustomerOptions está indisponível."
@@ -422,19 +424,49 @@ L.CHANGELOG_HELP = "/af changelog - abrir mudanças recentes do ArtisanFinder"
 L.CHANGELOG_TITLE = "Mudanças do ArtisanFinder"
 L.CHANGELOG_DESCRIPTION = "Mudanças recentes desta versão."
 L.CHANGELOG_ACKNOWLEDGE = "Entendi"
-L.CHANGELOG_VERSION = "Versão %s"
+L.CHANGELOG_ENTRY_2_1_0Versão %s"
 L.CHANGELOG_UNRELEASED = "Próxima atualização"
-L.CHANGELOG_ADDED = "Adicionado"
-L.CHANGELOG_CHANGED = "Alterado"
-L.CHANGELOG_FIXED = "Corrigido"
-L.CHANGELOG_ENTRY_PANEL = "As notas de atualização da conta agora abrem uma vez após o ArtisanFinder ser atualizado."
-L.CHANGELOG_ENTRY_TRANSFER = "A importação/exportação de artesãos pode transferir artesãos escaneados, preços de profissão, escolhas de divulgação e links de profissão entre contas WoW."
-L.CHANGELOG_ENTRY_ADVANCED_PREP = "Preparar pedido agora tem um modo Avançado para escolher qualidades de reagentes obrigatórios e reagentes opcionais antes de rastrear uma criação."
-L.CHANGELOG_ENTRY_REAGENT_RECOMMENDATIONS = "O ArtisanFinder pode estimar a qualidade esperada a partir dessas escolhas e sugerir combinações de reagentes que alcancem o melhor resultado conhecido sem sempre usar materiais da qualidade mais alta."
-L.CHANGELOG_ENTRY_SCAN_REWORK = "A varredura foi reconstruída para que cada artesão salve os fatos de perícia dos reagentes necessários para simular a qualidade de criação a partir de escolhas reais de reagentes. Isso foi necessário porque os dados antigos salvavam uma recomendação final, mas não conseguiam responder com confiança a novas perguntas de cliente como \"o que acontece se eu usar materiais de grau 2 junto com este reagente opcional?\" Varreduras antigas incompatíveis com o novo modelo agora são limpas ou marcadas como desatualizadas, então talvez você precise reabrir as profissões afetadas uma vez. Depois dessa nova varredura, clientes recebem estimativas de qualidade mais honestas, melhores sugestões de reagentes, respostas ao vivo menores e menos lentidão na interface, enquanto o ArtisanFinder ainda compartilha apenas os dados de capacidade de criação necessários para os resultados do addon."
-L.CHANGELOG_ENTRY_SCAN_PERFORMANCE = "Abrir uma profissão não deve mais causar uma queda significativa de FPS."
-L.CHANGELOG_ENTRY_REAGENT_DETAIL_FALLBACK = "Os detalhes de reagentes sugeridos agora chegam aos clientes mesmo em criações com muitas opções de reagentes; um resumo compacto chega quando os detalhes completos são grandes demais para enviar."
-L.CHANGELOG_ENTRY_GUILD_CRAFTER_ONLINE = "Membros da guilda que podem criar um item agora mostram seu status online real em vez de sempre aparecerem offline."
-L.CHANGELOG_ENTRY_TRADE_CHANNEL_RU = "Os recursos do canal de comércio agora funcionam em clientes de jogo russos."
-L.CHANGELOG_ENTRY_FULL_SCAN_SMOOTHNESS = "As varreduras completas de profissão agora distribuem o trabalho de forma mais uniforme, com menos travamentos e engasgos em profissões grandes."
-L.CHANGELOG_ENTRY_BACKGROUND_SMOOTHNESS = "Abrir uma profissão está mais fluido e o ArtisanFinder faz menos trabalho em segundo plano quando nenhuma criação está preparada."
+L.CHANGELOG_ENTRY_2_0_6 = [[### Adicionado
+
+* A importação/exportação de artesãos oferece uma forma de divulgar artesãos de outra conta além da sua conta principal.
+* Preparar pedido agora tem um modo Avançado que permite aos clientes escolher qualidades de reagentes obrigatórios e reagentes opcionais antes de rastrear uma criação.
+* O ArtisanFinder agora pode estimar a qualidade esperada de criação pela configuração de reagentes selecionada e sugerir combinações de reagentes que alcancem o melhor resultado conhecido sem sempre usar por padrão materiais da qualidade mais alta.
+
+### Alterado
+
+* As varreduras de profissão agora salvam os dados de perícia de reagentes necessários para uma simulação confiável do lado do cliente de qualidade, recomendações e preparação avançada. Registros de varredura antigos que não oferecem suporte ao novo modelo são limpos ou marcados como desatualizados para que os jogadores saibam quais personagens precisam de uma nova varredura.
+* Clicar em uma linha de cliente correspondente agora pode aplicar os materiais de criação rastreados do Objective Tracker ao formulário de pedido de criação.
+
+### Corrigido
+
+* Abrir uma profissão não deve mais causar uma queda significativa de FPS.
+* Membros da guilda que podem criar um item agora mostram seu status online real em vez de sempre aparecerem offline.
+* Os recursos do canal de comércio agora funcionam em clientes de jogo russos.
+* As varreduras completas de profissão agora distribuem o trabalho de forma mais uniforme, com menos travamentos e engasgos em profissões grandes.]]
+L.CHANGELOG_ENTRY_2_0_5 = [[### Adicionado
+
+* As linhas de cliente agora incluem ações de Preparar pedido para criações padrão e criações com reagentes opcionais.
+* Criações preparadas são rastreadas no Objective Tracker com componentes obrigatórios, reagentes opcionais selecionados, quantidades necessárias, contagens possuídas e faltantes, e marcadores de qualidade.
+* Pesquisas na Casa de Leilões a partir de criações preparadas agora usam pesquisas múltiplas temporárias do Auctionator quando o Auctionator está ativado.
+
+### Alterado
+
+* Os botões "Pedido pessoal" e "Pedido de guilda" foram removidos para que um simples clique em uma linha de artesão preencha automaticamente o formulário à esquerda.]]
+L.CHANGELOG_ENTRY_2_0_3 = [[### Corrigido
+
+* Tentativa de sussurro em PNJs de Pedido de Patrono ou personagens alternativos ao concluir um pedido de criação.]]
+L.CHANGELOG_ENTRY_2_0_2 = [[### Adicionado
+
+* Notificações para clientes quando um pedido de criação for concluído.]]
+L.CHANGELOG_ENTRY_2_0_1 = [[### Adicionado
+
+* Localização para chinês simplificado, espanhol da América Latina, português e português do Brasil.
+
+### Alterado
+
+* Pequenas otimizações de comunicação.
+* A comunicação de mensagens do addon agora é compactada.
+
+### Corrigido
+
+* Pequeno vazamento de memória em sessões longas.]]

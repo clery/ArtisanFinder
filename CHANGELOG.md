@@ -1,33 +1,25 @@
 # ArtisanFinder
 
-## [v2.0.6](https://github.com/clery/ArtisanFinder/releases/tag/v2.0.6-beta4) (2026-06-06)
-[Full Changelog](https://github.com/clery/ArtisanFinder/compare/v2.0.5...v2.0.6-beta4) | [Previous Releases](https://github.com/clery/ArtisanFinder/releases)
+## [v2.1.0](https://github.com/clery/ArtisanFinder/releases/tag/v2.1.0) (2026-06-11)
+[Full Changelog](https://github.com/clery/ArtisanFinder/compare/v2.0.5...v2.1.0) | [Previous Releases](https://github.com/clery/ArtisanFinder/releases)
 
 ### Added
 
-* Artisan import/export provides a versioned copy/paste payload for transferring scanned artisans, profession pricing, advertising choices, and profession links between WoW accounts.
-* An account-wide changelog panel now opens once after updating ArtisanFinder, with `/af changelog` available for manual viewing.
+* Artisan import/export provides a way to advertise another account's artisans as well as your main account.
 * Prepare order now has an Advanced mode that lets customers choose required reagent qualities and optional reagents before tracking a craft.
 * ArtisanFinder can now estimate expected craft quality from the selected reagent setup and suggest reagent combinations that reach the best known result without always defaulting to the highest-quality materials.
 
 ### Changed
 
 * Profession scans now save the reagent skill facts needed for reliable customer-side quality simulation, recommendations, and advanced preparation. Older scan records that cannot support the new model are cleared or marked outdated so players know which characters need a fresh scan.
-* Customer responses now use the new scan facts to rebuild quality and reagent recommendations locally, reducing oversized addon-message payloads and keeping the customer UI responsive while still sharing only craft capability data needed for ArtisanFinder results.
-* Crafter responses now transmit only the crafter-specific reagent skill bonuses; reagent lists, quantities, slot names, and skill-neutral reagents are rebuilt on the customer side from local game data. Responses for recipes with many reagents, which previously overflowed into a degraded compact format, now always fit in a single addon message with full Advanced prepare support.
+* Clicking a matching customer row can now apply tracked craft materials from the Objective Tracker into the Crafting Order form.
 
 ### Fixed
 
-* Expected craft quality in Advanced prepare now accounts for the added recipe difficulty of optional reagents (such as embellishments), so it no longer overstates the result as maximum quality when the selected reagents fall short.
-* Compact artisan responses now carry optional reagent difficulty deltas, so "With optional reagents" can adjust the displayed expected quality even when the full reagent-facts payload falls back to `C1`.
 * Opening a profession should no longer significantly cause an FPS drop.
-* Advanced prepare order no longer opens an empty panel claiming "No reagent choices were found" when detailed reagent data has not been received from a crafter; the Advanced action is disabled and a clear message is shown until the data is available.
-* A compact (summary-only) response no longer wipes previously received detailed reagent data for the same crafter and item.
-* Suggested reagent details now reach customers even for crafts with many reagent options; a compact summary arrives when the full details are too large to send.
 * Guild members who can craft an item now show their real online status instead of always appearing offline.
 * Trade chat features now work on Russian game clients.
 * Full profession scans now spread their work more evenly, with less freezing and stuttering on large professions.
-* Opening a profession is smoother, and ArtisanFinder does less background work while no crafts are being prepared.
 
 ## [v2.0.5](https://github.com/clery/ArtisanFinder/releases/tag/v2.0.5) (2026-06-05)
 

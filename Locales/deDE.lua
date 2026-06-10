@@ -403,6 +403,8 @@ L.ADVANCED_REAGENTS_EMPTY = "Für dieses Rezept wurden keine Reagenzienoptionen 
 L.ADVANCED_REAGENTS_PENDING = "Detaillierte Reagenziendaten wurden von diesem Handwerker noch nicht empfangen."
 L.REQUIRED_REAGENTS = "Benötigte Reagenzien"
 L.CUSTOMER_RESCAN_NEEDED = "Erneuter Scan nötig"
+L.CUSTOMER_LEGACY_SCAN_FALLBACK = "Outdated scan - Rescan recommended"
+L.CUSTOMER_LEGACY_SCAN_TOOLTIP = "This result comes from an outdated scan. It is shown as a customer fallback only; rescan this profession for current recommendations."
 L.PREPARE_ORDER_ADVANCED = "Erweitert"
 L.PREP_TRACKER_MODE_ADVANCED = "Erweitert für %s"
 L.ORDERABLE_DUMP_ERROR_API_UNAVAILABLE = "C_CraftingOrders.GetCustomerOptions ist nicht verfügbar."
@@ -414,19 +416,49 @@ L.CHANGELOG_HELP = "/af changelog - aktuelle ArtisanFinder-Änderungen öffnen"
 L.CHANGELOG_TITLE = "ArtisanFinder-Änderungen"
 L.CHANGELOG_DESCRIPTION = "Aktuelle Änderungen für diese Version."
 L.CHANGELOG_ACKNOWLEDGE = "Verstanden"
-L.CHANGELOG_VERSION = "Version %s"
+L.CHANGELOG_ENTRY_2_1_0Version %s"
 L.CHANGELOG_UNRELEASED = "Nächstes Update"
-L.CHANGELOG_ADDED = "Hinzugefügt"
-L.CHANGELOG_CHANGED = "Geändert"
-L.CHANGELOG_FIXED = "Behoben"
-L.CHANGELOG_ENTRY_PANEL = "Accountweite Updatehinweise öffnen sich nun einmal nach einer Aktualisierung von ArtisanFinder."
-L.CHANGELOG_ENTRY_TRANSFER = "Handwerker-Import/-Export kann gescannte Handwerker, Berufspreise, Werbeeinstellungen und Berufslinks zwischen WoW-Accounts übertragen."
-L.CHANGELOG_ENTRY_ADVANCED_PREP = "Auftrag vorbereiten hat jetzt einen erweiterten Modus, mit dem du Qualitäten benötigter Reagenzien und optionale Reagenzien vor dem Verfolgen einer Herstellung auswählen kannst."
-L.CHANGELOG_ENTRY_REAGENT_RECOMMENDATIONS = "ArtisanFinder kann aus diesen Auswahlen die erwartete Qualität schätzen und Reagenzienkombinationen vorschlagen, die das beste bekannte Ergebnis erreichen, ohne immer automatisch Materialien höchster Qualität zu wählen."
-L.CHANGELOG_ENTRY_SCAN_REWORK = "Der Scan wurde neu aufgebaut, damit jeder Handwerker die Reagenzien-Fertigkeitsdaten speichert, die nötig sind, um Handwerksqualität aus echten Reagenzienauswahlen zu simulieren. Das war nötig, weil alte Scandaten eine fertige Empfehlung speicherten, aber neue Kundenfragen wie „was passiert, wenn ich Materialien von Rang 2 plus dieses optionale Reagenz benutze?“ nicht zuverlässig beantworten konnten. Ältere Scans, die das neue Modell nicht unterstützen, werden nun gelöscht oder als veraltet markiert; du musst betroffene Berufe eventuell einmal erneut öffnen. Nach diesem erneuten Scan erhalten Kunden ehrlichere Qualitätsschätzungen, bessere Reagenzienvorschläge, kleinere Live-Antworten und weniger UI-Verlangsamung, während ArtisanFinder weiterhin nur die für Addon-Ergebnisse nötigen Handwerksfähigkeitsdaten teilt."
-L.CHANGELOG_ENTRY_SCAN_PERFORMANCE = "Das Öffnen eines Berufs sollte keinen starken FPS-Einbruch mehr verursachen."
-L.CHANGELOG_ENTRY_REAGENT_DETAIL_FALLBACK = "Vorgeschlagene Reagenziendetails erreichen Kunden jetzt auch bei Herstellungen mit vielen Reagenzienoptionen; eine kompakte Zusammenfassung kommt an, wenn die vollständigen Details zu groß zum Senden sind."
-L.CHANGELOG_ENTRY_GUILD_CRAFTER_ONLINE = "Gildenmitglieder, die einen Gegenstand herstellen können, zeigen jetzt ihren echten Onlinestatus, statt immer als offline zu erscheinen."
-L.CHANGELOG_ENTRY_TRADE_CHANNEL_RU = "Die Handelschannel-Funktionen funktionieren jetzt auf russischen Spielclients."
-L.CHANGELOG_ENTRY_FULL_SCAN_SMOOTHNESS = "Vollständige Berufsscans verteilen ihre Arbeit jetzt gleichmäßiger, mit weniger Einfrieren und Ruckeln bei großen Berufen."
-L.CHANGELOG_ENTRY_BACKGROUND_SMOOTHNESS = "Das Öffnen eines Berufs läuft flüssiger und ArtisanFinder erledigt weniger Hintergrundarbeit, solange keine Herstellungen vorbereitet sind."
+L.CHANGELOG_ENTRY_2_0_6 = [[### Hinzugefügt
+
+* Handwerker-Import/-Export bietet eine Möglichkeit, Handwerker eines anderen Accounts zusätzlich zu deinem Hauptaccount zu bewerben.
+* Auftrag vorbereiten hat jetzt einen erweiterten Modus, mit dem Kunden die Qualitäten benötigter Reagenzien und optionale Reagenzien vor dem Verfolgen einer Herstellung auswählen können.
+* ArtisanFinder kann jetzt die erwartete Herstellungsqualität aus der ausgewählten Reagenzienkonfiguration schätzen und Reagenzienkombinationen vorschlagen, die das beste bekannte Ergebnis erreichen, ohne immer automatisch Materialien höchster Qualität zu verwenden.
+
+### Geändert
+
+* Berufsscans speichern jetzt die Reagenzien-Fertigkeitsdaten, die für zuverlässige kundenseitige Qualitätssimulation, Empfehlungen und erweiterte Vorbereitung nötig sind. Ältere Scan-Datensätze, die das neue Modell nicht unterstützen, werden gelöscht oder als veraltet markiert, damit Spieler wissen, welche Charaktere einen neuen Scan brauchen.
+* Durch Klicken auf eine passende Kundenzeile können verfolgte Herstellungsmaterialien aus dem Objective Tracker jetzt in das Handwerksauftragsformular übernommen werden.
+
+### Behoben
+
+* Das Öffnen eines Berufs sollte keinen deutlichen FPS-Einbruch mehr verursachen.
+* Gildenmitglieder, die einen Gegenstand herstellen können, zeigen jetzt ihren echten Onlinestatus, statt immer als offline zu erscheinen.
+* Handelschat-Funktionen funktionieren jetzt auf russischen Spielclients.
+* Vollständige Berufsscans verteilen ihre Arbeit jetzt gleichmäßiger, mit weniger Einfrieren und Ruckeln bei großen Berufen.]]
+L.CHANGELOG_ENTRY_2_0_5 = [[### Hinzugefügt
+
+* Kundenzeilen enthalten jetzt Aktionen zum Vorbereiten von Aufträgen für Standardherstellungen und Herstellungen mit optionalen Reagenzien.
+* Vorbereitete Herstellungen werden im Objective Tracker mit benötigten Komponenten, ausgewählten optionalen Reagenzien, benötigter Menge, vorhandener und fehlender Anzahl sowie Qualitätsmarkierungen verfolgt.
+* Auktionshaussuchen aus vorbereiteten Herstellungen verwenden jetzt temporäre Auctionator-Mehrfachsuchen, wenn Auctionator aktiviert ist.
+
+### Geändert
+
+* Die Schaltflächen "Persönlicher Auftrag" und "Gildenauftrag" wurden entfernt, damit ein einfacher Klick auf eine Handwerkerzeile das Formular links automatisch ausfüllt.]]
+L.CHANGELOG_ENTRY_2_0_3 = [[### Behoben
+
+* Flüsterversuch bei Patron-Auftrags-NSCs oder Twink-Charakteren beim Abschluss eines Handwerksauftrags.]]
+L.CHANGELOG_ENTRY_2_0_2 = [[### Hinzugefügt
+
+* Benachrichtigungen für Kunden, wenn ein Handwerksauftrag erfüllt wurde.]]
+L.CHANGELOG_ENTRY_2_0_1 = [[### Hinzugefügt
+
+* Lokalisierung für vereinfachtes Chinesisch, lateinamerikanisches Spanisch, Portugiesisch und brasilianisches Portugiesisch.
+
+### Geändert
+
+* Kleine Kommunikationsoptimierungen.
+* Addon-Nachrichtenkommunikation ist jetzt komprimiert.
+
+### Behoben
+
+* Kleines Speicherleck bei langen Sitzungen.]]

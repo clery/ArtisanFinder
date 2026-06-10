@@ -403,6 +403,8 @@ L.ADVANCED_REAGENTS_EMPTY = "Aucun choix de composant trouvé pour cette recette
 L.ADVANCED_REAGENTS_PENDING = "Les données détaillées des composants n'ont pas encore été reçues de cet artisan."
 L.REQUIRED_REAGENTS = "Composants requis"
 L.CUSTOMER_RESCAN_NEEDED = "Nouveau scan requis"
+L.CUSTOMER_LEGACY_SCAN_FALLBACK = "Outdated scan - Rescan recommended"
+L.CUSTOMER_LEGACY_SCAN_TOOLTIP = "This result comes from an outdated scan. It is shown as a customer fallback only; rescan this profession for current recommendations."
 L.PREPARE_ORDER_ADVANCED = "Avancé"
 L.PREP_TRACKER_MODE_ADVANCED = "Avancé pour %s"
 L.ORDERABLE_DUMP_ERROR_API_UNAVAILABLE = "C_CraftingOrders.GetCustomerOptions est indisponible."
@@ -416,17 +418,47 @@ L.CHANGELOG_DESCRIPTION = "Changements récents pour cette version."
 L.CHANGELOG_ACKNOWLEDGE = "Compris"
 L.CHANGELOG_VERSION = "Version %s"
 L.CHANGELOG_UNRELEASED = "Prochaine mise à jour"
-L.CHANGELOG_ADDED = "Ajouté"
-L.CHANGELOG_CHANGED = "Modifié"
-L.CHANGELOG_FIXED = "Corrigé"
-L.CHANGELOG_ENTRY_PANEL = "Les notes de mise à jour liées au compte s'ouvrent désormais une fois après la mise à jour d'ArtisanFinder."
-L.CHANGELOG_ENTRY_TRANSFER = "L'importation/exportation d'artisans peut transférer artisans scannés, prix de métier, choix de publication et liens de métier entre comptes WoW."
-L.CHANGELOG_ENTRY_ADVANCED_PREP = "Préparer la commande dispose maintenant d'un mode Avancé pour choisir les qualités des composants requis et les composants optionnels avant de suivre une fabrication."
-L.CHANGELOG_ENTRY_REAGENT_RECOMMENDATIONS = "ArtisanFinder peut estimer la qualité prévue à partir de ces choix et suggérer des combinaisons de composants atteignant le meilleur résultat connu sans toujours choisir les matériaux de plus haute qualité."
-L.CHANGELOG_ENTRY_SCAN_REWORK = "Le scan a été reconstruit afin que chaque artisan enregistre les données de compétence des composants nécessaires pour simuler la qualité d'une fabrication à partir de vrais choix de composants. C'était nécessaire car les anciennes données de scan stockaient une recommandation finale, mais ne pouvaient pas répondre fiablement à de nouvelles questions client comme « que se passe-t-il si j'utilise des matériaux de rang 2 avec ce composant optionnel ? » Les anciens scans incompatibles sont désormais effacés ou marqués obsolètes ; vous devrez peut-être rouvrir les métiers concernés une fois. Après ce nouveau scan, les clients obtiennent des estimations de qualité plus honnêtes, de meilleures suggestions de composants, des réponses en direct plus petites et moins de ralentissements d'interface, tandis qu'ArtisanFinder ne partage toujours que les données de capacité de fabrication nécessaires aux résultats de l'addon."
-L.CHANGELOG_ENTRY_SCAN_PERFORMANCE = "Ouvrir un métier ne devrait plus provoquer de forte chute d'IPS."
-L.CHANGELOG_ENTRY_REAGENT_DETAIL_FALLBACK = "Les détails des composants suggérés parviennent désormais aux clients même pour les fabrications avec de nombreuses options de composants ; un résumé compact arrive lorsque les détails complets sont trop volumineux pour être envoyés."
-L.CHANGELOG_ENTRY_GUILD_CRAFTER_ONLINE = "Les membres de guilde pouvant fabriquer un objet affichent désormais leur véritable statut en ligne au lieu d'apparaître toujours hors ligne."
-L.CHANGELOG_ENTRY_TRADE_CHANNEL_RU = "Les fonctionnalités du canal Commerce fonctionnent désormais sur les clients de jeu russes."
-L.CHANGELOG_ENTRY_FULL_SCAN_SMOOTHNESS = "Les scans complets de métier répartissent désormais leur travail plus uniformément, avec moins de blocages et de saccades sur les grands métiers."
-L.CHANGELOG_ENTRY_BACKGROUND_SMOOTHNESS = "L'ouverture d'un métier est plus fluide et ArtisanFinder effectue moins de travail en arrière-plan quand aucune fabrication n'est préparée."
+L.CHANGELOG_ENTRY_2_1_0 = [[### Ajouté
+
+* L'importation/exportation d'artisans offre un moyen d'annoncer les artisans d'un autre compte en plus de ceux de votre compte principal.
+* Préparer la commande propose maintenant un mode Avancé qui permet aux clients de choisir les qualités des composants requis et les composants optionnels avant de suivre une fabrication.
+* ArtisanFinder peut maintenant estimer la qualité de fabrication attendue à partir de la configuration de composants sélectionnée et suggérer des combinaisons de composants atteignant le meilleur résultat connu sans toujours choisir par défaut les matériaux de plus haute qualité.
+
+### Modifié
+
+* Les scans de métier enregistrent maintenant les données de compétence des composants nécessaires pour une simulation fiable côté client de la qualité, des recommandations et de la préparation avancée. Les anciens enregistrements de scan qui ne prennent pas en charge le nouveau modèle sont effacés ou marqués obsolètes afin que les joueurs sachent quels personnages doivent être rescannés.
+* Cliquer sur une ligne client correspondante peut maintenant appliquer les matériaux de fabrication suivis depuis l'Objective Tracker dans le formulaire de commande d'artisanat.
+
+### Corrigé
+
+* Ouvrir un métier ne devrait plus provoquer de chute importante d'IPS.
+* Les membres de guilde pouvant fabriquer un objet affichent maintenant leur véritable statut en ligne au lieu d'apparaître toujours hors ligne.
+* Les fonctionnalités du canal Commerce fonctionnent maintenant sur les clients de jeu russes.
+* Les scans complets de métier répartissent maintenant leur travail plus uniformément, avec moins de blocages et de saccades sur les grands métiers.]]
+L.CHANGELOG_ENTRY_2_0_5 = [[### Ajouté
+
+* Les lignes client incluent désormais des actions Préparer la commande pour les fabrications standard et celles avec composants optionnels.
+* Les fabrications préparées sont suivies dans l'Objective Tracker avec composants requis, composants optionnels sélectionnés, quantités nécessaires, comptes possédés et manquants, et marqueurs de qualité.
+* Les recherches à l'hôtel des ventes depuis les fabrications préparées utilisent désormais les recherches multiples temporaires d'Auctionator quand Auctionator est activé.
+
+### Modifié
+
+* Les boutons "Commande personnelle" et "Commande de guilde" ont été supprimés afin qu'un simple clic sur une ligne d'artisan remplisse automatiquement le formulaire à gauche.]]
+L.CHANGELOG_ENTRY_2_0_3 = [[### Corrigé
+
+* Tentative de chuchotement sur les PNJ de commandes de mécène ou les personnages secondaires à la fin d'une commande d'artisanat.]]
+L.CHANGELOG_ENTRY_2_0_2 = [[### Ajouté
+
+* Notifications pour les clients lorsqu'une commande d'artisanat a été terminée.]]
+L.CHANGELOG_ENTRY_2_0_1 = [[### Ajouté
+
+* Localisation pour le chinois simplifié, l'espagnol d'Amérique latine, le portugais et le portugais brésilien.
+
+### Modifié
+
+* Petites optimisations de communication.
+* La communication des messages d'addon est désormais compressée.
+
+### Corrigé
+
+* Petite fuite mémoire lors des longues sessions.]]

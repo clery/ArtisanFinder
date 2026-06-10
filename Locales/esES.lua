@@ -404,6 +404,8 @@ L.ADVANCED_REAGENTS_EMPTY = "No se encontraron opciones de componentes para esta
 L.ADVANCED_REAGENTS_PENDING = "Aún no se han recibido los datos detallados de componentes de este artesano."
 L.REQUIRED_REAGENTS = "Componentes requeridos"
 L.CUSTOMER_RESCAN_NEEDED = "Se necesita reescanear"
+L.CUSTOMER_LEGACY_SCAN_FALLBACK = "Outdated scan - Rescan recommended"
+L.CUSTOMER_LEGACY_SCAN_TOOLTIP = "This result comes from an outdated scan. It is shown as a customer fallback only; rescan this profession for current recommendations."
 L.PREPARE_ORDER_ADVANCED = "Avanzado"
 L.PREP_TRACKER_MODE_ADVANCED = "Avanzado para %s"
 L.ORDERABLE_DUMP_ERROR_API_UNAVAILABLE = "C_CraftingOrders.GetCustomerOptions no está disponible."
@@ -415,19 +417,49 @@ L.CHANGELOG_HELP = "/af changelog - abrir cambios recientes de ArtisanFinder"
 L.CHANGELOG_TITLE = "Cambios de ArtisanFinder"
 L.CHANGELOG_DESCRIPTION = "Cambios recientes de esta versión."
 L.CHANGELOG_ACKNOWLEDGE = "Entendido"
-L.CHANGELOG_VERSION = "Versión %s"
+L.CHANGELOG_ENTRY_2_1_0Versión %s"
 L.CHANGELOG_UNRELEASED = "Próxima actualización"
-L.CHANGELOG_ADDED = "Añadido"
-L.CHANGELOG_CHANGED = "Cambiado"
-L.CHANGELOG_FIXED = "Corregido"
-L.CHANGELOG_ENTRY_PANEL = "Las notas de actualización de la cuenta ahora se abren una vez después de actualizar ArtisanFinder."
-L.CHANGELOG_ENTRY_TRANSFER = "La importación/exportación de artesanos puede transferir artesanos escaneados, precios de profesión, opciones de publicidad y enlaces de profesión entre cuentas de WoW."
-L.CHANGELOG_ENTRY_ADVANCED_PREP = "Preparar pedido ahora tiene un modo Avanzado para elegir calidades de componentes requeridos y componentes opcionales antes de seguir una fabricación."
-L.CHANGELOG_ENTRY_REAGENT_RECOMMENDATIONS = "ArtisanFinder puede estimar la calidad prevista a partir de esas elecciones y sugerir combinaciones de componentes que alcancen el mejor resultado conocido sin usar siempre los materiales de mayor calidad."
-L.CHANGELOG_ENTRY_SCAN_REWORK = "El escaneo se rehízo para que cada artesano guarde los datos de habilidad de componentes necesarios para simular la calidad de fabricación con elecciones reales de componentes. Era necesario porque los datos de escaneo antiguos guardaban una recomendación final, pero no podían responder con fiabilidad a nuevas preguntas de cliente como «¿qué pasa si uso materiales de rango 2 más este componente opcional?». Los escaneos antiguos que no admiten el nuevo modelo ahora se borran o se marcan como obsoletos, así que quizá debas volver a abrir las profesiones afectadas una vez. Tras ese reescaneo, los clientes obtienen estimaciones de calidad más sinceras, mejores sugerencias de componentes, respuestas en vivo más pequeñas y menos ralentización de la interfaz, mientras ArtisanFinder sigue compartiendo solo los datos de capacidad de fabricación necesarios para los resultados del addon."
-L.CHANGELOG_ENTRY_SCAN_PERFORMANCE = "Abrir una profesión ya no debería causar una caída importante de FPS."
-L.CHANGELOG_ENTRY_REAGENT_DETAIL_FALLBACK = "Los detalles de componentes sugeridos ahora llegan a los clientes incluso en fabricaciones con muchas opciones de componentes; cuando los detalles completos son demasiado grandes para enviarse, llega un resumen compacto."
-L.CHANGELOG_ENTRY_GUILD_CRAFTER_ONLINE = "Los miembros de hermandad que pueden fabricar un objeto ahora muestran su estado de conexión real en lugar de aparecer siempre desconectados."
-L.CHANGELOG_ENTRY_TRADE_CHANNEL_RU = "Las funciones del canal de comercio ahora funcionan en clientes de juego rusos."
-L.CHANGELOG_ENTRY_FULL_SCAN_SMOOTHNESS = "Los escaneos completos de profesión ahora reparten su trabajo de forma más uniforme, con menos bloqueos y tirones en profesiones grandes."
-L.CHANGELOG_ENTRY_BACKGROUND_SMOOTHNESS = "Abrir una profesión es más fluido y ArtisanFinder hace menos trabajo en segundo plano cuando no hay fabricaciones preparadas."
+L.CHANGELOG_ENTRY_2_0_6 = [[### Añadido
+
+* La importación/exportación de artesanos ofrece una forma de anunciar los artesanos de otra cuenta además de los de tu cuenta principal.
+* Preparar pedido ahora tiene un modo Avanzado que permite a los clientes elegir calidades de componentes requeridos y componentes opcionales antes de seguir una fabricación.
+* ArtisanFinder ahora puede estimar la calidad de fabricación prevista a partir de la configuración de componentes seleccionada y sugerir combinaciones de componentes que alcancen el mejor resultado conocido sin usar siempre por defecto los materiales de mayor calidad.
+
+### Cambiado
+
+* Los escaneos de profesión ahora guardan los datos de habilidad de componentes necesarios para una simulación fiable del lado del cliente de la calidad, las recomendaciones y la preparación avanzada. Los registros de escaneo antiguos que no admiten el nuevo modelo se borran o se marcan como obsoletos para que los jugadores sepan qué personajes necesitan un nuevo escaneo.
+* Al hacer clic en una fila de cliente coincidente, ahora se pueden aplicar los materiales de fabricación seguidos desde el Objective Tracker al formulario de pedido de fabricación.
+
+### Corregido
+
+* Abrir una profesión ya no debería causar una caída importante de FPS.
+* Los miembros de hermandad que pueden fabricar un objeto ahora muestran su estado de conexión real en lugar de aparecer siempre desconectados.
+* Las funciones del canal de comercio ahora funcionan en clientes de juego rusos.
+* Los escaneos completos de profesión ahora reparten su trabajo de forma más uniforme, con menos bloqueos y tirones en profesiones grandes.]]
+L.CHANGELOG_ENTRY_2_0_5 = [[### Añadido
+
+* Las filas de cliente ahora incluyen acciones de Preparar pedido para fabricaciones estándar y fabricaciones con componentes opcionales.
+* Las fabricaciones preparadas se siguen en el Objective Tracker con componentes requeridos, componentes opcionales seleccionados, cantidades necesarias, recuentos disponibles y faltantes, y marcadores de calidad.
+* Las búsquedas en la casa de subastas desde fabricaciones preparadas ahora usan búsquedas múltiples temporales de Auctionator cuando Auctionator está activado.
+
+### Cambiado
+
+* Los botones "Pedido personal" y "Pedido de hermandad" se han eliminado para que un simple clic en una fila de artesano rellene automáticamente el formulario de la izquierda.]]
+L.CHANGELOG_ENTRY_2_0_3 = [[### Corregido
+
+* Intento de susurro a PNJ de pedidos de patrón o personajes alternativos al completar un pedido de fabricación.]]
+L.CHANGELOG_ENTRY_2_0_2 = [[### Añadido
+
+* Notificaciones para clientes cuando se completa un pedido de fabricación.]]
+L.CHANGELOG_ENTRY_2_0_1 = [[### Añadido
+
+* Localización para chino simplificado, español de Latinoamérica, portugués y portugués de Brasil.
+
+### Cambiado
+
+* Pequeñas optimizaciones de comunicación.
+* La comunicación de mensajes del addon ahora está comprimida.
+
+### Corregido
+
+* Pequeña fuga de memoria en sesiones largas.]]
