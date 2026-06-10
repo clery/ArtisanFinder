@@ -177,6 +177,8 @@ local function GuildRosterLookupHasMember(AF, lookup, name, guid)
 	return GuildRosterLookupHasGUID(lookup, guid) or GuildRosterLookupHasName(AF, lookup, name)
 end
 
+-- Snapshot keys for loops that insert entries while iterating; adding keys
+-- during pairs() is undefined behavior (deleting is fine).
 local function GetTableKeys(tbl)
 	local keys = {}
 	for key in pairs(tbl or {}) do
@@ -576,8 +578,7 @@ function AF:ClearDepartedGuildArtisanContacts(rosterNames, departedNames)
 	local departedLookup = EnsureGuildRosterLookup(self, departedNames)
 	local cleared = 0
 	local guildKey = self.currentGuildCacheKey
-	for _, crafterName in ipairs(GetTableKeys(self.db and self.db.artisanContacts)) do
-		local entry = self.db and self.db.artisanContacts and self.db.artisanContacts[crafterName]
+	for crafterName, entry in pairs(self.db and self.db.artisanContacts or {}) do
 		if type(entry) == "table" and (guildKey == nil or entry.guildKey == nil or entry.guildKey == guildKey) then
 			local normalizedName = self:NormalizeName(crafterName)
 			if normalizedName
@@ -601,9 +602,8 @@ function AF:ReconcileGuildCachesToRoster(rosterNames)
 	local removedRoster = 0
 	local removedProfession = 0
 	local removedRecipe = 0
-	for _, name in ipairs(GetTableKeys(self.guildRosterByName)) do
+	for name, entry in pairs(self.guildRosterByName or {}) do
 		local normalizedName = self:NormalizeName(name)
-		local entry = self.guildRosterByName[name]
 		local rosterName = entry and entry.guid and rosterLookup.namesByGUID[tostring(entry.guid)]
 		if not normalizedName or not GuildRosterLookupHasMember(self, rosterLookup, name, entry and entry.guid) then
 			if normalizedName then
@@ -1188,8 +1188,8 @@ function AF:HandleGuildRecipeKnownByMembers()
 		end
 	end
 	for index = 1, tonumber(numMembers) or 0 do
-		local memberOk, name, onlineFlag = pcall(GetGuildRecipeMember, index)
-		name = memberOk and self:ResolveGuildMemberName(name, true) or nil
+		local memberOk, displayName, fullName, _, onlineFlag = pcall(GetGuildRecipeMember, index)
+		local name = memberOk and self:ResolveGuildMemberName(fullName or displayName, true) or nil
 		local isOnline = IsOnlineFlag(onlineFlag)
 		if name then
 			table.insert(members, name)
