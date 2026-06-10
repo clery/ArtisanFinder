@@ -330,6 +330,39 @@ function AF:IsCurrentScanModelEntry(entry)
 	return HasCurrentScanModel(entry)
 end
 
+-- True when the entry carries real per-slot reagent facts usable by the
+-- Advanced prepare flow. Synthetic facts built from compact responses (or
+-- failed wire rehydration) are tagged compact = true; retry rehydration here
+-- when the original wire payload is still cached.
+function AF:HasAdvancedReagentFacts(entry)
+	if not HasCurrentScanModel(entry) then
+		return false
+	end
+	local facts = entry.reagentSkillFacts
+	if facts.compact == true and entry.wireReagentSkillFacts and self.RehydrateWireReagentSkillFacts then
+		local rehydrated = self:RehydrateWireReagentSkillFacts(entry.wireReagentSkillFacts, entry.recipeID)
+		if rehydrated then
+			local function ApplyRehydratedFacts(target)
+				target.reagentSkillFacts = rehydrated
+				target.scanModelVersion = rehydrated.scanModelVersion
+				target.maxOutputQuality = rehydrated.maxOutputQuality
+				target.optionalSlotCount = #(rehydrated.optionalSlots or {})
+				target.wireReagentSkillFacts = nil
+			end
+			ApplyRehydratedFacts(entry)
+			-- Rows hold copies of customer cache entries; persist the
+			-- rehydrated facts on the cached entry too.
+			local itemCache = self.db and self.db.customerCache and self.db.customerCache[tostring(entry.itemID)]
+			local cached = itemCache and itemCache[self:NormalizeName(entry.orderTarget or entry.name or entry.target) or ""]
+			if cached and cached ~= entry and cached.reagentSkillFacts and cached.reagentSkillFacts.compact == true then
+				ApplyRehydratedFacts(cached)
+			end
+			facts = rehydrated
+		end
+	end
+	return facts.compact ~= true
+end
+
 function AF:HasLegacyScanFallback(entry)
 	return HasLegacyScanFallback(entry)
 end

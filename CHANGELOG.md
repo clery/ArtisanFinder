@@ -14,10 +14,13 @@
 
 * Profession scans now save the reagent skill facts needed for reliable customer-side quality simulation, recommendations, and advanced preparation. Older scan records that cannot support the new model are cleared or marked outdated so players know which characters need a fresh scan.
 * Customer responses now use the new scan facts to rebuild quality and reagent recommendations locally, reducing oversized addon-message payloads and keeping the customer UI responsive while still sharing only craft capability data needed for ArtisanFinder results.
+* Crafter responses now transmit only the crafter-specific reagent skill bonuses; reagent lists, quantities, slot names, and skill-neutral reagents are rebuilt on the customer side from local game data. Responses for recipes with many reagents, which previously overflowed into a degraded compact format, now always fit in a single addon message with full Advanced prepare support.
 
 ### Fixed
 
 * Opening a profession should no longer significantly cause an FPS drop.
+* Advanced prepare order no longer opens an empty panel claiming "No reagent choices were found" when detailed reagent data has not been received from a crafter; the Advanced action is disabled and a clear message is shown until the data is available.
+* A compact (summary-only) response no longer wipes previously received detailed reagent data for the same crafter and item.
 * Suggested reagent details now reach customers even for crafts with many reagent options; a compact summary arrives when the full details are too large to send.
 * Guild members who can craft an item now show their real online status instead of always appearing offline.
 * Trade chat features now work on Russian game clients.

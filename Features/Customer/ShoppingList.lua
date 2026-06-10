@@ -923,6 +923,11 @@ function AF:SetCustomerShoppingListShown(shown)
 end
 
 function AF:ShowCustomerShoppingListForEntry(entry, mode)
+	if mode == "advanced" and self.HasAdvancedReagentFacts then
+		-- Retries wire-facts rehydration in place when the entry only has
+		-- synthetic compact facts but the wire payload is still cached.
+		self:HasAdvancedReagentFacts(entry)
+	end
 	local context = self:SetCustomerShoppingContext(entry, mode or "optional")
 	if not context then
 		return
@@ -1004,7 +1009,8 @@ function AF:RefreshCustomerOptionalPrepRow(row, entry)
 	prep:SetWidth(math.max(280, row:GetWidth() or 280))
 	prep:SetHeight(advanced and advancedHeight or PREP_HEIGHT)
 	prep.label:SetText(advanced and self:Text("ADVANCED_REAGENTS") or self:Text("OPTIONAL_REAGENTS"))
-	prep.empty:SetText(advanced and self:Text("ADVANCED_REAGENTS_EMPTY") or self:Text("CUSTOMER_SHOPPING_EMPTY"))
+	local factsPending = advanced and entry and type(entry.reagentSkillFacts) == "table" and entry.reagentSkillFacts.compact == true
+	prep.empty:SetText(advanced and self:Text(factsPending and "ADVANCED_REAGENTS_PENDING" or "ADVANCED_REAGENTS_EMPTY") or self:Text("CUSTOMER_SHOPPING_EMPTY"))
 	prep.label:ClearAllPoints()
 	prep.label:SetPoint("TOPLEFT", prep, "TOPLEFT", 27, -10)
 	prep.label:SetShown(not advanced)

@@ -1299,7 +1299,7 @@ function AF:ShowCustomerMenu(entry, owner)
 		menu.prepare:Enable()
 		menu.prepareSubmenu.standard:Enable()
 		menu.prepareSubmenu.optional:Enable()
-		menu.prepareSubmenu.advanced:SetEnabled(self:IsCurrentScanModelEntry(entry))
+		menu.prepareSubmenu.advanced:SetEnabled(self:HasAdvancedReagentFacts(entry))
 		menu.link:Disable()
 		self:ClearProfessionButtonTooltip()
 	elseif entry.ownAlt then
@@ -1307,13 +1307,13 @@ function AF:ShowCustomerMenu(entry, owner)
 		menu.prepare:Enable()
 		menu.prepareSubmenu.standard:Enable()
 		menu.prepareSubmenu.optional:Enable()
-		menu.prepareSubmenu.advanced:SetEnabled(self:IsCurrentScanModelEntry(entry))
+		menu.prepareSubmenu.advanced:SetEnabled(self:HasAdvancedReagentFacts(entry))
 	else
 		menu.whisper:Enable()
 		menu.prepare:Enable()
 		menu.prepareSubmenu.standard:Enable()
 		menu.prepareSubmenu.optional:Enable()
-		menu.prepareSubmenu.advanced:SetEnabled(self:IsCurrentScanModelEntry(entry))
+		menu.prepareSubmenu.advanced:SetEnabled(self:HasAdvancedReagentFacts(entry))
 	end
 	if entry.tutorialFake or (entry.ownSelf and not self:IsDevEnabled()) then
 		-- Keep Favorite interactive; side-effecting order/profession actions stay disabled.

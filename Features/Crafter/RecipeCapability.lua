@@ -738,10 +738,12 @@ local function BuildBaselineRequiredReagents(requiredSlots)
 	return reagentInfo, baselineBySlot
 end
 
-function AF:BuildRecipeReagentSkillFacts(recipeID)
-	if self:IsSecretValue(recipeID) then
-		return nil
-	end
+-- Builds the schematic-derived portion of reagent skill facts (slots, reagents,
+-- quantities) without any crafter-specific GetCraftingOperationInfo probing.
+-- Shared by the crafter-side facts builder and the customer-side wire-format
+-- rehydration: both sides reconstruct identical slot structures from the same
+-- local recipe schematic data.
+local function BuildReagentFactsSkeleton(recipeID)
 	local recipeInfo = C_TradeSkillUI.GetRecipeInfo(recipeID)
 	local recipeLevel = recipeInfo and recipeInfo.unlockedRecipeLevel
 	local okSchematic, schematic = pcall(C_TradeSkillUI.GetRecipeSchematic, recipeID, false, recipeLevel)
@@ -764,33 +766,12 @@ function AF:BuildRecipeReagentSkillFacts(recipeID)
 	end
 
 	local baselineReagentInfo, baselineBySlot = BuildBaselineRequiredReagents(requiredSlots)
-	local baselineOperationInfo = GetOperationInfoForReagentInfo(recipeID, baselineReagentInfo)
-	if not baselineOperationInfo then
-		baselineOperationInfo = GetOperationInfoForReagentInfo(recipeID, {})
-	end
-	if not baselineOperationInfo then
-		return nil
-	end
 
-	local baselineTotalSkill = GetOperationTotalSkill(baselineOperationInfo) or 0
 	local facts = {
-		scanModelVersion = self.SCAN_MODEL_VERSION or 2,
+		scanModelVersion = AF.SCAN_MODEL_VERSION or 2,
 		recipeID = tonumber(recipeID),
-		baseSkill = baselineTotalSkill,
-		baseRecipeDifficulty = GetOperationDifficulty(baselineOperationInfo) or tonumber(baselineOperationInfo.baseDifficulty) or 0,
-		maxOutputQuality = tonumber(recipeInfo and recipeInfo.maxQuality) or tonumber(GetRecipeDisplayQualityInfo(recipeID, baselineOperationInfo, baselineReagentInfo)) or 1,
 		requiredSlots = {},
 		optionalSlots = {},
-		probeMethod = "GetCraftingOperationInfo reagent quality deltas",
-		operationInfoFields = {
-			"baseDifficulty",
-			"bonusDifficulty",
-			"baseSkill",
-			"bonusSkill",
-			"craftingQuality",
-			"quality",
-			"guaranteedCraftingQualityID",
-		},
 	}
 
 	for slotIndex, reagentSlotSchematic in ipairs(requiredSlots) do
@@ -809,17 +790,6 @@ function AF:BuildRecipeReagentSkillFacts(recipeID)
 			if entry then
 				slotFact.reagents[#slotFact.reagents + 1] = entry
 			end
-		end
-		for _, quality in ipairs(GetRequiredQualityList(reagentSlotSchematic)) do
-			YieldSkillFactsBuildIfNeeded()
-			local reagent = SelectRepresentativeQualityReagent(reagentSlotSchematic, quality)
-			local probeReagentInfo = {}
-			for baselineSlotIndex, baselineSlot in ipairs(requiredSlots) do
-				AddCraftingReagentInfo(probeReagentInfo, baselineSlot, baselineSlotIndex == slotIndex and reagent or baselineBySlot[baselineSlotIndex])
-			end
-			local operationInfo = GetOperationInfoForReagentInfo(recipeID, probeReagentInfo)
-			local delta = operationInfo and ((GetOperationTotalSkill(operationInfo) or baselineTotalSkill) - baselineTotalSkill) or 0
-			slotFact.qualityBonuses[quality] = delta / math.max(1, tonumber(slotFact.quantity) or 1)
 		end
 		facts.requiredSlots[#facts.requiredSlots + 1] = slotFact
 	end
@@ -841,7 +811,108 @@ function AF:BuildRecipeReagentSkillFacts(recipeID)
 		facts.optionalSlots[#facts.optionalSlots + 1] = slotFact
 	end
 
+	return facts, requiredSlots, baselineReagentInfo, baselineBySlot, recipeInfo
+end
+
+function AF:BuildRecipeReagentSkillFacts(recipeID)
+	if self:IsSecretValue(recipeID) then
+		return nil
+	end
+	local facts, requiredSlots, baselineReagentInfo, baselineBySlot, recipeInfo = BuildReagentFactsSkeleton(recipeID)
+	if not facts then
+		return nil
+	end
+
+	local baselineOperationInfo = GetOperationInfoForReagentInfo(recipeID, baselineReagentInfo)
+	if not baselineOperationInfo then
+		baselineOperationInfo = GetOperationInfoForReagentInfo(recipeID, {})
+	end
+	if not baselineOperationInfo then
+		return nil
+	end
+
+	local baselineTotalSkill = GetOperationTotalSkill(baselineOperationInfo) or 0
+	facts.baseSkill = baselineTotalSkill
+	facts.baseRecipeDifficulty = GetOperationDifficulty(baselineOperationInfo) or tonumber(baselineOperationInfo.baseDifficulty) or 0
+	facts.maxOutputQuality = tonumber(recipeInfo and recipeInfo.maxQuality) or tonumber(GetRecipeDisplayQualityInfo(recipeID, baselineOperationInfo, baselineReagentInfo)) or 1
+	facts.probeMethod = "GetCraftingOperationInfo reagent quality deltas"
+	facts.operationInfoFields = {
+		"baseDifficulty",
+		"bonusDifficulty",
+		"baseSkill",
+		"bonusSkill",
+		"craftingQuality",
+		"quality",
+		"guaranteedCraftingQualityID",
+	}
+
+	for slotIndex, reagentSlotSchematic in ipairs(requiredSlots) do
+		local slotFact = facts.requiredSlots[slotIndex]
+		for _, quality in ipairs(GetRequiredQualityList(reagentSlotSchematic)) do
+			YieldSkillFactsBuildIfNeeded()
+			local reagent = SelectRepresentativeQualityReagent(reagentSlotSchematic, quality)
+			local probeReagentInfo = {}
+			for baselineSlotIndex, baselineSlot in ipairs(requiredSlots) do
+				AddCraftingReagentInfo(probeReagentInfo, baselineSlot, baselineSlotIndex == slotIndex and reagent or baselineBySlot[baselineSlotIndex])
+			end
+			local operationInfo = GetOperationInfoForReagentInfo(recipeID, probeReagentInfo)
+			local delta = operationInfo and ((GetOperationTotalSkill(operationInfo) or baselineTotalSkill) - baselineTotalSkill) or 0
+			slotFact.qualityBonuses[quality] = delta / math.max(1, tonumber(slotFact.quantity) or 1)
+		end
+	end
+
 	return facts, baselineOperationInfo, baselineReagentInfo
+end
+
+-- Customer-side: rebuilds full reagent skill facts from the lean wire format
+-- (see AF:BuildWireReagentSkillFacts in Comms.lua) plus the local recipe
+-- schematic. Returns nil when the wire data targets a different scan model
+-- version or the local schematic cannot be matched to the transmitted slots.
+function AF:RehydrateWireReagentSkillFacts(wire, recipeID)
+	if type(wire) ~= "table" then
+		return nil
+	end
+	if tonumber(wire.v) ~= tonumber(self.SCAN_MODEL_VERSION or 2) then
+		return nil
+	end
+	recipeID = tonumber(recipeID)
+	if not recipeID or self:IsSecretValue(recipeID) then
+		return nil
+	end
+	local facts = BuildReagentFactsSkeleton(recipeID)
+	if not facts then
+		return nil
+	end
+	facts.baseSkill = tonumber(wire.s) or 0
+	facts.baseRecipeDifficulty = tonumber(wire.d) or 0
+	facts.maxOutputQuality = tonumber(wire.q) or 1
+	facts.rehydrated = true
+
+	local bySlotIndex = {}
+	local byDataSlotIndex = {}
+	for _, slotFact in ipairs(facts.requiredSlots) do
+		if tonumber(slotFact.slotIndex) then
+			bySlotIndex[tonumber(slotFact.slotIndex)] = slotFact
+		end
+		if tonumber(slotFact.dataSlotIndex) then
+			byDataSlotIndex[tonumber(slotFact.dataSlotIndex)] = slotFact
+		end
+	end
+	for _, wireSlot in ipairs(type(wire.b) == "table" and wire.b or {}) do
+		local slotFact = (tonumber(wireSlot.i) and bySlotIndex[tonumber(wireSlot.i)])
+			or (tonumber(wireSlot.x) and byDataSlotIndex[tonumber(wireSlot.x)])
+		if not slotFact then
+			return nil
+		end
+		slotFact.quantity = tonumber(wireSlot.n) or slotFact.quantity
+		for quality, bonus in pairs(type(wireSlot.t) == "table" and wireSlot.t or {}) do
+			quality = tonumber(quality)
+			if quality then
+				slotFact.qualityBonuses[quality] = tonumber(bonus) or 0
+			end
+		end
+	end
+	return facts
 end
 
 function AF:CreateRecipeReagentSkillFactsCoroutine(recipeID)

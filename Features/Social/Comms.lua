@@ -289,6 +289,53 @@ function AF:DecodeCompressedPayloadParts(encoded)
 	return parts
 end
 
+-- Lean wire format for reagent skill facts (single addon message instead of the
+-- full facts table, which can exceed the 255-byte payload limit by 4x). Only
+-- crafter-specific probe results travel; the customer rebuilds slot structure,
+-- reagent lists, quantities, texts, and skill-neutral slots from its own local
+-- C_TradeSkillUI.GetRecipeSchematic data (AF:RehydrateWireReagentSkillFacts).
+-- Wire keys:
+--   w = wire format version (marker distinguishing wire facts from legacy full facts)
+--   v = scanModelVersion, s = baseSkill, d = baseRecipeDifficulty, q = maxOutputQuality
+--   b = array of required slots with non-zero quality skill bonuses (skill-neutral
+--       slots are omitted entirely): i = slotIndex, x = dataSlotIndex,
+--       n = quantity, t = { [reagentQuality] = skillBonusPerUnit }
+local WIRE_FACTS_FORMAT = 1
+
+function AF:BuildWireReagentSkillFacts(facts)
+	if type(facts) ~= "table" or type(facts.requiredSlots) ~= "table" then
+		return nil
+	end
+	local wire = {
+		w = WIRE_FACTS_FORMAT,
+		v = tonumber(facts.scanModelVersion) or 0,
+		s = tonumber(facts.baseSkill) or 0,
+		d = tonumber(facts.baseRecipeDifficulty) or 0,
+		q = tonumber(facts.maxOutputQuality) or 0,
+	}
+	local bonusSlots
+	for _, slot in ipairs(facts.requiredSlots) do
+		local slotBonuses
+		for quality, bonus in pairs(type(slot.qualityBonuses) == "table" and slot.qualityBonuses or {}) do
+			if tonumber(quality) and (tonumber(bonus) or 0) ~= 0 then
+				slotBonuses = slotBonuses or {}
+				slotBonuses[tonumber(quality)] = tonumber(bonus)
+			end
+		end
+		if slotBonuses then
+			bonusSlots = bonusSlots or {}
+			bonusSlots[#bonusSlots + 1] = {
+				i = tonumber(slot.slotIndex),
+				x = tonumber(slot.dataSlotIndex),
+				n = tonumber(slot.quantity) or 1,
+				t = slotBonuses,
+			}
+		end
+	end
+	wire.b = bonusSlots
+	return wire
+end
+
 function AF:SendAddon(prefixPayload, chatType, target, priority, queueName)
 	if self:IsAddonCommsUnavailable() then
 		if self:IsDevTrafficLogsEnabled() then
@@ -652,6 +699,7 @@ function AF:HandleQuery(parts, sender, channel)
 			local encodedLink = self:EncodeField(professionLink)
 			local responseTimestamp = self:Now()
 			local afk = UnitIsAFK and UnitIsAFK("player")
+			local wireFacts = self:BuildWireReagentSkillFacts(item.reagentSkillFacts)
 			local payloadParts = {
 				"R",
 				self.PROTOCOL_VERSION,
@@ -667,11 +715,14 @@ function AF:HandleQuery(parts, sender, channel)
 				self:EncodeField(crafterName, 48),
 				channel == "GUILD" and self:EncodeField(requesterName, 48) or "",
 				afk and 1 or 0,
-				item.reagentSkillFacts,
+				wireFacts,
 			}
 			local responseChannel = channel == "GUILD" and "GUILD" or "WHISPER"
 			local responseTarget = responseChannel == "WHISPER" and sender or nil
 			local sent = self:SendPayloadParts(payloadParts, responseChannel, responseTarget, "NORMAL", "R:" .. tostring(sender))
+			if sent and self:IsDevTrafficLogsEnabled() then
+				self:DebugLog("response", string.format("sent crafter=%s target=%s item=%s profession=%s facts=%s bonusSlots=%d", tostring(crafterName or ""), tostring(responseTarget or requesterName or ""), tostring(itemID or ""), tostring(responseProfessionID or ""), wireFacts and "wire" or "none", wireFacts and #(wireFacts.b or {}) or 0))
+			end
 			if not sent then
 				sent = self:SendCompactResponse(item, itemID, responseProfessionID, priceCopper, freeCommission, note, item.recipeID, responseTimestamp, professionLink, queryToken, crafterName, responseChannel, responseChannel == "GUILD" and requesterName or sender, afk, "R:" .. tostring(sender) .. ":compact")
 				if not sent and self:IsDevTrafficLogsEnabled() then
@@ -844,24 +895,32 @@ function AF:HandleResponse(parts, sender)
 	local afk = tonumber(parts[14]) == 1
 	local compactResponse = IsCompactResponse(parts)
 	local reagentSkillFacts = type(parts[15]) == "table" and parts[15] or nil
+	local wireFacts
+	local factsMode
 	local cacheKey = crafterName
 
 	if not itemID then
 		return
 	end
 	if compactResponse then
-		reagentSkillFacts = {
-			scanModelVersion = self.SCAN_MODEL_VERSION,
-			baseRecipeDifficulty = tonumber(parts[16]) or 0,
-			baseSkill = tonumber(parts[17]) or 0,
-			maxOutputQuality = tonumber(parts[23]) or 0,
-			requiredSlots = {},
-			optionalSlots = {},
-		}
-	elseif not self:IsCurrentScanModelEntry({
-		scanModelVersion = reagentSkillFacts and reagentSkillFacts.scanModelVersion,
-		reagentSkillFacts = reagentSkillFacts,
-	}) then
+		reagentSkillFacts = nil
+		factsMode = "compact"
+	elseif reagentSkillFacts and reagentSkillFacts.w ~= nil then
+		wireFacts = reagentSkillFacts
+		if tonumber(wireFacts.v) ~= tonumber(self.SCAN_MODEL_VERSION) then
+			return
+		end
+		reagentSkillFacts = self.RehydrateWireReagentSkillFacts and self:RehydrateWireReagentSkillFacts(wireFacts, recipeID) or nil
+		factsMode = reagentSkillFacts and "wire" or "wire-rehydrate-failed"
+	elseif reagentSkillFacts then
+		if not self:IsCurrentScanModelEntry({
+			scanModelVersion = reagentSkillFacts.scanModelVersion,
+			reagentSkillFacts = reagentSkillFacts,
+		}) then
+			return
+		end
+		factsMode = "legacy"
+	else
 		return
 	end
 	if responseTarget and responseTarget ~= self:NormalizeName(self.playerName or self:GetPlayerFullName()) then
@@ -880,14 +939,34 @@ function AF:HandleResponse(parts, sender)
 	local itemKey = tostring(itemID)
 	self.db.customerCache[itemKey] = self.db.customerCache[itemKey] or {}
 	local previous = self.db.customerCache[itemKey][cacheKey]
+	if not reagentSkillFacts then
+		-- Compact response or failed wire rehydration: never downgrade valid
+		-- cached detailed facts to synthetic empty ones.
+		local previousFacts = previous and previous.reagentSkillFacts
+		if previousFacts and previousFacts.compact ~= true and self:IsCurrentScanModelEntry(previous) then
+			reagentSkillFacts = previousFacts
+			factsMode = factsMode .. "+reused-cached"
+		else
+			reagentSkillFacts = {
+				scanModelVersion = self.SCAN_MODEL_VERSION,
+				baseRecipeDifficulty = compactResponse and (tonumber(parts[16]) or 0) or (wireFacts and tonumber(wireFacts.d)) or 0,
+				baseSkill = compactResponse and (tonumber(parts[17]) or 0) or (wireFacts and tonumber(wireFacts.s)) or 0,
+				maxOutputQuality = compactResponse and (tonumber(parts[23]) or 0) or (wireFacts and tonumber(wireFacts.q)) or 0,
+				requiredSlots = {},
+				optionalSlots = {},
+				compact = true,
+			}
+		end
+	end
+	local hasDetailedFacts = reagentSkillFacts.compact ~= true
 	local suggestionEntry = {
 		recipeID = recipeID,
 		itemID = itemID,
 		scanModelVersion = reagentSkillFacts.scanModelVersion,
 		reagentSkillFacts = reagentSkillFacts,
 	}
-	local suggestion = not compactResponse and self.BuildReagentSuggestion and self:BuildReagentSuggestion(suggestionEntry) or nil
-	local outcome = not compactResponse and self.ComputeCraftOutcome and self:ComputeCraftOutcome(suggestionEntry) or nil
+	local suggestion = hasDetailedFacts and self.BuildReagentSuggestion and self:BuildReagentSuggestion(suggestionEntry) or nil
+	local outcome = hasDetailedFacts and self.ComputeCraftOutcome and self:ComputeCraftOutcome(suggestionEntry) or nil
 	local savedReagents = suggestion and suggestion.reagents or nil
 	local bestQuality = compactResponse and tonumber(parts[20]) or (suggestion and suggestion.quality or nil)
 	local bestConcentrationQuality = compactResponse and tonumber(parts[21]) or (suggestion and suggestion.concentrationQuality or nil)
@@ -897,7 +976,7 @@ function AF:HandleResponse(parts, sender)
 	local recipeDifficulty = compactResponse and tonumber(parts[16]) or tonumber(reagentSkillFacts.baseRecipeDifficulty)
 	local totalSkill = compactResponse and tonumber(parts[17]) or tonumber(reagentSkillFacts.baseSkill)
 	local optionalSlotCount = compactResponse and tonumber(parts[24]) or #(reagentSkillFacts.optionalSlots or {})
-	local hasReagentSummary = compactResponse and tonumber(parts[25]) == 1 or savedReagents ~= nil
+	local hasReagentSummary = compactResponse and tonumber(parts[25]) == 1 or savedReagents ~= nil or wireFacts ~= nil
 	if professionLink ~= "" then
 		self:RememberProfessionLink(crafterName, professionID, professionLink)
 	elseif previous and previous.professionLink then
@@ -942,6 +1021,9 @@ function AF:HandleResponse(parts, sender)
 		optionalBestReagentTruncated = nil,
 		scanModelVersion = reagentSkillFacts.scanModelVersion,
 		reagentSkillFacts = reagentSkillFacts,
+		-- Kept only while facts are synthetic so detailed facts can be
+		-- rehydrated later once the local recipe schematic resolves.
+		wireReagentSkillFacts = reagentSkillFacts.compact == true and wireFacts or nil,
 		maxOutputQuality = reagentSkillFacts.maxOutputQuality,
 		professionLink = professionLink ~= "" and professionLink or nil,
 		updatedAt = timestamp,
@@ -955,7 +1037,7 @@ function AF:HandleResponse(parts, sender)
 		afk = afk or nil,
 	}
 	self:DebugLog("response", string.format(
-		"stored crafter=%s sender=%s item=%s profession=%s queryMatch=%s guild=%s reagents=%s compact=%s",
+		"stored crafter=%s sender=%s item=%s profession=%s queryMatch=%s guild=%s reagents=%s compact=%s facts=%s",
 		tostring(crafterName or ""),
 		tostring(sender or ""),
 		tostring(itemID or ""),
@@ -963,7 +1045,8 @@ function AF:HandleResponse(parts, sender)
 		tostring(verifiedForCurrentQuery == true),
 		tostring(validGuildResponse == true),
 		tostring(savedReagents ~= nil),
-		tostring(compactResponse == true)
+		tostring(compactResponse == true),
+		tostring(factsMode or "?")
 	))
 	self:ApplyPendingReagentDetail(sender, itemID, recipeID, queryToken, crafterName)
 
