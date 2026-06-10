@@ -947,15 +947,22 @@ function AF:GetDisplayItemName(itemID, fallback)
 end
 
 function AF:OnItemDataLoaded(...)
-	local refreshCustomerResults = self.pendingReagentItemData
-	self.pendingReagentItemData = nil
 	if self.OnOrderNotificationItemDataLoaded then
 		self:OnOrderNotificationItemDataLoaded(...)
 	end
-	if refreshCustomerResults and self.RefreshCustomerResults then
-		self:RefreshCustomerResults()
+	if self.itemDataRefreshQueued then
+		return
 	end
-	if self.RefreshCrafterUI then
-		self:RefreshCrafterUI()
-	end
+	self.itemDataRefreshQueued = true
+	C_Timer.After(0.1, function()
+		AF.itemDataRefreshQueued = nil
+		local refreshCustomerResults = AF.pendingReagentItemData
+		AF.pendingReagentItemData = nil
+		if refreshCustomerResults and AF.RefreshCustomerResults then
+			AF:RefreshCustomerResults()
+		end
+		if AF.RefreshCrafterUIScanSafe then
+			AF:RefreshCrafterUIScanSafe()
+		end
+	end)
 end
