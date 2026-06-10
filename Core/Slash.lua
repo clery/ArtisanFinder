@@ -205,9 +205,17 @@ function AF:ClearCharacterScans(characterName)
 	end
 	local profile = self.db.artisanCharacters and self.db.artisanCharacters[characterName] or self.db.artisanProfile
 	profile = self:NormalizeArtisanProfile(profile, characterName)
-	profile.professions = {}
-	profile.items = {}
-	self.db.artisanCharacters[characterName] = profile
+	local importedAlt = profile.importedAlt == true and self.activeArtisanCharacter ~= characterName
+	if importedAlt and self.MoveImportedArtisanProfileToCustomerCache then
+		self:MoveImportedArtisanProfileToCustomerCache(characterName, profile)
+		if self.db.artisanCharacters then
+			self.db.artisanCharacters[characterName] = nil
+		end
+	else
+		profile.professions = {}
+		profile.items = {}
+		self.db.artisanCharacters[characterName] = profile
+	end
 	if self.db.advertising then
 		self.db.advertising[characterName] = nil
 	end

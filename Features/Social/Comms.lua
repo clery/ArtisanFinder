@@ -1051,7 +1051,9 @@ function AF:HandleResponse(parts, sender)
 
 	local itemKey = tostring(itemID)
 	self.db.customerCache[itemKey] = self.db.customerCache[itemKey] or {}
-	local previous = self.db.customerCache[itemKey][cacheKey]
+	local importedProfile = self.GetImportedArtisanProfile and self:GetImportedArtisanProfile(crafterName) or nil
+	local importedItem = importedProfile and importedProfile.items and importedProfile.items[itemKey] or nil
+	local previous = self.db.customerCache[itemKey][cacheKey] or importedItem
 	compactOptionalReagentDeltas = compactOptionalReagentDeltas or (previous and previous.compactOptionalReagentDeltas)
 	if not reagentSkillFacts then
 		-- Compact response or failed wire rehydration: never downgrade valid
@@ -1101,7 +1103,7 @@ function AF:HandleResponse(parts, sender)
 	if validGuildResponse and self.RememberArtisanContact then
 		self:RememberArtisanContact(crafterName, sender, guildKey)
 	end
-	self.db.customerCache[itemKey][cacheKey] = {
+	local cacheEntry = {
 		name = crafterName,
 		target = sender,
 		orderTarget = crafterName,
@@ -1151,6 +1153,14 @@ function AF:HandleResponse(parts, sender)
 		guildKey = guildKey,
 		afk = afk or nil,
 	}
+	if self.ApplyCustomerCacheEntryToImportedArtisan and self:ApplyCustomerCacheEntryToImportedArtisan(crafterName, cacheEntry) then
+		self.db.customerCache[itemKey][cacheKey] = nil
+		if next(self.db.customerCache[itemKey]) == nil then
+			self.db.customerCache[itemKey] = nil
+		end
+	else
+		self.db.customerCache[itemKey][cacheKey] = cacheEntry
+	end
 	self:DebugLog("response", string.format(
 		"stored crafter=%s sender=%s item=%s profession=%s queryMatch=%s guild=%s reagents=%s compact=%s facts=%s",
 		tostring(crafterName or ""),

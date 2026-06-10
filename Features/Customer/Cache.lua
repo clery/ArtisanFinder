@@ -231,6 +231,9 @@ local function PrepareOwnAltOrderEligibility(AF, entry)
 	if not entry or not entry.ownAlt then
 		return true
 	end
+	if entry.importedAlt == true then
+		return true
+	end
 	if AF:IsNameOnConnectedRealm(entry.orderTarget or entry.name or entry.target) then
 		MarkGuildAffiliation(AF, entry)
 		return true
@@ -283,6 +286,17 @@ function AF:GetOwnAltRows(itemID, professionID, filterText, seenNames, recipeID)
 		local item = profile.items and profile.items[itemKey]
 		if not item then
 			return
+		end
+		if profile.importedAlt == true then
+			local itemCache = self.db and self.db.customerCache and self.db.customerCache[itemKey]
+			local cachedEntry = itemCache and itemCache[characterName]
+			if cachedEntry and self.ApplyCustomerCacheEntryToImportedArtisan and self:ApplyCustomerCacheEntryToImportedArtisan(characterName, cachedEntry) then
+				itemCache[characterName] = nil
+				if next(itemCache) == nil then
+					self.db.customerCache[itemKey] = nil
+				end
+				item = profile.items and profile.items[itemKey] or item
+			end
 		end
 		if professionID ~= 0 and self:GetBaseProfessionID(item.professionID) ~= self:GetBaseProfessionID(professionID) then
 			return
@@ -349,6 +363,7 @@ function AF:GetOwnAltRows(itemID, professionID, filterText, seenNames, recipeID)
 			certified = true,
 			tradeLead = false,
 			ownAlt = true,
+			importedAlt = profile.importedAlt == true or nil,
 			ownSelf = isCurrentCharacter,
 		}
 		if not self:IsCurrentScanModelEntry(entry) and self.MarkScanModelRescanNeeded then

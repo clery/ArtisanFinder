@@ -1122,6 +1122,8 @@ function AF:SelectActiveArtisanProfile(characterName)
 	end
 
 	local profile = self:NormalizeArtisanProfile(self.db.artisanCharacters[characterName], characterName)
+	profile.importedAlt = nil
+	profile.localCharacter = true
 	self.db.artisanCharacters[characterName] = profile
 	self.db.artisanProfile = profile
 	self.activeArtisanCharacter = characterName
@@ -1148,6 +1150,213 @@ function AF:ForEachArtisanProfile(callback)
 			callback(self:NormalizeName(characterName) or characterName, self:NormalizeArtisanProfile(profile, characterName))
 		end
 	end
+end
+
+local PROFILE_CACHE_ITEM_FIELDS = {
+	"itemID",
+	"professionID",
+	"recipeID",
+	"recipeDifficulty",
+	"totalSkill",
+	"quality",
+	"rawQuality",
+	"concentrationQuality",
+	"concentrationCost",
+	"outputItemLevel",
+	"bestQuality",
+	"rawBestQuality",
+	"bestConcentrationQuality",
+	"bestTotalSkill",
+	"bestConcentrationCost",
+	"bestOutputItemLevel",
+	"bestReagents",
+	"bestReagentSummaryUpdatedAt",
+	"bestReagentTruncated",
+	"bestReagentPendingNames",
+	"hasReagentSummary",
+	"scanModelVersion",
+	"reagentSkillFacts",
+	"wireReagentSkillFacts",
+	"maxOutputQuality",
+	"compactOptionalReagentDeltas",
+	"optionalDifficultyDelta",
+	"optionalQuality",
+	"optionalOutputItemLevel",
+	"optionalOutputItemLevelDelta",
+	"optionalConcentrationQuality",
+	"optionalReagents",
+	"optionalSlotCount",
+	"optionalBestReagents",
+	"optionalBestReagentSummaryUpdatedAt",
+	"optionalBestReagentTruncated",
+	"professionLink",
+	"updatedAt",
+}
+
+local function CopyProfileCacheFields(source, target)
+	for _, fieldName in ipairs(PROFILE_CACHE_ITEM_FIELDS) do
+		target[fieldName] = source[fieldName]
+	end
+end
+
+local function GetProfileCacheTimestamp(entry)
+	if type(entry) ~= "table" then
+		return 0
+	end
+	return tonumber(entry.updatedAt) or tonumber(entry.scannedAt) or 0
+end
+
+local function ApplyProfileItemCommission(target, priceCopper, freeCommission, specified)
+	if freeCommission == true then
+		target.priceCopper = 0
+		target.freeCommission = true
+		target.commissionSpecified = true
+	elseif tonumber(priceCopper) and tonumber(priceCopper) > 0 then
+		target.priceCopper = tonumber(priceCopper)
+		target.freeCommission = nil
+		target.commissionSpecified = specified ~= false and true or nil
+	else
+		target.priceCopper = nil
+		target.freeCommission = nil
+		target.commissionSpecified = nil
+	end
+end
+
+local function GetProfileItemNote(entry)
+	return type(entry) == "table" and type(entry.note) == "string" and entry.note ~= "" and entry.note or nil
+end
+
+local function GetProfileItemProfessionLink(AF, characterName, profile, item)
+	local profession = profile and profile.professions and profile.professions[tostring(item and item.professionID or "")]
+	return item and item.professionLink
+		or profession and profession.professionLink
+		or AF:GetRememberedProfessionLink(characterName, item and item.professionID)
+end
+
+local function BuildCustomerCacheEntryFromProfileItem(AF, characterName, profile, itemKey, item)
+	if type(item) ~= "table" then
+		return nil
+	end
+	local itemID = tonumber(item.itemID) or tonumber(itemKey)
+	local professionID = GetSupportedProfessionIDForEntry(item.professionID, item)
+	if not itemID or not professionID then
+		return nil
+	end
+	local priceCopper, freeCommission, note = AF:GetItemPriceForProfile(profile, itemID, professionID)
+	local now = AF:Now()
+	local entry = {
+		name = characterName,
+		target = characterName,
+		orderTarget = characterName,
+		itemID = itemID,
+		professionID = professionID,
+		priceCopper = tonumber(priceCopper) or 0,
+		freeCommission = freeCommission == true or nil,
+		note = note ~= "" and note or nil,
+		updatedAt = item.updatedAt or profile.updatedAt or now,
+	}
+	CopyProfileCacheFields(item, entry)
+	entry.name = characterName
+	entry.target = characterName
+	entry.orderTarget = characterName
+	entry.itemID = itemID
+	entry.professionID = professionID
+	entry.priceCopper = tonumber(priceCopper) or 0
+	entry.freeCommission = freeCommission == true or nil
+	entry.note = note ~= "" and note or nil
+	entry.professionLink = GetProfileItemProfessionLink(AF, characterName, profile, item)
+	entry.updatedAt = item.updatedAt or profile.updatedAt or now
+	local currentQueryItemID = tonumber(AF.currentCustomerQueryItemID) or tonumber(AF.currentCustomerItemID)
+	if AF.currentCustomerQueryToken and currentQueryItemID == itemID then
+		entry.lastQueryToken = AF.currentCustomerQueryToken
+		entry.verifiedAt = now
+		entry.lastQueryAt = AF.lastQueryAt
+	end
+	return entry
+end
+
+function AF:MarkImportedArtisanProfile(profile)
+	if type(profile) == "table" then
+		profile.importedAlt = true
+	end
+	return profile
+end
+
+function AF:GetImportedArtisanProfile(characterName)
+	if not self.db then
+		return nil
+	end
+	characterName = self:NormalizeName(characterName)
+	local profile = characterName and self.db.artisanCharacters and self.db.artisanCharacters[characterName] or nil
+	if type(profile) ~= "table" or profile.importedAlt ~= true then
+		return nil
+	end
+	return self:NormalizeArtisanProfile(profile, characterName), characterName
+end
+
+function AF:ApplyCustomerCacheEntryToImportedArtisan(characterName, entry)
+	local profile, normalizedName = self:GetImportedArtisanProfile(characterName)
+	if not profile or type(entry) ~= "table" then
+		return false
+	end
+	local itemID = tonumber(entry.itemID)
+	local professionID = GetSupportedProfessionIDForEntry(entry.professionID, entry)
+	if not itemID or not professionID then
+		return true
+	end
+	local itemKey = tostring(itemID)
+	local existing = profile.items[itemKey]
+	local incomingUpdated = GetProfileCacheTimestamp(entry)
+	if type(existing) == "table" and GetProfileCacheTimestamp(existing) > incomingUpdated then
+		return true
+	end
+
+	local item = type(existing) == "table" and existing or {}
+	CopyProfileCacheFields(entry, item)
+	item.itemID = itemID
+	item.professionID = professionID
+	item.updatedAt = incomingUpdated > 0 and incomingUpdated or self:Now()
+	ApplyProfileItemCommission(item, entry.priceCopper, entry.freeCommission, entry.commissionSpecified)
+	item.note = GetProfileItemNote(entry)
+	profile.items[itemKey] = item
+
+	local professionKey = tostring(professionID)
+	local profession = profile.professions[professionKey] or { id = professionID, recipes = {} }
+	profile.professions[professionKey] = profession
+	profession.id = professionID
+	profession.updatedAt = item.updatedAt
+	if entry.professionLink then
+		profession.professionLink = entry.professionLink
+		item.professionLink = entry.professionLink
+	end
+	self.db.artisanCharacters[normalizedName] = profile
+	return true
+end
+
+function AF:MoveImportedArtisanProfileToCustomerCache(characterName, profile)
+	if not self.db or type(profile) ~= "table" or profile.importedAlt ~= true then
+		return 0
+	end
+	characterName = self:NormalizeName(characterName or profile.characterName)
+	if not characterName then
+		return 0
+	end
+	profile = self:NormalizeArtisanProfile(profile, characterName)
+	self.db.customerCache = self.db.customerCache or {}
+	local moved = 0
+	for itemKey, item in pairs(profile.items or {}) do
+		local entry = BuildCustomerCacheEntryFromProfileItem(self, characterName, profile, itemKey, item)
+		if entry then
+			local cacheItemKey = tostring(entry.itemID)
+			self.db.customerCache[cacheItemKey] = self.db.customerCache[cacheItemKey] or {}
+			local existing = self.db.customerCache[cacheItemKey][characterName]
+			if type(existing) ~= "table" or GetProfileCacheTimestamp(entry) >= GetProfileCacheTimestamp(existing) then
+				self.db.customerCache[cacheItemKey][characterName] = entry
+				moved = moved + 1
+			end
+		end
+	end
+	return moved
 end
 
 function AF:IsProfessionAdvertisedByDefault(professionID)

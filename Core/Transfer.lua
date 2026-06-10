@@ -1045,6 +1045,11 @@ function AF:ImportArtisanTransferPayload(text)
 			if not preparedOK or self:IsArtisanProfileEmpty(profile) then
 				summary.skippedInvalid = summary.skippedInvalid + 1
 			else
+				local existingProfile = self.db.artisanCharacters and self.db.artisanCharacters[characterName]
+				local importAsAlt = not (type(existingProfile) == "table" and existingProfile.localCharacter == true)
+				if importAsAlt and self.MarkImportedArtisanProfile then
+					self:MarkImportedArtisanProfile(profile)
+				end
 				seenNames[characterIdentity] = true
 				local advertisingOK, advertising = pcall(self.PrepareImportedProfessionSettings, self, transfer.advertising)
 				local knownOK, advertisingKnown = pcall(self.PrepareImportedProfessionSettings, self, transfer.advertisingKnown)
@@ -1073,6 +1078,9 @@ function AF:ImportArtisanTransferPayload(text)
 				+ self:GetArtisanProfileEntryCount(profile)
 		else
 			target = self:NormalizeArtisanProfile(target, characterName)
+			if target.localCharacter ~= true and self.MarkImportedArtisanProfile then
+				self:MarkImportedArtisanProfile(target)
+			end
 			local added, updated = MergeTimestampedEntries(target.professions, profile.professions)
 			summary.addedEntries = summary.addedEntries + added
 			summary.updatedEntries = summary.updatedEntries + updated
