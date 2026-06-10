@@ -1153,7 +1153,13 @@ function AF:HandleResponse(parts, sender)
 		guildKey = guildKey,
 		afk = afk or nil,
 	}
+	local absorbedIntoProfile = false
 	if self.ApplyCustomerCacheEntryToImportedArtisan and self:ApplyCustomerCacheEntryToImportedArtisan(crafterName, cacheEntry) then
+		absorbedIntoProfile = true
+	elseif self.ApplyCustomerCacheEntryToLocalArtisan and self:ApplyCustomerCacheEntryToLocalArtisan(crafterName, cacheEntry) then
+		absorbedIntoProfile = true
+	end
+	if absorbedIntoProfile then
 		self.db.customerCache[itemKey][cacheKey] = nil
 		if next(self.db.customerCache[itemKey]) == nil then
 			self.db.customerCache[itemKey] = nil

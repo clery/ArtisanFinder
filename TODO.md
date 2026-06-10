@@ -16,5 +16,3 @@
     [] When clicking a row, prefill the Crafting order like the current "Personal Order" and "Guild Order" buttons do, and add information to the Crafting Order panel with suggested reagent and optional reagent for best results (with or without each optional reagent)
 
 [] Explore EditModeExpanded
-
-[] Alts that have been imported into another account show up twice in the original account customer view (as "Your alt" and not)

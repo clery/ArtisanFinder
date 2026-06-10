@@ -121,11 +121,12 @@ local function NewProfileItem(quality, updatedAt)
 	}
 end
 
-local function NewCacheEntry(quality, updatedAt)
+local function NewCacheEntry(quality, updatedAt, name)
+	name = name or "Imported-Realm"
 	return {
-		name = "Imported-Realm",
-		target = "Imported-Realm",
-		orderTarget = "Imported-Realm",
+		name = name,
+		target = name,
+		orderTarget = name,
 		itemID = 2000,
 		professionID = 164,
 		recipeID = 100,
@@ -229,5 +230,60 @@ AF:ClearCharacterScans("Local-Realm")
 Check(AF.db.artisanCharacters["Local-Realm"] ~= nil, "local alt clear should keep profile shell")
 Check(next(AF.db.artisanCharacters["Local-Realm"].items) == nil, "local alt clear should wipe scan items")
 Check(not (AF.db.customerCache["2000"] and AF.db.customerCache["2000"]["Local-Realm"]), "local alt clear should not move data to remote cache")
+
+AF.IsNameOnConnectedRealm = function()
+	return true
+end
+AF.customerRefreshes = 0
+AF.db = {
+	artisanCharacters = {
+		["OriginalAlt-Realm"] = {
+			characterName = "OriginalAlt-Realm",
+			localCharacter = true,
+			professions = {
+				["164"] = { id = 164, professionLink = "trade:local-old" },
+			},
+			items = {
+				["2000"] = NewProfileItem(2, 100),
+			},
+			professionPrices = {},
+		},
+	},
+	advertising = {},
+	advertisingKnown = {},
+	customerCache = {
+		["2000"] = {
+			["OriginalAlt-Realm"] = NewCacheEntry(5, 260, "OriginalAlt-Realm"),
+		},
+	},
+	favoriteArtisans = {},
+	professionLinks = {},
+	connectedRealmCache = {},
+	showUncertifiedPeople = false,
+	offlineFallbackResults = 0,
+}
+
+rows = AF:GetCachedArtisans(2000, "", "quality", 77)
+Check(#rows == 1, "local alt and same-name cache should collapse to one row")
+Check(rows[1].ownAlt == true and rows[1].importedAlt ~= true, "collapsed local row should stay Your alt")
+Check(rows[1].quality == 5, "collapsed local row should use newer cached data")
+Check(AF.db.artisanCharacters["OriginalAlt-Realm"].items["2000"].quality == 5, "cached data should update local profile")
+Check(AF.db.customerCache["2000"] == nil, "absorbed local cache duplicate should be removed")
+
+local localLiveParts = {
+	"R", AF.PROTOCOL_VERSION, "2000", "164", "40000", "0", "local live note",
+	"100", "300", "trade:local-new", "77", "OriginalAlt-Realm", "", "0", "C1",
+	"100", "150", "4", "4", "5", "5", "150", "5", "0", "1",
+}
+AF:HandleResponse(localLiveParts, "OtherAccount-Realm")
+local localItem = AF.db.artisanCharacters["OriginalAlt-Realm"].items["2000"]
+Check(localItem.quality == 4 and localItem.bestQuality == 5, "live response should update local profile")
+Check(localItem.priceCopper == 40000 and localItem.note == "local live note", "live response should update local price/note")
+Check(localItem.professionLink == "trade:local-new", "live response should update local profession link")
+Check(AF.db.customerCache["2000"] == nil, "live response for local alt should not leave cache duplicate")
+
+rows = AF:GetCachedArtisans(2000, "", "quality", 77)
+Check(#rows == 1, "live-updated local alt should still render once")
+Check(rows[1].ownAlt == true and rows[1].quality == 4, "live-updated local row should stay Your alt with latest data")
 
 print("imported alt merge tests: PASS")

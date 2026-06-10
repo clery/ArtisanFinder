@@ -1294,8 +1294,19 @@ function AF:GetImportedArtisanProfile(characterName)
 	return self:NormalizeArtisanProfile(profile, characterName), characterName
 end
 
-function AF:ApplyCustomerCacheEntryToImportedArtisan(characterName, entry)
-	local profile, normalizedName = self:GetImportedArtisanProfile(characterName)
+function AF:GetLocalArtisanProfile(characterName)
+	if not self.db then
+		return nil
+	end
+	characterName = self:NormalizeName(characterName)
+	local profile = characterName and self.db.artisanCharacters and self.db.artisanCharacters[characterName] or nil
+	if type(profile) ~= "table" or profile.importedAlt == true then
+		return nil
+	end
+	return self:NormalizeArtisanProfile(profile, characterName), characterName
+end
+
+local function ApplyCustomerCacheEntryToArtisanProfile(AF, profile, normalizedName, entry)
 	if not profile or type(entry) ~= "table" then
 		return false
 	end
@@ -1329,8 +1340,18 @@ function AF:ApplyCustomerCacheEntryToImportedArtisan(characterName, entry)
 		profession.professionLink = entry.professionLink
 		item.professionLink = entry.professionLink
 	end
-	self.db.artisanCharacters[normalizedName] = profile
+	AF.db.artisanCharacters[normalizedName] = profile
 	return true
+end
+
+function AF:ApplyCustomerCacheEntryToImportedArtisan(characterName, entry)
+	local profile, normalizedName = self:GetImportedArtisanProfile(characterName)
+	return ApplyCustomerCacheEntryToArtisanProfile(self, profile, normalizedName, entry)
+end
+
+function AF:ApplyCustomerCacheEntryToLocalArtisan(characterName, entry)
+	local profile, normalizedName = self:GetLocalArtisanProfile(characterName)
+	return ApplyCustomerCacheEntryToArtisanProfile(self, profile, normalizedName, entry)
 end
 
 function AF:MoveImportedArtisanProfileToCustomerCache(characterName, profile)

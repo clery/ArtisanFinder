@@ -287,10 +287,16 @@ function AF:GetOwnAltRows(itemID, professionID, filterText, seenNames, recipeID)
 		if not item then
 			return
 		end
-		if profile.importedAlt == true then
-			local itemCache = self.db and self.db.customerCache and self.db.customerCache[itemKey]
-			local cachedEntry = itemCache and itemCache[characterName]
-			if cachedEntry and self.ApplyCustomerCacheEntryToImportedArtisan and self:ApplyCustomerCacheEntryToImportedArtisan(characterName, cachedEntry) then
+		local itemCache = self.db and self.db.customerCache and self.db.customerCache[itemKey]
+		local cachedEntry = itemCache and itemCache[characterName]
+		if cachedEntry then
+			local absorbed
+			if profile.importedAlt == true then
+				absorbed = self.ApplyCustomerCacheEntryToImportedArtisan and self:ApplyCustomerCacheEntryToImportedArtisan(characterName, cachedEntry)
+			else
+				absorbed = self.ApplyCustomerCacheEntryToLocalArtisan and self:ApplyCustomerCacheEntryToLocalArtisan(characterName, cachedEntry)
+			end
+			if absorbed then
 				itemCache[characterName] = nil
 				if next(itemCache) == nil then
 					self.db.customerCache[itemKey] = nil
@@ -393,7 +399,14 @@ function AF:GetCachedArtisans(itemID, filterText, sortMode, queryToken)
 
 	for _, entry in pairs(itemCache or {}) do
 		local verifiedForQuery = queryToken and tonumber(entry.lastQueryToken) == tonumber(queryToken) and entry.verifiedAt
-		if verifiedForQuery and not (entry.debug and not self:IsDevFakeRowsEnabled()) and entry.updatedAt and now - entry.updatedAt <= self.CACHE_MAX_AGE then
+		local seenKey = GetSeenKey(self, entry)
+		if verifiedForQuery
+			and seenKey
+			and not seenNames[seenKey]
+			and not (entry.debug and not self:IsDevFakeRowsEnabled())
+			and entry.updatedAt
+			and now - entry.updatedAt <= self.CACHE_MAX_AGE
+		then
 			if EntryMatchesCustomerFilter(self, entry, filterText) then
 				local rowEntry = PrepareCachedCustomerEntry(self, entry)
 				if self:IsCustomerEntryOrderEligible(rowEntry) then
