@@ -142,6 +142,10 @@ local function CompleteWhoQuery(request, results, complete)
 	end
 
 	AF.whoStatusActive = nil
+	if AF.whoStatusFrame then
+		AF.whoStatusFrame:UnregisterEvent("WHO_LIST_UPDATE")
+		AF.whoStatusFrame:UnregisterEvent("CHAT_MSG_SYSTEM")
+	end
 	AF.suppressWhoSystemUntil = AF:Now() + WHO_SYSTEM_SUPPRESS_AFTER_RESULT
 	RefreshWhoUi()
 	if AF.UpdateCustomerWhoRefreshButtons then
@@ -184,8 +188,6 @@ local function EnsureWhoFrame()
 		return
 	end
 	AF.whoStatusFrame = CreateFrame("Frame")
-	AF.whoStatusFrame:RegisterEvent("WHO_LIST_UPDATE")
-	AF.whoStatusFrame:RegisterEvent("CHAT_MSG_SYSTEM")
 	AF.whoStatusFrame:SetScript("OnEvent", HandleNativeWhoEvent)
 end
 
@@ -201,6 +203,9 @@ local function StartManualWhoQuery(name)
 		},
 	}
 	AF.whoStatusActive = request
+	EnsureWhoFrame()
+	AF.whoStatusFrame:RegisterEvent("WHO_LIST_UPDATE")
+	AF.whoStatusFrame:RegisterEvent("CHAT_MSG_SYSTEM")
 	AF.customerWhoLastKickAt = AF:Now()
 	AF.suppressWhoSystemUntil = AF:Now() + WHO_SYSTEM_SUPPRESS_AFTER_QUERY
 	AF.suppressWhoSystemNames = request.suppressNames
