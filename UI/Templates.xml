@@ -266,10 +266,16 @@
 					<Anchor point="RIGHT" x="-5" y="0"/>
 				</Anchors>
 			</Button>
+			<Button parentKey="prepare" hidden="true">
+				<Size x="22" y="22"/>
+				<Anchors>
+					<Anchor point="RIGHT" relativeKey="$parent.action" relativePoint="LEFT" x="-1" y="0"/>
+				</Anchors>
+			</Button>
 			<Button parentKey="whoRefresh" hidden="true">
 				<Size x="18" y="18"/>
 				<Anchors>
-					<Anchor point="RIGHT" x="-30" y="0"/>
+					<Anchor point="RIGHT" relativeKey="$parent.prepare" relativePoint="LEFT" x="-1" y="0"/>
 				</Anchors>
 			</Button>
 			<Frame parentKey="whoSpinner" inherits="SpinnerTemplate" hidden="true">
@@ -285,7 +291,7 @@
 	</Button>
 
 	<Frame name="ArtisanFinderCustomerMenuTemplate" virtual="true" inherits="BackdropTemplate">
-		<Size x="164" y="132"/>
+		<Size x="164" y="104"/>
 		<Frames>
 			<Button parentKey="favorite" inherits="UIPanelButtonTemplate">
 				<Size x="140" y="23"/>
@@ -302,41 +308,33 @@
 			<Button parentKey="link" inherits="UIPanelButtonTemplate">
 				<Size x="140" y="23"/>
 				<Anchors>
-					<Anchor point="TOP" x="0" y="-96"/>
+					<Anchor point="TOP" x="0" y="-68"/>
 				</Anchors>
 			</Button>
-			<Button parentKey="prepare" inherits="UIPanelButtonTemplate">
-				<Size x="140" y="23"/>
+		</Frames>
+	</Frame>
+
+	<Frame name="ArtisanFinderCustomerPrepareMenuTemplate" virtual="true" inherits="BackdropTemplate">
+		<Size x="174" y="104"/>
+		<Frames>
+			<Button parentKey="standard" inherits="UIPanelButtonTemplate">
+				<Size x="150" y="23"/>
+				<Anchors>
+					<Anchor point="TOP" x="0" y="-12"/>
+				</Anchors>
+			</Button>
+			<Button parentKey="optional" inherits="UIPanelButtonTemplate">
+				<Size x="150" y="23"/>
+				<Anchors>
+					<Anchor point="TOP" x="0" y="-40"/>
+				</Anchors>
+			</Button>
+			<Button parentKey="advanced" inherits="UIPanelButtonTemplate">
+				<Size x="150" y="23"/>
 				<Anchors>
 					<Anchor point="TOP" x="0" y="-68"/>
 				</Anchors>
 			</Button>
-			<Frame parentKey="prepareSubmenu" inherits="BackdropTemplate" hidden="true">
-				<Size x="174" y="104"/>
-				<Anchors>
-					<Anchor point="TOPLEFT" relativeKey="$parent.prepare" relativePoint="TOPRIGHT" x="2" y="0"/>
-				</Anchors>
-				<Frames>
-					<Button parentKey="standard" inherits="UIPanelButtonTemplate">
-						<Size x="150" y="23"/>
-						<Anchors>
-							<Anchor point="TOP" x="0" y="-12"/>
-						</Anchors>
-					</Button>
-					<Button parentKey="optional" inherits="UIPanelButtonTemplate">
-						<Size x="150" y="23"/>
-						<Anchors>
-							<Anchor point="TOP" x="0" y="-40"/>
-						</Anchors>
-					</Button>
-					<Button parentKey="advanced" inherits="UIPanelButtonTemplate">
-						<Size x="150" y="23"/>
-						<Anchors>
-							<Anchor point="TOP" x="0" y="-68"/>
-						</Anchors>
-					</Button>
-				</Frames>
-			</Frame>
 		</Frames>
 	</Frame>
 

@@ -542,7 +542,7 @@ function AF:BuildCustomerHelpPlateInfo()
 	leftX = math.max(0, leftX - HELP_PLATE_HIGHLIGHT_PADDING)
 	AddHelpPlateTile(info, frame, self:Text("TUTORIAL_CUSTOMER_STATUS"), { leftX = leftX }, frame.status)
 	AddHelpPlateTile(info, frame, self:Text("TUTORIAL_CUSTOMER_SEARCH"), { leftX = leftX }, frame.search, frame.sort, frame.refresh)
-	AddHelpPlateTile(info, frame, self:Text("TUTORIAL_CUSTOMER_ROW") .. "\n\n" .. self:Text("TUTORIAL_CUSTOMER_ACTION"), { leftX = leftX }, row.name, row.detail, row.capability, row.whoRefresh, row.action)
+	AddHelpPlateTile(info, frame, self:Text("TUTORIAL_CUSTOMER_ROW") .. "\n\n" .. self:Text("TUTORIAL_CUSTOMER_ACTION"), { leftX = leftX }, row.name, row.detail, row.capability, row.whoRefresh, row.prepare, row.action)
 	return #info > 0 and info or nil
 end
 

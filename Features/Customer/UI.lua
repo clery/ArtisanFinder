@@ -20,6 +20,8 @@ local CUSTOMER_ROW_AGE_TICK_INTERVAL = 30
 local CUSTOMER_OPEN_REFRESH_DEDUPE_SECONDS = 0.25
 local CUSTOMER_ROW_HIGHLIGHT_ALPHA = 0.28
 local CUSTOMER_ROW_OWN_HIGHLIGHT_ALPHA = 0.22
+local CUSTOMER_ROW_BUTTON_TEXT_RIGHT_OFFSET = -90
+local CUSTOMER_PREPARE_ATLAS = "UI-HUD-Minimap-CraftingOrder-Up"
 
 local function GetSortMode(index)
 	return SORT_MODES[index or 1] or SORT_MODES[1]
@@ -98,6 +100,13 @@ end
 
 local function IsCustomerRowClickable(entry)
 	return entry and not entry.tutorialFake and (not entry.ownSelf or AF:IsDevEnabled())
+end
+
+local function UpdatePrepareMenuButtons(menu, entry)
+	local enabled = IsCustomerRowClickable(entry)
+	menu.standard:SetEnabled(enabled)
+	menu.optional:SetEnabled(enabled)
+	menu.advanced:SetEnabled(enabled and AF:HasAdvancedReagentFacts(entry))
 end
 
 local function SetCustomerRowHighlight(row, entry)
@@ -226,6 +235,15 @@ local function SetButtonAtlas(button, normalAtlas, pushedAtlas, disabledAtlas, h
 	button:SetPushedAtlas(pushedAtlas)
 	button:SetDisabledAtlas(disabledAtlas or normalAtlas)
 	button:SetHighlightAtlas(highlightAtlas or normalAtlas, "ADD")
+end
+
+local function PositionButtonTexture(texture, width, height, xOffset, yOffset)
+	if not texture then
+		return
+	end
+	texture:ClearAllPoints()
+	texture:SetSize(width, height)
+	texture:SetPoint("CENTER", xOffset or 0, yOffset or 0)
 end
 
 local function TrySetTextureAtlas(texture, atlas, useAtlasSize)
@@ -488,10 +506,10 @@ local function ConfigureCustomerRow(row)
 		row.name:SetMaxLines(1)
 	end
 	row.updatedAt:ClearAllPoints()
-	row.updatedAt:SetPoint("TOPRIGHT", -65, -6)
+	row.updatedAt:SetPoint("TOPRIGHT", CUSTOMER_ROW_BUTTON_TEXT_RIGHT_OFFSET, -6)
 	row.detail:ClearAllPoints()
 	row.detail:SetPoint("TOPLEFT", row.name, "BOTTOMLEFT", 0, -3)
-	row.detail:SetPoint("RIGHT", -65, 0)
+	row.detail:SetPoint("RIGHT", CUSTOMER_ROW_BUTTON_TEXT_RIGHT_OFFSET, 0)
 	if row.detail.SetWordWrap then
 		row.detail:SetWordWrap(false)
 	end
@@ -500,7 +518,7 @@ local function ConfigureCustomerRow(row)
 	end
 	row.capability:ClearAllPoints()
 	row.capability:SetPoint("TOPLEFT", row.detail, "BOTTOMLEFT", 0, -3)
-	row.capability:SetPoint("RIGHT", -65, 0)
+	row.capability:SetPoint("RIGHT", CUSTOMER_ROW_BUTTON_TEXT_RIGHT_OFFSET, 0)
 
 	row.action:SetNormalTexture("Interface\\Buttons\\UI-OptionsButton")
 	row.action:SetPushedTexture("Interface\\Buttons\\UI-OptionsButton")
@@ -521,10 +539,41 @@ local function ConfigureCustomerRow(row)
 		end
 	end)
 
+	row.prepare:ClearAllPoints()
+	row.prepare:SetSize(22, 22)
+	row.prepare:SetPoint("RIGHT", row.action, "LEFT", -1, 0)
+	row.prepare:SetFrameLevel((row.action:GetFrameLevel() or row:GetFrameLevel() or 0) + 2)
+	SetButtonAtlas(row.prepare, CUSTOMER_PREPARE_ATLAS, CUSTOMER_PREPARE_ATLAS, CUSTOMER_PREPARE_ATLAS, CUSTOMER_PREPARE_ATLAS)
+	PositionButtonTexture(row.prepare:GetNormalTexture(), 20, 15)
+	PositionButtonTexture(row.prepare:GetPushedTexture(), 20, 15, 1, -1)
+	PositionButtonTexture(row.prepare:GetDisabledTexture(), 20, 15)
+	PositionButtonTexture(row.prepare:GetHighlightTexture(), 20, 15)
+	if row.prepare:GetDisabledTexture() and row.prepare:GetDisabledTexture().SetDesaturated then
+		row.prepare:GetDisabledTexture():SetDesaturated(true)
+		row.prepare:GetDisabledTexture():SetVertexColor(0.55, 0.55, 0.55)
+	end
+	if row.prepare:GetHighlightTexture() then
+		row.prepare:GetHighlightTexture():SetVertexColor(1, 0.82, 0)
+	end
+	row.prepare:SetScript("OnClick", function(buttonFrame)
+		if row.entry then
+			GameTooltip:Hide()
+			AF:ShowCustomerPrepareMenu(row.entry, buttonFrame)
+		end
+	end)
+	row.prepare:SetScript("OnEnter", function(buttonFrame)
+		GameTooltip:SetOwner(buttonFrame, "ANCHOR_RIGHT")
+		GameTooltip:SetText(AF:Text("PREPARE_ORDER"), 1, 0.82, 0)
+		GameTooltip:Show()
+	end)
+	row.prepare:SetScript("OnLeave", function()
+		GameTooltip:Hide()
+	end)
+
 	row.whoRefresh:ClearAllPoints()
 	row.whoRefresh:SetSize(18, 18)
-	row.whoRefresh:SetPoint("RIGHT", row.action, "LEFT", -1, 0)
-	row.whoRefresh:SetFrameLevel((row.action:GetFrameLevel() or row:GetFrameLevel() or 0) + 2)
+	row.whoRefresh:SetPoint("RIGHT", row.prepare, "LEFT", -1, 0)
+	row.whoRefresh:SetFrameLevel((row.prepare:GetFrameLevel() or row:GetFrameLevel() or 0) + 2)
 	SetButtonAtlas(row.whoRefresh, "UI-RefreshButton", "UI-RefreshButton", "UI-RefreshButton", "UI-RefreshButton")
 	if row.whoRefresh:GetDisabledTexture() then
 		row.whoRefresh:GetDisabledTexture():SetDesaturated(true)
@@ -599,6 +648,9 @@ local function ResetCustomerRow(_, row)
 	end
 	if row.whoRefresh then
 		row.whoRefresh:Hide()
+	end
+	if row.prepare then
+		row.prepare:Hide()
 	end
 	if row.optionalPrep then
 		row.optionalPrep:Hide()
@@ -818,11 +870,10 @@ function AF:RefreshCustomerLocale()
 	self:UpdateCustomerRefreshButton()
 	frame.menu.favorite:SetText(self:Text(frame.menu.entry and self:IsFavoriteArtisan(frame.menu.entry) and "UNFAVORITE" or "FAVORITE"))
 	frame.menu.whisper:SetText(self:Text("WHISPER"))
-	frame.menu.prepare:SetText(self:Text("PREPARE_ORDER"))
-	frame.menu.prepareSubmenu.standard:SetText(self:Text("PREPARE_ORDER_STANDARD"))
-	frame.menu.prepareSubmenu.optional:SetText(self:Text("PREPARE_ORDER_OPTIONAL"))
-	frame.menu.prepareSubmenu.advanced:SetText(self:Text("PREPARE_ORDER_ADVANCED"))
 	frame.menu.link:SetText(self:Text("PROFESSION"))
+	frame.prepareMenu.standard:SetText(self:Text("PREPARE_ORDER_STANDARD"))
+	frame.prepareMenu.optional:SetText(self:Text("PREPARE_ORDER_OPTIONAL"))
+	frame.prepareMenu.advanced:SetText(self:Text("PREPARE_ORDER_ADVANCED"))
 	for _, row in ipairs(self.customerRows or {}) do
 		if row.optionalPrep then
 			row.optionalPrep.label:SetText(self:Text("OPTIONAL_REAGENTS"))
@@ -1003,8 +1054,13 @@ function AF:AttachCustomerUI()
 	frame.menu:SetFrameStrata("FULLSCREEN_DIALOG")
 	frame.menu:SetFrameLevel(frame.menuBlocker:GetFrameLevel() + 10)
 	self:ApplyCustomerPopupPanel(frame.menu)
-	self:ApplyCustomerPopupPanel(frame.menu.prepareSubmenu)
 	frame.menu:Hide()
+
+	frame.prepareMenu = CreateFrame("Frame", "ArtisanFinderCustomerPrepareMenu", UIParent, "ArtisanFinderCustomerPrepareMenuTemplate")
+	frame.prepareMenu:SetFrameStrata("FULLSCREEN_DIALOG")
+	frame.prepareMenu:SetFrameLevel(frame.menuBlocker:GetFrameLevel() + 10)
+	self:ApplyCustomerPopupPanel(frame.prepareMenu)
+	frame.prepareMenu:Hide()
 
 	frame.menu.favorite:SetText(self:Text("FAVORITE"))
 	frame.menu.favorite:SetScript("OnClick", function()
@@ -1030,30 +1086,22 @@ function AF:AttachCustomerUI()
 		AF:HideCustomerMenu()
 	end)
 
-	local function ShowPrepareSubmenu()
-		frame.menu.prepareSubmenu:Show()
-	end
-
-	frame.menu.prepare:SetText(self:Text("PREPARE_ORDER"))
-	frame.menu.prepare:SetScript("OnEnter", ShowPrepareSubmenu)
-	frame.menu.prepare:SetScript("OnClick", ShowPrepareSubmenu)
-	frame.menu.prepareSubmenu:SetScript("OnEnter", ShowPrepareSubmenu)
-	frame.menu.prepareSubmenu.standard:SetText(self:Text("PREPARE_ORDER_STANDARD"))
-	frame.menu.prepareSubmenu.standard:SetScript("OnClick", function()
-		if frame.menu.entry then
-			AF:PrepareCustomerOrder(frame.menu.entry, "standard")
+	frame.prepareMenu.standard:SetText(self:Text("PREPARE_ORDER_STANDARD"))
+	frame.prepareMenu.standard:SetScript("OnClick", function()
+		if frame.prepareMenu.entry then
+			AF:PrepareCustomerOrder(frame.prepareMenu.entry, "standard")
 		end
 	end)
-	frame.menu.prepareSubmenu.optional:SetText(self:Text("PREPARE_ORDER_OPTIONAL"))
-	frame.menu.prepareSubmenu.optional:SetScript("OnClick", function()
-		if frame.menu.entry then
-			AF:PrepareCustomerOrder(frame.menu.entry, "optional")
+	frame.prepareMenu.optional:SetText(self:Text("PREPARE_ORDER_OPTIONAL"))
+	frame.prepareMenu.optional:SetScript("OnClick", function()
+		if frame.prepareMenu.entry then
+			AF:PrepareCustomerOrder(frame.prepareMenu.entry, "optional")
 		end
 	end)
-	frame.menu.prepareSubmenu.advanced:SetText(self:Text("PREPARE_ORDER_ADVANCED"))
-	frame.menu.prepareSubmenu.advanced:SetScript("OnClick", function()
-		if frame.menu.entry then
-			AF:PrepareCustomerOrder(frame.menu.entry, "advanced")
+	frame.prepareMenu.advanced:SetText(self:Text("PREPARE_ORDER_ADVANCED"))
+	frame.prepareMenu.advanced:SetScript("OnClick", function()
+		if frame.prepareMenu.entry then
+			AF:PrepareCustomerOrder(frame.prepareMenu.entry, "advanced")
 		end
 	end)
 
@@ -1173,10 +1221,28 @@ function AF:HideCustomerMenu()
 	end
 	self:ClearProfessionButtonTooltip()
 	frame.menu:Hide()
-	if frame.menu.prepareSubmenu then
-		frame.menu.prepareSubmenu:Hide()
+	if frame.prepareMenu then
+		frame.prepareMenu:Hide()
 	end
 	frame.menuBlocker:Hide()
+end
+
+function AF:ShowCustomerPrepareMenu(entry, owner)
+	local frame = self.customerFrame
+	local menu = frame and frame.prepareMenu
+	if not menu or not owner or not IsCustomerRowClickable(entry) then
+		return
+	end
+	self:ClearProfessionButtonTooltip()
+	if frame.menu then
+		frame.menu:Hide()
+	end
+	menu.entry = entry
+	UpdatePrepareMenuButtons(menu, entry)
+	menu:ClearAllPoints()
+	menu:SetPoint("TOPLEFT", owner, "TOPRIGHT", 2, 0)
+	frame.menuBlocker:Show()
+	menu:Show()
 end
 
 function AF:ShowProfessionButtonTooltip(button)
@@ -1275,45 +1341,27 @@ function AF:ShowCustomerMenu(entry, owner)
 		return
 	end
 	menu.entry = entry
-	menu.prepareSubmenu:Hide()
+	if self.customerFrame.prepareMenu then
+		self.customerFrame.prepareMenu:Hide()
+	end
 	menu.favorite:SetText(self:Text(self:IsFavoriteArtisan(entry) and "UNFAVORITE" or "FAVORITE"))
 	if entry.tutorialFake then
 		menu.favorite:SetText(self:Text(self.customerTutorialFavorite and "UNFAVORITE" or "FAVORITE"))
 		menu.whisper:Disable()
-		menu.prepare:Disable()
-		menu.prepareSubmenu.standard:Disable()
-		menu.prepareSubmenu.optional:Disable()
-		menu.prepareSubmenu.advanced:Disable()
 		menu.link:Disable()
 		self:SetProfessionButtonTooltip(self:Text("TUTORIAL_FAKE_ACTION_TOOLTIP"))
 	elseif entry.ownSelf and not self:IsDevEnabled() then
 		menu.whisper:Disable()
-		menu.prepare:Disable()
-		menu.prepareSubmenu.standard:Disable()
-		menu.prepareSubmenu.optional:Disable()
-		menu.prepareSubmenu.advanced:Disable()
 		menu.link:Disable()
 		self:ClearProfessionButtonTooltip()
 	elseif entry.ownSelf then
 		menu.whisper:Disable()
-		menu.prepare:Enable()
-		menu.prepareSubmenu.standard:Enable()
-		menu.prepareSubmenu.optional:Enable()
-		menu.prepareSubmenu.advanced:SetEnabled(self:HasAdvancedReagentFacts(entry))
 		menu.link:Disable()
 		self:ClearProfessionButtonTooltip()
 	elseif entry.ownAlt then
 		menu.whisper:Disable()
-		menu.prepare:Enable()
-		menu.prepareSubmenu.standard:Enable()
-		menu.prepareSubmenu.optional:Enable()
-		menu.prepareSubmenu.advanced:SetEnabled(self:HasAdvancedReagentFacts(entry))
 	else
 		menu.whisper:Enable()
-		menu.prepare:Enable()
-		menu.prepareSubmenu.standard:Enable()
-		menu.prepareSubmenu.optional:Enable()
-		menu.prepareSubmenu.advanced:SetEnabled(self:HasAdvancedReagentFacts(entry))
 	end
 	if entry.tutorialFake or (entry.ownSelf and not self:IsDevEnabled()) then
 		-- Keep Favorite interactive; side-effecting order/profession actions stay disabled.
@@ -1607,6 +1655,12 @@ function AF:RefreshCustomerResults(statusOverride)
 		row:ClearAllPoints()
 		row:SetPoint("TOPLEFT", 0, -contentHeight)
 		row:SetWidth(math.max(280, frame.scroll:GetWidth() - 4))
+		if row.prepare then
+			local canPrepare = IsCustomerRowClickable(entry)
+			row.prepare:SetShown(entry ~= nil)
+			row.prepare:SetEnabled(canPrepare)
+			row.prepare:SetAlpha(canPrepare and 1 or 0.45)
+		end
 		row:Show()
 		row.name:ClearAllPoints()
 		row.name:SetPoint("TOPLEFT", row.certified, "TOPRIGHT", 4, 0)

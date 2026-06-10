@@ -18,4 +18,3 @@
 [] Explore EditModeExpanded
 
 [] Export too large and pasting may cause large freeze
-[] Move prepare order to a button on the left of the cogwheel button with the icon from Crafting Orders (the one from the minimap)
