@@ -11,6 +11,7 @@ local TRADE_CHANNEL_PATTERNS = {
 	"handel",
 	"торгов",
 	"торг",
+	"оргов",
 	"交易",
 	"貿易",
 }
