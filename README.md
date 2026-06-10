@@ -9,7 +9,9 @@ ArtisanFinder helps players find available crafters directly from the Crafting O
 *   Multi-character advertising for scanned professions from your alts.
 *   Guild and trade-chat crafter discovery.
 *   Favorites, search, sorting, online checks, and personal order helpers.
-*   Prepare Order tracking with required components, optional reagents, quantities, quality markers, and Auctionator temporary searches.
+*   Prepare Order tracking with Standard, optional-reagent, and Advanced preparation modes.
+*   Smart reagent guidance with expected quality estimates and material suggestions.
+*   One-click order filling from prepared craft materials when a matching artisan is selected.
 *   Personal order notifications for addon-enabled customers and artisans.
 *   Manual recipe scanning for supported crafting professions, with optional automatic rescans.
 *   Minimap, movable button, Options -> AddOns, and Blizzard Edit Mode controls.
@@ -21,13 +23,17 @@ ArtisanFinder helps players find available crafters directly from the Crafting O
 
 When you choose an item in the Crafting Order form, ArtisanFinder shows matching artisans who can help with that craft. Results can include commission, note, quality with recommended or optional reagents, AFK state, guild source, trade-chat leads, and actions for whispering or preparing an order.
 
-Use the customer row gear menu to prepare an order as Standard or With optional reagents. Standard preparation adds the craft to the ObjectiveTracker with required components and any artisan quality or reagent recommendations. With optional reagents opens Blizzard-style optional reagent slots inside the artisan row so you can choose one reagent per slot before tracking the craft.
+![ArtisanFinder customer view](Images/CustomerView.png)
+
+Use the customer row "Prepare order" button to prepare an order as Standard, With optional reagents, or Advanced. Standard preparation adds the craft to the ObjectiveTracker with required components and any artisan quality or reagent recommendations. With optional reagents opens Blizzard-style optional reagent slots inside the artisan row so you can choose one reagent per slot before tracking the craft. Advanced preparation lets you choose required reagent qualities and optional reagents before tracking the craft, with an expected quality preview when ArtisanFinder has enough information.
 
 Prepared crafts appear under ArtisanFinder in the ObjectiveTracker with required components, vendor reagents, selected optional reagents, quantities, owned and missing counts, and quality markers where available. Left-click the craft header to open the profession recipe panel, right-click it to untrack, or use Search at the Auction House to run a temporary Auctionator multi-search for missing reagents when Auctionator is enabled.
 
-ArtisanFinder does not place orders for you. It only helps fill or open the right information so you can review everything before submitting an order yourself.
+When a prepared craft matches the order you are viewing, clicking a matching artisan row can apply the tracked materials directly to the Crafting Order form so you can review the order faster.
 
-![ArtisanFinder customer view](Images/CustomerView.png)
+![ArtisanFinder customer view](Images/PrepareOrder.png)
+
+ArtisanFinder does not place orders for you. It only helps fill or open the right information so you can review everything before submitting an order yourself.
 
 ## For Crafters
 
@@ -49,6 +55,8 @@ If an addon-enabled customer places a personal order for one of your characters 
 
 For addon-enabled crafters, ArtisanFinder can show suggested reagent qualities for the selected craft. Reagent names and icons appear directly in customer tooltips, with optional difficulty estimates when scan data is available.
 
+ArtisanFinder can estimate expected craft quality from the reagents you choose and suggest combinations that reach the best possible result.
+
 ## Commission Values
 
 Commission fields use a single gold input:
@@ -63,7 +71,7 @@ An item-specific commission takes priority over a profession default. If an item
 
 ArtisanFinder has an Options -> AddOns panel ordered around common controls first: minimap/button behavior, availability, scanning, trade-chat leads, order notifications, result sorting, cache behavior and advertised character professions. Blizzard Edit Mode controls the order notification toast and movable ArtisanFinder button placement.
 
-The scanning section includes **Artisan import / export**. It creates a copy/paste payload containing scanned artisan profiles, profession pricing, advertising choices, and profession links. Importing merges newer or missing artisan data without replacing local settings. A profile matching the currently logged-in character is skipped so imported data is never treated as the active character.
+The scanning section includes **Artisan import / export**. It creates a copy/paste payload containing scanned artisan profiles, profession pricing, advertising choices, and profession links, so another WoW account's artisans can be advertised alongside your main account.
 
 ![ArtisanFinder options](Images/Options1.png)
 ![ArtisanFinder options](Images/Options2.png)
