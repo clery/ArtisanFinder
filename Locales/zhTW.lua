@@ -423,9 +423,9 @@ L.CHANGELOG_HELP = "/af changelog - 開啟 ArtisanFinder 最近變更"
 L.CHANGELOG_TITLE = "ArtisanFinder 變更"
 L.CHANGELOG_DESCRIPTION = "此版本的最近變更。"
 L.CHANGELOG_ACKNOWLEDGE = "知道了"
-L.CHANGELOG_ENTRY_2_1_0版本 %s"
+L.CHANGELOG_VERSION = "版本 %s"
 L.CHANGELOG_UNRELEASED = "下次更新"
-L.CHANGELOG_ENTRY_2_0_6 = [[### 新增
+L.CHANGELOG_ENTRY_2_1_0 = [[### 新增
 
 * 工匠匯入/匯出現在可同時宣傳另一個帳號的工匠和你主帳號的工匠。
 * 準備訂單現在有進階模式，讓客戶能在追蹤製作前選擇必要材料品質和可選材料。

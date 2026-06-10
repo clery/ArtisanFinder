@@ -417,9 +417,9 @@ L.CHANGELOG_HELP = "/af changelog - abrir cambios recientes de ArtisanFinder"
 L.CHANGELOG_TITLE = "Cambios de ArtisanFinder"
 L.CHANGELOG_DESCRIPTION = "Cambios recientes de esta versión."
 L.CHANGELOG_ACKNOWLEDGE = "Entendido"
-L.CHANGELOG_ENTRY_2_1_0Versión %s"
+L.CHANGELOG_VERSION = "Versión %s"
 L.CHANGELOG_UNRELEASED = "Próxima actualización"
-L.CHANGELOG_ENTRY_2_0_6 = [[### Añadido
+L.CHANGELOG_ENTRY_2_1_0 = [[### Añadido
 
 * La importación/exportación de artesanos ofrece una forma de anunciar los artesanos de otra cuenta además de los de tu cuenta principal.
 * Preparar pedido ahora tiene un modo Avanzado que permite a los clientes elegir calidades de componentes requeridos y componentes opcionales antes de seguir una fabricación.

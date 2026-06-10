@@ -417,9 +417,9 @@ L.CHANGELOG_HELP = "/af changelog - 打开 ArtisanFinder 最近更改"
 L.CHANGELOG_TITLE = "ArtisanFinder 更改"
 L.CHANGELOG_DESCRIPTION = "此版本的最近更改。"
 L.CHANGELOG_ACKNOWLEDGE = "知道了"
-L.CHANGELOG_ENTRY_2_1_0版本 %s"
+L.CHANGELOG_VERSION = "版本 %s"
 L.CHANGELOG_UNRELEASED = "下次更新"
-L.CHANGELOG_ENTRY_2_0_6 = [[### 新增
+L.CHANGELOG_ENTRY_2_1_0 = [[### 新增
 
 * 工匠导入/导出现在可同时宣传另一个账号的工匠和你主账号的工匠。
 * 准备订单现在有高级模式，让客户能在追踪制作前选择必需材料品质和可选材料。

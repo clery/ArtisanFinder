@@ -416,9 +416,9 @@ L.CHANGELOG_HELP = "/af changelog - aktuelle ArtisanFinder-Änderungen öffnen"
 L.CHANGELOG_TITLE = "ArtisanFinder-Änderungen"
 L.CHANGELOG_DESCRIPTION = "Aktuelle Änderungen für diese Version."
 L.CHANGELOG_ACKNOWLEDGE = "Verstanden"
-L.CHANGELOG_ENTRY_2_1_0Version %s"
+L.CHANGELOG_VERSION = "Version %s"
 L.CHANGELOG_UNRELEASED = "Nächstes Update"
-L.CHANGELOG_ENTRY_2_0_6 = [[### Hinzugefügt
+L.CHANGELOG_ENTRY_2_1_0 = [[### Hinzugefügt
 
 * Handwerker-Import/-Export bietet eine Möglichkeit, Handwerker eines anderen Accounts zusätzlich zu deinem Hauptaccount zu bewerben.
 * Auftrag vorbereiten hat jetzt einen erweiterten Modus, mit dem Kunden die Qualitäten benötigter Reagenzien und optionale Reagenzien vor dem Verfolgen einer Herstellung auswählen können.
