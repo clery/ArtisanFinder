@@ -63,9 +63,16 @@ function AF:IsDevTrafficLogsEnabled()
 	return false
 end
 
-function AF:GetCachedGuildRosterEntry()
-	return nil
+function AF:GetCurrentGuildCacheKey()
+	return self.currentGuildCacheKey
 end
+
+function AF:GetCachedGuildRosterEntry(name)
+	name = self:NormalizeName(name)
+	return name and self.guildRoster and self.guildRoster[name] or nil
+end
+
+LoadAddonFile("Features/Social/WhoStatus.lua")
 
 function AF:IsSecretValue()
 	return false
@@ -151,6 +158,11 @@ AF.currentCustomerQueryItemID = 2000
 AF.currentCustomerProfessionID = 164
 AF.currentCustomerRecipeID = 100
 AF.lastQueryAt = 240
+AF.currentGuildCacheKey = "Guild-Realm"
+AF.guildRoster = {
+	["Imported-Realm"] = { online = false, guid = "Player-Crafter" },
+	["Broker-Realm"] = { online = true, guid = "Player-Broker" },
+}
 AF.db = {
 	artisanCharacters = {
 		["Imported-Realm"] = {
@@ -175,6 +187,7 @@ AF.db = {
 	favoriteArtisans = {},
 	professionLinks = {},
 	connectedRealmCache = {},
+	artisanContacts = {},
 	showUncertifiedPeople = false,
 	offlineFallbackResults = 0,
 }
@@ -188,19 +201,64 @@ Check(AF.db.customerCache["2000"] == nil, "absorbed cache duplicate should be re
 
 local compactParts = {
 	"R", AF.PROTOCOL_VERSION, "2000", "164", "30000", "0", "live note",
-	"100", "200", "trade:new", "77", "Imported-Realm", "", "0", "C1",
+	"100", "200", "trade:new", "77", "Imported-Realm", "Buyer-Realm", "0", "C1",
 	"100", "140", "4", "4", "5", "5", "140", "5", "0", "1",
 }
-AF:HandleResponse(compactParts, "Imported-Realm")
+AF:HandleResponse(compactParts, "Broker-Realm")
 local importedItem = AF.db.artisanCharacters["Imported-Realm"].items["2000"]
 Check(importedItem.quality == 4 and importedItem.bestQuality == 5, "live response should update imported profile")
 Check(importedItem.priceCopper == 30000 and importedItem.note == "live note", "live response should update imported price/note")
 Check(importedItem.professionLink == "trade:new", "live response should update imported profession link")
 Check(AF.db.customerCache["2000"] == nil, "live response for imported alt should not leave cache duplicate")
+Check(AF.db.artisanContacts["Imported-Realm"].target == "Broker-Realm", "absorbed imported response should remember online responder")
 
 rows = AF:GetCachedArtisans(2000, "", "quality", 77)
 Check(#rows == 1, "live-updated imported alt should still render once")
 Check(rows[1].ownAlt == true and rows[1].quality == 4, "live-updated row should stay Your alt with latest data")
+Check(rows[1].target == "Broker-Realm" and rows[1].onlineContact == true, "imported row should keep online responder after profile merge")
+Check(AF:IsCustomerEntryOnline(rows[1]) == true, "imported row should be online via remembered responder")
+Check(AF:IsCustomerEntryOffline(rows[1]) == false, "imported row should not also be offline when responder is online")
+
+AF.db = {
+	artisanCharacters = {},
+	advertising = {},
+	advertisingKnown = {},
+	customerCache = {},
+	favoriteArtisans = {},
+	professionLinks = {},
+	connectedRealmCache = {},
+	artisanContacts = {},
+	showUncertifiedPeople = false,
+	offlineFallbackResults = 0,
+}
+AF:HandleResponse(compactParts, "Broker-Realm")
+local remoteEntry = AF.db.customerCache["2000"] and AF.db.customerCache["2000"]["Imported-Realm"]
+Check(remoteEntry and remoteEntry.target == "Broker-Realm", "third-account cache response should keep online responder target")
+rows = AF:GetCachedArtisans(2000, "", "quality", 77)
+Check(#rows == 1 and rows[1].ownAlt ~= true, "third-account response should render as remote addon row")
+Check(rows[1].onlineContact == true and rows[1].guildOnline == false, "remote row should distinguish online responder from offline crafter")
+Check(AF:IsCustomerEntryOnline(rows[1]) == true, "remote row should be online via responder")
+Check(AF:IsCustomerEntryOffline(rows[1]) == false, "remote row should not be offline while responder is online")
+remoteEntry.verifiedAt = 0
+AF.guildRoster["Broker-Realm"].online = false
+rows = AF:GetCachedArtisans(2000, "", "quality", 77)
+Check(#rows == 1 and rows[1].onlineContact ~= true, "stale remote row should clear offline responder contact")
+Check(AF:IsCustomerEntryOnline(rows[1]) == false, "stale remote row should not stay online after responder leaves")
+Check(AF:IsCustomerEntryOffline(rows[1]) == true, "stale remote row should fall back to crafter roster status")
+AF.guildRoster["Broker-Realm"].online = true
+
+AF.db.artisanCharacters["Imported-Realm"] = {
+	characterName = "Imported-Realm",
+	importedAlt = true,
+	professions = {
+		["164"] = { id = 164, professionLink = "trade:new" },
+	},
+	items = {
+		["2000"] = importedItem,
+	},
+	professionPrices = {},
+}
+AF.db.customerCache = nil
 
 AF:ClearCharacterScans("Imported-Realm")
 Check(AF.db.artisanCharacters["Imported-Realm"] == nil, "cleared imported alt should remove ownership profile")

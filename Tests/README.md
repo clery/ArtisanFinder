@@ -6,6 +6,7 @@ Run from repository root:
 lua Tests/profession_open_regression.lua
 lua Tests/recommendation.lua
 lua Tests/cache_invalidation.lua
+lua Tests/imported_alt_merge.lua
 lua Tests/guild_roster_cache.lua
 lua Tests/customer_reagent_detail.lua
 lua Tests/wire_reagent_facts.lua
@@ -17,6 +18,8 @@ The profession-open regression harness creates a synthetic multi-character saved
 The recommendation harness verifies customer-side quality breakpoints, optional difficulty, concentration quality caps, lowest-sufficient reagent suggestions, highest-impact tie-breaks, and missing-fact rescan handling.
 
 The cache invalidation harness verifies stale alt/customer cache scan entries are preserved as rescan-needed rows without computed recommendations.
+
+The [imported alt merge harness](imported_alt_merge.lua) verifies imported artisan profiles collapse with same-name live/cache rows, preserve online responder contacts, and move cleanly back to customer cache when cleared.
 
 The guild roster cache harness verifies partial roster refreshes, authoritative pruning, and connected-realm member name key preservation.
 

@@ -313,7 +313,13 @@ function AF:IsCustomerEntryWhoRefreshable(entry)
 end
 
 function AF:IsCustomerEntryOnline(entry)
-	if not entry or entry.ownAlt then
+	if not entry then
+		return false
+	end
+	if entry.onlineContact == true then
+		return true
+	end
+	if entry.ownAlt then
 		return false
 	end
 	if self:IsCustomerEntryWhoCheckFailed(entry) then
@@ -338,7 +344,7 @@ function AF:IsCustomerEntryWhoCheckFailed(entry)
 end
 
 function AF:IsCustomerEntryOffline(entry)
-	if not entry or entry.ownAlt then
+	if not entry or entry.onlineContact == true or entry.ownAlt then
 		return false
 	end
 	if self:IsCustomerEntryWhoCheckFailed(entry) then

@@ -36,7 +36,10 @@ local function GetAvailabilitySort(AF, entry)
 	if not entry then
 		return 3
 	end
-	if entry.ownAlt then
+	if entry.onlineContact == true then
+		return 0
+	end
+	if entry.ownAlt and entry.importedAlt ~= true then
 		return 0
 	end
 	if entry.unavailableCached then
@@ -150,6 +153,27 @@ end
 local FAVORITE_CACHE_ROW_OPTIONS = { unavailableFavorite = true, useOrderTarget = true }
 local OFFLINE_CACHE_ROW_OPTIONS = { offlineCached = true, offlineFallback = true, useOrderTarget = true }
 
+local function RefreshOnlineContact(AF, entry)
+	if not entry or entry.onlineContact ~= true then
+		return entry
+	end
+	local contactName = AF:NormalizeName(entry.target)
+	local crafterName = AF:NormalizeName(entry.orderTarget or entry.name)
+	if not contactName or contactName == crafterName then
+		entry.onlineContact = nil
+		return entry
+	end
+	local verifiedAt = tonumber(entry.verifiedAt)
+	if verifiedAt and AF:Now() - verifiedAt <= (tonumber(AF.LIVE_QUERY_TIMEOUT) or 5) then
+		return entry
+	end
+	local rosterEntry = AF.GetCachedGuildRosterEntry and AF:GetCachedGuildRosterEntry(contactName) or nil
+	if not rosterEntry or rosterEntry.online ~= true then
+		entry.onlineContact = nil
+	end
+	return entry
+end
+
 local function PrepareCachedCustomerEntry(AF, entry, options)
 	local copy = CopyTable(entry)
 	if not AF:IsCurrentScanModelEntry(copy) and AF.MarkScanModelRescanNeeded then
@@ -163,6 +187,7 @@ local function PrepareCachedCustomerEntry(AF, entry, options)
 	if options and options.useOrderTarget then
 		copy.target = copy.orderTarget or copy.name
 	end
+	RefreshOnlineContact(AF, copy)
 	copy.professionLink = copy.professionLink or AF:GetRememberedProfessionLink(copy.orderTarget or copy.name, copy.professionID)
 	return copy
 end
@@ -174,6 +199,22 @@ local function ClearGuildAffiliation(entry)
 	entry.guildRecipeKnown = nil
 	entry.guildKey = nil
 	return entry
+end
+
+local function GetOnlineImportedArtisanContact(AF, characterName, profile)
+	if type(profile) ~= "table" or profile.importedAlt ~= true or not AF.GetRememberedArtisanContact or not AF.GetCachedGuildRosterEntry then
+		return nil, nil
+	end
+	local guildKey = AF.GetCurrentGuildCacheKey and AF:GetCurrentGuildCacheKey() or nil
+	local contactName = AF:GetRememberedArtisanContact(characterName, guildKey)
+	if not contactName or contactName == characterName then
+		return nil, nil
+	end
+	local rosterEntry = AF:GetCachedGuildRosterEntry(contactName)
+	if rosterEntry and rosterEntry.online == true then
+		return contactName, rosterEntry
+	end
+	return nil, nil
 end
 
 local function MarkGuildAffiliation(AF, entry)
@@ -320,9 +361,10 @@ function AF:GetOwnAltRows(itemID, professionID, filterText, seenNames, recipeID)
 		local priceCopper, freeCommission, note = self:GetItemPriceForProfile(profile, itemID, item.professionID)
 		local profession = profile.professions and profile.professions[tostring(item.professionID or "")]
 		local professionLink = item.professionLink or (profession and profession.professionLink) or self:GetRememberedProfessionLink(characterName, item.professionID)
+		local contactName, contactRosterEntry = GetOnlineImportedArtisanContact(self, characterName, profile)
 		local entry = {
 			name = characterName,
-			target = characterName,
+			target = contactName or characterName,
 			orderTarget = characterName,
 			itemID = itemID,
 			professionID = item.professionID,
@@ -371,6 +413,9 @@ function AF:GetOwnAltRows(itemID, professionID, filterText, seenNames, recipeID)
 			ownAlt = true,
 			importedAlt = profile.importedAlt == true or nil,
 			ownSelf = isCurrentCharacter,
+			onlineContact = contactName and true or nil,
+			guildOnline = contactName and true or nil,
+			guildMemberGUID = contactRosterEntry and contactRosterEntry.guid or nil,
 		}
 		if not self:IsCurrentScanModelEntry(entry) and self.MarkScanModelRescanNeeded then
 			self:MarkScanModelRescanNeeded(entry)
