@@ -398,6 +398,7 @@ L.OPTIONS_TRANSFER_OPEN = "Abrir transferencia"
 -- Advanced preparation and changelog.
 L.ADVANCED_REAGENTS = "Componentes avanzados"
 L.ADVANCED_EXPECTED_QUALITY = "Previsto: %s"
+L.ADVANCED_EXPECTED_MISSING_DATA = "Unknown (missing data)"
 L.ADVANCED_EXPECTED_RESCAN = "La calidad prevista no está disponible; se necesita reescanear."
 L.ADVANCED_EXPECTED_SELECT_REQUIRED = "Selecciona los componentes requeridos."
 L.ADVANCED_REAGENTS_EMPTY = "No se encontraron opciones de componentes para esta receta."

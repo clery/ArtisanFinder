@@ -398,6 +398,7 @@ L.OPTIONS_TRANSFER_OPEN = "打开传输"
 -- Advanced preparation and changelog.
 L.ADVANCED_REAGENTS = "高级材料"
 L.ADVANCED_EXPECTED_QUALITY = "预期：%s"
+L.ADVANCED_EXPECTED_MISSING_DATA = "Unknown (missing data)"
 L.ADVANCED_EXPECTED_RESCAN = "预期品质不可用；需要重新扫描。"
 L.ADVANCED_EXPECTED_SELECT_REQUIRED = "请选择必需材料。"
 L.ADVANCED_REAGENTS_EMPTY = "未找到此配方的材料选择。"

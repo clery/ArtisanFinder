@@ -405,6 +405,7 @@ L.OPTIONS_TRANSFER_OPEN = "Abrir transferência"
 -- Advanced preparation and changelog.
 L.ADVANCED_REAGENTS = "Reagentes avançados"
 L.ADVANCED_EXPECTED_QUALITY = "Esperado: %s"
+L.ADVANCED_EXPECTED_MISSING_DATA = "Unknown (missing data)"
 L.ADVANCED_EXPECTED_RESCAN = "Qualidade esperada indisponível; nova varredura necessária."
 L.ADVANCED_EXPECTED_SELECT_REQUIRED = "Selecione os reagentes obrigatórios."
 L.ADVANCED_REAGENTS_EMPTY = "Nenhuma opção de reagente foi encontrada para esta receita."

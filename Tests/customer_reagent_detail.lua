@@ -26,15 +26,26 @@ end
 local function NewRegion()
 	return {
 		ClearAllPoints = Noop,
-		Hide = Noop,
+		Hide = function(self)
+			self.shown = false
+		end,
+		SetAtlas = Noop,
 		SetEnabled = Noop,
 		SetHeight = Noop,
 		SetPoint = Noop,
-		SetShown = Noop,
-		SetText = Noop,
+		SetShown = function(self, shown)
+			self.shown = shown == true
+		end,
+		SetText = function(self, text)
+			self.text = text
+		end,
 		SetTextColor = Noop,
+		SetTexture = Noop,
+		SetVertexColor = Noop,
 		SetWidth = Noop,
-		Show = Noop,
+		Show = function(self)
+			self.shown = true
+		end,
 	}
 end
 
@@ -205,6 +216,12 @@ Check(compactEntry.bestQuality == 5, "compact response should preserve best qual
 Check(compactEntry.reagentSkillFacts and compactEntry.reagentSkillFacts.scanModelVersion == AF.SCAN_MODEL_VERSION, "compact response should create minimal current facts")
 
 function AF:Text(key, ...)
+	if key == "ADVANCED_EXPECTED_QUALITY" then
+		return "Expected: " .. tostring(select(1, ...))
+	end
+	if key == "ADVANCED_EXPECTED_MISSING_DATA" then
+		return "Unknown (missing data)"
+	end
 	if key == "RECOMMENDED_REAGENTS_QUALITY" then
 		return "Recommended " .. tostring(select(1, ...))
 	end
@@ -563,10 +580,27 @@ local exactAdvancedOutcome = AF:GetCustomerShoppingOutcome(exactEntry, exactAdva
 	local formUpdated = 0
 	local listButtonUpdated = 0
 	local clearedSlots = {}
+	local requiredContainer = {}
+	local optionalContainer = {}
+	local currentOrderSchematic = orderSchematic
 
-	local function NewOrderSlot(schematic)
+	local function IsOrderSlotOptional(schematic)
+		return schematic
+			and schematic.required ~= true
+			and schematic.reagentType ~= Enum.CraftingReagentType.Basic
+	end
+
+	local function NewOrderSlot(schematic, parent, reagent)
 		return {
 			schematic = schematic,
+			parent = parent or (IsOrderSlotOptional(schematic) and optionalContainer or requiredContainer),
+			reagent = reagent,
+			GetParent = function(self)
+				return self.parent
+			end,
+			GetReagent = function(self)
+				return self.reagent
+			end,
 			GetReagentSlotSchematic = function(self)
 				return self.schematic
 			end,
@@ -587,12 +621,40 @@ local exactAdvancedOutcome = AF:GetCustomerShoppingOutcome(exactEntry, exactAdva
 		activeSlots[#activeSlots + 1] = NewOrderSlot(slot)
 	end
 
+	local function NewAllocation(allocation)
+		return allocation and {
+			reagent = allocation.reagent,
+			quantity = allocation.quantity,
+			GetReagent = function(self)
+				return self.reagent
+			end,
+			GetQuantity = function(self)
+				return self.quantity
+			end,
+		} or nil
+	end
+
+	local function NewAllocations(slotIndex)
+		return {
+			GetFirstAllocation = function()
+				return NewAllocation(allocations[slotIndex])
+			end,
+			HasAnyAllocations = function()
+				local allocation = allocations[slotIndex]
+				return allocation ~= nil and (tonumber(allocation.quantity) or 0) > 0
+			end,
+		}
+	end
+
 	local fakeTransaction = {
 		GetRecipeID = function()
 			return 374498
 		end,
 		GetRecipeSchematic = function()
-			return orderSchematic
+			return currentOrderSchematic
+		end,
+		GetAllocations = function(_, slotIndex)
+			return NewAllocations(slotIndex)
 		end,
 		OverwriteAllocation = function(_, slotIndex, reagent, quantity)
 			allocations[slotIndex] = {
@@ -609,6 +671,10 @@ local exactAdvancedOutcome = AF:GetCustomerShoppingOutcome(exactEntry, exactAdva
 	ProfessionsCustomerOrdersFrame = {
 		Form = {
 			transaction = fakeTransaction,
+			ReagentContainer = {
+				Reagents = requiredContainer,
+				OptionalReagents = optionalContainer,
+			},
 			reagentSlotPool = {
 				EnumerateActive = function()
 					local index = 0
@@ -628,6 +694,248 @@ local exactAdvancedOutcome = AF:GetCustomerShoppingOutcome(exactEntry, exactAdva
 	}
 	InCombatLockdown = function()
 		return false
+	end
+
+	local fallbackPanelEntry = {
+		name = "Rakhnar-Dalaran",
+		target = "Rakhnar-Dalaran",
+		orderTarget = "Rakhnar-Dalaran",
+		itemID = 193000,
+		professionID = 755,
+		recipeID = 374498,
+	}
+	local fallbackPanelContext = AF:SetCustomerShoppingContext(fallbackPanelEntry, "advanced")
+	local fallbackPanelCandidates = AF:BuildCustomerShoppingCandidates(fallbackPanelContext, { fallbackPanelEntry })
+	local fallbackPanelRequired = 0
+	local fallbackPanelOptional = 0
+	for _, candidate in ipairs(fallbackPanelCandidates or {}) do
+		if candidate.required then
+			fallbackPanelRequired = fallbackPanelRequired + 1
+		elseif candidate.optional then
+			fallbackPanelOptional = fallbackPanelOptional + 1
+		end
+	end
+	Check(AF:HasAdvancedReagentFacts(fallbackPanelEntry) == false, "panel fallback entry should still report missing advanced facts")
+	Check(#fallbackPanelCandidates == 7, "advanced shopping should expose panel reagent candidates when artisan facts are missing")
+	Check(fallbackPanelRequired == 6, "advanced panel fallback should include required reagent choices")
+	Check(fallbackPanelOptional == 1, "advanced panel fallback should include optional reagent choices")
+
+	local RING_SPARK_ITEM_ID = 300001
+	local RING_BLASPHEMITE_ITEM_ID = 300002
+	local RING_OSTENTATIOUS_ONYX_ITEM_ID = 300003
+	local RING_MARBLED_STONE_ITEM_ID = 300004
+	local RING_EMBELLISHMENT_ITEM_ID = 219898
+	local ringSchematic = {
+		reagentSlotSchematics = {
+			{
+				slotIndex = 1,
+				dataSlotIndex = 11,
+				required = true,
+				hiddenInCraftingForm = false,
+				reagentType = Enum.CraftingReagentType.Basic,
+				dataSlotType = Enum.TradeskillSlotDataType.Reagent,
+				quantityRequired = 1,
+				slotInfo = { slotText = "Spark" },
+				reagents = {},
+			},
+			{
+				slotIndex = 2,
+				dataSlotIndex = 12,
+				required = true,
+				hiddenInCraftingForm = false,
+				reagentType = Enum.CraftingReagentType.Basic,
+				dataSlotType = Enum.TradeskillSlotDataType.Reagent,
+				quantityRequired = 1,
+				slotInfo = { slotText = "Blasphemite" },
+				reagents = {
+					{ itemID = RING_BLASPHEMITE_ITEM_ID },
+				},
+			},
+			{
+				slotIndex = 3,
+				dataSlotIndex = 13,
+				required = false,
+				hiddenInCraftingForm = false,
+				reagentType = Enum.CraftingReagentType.Modifying,
+				dataSlotType = Enum.TradeskillSlotDataType.ModifiedReagent,
+				quantityRequired = 8,
+				slotInfo = { slotText = "Add Embellishment" },
+				reagents = {
+					{ itemID = RING_OSTENTATIOUS_ONYX_ITEM_ID },
+				},
+			},
+			{
+				slotIndex = 4,
+				dataSlotIndex = 14,
+				required = true,
+				hiddenInCraftingForm = false,
+				reagentType = Enum.CraftingReagentType.Basic,
+				dataSlotType = Enum.TradeskillSlotDataType.Reagent,
+				quantityRequired = 20,
+				slotInfo = { slotText = "Marbled Stone" },
+				reagents = {
+					{ itemID = RING_MARBLED_STONE_ITEM_ID },
+				},
+			},
+			{
+				slotIndex = 5,
+				dataSlotIndex = 13,
+				required = false,
+				hiddenInCraftingForm = false,
+				reagentType = Enum.CraftingReagentType.Modifying,
+				dataSlotType = Enum.TradeskillSlotDataType.ModifiedReagent,
+				quantityRequired = 1,
+				slotInfo = { slotText = "Add Embellishment" },
+				reagents = {
+					{ itemID = RING_OSTENTATIOUS_ONYX_ITEM_ID, difficultyAdjustment = 30 },
+					{ itemID = RING_EMBELLISHMENT_ITEM_ID, difficultyAdjustment = 30 },
+				},
+			},
+		},
+	}
+	local requiredChild = {
+		parent = requiredContainer,
+		GetParent = function(self)
+			return self.parent
+		end,
+	}
+	local optionalChild = {
+		parent = optionalContainer,
+		GetParent = function(self)
+			return self.parent
+		end,
+	}
+	currentOrderSchematic = ringSchematic
+	allocations[1] = { reagent = { itemID = RING_SPARK_ITEM_ID }, quantity = 1 }
+	activeSlots = {
+		NewOrderSlot(ringSchematic.reagentSlotSchematics[1], requiredChild),
+		NewOrderSlot(ringSchematic.reagentSlotSchematics[2], requiredChild),
+		NewOrderSlot(ringSchematic.reagentSlotSchematics[3], requiredChild, { itemID = RING_OSTENTATIOUS_ONYX_ITEM_ID }),
+		NewOrderSlot(ringSchematic.reagentSlotSchematics[4], requiredChild),
+		NewOrderSlot(ringSchematic.reagentSlotSchematics[5], optionalChild),
+	}
+	local ringPanelEntry = {
+		name = "Rakhnar-Dalaran",
+		target = "Rakhnar-Dalaran",
+		orderTarget = "Rakhnar-Dalaran",
+		itemID = 193001,
+		professionID = 755,
+		recipeID = 374498,
+	}
+	local ringPanelContext = AF:SetCustomerShoppingContext(ringPanelEntry, "advanced")
+	local ringPanelCandidates = AF:BuildCustomerShoppingCandidates(ringPanelContext, { ringPanelEntry })
+	local ringPanelRequired = 0
+	local ringPanelOptional = 0
+	local foundSparkRequired = false
+	local foundOnyxRequired = false
+	local foundOnyxOptional = false
+	for _, candidate in ipairs(ringPanelCandidates or {}) do
+		if candidate.required then
+			ringPanelRequired = ringPanelRequired + 1
+		elseif candidate.optional then
+			ringPanelOptional = ringPanelOptional + 1
+		end
+		if candidate.itemID == RING_SPARK_ITEM_ID and candidate.required and candidate.quantity == 1 then
+			foundSparkRequired = true
+		elseif candidate.itemID == RING_OSTENTATIOUS_ONYX_ITEM_ID then
+			foundOnyxRequired = candidate.required == true
+			foundOnyxOptional = candidate.optional == true
+		end
+	end
+	Check(#ringPanelCandidates == 5, "ring panel fallback should expose required/provided rows plus true optional slot")
+	Check(ringPanelRequired == 4, "ring panel fallback should keep provided reagents under required")
+	Check(ringPanelOptional == 1, "ring panel fallback should keep only true optional slots optional")
+	Check(foundSparkRequired, "ring panel fallback should include Spark active order reagent")
+	Check(foundOnyxRequired and not foundOnyxOptional, "ring panel fallback should not classify Ostentatious Onyx as optional")
+
+	local function NewInlineButton()
+		local button = {
+			icon = NewRegion(),
+			iconBorder = NewRegion(),
+			addIcon = NewRegion(),
+			addIconHighlight = NewRegion(),
+			qualityOverlay = NewRegion(),
+			quantity = NewRegion(),
+			ClearAllPoints = Noop,
+			Hide = function(self)
+				self.shown = false
+			end,
+			SetParent = Noop,
+			SetPoint = function(self, ...)
+				local numeric = {}
+				for _, value in ipairs({ ... }) do
+					if type(value) == "number" then
+						numeric[#numeric + 1] = value
+					end
+				end
+				self.pointX = numeric[#numeric - 1]
+				self.pointY = numeric[#numeric]
+			end,
+			Show = function(self)
+				self.shown = true
+			end,
+		}
+		return button
+	end
+
+	local renderSlotPool = {
+		buttons = {},
+		Acquire = function(self)
+			local button = NewInlineButton()
+			self.buttons[#self.buttons + 1] = button
+			return button
+		end,
+		ReleaseAll = function(self)
+			self.buttons = {}
+		end,
+	}
+	local renderPrep = NewRegion()
+	renderPrep.label = NewRegion()
+	renderPrep.empty = NewRegion()
+	renderPrep.slots = NewRegion()
+	renderPrep.track = NewRegion()
+	renderPrep.expectedQuality = NewRegion()
+	renderPrep.concentrationQuality = NewRegion()
+	renderPrep.requiredLabel = NewRegion()
+	renderPrep.optionalLabel = NewRegion()
+	renderPrep.slotPool = renderSlotPool
+	local renderRow = {
+		optionalPrep = renderPrep,
+		optionalPrepConfigured = true,
+		GetWidth = function()
+			return 420
+		end,
+	}
+	AF:SetCustomerShoppingContext(ringPanelEntry, "advanced")
+	local renderHeight = AF:RefreshCustomerOptionalPrepRow(renderRow, ringPanelEntry)
+	local renderFoundSparkRequired = false
+	local renderFoundOnyxRequired = false
+	local renderFoundOnyxOptional = false
+	local renderOptionalSlots = 0
+	for _, button in ipairs(renderSlotPool.buttons or {}) do
+		if button.slotData and button.slotData.optional then
+			renderOptionalSlots = renderOptionalSlots + 1
+			if button.candidate and button.candidate.itemID == RING_OSTENTATIOUS_ONYX_ITEM_ID then
+				renderFoundOnyxOptional = true
+			end
+		elseif button.slotData and button.slotData.required then
+			if button.candidate and button.candidate.itemID == RING_SPARK_ITEM_ID then
+				renderFoundSparkRequired = true
+			elseif button.candidate and button.candidate.itemID == RING_OSTENTATIOUS_ONYX_ITEM_ID then
+				renderFoundOnyxRequired = true
+			end
+		end
+	end
+	Check(renderHeight > 0, "expanded advanced row should render panel fallback")
+	Check(renderFoundSparkRequired, "expanded advanced row should render Spark under required reagents")
+	Check(renderFoundOnyxRequired, "expanded advanced row should render Ostentatious Onyx under required reagents")
+	Check(not renderFoundOnyxOptional, "expanded advanced row should not render Ostentatious Onyx under optional reagents")
+	Check(renderOptionalSlots == 1, "expanded advanced row should keep true optional slot optional")
+	Check(renderPrep.expectedQuality.text == "Expected: Unknown (missing data)", "expanded advanced row should keep missing-data expected quality")
+	currentOrderSchematic = orderSchematic
+	activeSlots = {}
+	for _, slot in ipairs(orderSchematic.reagentSlotSchematics or {}) do
+		activeSlots[#activeSlots + 1] = NewOrderSlot(slot)
 	end
 
 	AF.db.preparedCrafts = { preparedOptional }

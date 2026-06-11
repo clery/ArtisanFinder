@@ -404,6 +404,7 @@ L.OPTIONS_TRANSFER_OPEN = "開啟傳輸"
 -- Advanced preparation and changelog.
 L.ADVANCED_REAGENTS = "進階材料"
 L.ADVANCED_EXPECTED_QUALITY = "預期：%s"
+L.ADVANCED_EXPECTED_MISSING_DATA = "Unknown (missing data)"
 L.ADVANCED_EXPECTED_RESCAN = "預期品質無法使用；需要重新掃描。"
 L.ADVANCED_EXPECTED_SELECT_REQUIRED = "請選擇必要材料。"
 L.ADVANCED_REAGENTS_EMPTY = "未找到此配方的材料選擇。"

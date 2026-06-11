@@ -397,6 +397,7 @@ L.OPTIONS_TRANSFER_OPEN = "Открыть перенос"
 -- Advanced preparation and changelog.
 L.ADVANCED_REAGENTS = "Продвинутые реагенты"
 L.ADVANCED_EXPECTED_QUALITY = "Ожидается: %s"
+L.ADVANCED_EXPECTED_MISSING_DATA = "Unknown (missing data)"
 L.ADVANCED_EXPECTED_RESCAN = "Ожидаемое качество недоступно; нужно пересканировать."
 L.ADVANCED_EXPECTED_SELECT_REQUIRED = "Выберите обязательные реагенты."
 L.ADVANCED_REAGENTS_EMPTY = "Для этого рецепта не найдено вариантов реагентов."

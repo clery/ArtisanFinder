@@ -397,6 +397,7 @@ L.OPTIONS_TRANSFER_OPEN = "Transfer öffnen"
 -- Advanced preparation and changelog.
 L.ADVANCED_REAGENTS = "Erweiterte Reagenzien"
 L.ADVANCED_EXPECTED_QUALITY = "Erwartet: %s"
+L.ADVANCED_EXPECTED_MISSING_DATA = "Unknown (missing data)"
 L.ADVANCED_EXPECTED_RESCAN = "Erwartete Qualität nicht verfügbar; erneuter Scan nötig."
 L.ADVANCED_EXPECTED_SELECT_REQUIRED = "Wähle benötigte Reagenzien aus."
 L.ADVANCED_REAGENTS_EMPTY = "Für dieses Rezept wurden keine Reagenzienoptionen gefunden."

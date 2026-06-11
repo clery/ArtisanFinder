@@ -54,18 +54,19 @@ local function SlotContainsItem(slot, itemID)
 end
 
 local function GetQuantityRequired(slot, reagent)
-	if slot and slot.GetQuantityRequired then
-		local ok, quantity = pcall(slot.GetQuantityRequired, slot, reagent)
+	local quantitySlot = slot and (slot.sourceSlot or slot)
+	if quantitySlot and quantitySlot.GetQuantityRequired then
+		local ok, quantity = pcall(quantitySlot.GetQuantityRequired, quantitySlot, reagent)
 		if ok and tonumber(quantity) then
 			return tonumber(quantity)
 		end
 	end
-	for _, variableQuantity in ipairs(slot and slot.variableQuantities or {}) do
+	for _, variableQuantity in ipairs(quantitySlot and quantitySlot.variableQuantities or {}) do
 		if MatchesItem(variableQuantity.reagent, reagent and reagent.itemID) then
-			return tonumber(variableQuantity.quantity) or tonumber(slot.quantityRequired) or 1
+			return tonumber(variableQuantity.quantity) or tonumber(quantitySlot.quantityRequired) or 1
 		end
 	end
-	return tonumber(slot and slot.quantityRequired) or tonumber(reagent and reagent.quantity) or 1
+	return tonumber(quantitySlot and quantitySlot.quantityRequired) or tonumber(reagent and reagent.quantity) or 1
 end
 
 local function GetReagentQualityInfo(itemID)
@@ -146,8 +147,13 @@ local function IsOptionalReagentType(slot)
 		or slot.reagentType == Enum.CraftingReagentType.Optional
 end
 
+local IsBaselineRequiredSlot
+
 local function IsShoppingOptionalSlot(slot)
 	if not slot or slot.required or slot.hiddenInCraftingForm then
+		return false
+	end
+	if IsBaselineRequiredSlot(slot) then
 		return false
 	end
 	if type(slot.reagents) ~= "table" or #slot.reagents == 0 then
@@ -223,9 +229,14 @@ local function GetOperationDifficulty(operationInfo)
 	return difficulty > 0 and difficulty or nil
 end
 
-local function IsBaselineRequiredSlot(slot)
+IsBaselineRequiredSlot = function(slot)
 	local isBasic = Enum and Enum.CraftingReagentType and slot.reagentType == Enum.CraftingReagentType.Basic
-	return slot and not slot.hiddenInCraftingForm and (slot.required == true or isBasic)
+	local isModifyingRequired = false
+	if ProfessionsUtil and ProfessionsUtil.IsReagentSlotModifyingRequired then
+		local ok, required = pcall(ProfessionsUtil.IsReagentSlotModifyingRequired, slot)
+		isModifyingRequired = ok and required == true
+	end
+	return slot and not slot.hiddenInCraftingForm and (slot.required == true or isBasic or isModifyingRequired)
 end
 
 local function IsLowerQualityReagent(left, right)
@@ -369,6 +380,227 @@ local function BuildAdvancedSlotsFromFacts(facts)
 			optional = true,
 			reagents = slot.reagents or {},
 		}
+	end
+	return slots
+end
+
+local function CallObjectMethod(object, methodName, ...)
+	local method = object and object[methodName]
+	if not method then
+		return nil
+	end
+	local ok, value = pcall(method, object, ...)
+	return ok and value or nil
+end
+
+local function GetCustomerOrderFormForRecipe(recipeID)
+	local form = ProfessionsCustomerOrdersFrame and ProfessionsCustomerOrdersFrame.Form
+	local transaction = form and form.transaction
+	if transaction and transaction.GetRecipeID then
+		local formRecipeID = CallObjectMethod(transaction, "GetRecipeID")
+		if tonumber(formRecipeID) and tonumber(formRecipeID) ~= tonumber(recipeID) then
+			return nil
+		end
+	end
+	return form
+end
+
+local function GetPanelSlotParent(slot)
+	if slot and slot.GetParent then
+		return CallObjectMethod(slot, "GetParent")
+	end
+	return slot and slot.parent
+end
+
+local function IsSameOrDescendant(frame, ancestor)
+	local current = frame
+	local guard = 0
+	while current and guard < 20 do
+		if current == ancestor then
+			return true
+		end
+		current = GetPanelSlotParent(current)
+		guard = guard + 1
+	end
+	return false
+end
+
+local function GetPanelSlotSection(slot, form)
+	if slot and slot.requiredSection == true then
+		return "required"
+	elseif slot and slot.optionalSection == true then
+		return "optional"
+	end
+	local parent = GetPanelSlotParent(slot)
+	local container = form and form.ReagentContainer
+	if container then
+		if parent and IsSameOrDescendant(parent, container.Reagents) then
+			return "required"
+		elseif parent and IsSameOrDescendant(parent, container.OptionalReagents) then
+			return "optional"
+		end
+	end
+	return nil
+end
+
+local function GetAllocationReagent(allocation)
+	local reagent = CallObjectMethod(allocation, "GetReagent")
+	if type(reagent) == "table" then
+		return reagent
+	end
+	return type(allocation and allocation.reagent) == "table" and allocation.reagent or nil
+end
+
+local function GetTransactionSlotReagent(transaction, slotIndex, dataSlotIndex)
+	slotIndex = tonumber(slotIndex)
+	if slotIndex then
+		local allocations = CallObjectMethod(transaction, "GetAllocations", slotIndex)
+		local allocation = CallObjectMethod(allocations, "GetFirstAllocation")
+		local reagent = GetAllocationReagent(allocation)
+		if reagent then
+			return reagent
+		end
+	end
+
+	dataSlotIndex = tonumber(dataSlotIndex)
+	if dataSlotIndex then
+		local modification = CallObjectMethod(transaction, "GetModification", dataSlotIndex)
+		if type(modification) == "table" and type(modification.reagent) == "table" then
+			return modification.reagent
+		end
+	end
+	return nil
+end
+
+local function GetPanelSlotReagent(slot, transaction, schematic, slotIndex)
+	local reagent = CallObjectMethod(slot, "GetReagent")
+	if type(reagent) == "table" then
+		return reagent
+	end
+	local button = slot and slot.Button
+	reagent = CallObjectMethod(button, "GetReagent")
+	if type(reagent) == "table" then
+		return reagent
+	end
+	return GetTransactionSlotReagent(transaction, slotIndex or (schematic and schematic.slotIndex), schematic and schematic.dataSlotIndex)
+end
+
+local function BuildPanelSlotIndex(recipeID)
+	local form = GetCustomerOrderFormForRecipe(recipeID)
+	local transaction = form and form.transaction
+	local pool = form and form.reagentSlotPool
+	if not pool or not pool.EnumerateActive then
+		return nil
+	end
+
+	local index = {
+		bySlotIndex = {},
+		byDataSlotIndex = {},
+		ordered = {},
+	}
+	for panelSlot in pool:EnumerateActive() do
+		local schematic = CallObjectMethod(panelSlot, "GetReagentSlotSchematic") or panelSlot.schematic
+		if type(schematic) == "table" then
+			local info = {
+				panelSlot = panelSlot,
+				schematic = schematic,
+				section = GetPanelSlotSection(panelSlot, form),
+			}
+			local slotIndex = tonumber(schematic.slotIndex) or tonumber(CallObjectMethod(panelSlot, "GetSlotIndex"))
+			local dataSlotIndex = tonumber(schematic.dataSlotIndex)
+			info.reagent = GetPanelSlotReagent(panelSlot, transaction, schematic, slotIndex)
+			info.slotKey = table.concat({
+				"panel",
+				tostring(#index.ordered + 1),
+				tostring(info.section or "?"),
+				tostring(slotIndex or dataSlotIndex or "?"),
+			}, ":")
+			index.ordered[#index.ordered + 1] = info
+			if slotIndex then
+				index.bySlotIndex[slotIndex] = info
+			end
+			if dataSlotIndex then
+				index.byDataSlotIndex[dataSlotIndex] = info
+			end
+		end
+	end
+	return index
+end
+
+local function GetPanelSlotInfo(panelIndex, slot)
+	if not panelIndex or not slot then
+		return nil
+	end
+	local slotIndex = tonumber(slot.slotIndex)
+	local dataSlotIndex = tonumber(slot.dataSlotIndex)
+	return (slotIndex and panelIndex.bySlotIndex[slotIndex])
+		or (dataSlotIndex and panelIndex.byDataSlotIndex[dataSlotIndex])
+end
+
+local function GetAdvancedSlotFlags(slot, panelInfo)
+	local section = panelInfo and panelInfo.section
+	if section == "required" then
+		return true, false
+	elseif section == "optional" then
+		return false, true
+	end
+	local required = IsBaselineRequiredSlot(slot)
+	local optional = not required and IsShoppingOptionalSlot(slot)
+	return required, optional
+end
+
+local function CopySlotReagentsWithPanelReagent(slot, panelInfo, required)
+	local reagents = {}
+	local panelReagent = panelInfo and panelInfo.reagent
+	if required and panelReagent and not IsBaselineRequiredSlot(slot) then
+		return { panelReagent }
+	end
+	for _, reagent in ipairs(slot and slot.reagents or {}) do
+		reagents[#reagents + 1] = reagent
+	end
+	local itemID = tonumber(panelReagent and (panelReagent.itemID or panelReagent.id))
+	if itemID and not SlotContainsItem({ reagents = reagents }, itemID) then
+		reagents[#reagents + 1] = panelReagent
+	end
+	return reagents
+end
+
+local function AddAdvancedSlot(slots, slot, panelInfo)
+	local required, optional = GetAdvancedSlotFlags(slot, panelInfo)
+	if not required and not optional then
+		return
+	end
+	local reagents = CopySlotReagentsWithPanelReagent(slot, panelInfo, required)
+	slots[#slots + 1] = {
+		slotKey = panelInfo and panelInfo.slotKey or GetSlotKey(slot),
+		slotText = GetSlotText(slot),
+		required = required,
+		optional = optional,
+		reagents = reagents,
+		sourceSlot = slot,
+		slotIndex = slot.slotIndex,
+		dataSlotIndex = slot.dataSlotIndex,
+		quantityRequired = slot.quantityRequired,
+		variableQuantities = slot.variableQuantities,
+	}
+end
+
+local function BuildAdvancedSlotsFromCraftingOrderPanel(recipeID)
+	local slots = {}
+	local panelIndex = BuildPanelSlotIndex(recipeID)
+	if panelIndex and #panelIndex.ordered > 0 then
+		for _, panelInfo in ipairs(panelIndex.ordered) do
+			AddAdvancedSlot(slots, panelInfo.schematic, panelInfo)
+		end
+		if #slots > 0 then
+			return slots
+		end
+	end
+
+	local schematic = GetRecipeSchematic(recipeID)
+	for _, slot in ipairs(schematic and schematic.reagentSlotSchematics or {}) do
+		local panelInfo = GetPanelSlotInfo(panelIndex, slot)
+		AddAdvancedSlot(slots, slot, panelInfo)
 	end
 	return slots
 end
@@ -598,13 +830,34 @@ function AF:BuildCustomerShoppingCandidates(context, entries)
 	local seen = {}
 	local optionalEffects = BuildEntryOptionalEffectMap(context.entry)
 	if context.mode == "advanced" then
-		if not self:IsCurrentScanModelEntry(context.entry) then
-			return candidates
+		local advancedSlots = {}
+		if self:IsCurrentScanModelEntry(context.entry)
+			and (not self.HasAdvancedReagentFacts or self:HasAdvancedReagentFacts(context.entry))
+		then
+			advancedSlots = BuildAdvancedSlotsFromFacts(context.entry and context.entry.reagentSkillFacts)
+		end
+		if #advancedSlots == 0 then
+			advancedSlots = BuildAdvancedSlotsFromCraftingOrderPanel(context.recipeID)
+		end
+		local requiredItemIDs = {}
+		for _, slot in ipairs(advancedSlots) do
+			if slot.required then
+				for _, reagent in ipairs(slot.reagents or {}) do
+					local itemID = tonumber(reagent and (reagent.itemID or reagent.id))
+					if itemID then
+						requiredItemIDs[itemID] = true
+					end
+				end
+			end
 		end
 		local suggestedSignature = self:GetReagentDisplaySignature(context.entry and context.entry.bestReagents)
-		for _, slot in ipairs(BuildAdvancedSlotsFromFacts(context.entry and context.entry.reagentSkillFacts)) do
+		for _, slot in ipairs(advancedSlots) do
 			for _, reagent in ipairs(slot.reagents or {}) do
-				local candidate = ApplyOptionalEffect(BuildCandidate(slot, reagent, false), optionalEffects)
+				local itemID = tonumber(reagent and (reagent.itemID or reagent.id))
+				local candidate
+				if not (slot.optional and itemID and requiredItemIDs[itemID]) then
+					candidate = ApplyOptionalEffect(BuildCandidate(slot, reagent, false), optionalEffects)
+				end
 				if candidate then
 					local candidateSignature = self:GetReagentDisplaySignature({ candidate })
 					candidate.suggested = suggestedSignature ~= "" and suggestedSignature:find(candidateSignature, 1, true) ~= nil
@@ -1059,9 +1312,14 @@ local function FormatAdvancedExpectedQuality(AF, entry, candidates, selectedBySl
 	if not AF.ComputeCraftOutcome then
 		return nil
 	end
+	if AF.HasAdvancedReagentFacts and not AF:HasAdvancedReagentFacts(entry) then
+		return AF:Text("ADVANCED_EXPECTED_QUALITY", AF:Text("ADVANCED_EXPECTED_MISSING_DATA")), nil
+	end
 	local outcome = AF:ComputeCraftOutcome(entry, BuildAdvancedOutcomeSelections(candidates, selectedBySlot))
 	if not outcome or outcome.rescanNeeded then
-		if outcome and outcome.missingData and not outcome.missingData.reagentSkillFacts then
+		if outcome and outcome.missingData and outcome.missingData.reagentSkillFacts then
+			return AF:Text("ADVANCED_EXPECTED_QUALITY", AF:Text("ADVANCED_EXPECTED_MISSING_DATA")), nil
+		elseif outcome and outcome.missingData then
 			return AF:Text("ADVANCED_EXPECTED_SELECT_REQUIRED"), nil
 		end
 		return AF:Text("ADVANCED_EXPECTED_RESCAN"), nil

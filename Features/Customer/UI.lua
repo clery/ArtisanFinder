@@ -106,7 +106,7 @@ local function UpdatePrepareMenuButtons(menu, entry)
 	local enabled = IsCustomerRowClickable(entry)
 	menu.standard:SetEnabled(enabled)
 	menu.optional:SetEnabled(enabled)
-	menu.advanced:SetEnabled(enabled and AF:HasAdvancedReagentFacts(entry))
+	menu.advanced:SetEnabled(enabled)
 end
 
 local function SetCustomerRowHighlight(row, entry)
