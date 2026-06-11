@@ -15,9 +15,6 @@ externals:
   Libs/LibDeflate: https://github.com/SafeteeWoW/LibDeflate.git
   Libs/LibEditMode: https://github.com/p3lim-wow/LibEditMode.git
 
-embedded-libraries:
-  - libmarkdown
-
 ignore:
   - README.md
   - Images
