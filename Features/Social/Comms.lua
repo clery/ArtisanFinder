@@ -1043,6 +1043,8 @@ function AF:HandleResponse(parts, sender)
 	local guildRosterEntry = guildResponse and self:GetCachedGuildRosterEntry(crafterName) or nil
 	local validGuildResponse = guildResponse and guildRosterEntry ~= nil
 	local guildKey = validGuildResponse and self.GetCurrentGuildCacheKey and self:GetCurrentGuildCacheKey() or nil
+	local responseSender = self:NormalizeName(sender) or sender
+	local onlineContact = validGuildResponse and responseSender and responseSender ~= crafterName
 
 	local verifiedForCurrentQuery = queryToken
 		and self.currentCustomerQueryToken
@@ -1105,7 +1107,7 @@ function AF:HandleResponse(parts, sender)
 	end
 	local cacheEntry = {
 		name = crafterName,
-		target = sender,
+		target = responseSender,
 		orderTarget = crafterName,
 		itemID = itemID,
 		professionID = professionID,
@@ -1148,9 +1150,10 @@ function AF:HandleResponse(parts, sender)
 		lastQueryToken = queryToken,
 		lastQueryAt = verifiedForCurrentQuery and self.lastQueryAt or nil,
 		guildMember = validGuildResponse or nil,
-		guildOnline = validGuildResponse and true or nil,
+		guildOnline = guildRosterEntry and guildRosterEntry.online or nil,
 		guildMemberGUID = guildRosterEntry and guildRosterEntry.guid or nil,
 		guildKey = guildKey,
+		onlineContact = onlineContact and true or nil,
 		afk = afk or nil,
 	}
 	local absorbedIntoProfile = false

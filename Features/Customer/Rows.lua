@@ -221,7 +221,7 @@ function AF:BuildCustomerRowViewModel(entry)
 	local crafterName = self:NormalizeName(entry.orderTarget or entry.name)
 	local contactName = self:NormalizeName(entry.target)
 	local displayNameTarget = self:NormalizeName(entry.displayName)
-	if entry.guildMember and contactName and crafterName and contactName ~= crafterName and displayNameTarget ~= contactName and not entry.offlineCached and not entry.unavailableFavorite then
+	if (entry.guildMember or entry.onlineContact) and contactName and crafterName and contactName ~= crafterName and displayNameTarget ~= contactName and not entry.offlineCached and not entry.unavailableFavorite then
 		onlineAs = self:Text("ONLINE_AS", self:GetDisplayPlayerName(contactName))
 	end
 	if entry.tradeLead then
