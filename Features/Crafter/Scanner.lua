@@ -941,7 +941,12 @@ function AF:ProcessScanQueue()
 		end
 
 		local active, professionEntry, progress = AF:GetActiveScanProgress()
-		if not active then
+		if not active or type(progress) ~= "table" then
+			return
+		end
+		local pending = progress.pending
+		local completed = progress.completed
+		if type(pending) ~= "table" or type(completed) ~= "table" then
 			return
 		end
 
@@ -975,11 +980,12 @@ function AF:ProcessScanQueue()
 				break
 			end
 			progress.pendingIndex = pendingIndex + 1
-			progress.pending[pendingIndex] = nil
-			if type(progress.pendingKeys) == "table" then
-				progress.pendingKeys[job.key] = nil
+			pending[pendingIndex] = nil
+			local pendingKeys = progress.pendingKeys
+			if type(pendingKeys) == "table" then
+				pendingKeys[job.key] = nil
 			end
-			progress.completed[job.key] = true
+			completed[job.key] = true
 			progress.completedCount = (tonumber(progress.completedCount) or 0) + 1
 			if result ~= "skipped" then
 				progress.scanned = (tonumber(progress.scanned) or 0) + 1

@@ -12,6 +12,7 @@
 * Imported customer cache entries now use the addon clock when filling missing timestamps.
 * Transfer imports now skip artisan records that cannot produce a valid character identity.
 * Reagent skill fact scans now tolerate incomplete baseline reagent data instead of failing.
+* Profession scan queue processing now exits safely if scan progress data is missing or malformed.
 
 ## [v2.1.0](https://github.com/clery/ArtisanFinder/releases/tag/v2.1.0) (2026-06-11)
 [Full Changelog](https://github.com/clery/ArtisanFinder/compare/v2.0.5...v2.1.0) | [Previous Releases](https://github.com/clery/ArtisanFinder/releases)
