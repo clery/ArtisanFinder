@@ -15,3 +15,7 @@
     [] See if adding communities as broadcast channels is possible.
 
 [] Explore EditModeExpanded
+
+[] Add gold statistics
+[] Add simulation in profession panel
+[] Add a "Show available artisans" to the ArtisanFinder panel while profession is opened.

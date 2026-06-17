@@ -10,6 +10,7 @@
 ### Changed
 
 * Offline test harnesses and editor diagnostics now use cleaner explicit global handling.
+* Follow-up ideas for profession panel simulation and artisan availability are now tracked in TODO.
 
 ### Fixed
 
