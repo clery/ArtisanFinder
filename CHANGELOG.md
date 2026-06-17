@@ -7,6 +7,10 @@
 * Profession panel reagent previews can now use an Unlimited reagents toggle to simulate quality allocations without owning every reagent.
 * Profession panel controls can now default to either maximized or minimized from addon options.
 
+### Changed
+
+* Offline test harnesses and editor diagnostics now use cleaner explicit global handling.
+
 ### Fixed
 
 * Imported customer cache entries now use the addon clock when filling missing timestamps.

@@ -1,4 +1,5 @@
 local AF = {}
+local LoadFile = rawget(_G, "loadfile")
 
 local function Check(condition, message)
 	if not condition then
@@ -7,7 +8,7 @@ local function Check(condition, message)
 end
 
 local function LoadAddonFile(path)
-	local chunk, err = loadfile(path)
+	local chunk, err = LoadFile(path)
 	Check(chunk, err)
 	return chunk("ArtisanFinder", AF)
 end
@@ -389,6 +390,7 @@ AF.db.customerCache["193000"] = {
 		},
 	},
 }
+---@diagnostic disable-next-line: duplicate-set-field
 C_TradeSkillUI.GetCraftingOperationInfo = function(_, reagentInfo)
 	local bonusDifficulty = 0
 	for _, info in ipairs(reagentInfo or {}) do
@@ -1050,7 +1052,7 @@ Enum = {
 	},
 }
 C_Timer = nil
-ContinuableContainer = nil
+rawset(_G, "ContinuableContainer", nil)
 C_Item = {
 	GetItemCount = function()
 		return 0

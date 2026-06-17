@@ -1,4 +1,5 @@
 local AF = {}
+local LoadFile = rawget(_G, "loadfile")
 
 local function Check(condition, message)
 	if not condition then
@@ -7,7 +8,7 @@ local function Check(condition, message)
 end
 
 local function LoadAddonFile(path)
-	local chunk, err = loadfile(path)
+	local chunk, err = LoadFile(path)
 	Check(chunk, err)
 	return chunk("ArtisanFinder", AF)
 end
@@ -43,6 +44,7 @@ function AF:IsAvailable()
 	return true
 end
 
+---@diagnostic disable-next-line: duplicate-set-field
 function AF:IsNameOnConnectedRealm()
 	return false
 end
@@ -267,6 +269,7 @@ Check(AF.db.customerCache["2000"] and AF.db.customerCache["2000"]["Imported-Real
 local movedEntry = AF.db.customerCache["2000"]["Imported-Realm"]
 Check(movedEntry.quality == 4 and movedEntry.lastQueryToken == 77, "moved cache entry should preserve craft data and current query marker")
 
+---@diagnostic disable-next-line: duplicate-set-field
 AF.IsNameOnConnectedRealm = function()
 	return true
 end
@@ -289,6 +292,7 @@ Check(AF.db.artisanCharacters["Local-Realm"] ~= nil, "local alt clear should kee
 Check(next(AF.db.artisanCharacters["Local-Realm"].items) == nil, "local alt clear should wipe scan items")
 Check(not (AF.db.customerCache["2000"] and AF.db.customerCache["2000"]["Local-Realm"]), "local alt clear should not move data to remote cache")
 
+---@diagnostic disable-next-line: duplicate-set-field
 AF.IsNameOnConnectedRealm = function()
 	return true
 end

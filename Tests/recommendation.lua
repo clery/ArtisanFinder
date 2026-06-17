@@ -1,4 +1,5 @@
 local AF = {}
+local LoadFile = rawget(_G, "loadfile")
 
 local function Check(condition, message)
 	if not condition then
@@ -7,7 +8,7 @@ local function Check(condition, message)
 end
 
 local function LoadAddonFile(path)
-	local chunk, err = loadfile(path)
+	local chunk, err = LoadFile(path)
 	Check(chunk, err)
 	return chunk("ArtisanFinder", AF)
 end

@@ -72,7 +72,10 @@
         "Professions",
         "PROFESSIONS_UNTRACK_RECIPE",
         "OBJECTIVES_STOP_TRACKING",
-        "ColorPickerFrame"
+        "ColorPickerFrame",
+        "ITEM_BIND_ON_PICKUP",
+        "UISpecialFrames",
+        "GameTooltip_Hide"
     ],
     "Lua.type.weakUnionCheck": true
 }
