@@ -1332,7 +1332,7 @@ local function ApplyCustomerCacheEntryToArtisanProfile(AF, profile, normalizedNa
 	CopyProfileCacheFields(entry, item)
 	item.itemID = itemID
 	item.professionID = professionID
-	item.updatedAt = incomingUpdated > 0 and incomingUpdated or self:Now()
+	item.updatedAt = incomingUpdated > 0 and incomingUpdated or AF:Now()
 	ApplyProfileItemCommission(item, entry.priceCopper, entry.freeCommission, entry.commissionSpecified)
 	item.note = GetProfileItemNote(entry)
 	profile.items[itemKey] = item
