@@ -244,6 +244,16 @@ L.CHANGELOG_DESCRIPTION = "Recent changes for this version."
 L.CHANGELOG_ACKNOWLEDGE = "Got It"
 L.CHANGELOG_VERSION = "Version %s"
 L.CHANGELOG_UNRELEASED = "Next update"
+L.CHANGELOG_ENTRY_2_1_1 = [[### Added
+
+* Profession panel reagent previews can now use an "Unlimited reagents" toggle to simulate quality allocations without owning every reagent.
+* Profession panel controls can now default to either maximized or minimized from addon options.
+
+### Fixed
+
+* Reagent skill fact scans now tolerate incomplete baseline reagent data instead of failing.
+* Profession scan queue processing now exits safely if scan progress data is missing or malformed.
+* Trade-link profession parsing now ignores malformed numeric tokens safely.]]
 L.CHANGELOG_ENTRY_2_1_0 = [[### Added
 
 * Artisan import/export provides a way to advertise another account's artisans as well as your main account.

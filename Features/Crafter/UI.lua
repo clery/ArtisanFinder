@@ -57,6 +57,37 @@ local function IsBasicQualityReagentSlot(slot)
 		and Professions.GetReagentInputMode(slot) == Professions.ReagentInputMode.Quality
 end
 
+local function IsUnlimitedSelectableReagentSlot(slot)
+	if not slot or not Enum or not Enum.CraftingReagentType or not Enum.TradeskillSlotDataType then
+		return false
+	end
+	if slot.dataSlotType ~= Enum.TradeskillSlotDataType.ModifiedReagent then
+		return false
+	end
+	if IsBasicReagentSlot(slot) then
+		return false
+	end
+
+	local reagentType = slot.reagentType
+	local craftingReagentType = Enum.CraftingReagentType
+	local isRequiredModifying = ProfessionsUtil
+		and ProfessionsUtil.IsReagentSlotModifyingRequired
+		and ProfessionsUtil.IsReagentSlotModifyingRequired(slot)
+	return isRequiredModifying == true
+		or reagentType == craftingReagentType.Modifying
+		or reagentType == craftingReagentType.Optional
+		or reagentType == craftingReagentType.Finishing
+end
+
+local function ReagentBelongsToSlot(slot, reagent)
+	for _, slotReagent in ipairs(slot and slot.reagents or {}) do
+		if ReagentMatches(slotReagent, reagent) then
+			return true
+		end
+	end
+	return false
+end
+
 local function GetUnlimitedReagentForSlot(slot, useBestQuality)
 	local reagents = type(slot and slot.reagents) == "table" and slot.reagents or nil
 	if not reagents then
@@ -926,6 +957,228 @@ function AF:IsUnlimitedReagentsEnabled()
 	return self.db and self.db.unlimitedReagents == true
 end
 
+function AF:IsUnlimitedReagentFlyoutContextActive(context)
+	if not context or not self:IsUnlimitedReagentsEnabled() or not self:IsOwnProfessionWindowOpen() then
+		return false
+	end
+	local transaction = context.transaction
+	if not transaction or transaction.IsRecraft and transaction:IsRecraft() then
+		return false
+	end
+	local slot = context.reagentSlotSchematic
+	if not IsUnlimitedSelectableReagentSlot(slot) then
+		return false
+	end
+	local form = self:GetCraftingSchematicForm()
+	local formTransaction = form and form.GetTransaction and form:GetTransaction()
+	return formTransaction == nil or formTransaction == transaction
+end
+
+function AF:GetUnlimitedReagentQuantityOverride(reagent)
+	local context = self.professionUnlimitedReagentQuantityContext
+	if not reagent or not self:IsUnlimitedReagentFlyoutContextActive(context) then
+		return nil
+	end
+	local slot = context.reagentSlotSchematic
+	if not ReagentBelongsToSlot(slot, reagent) then
+		return nil
+	end
+	return GetReagentQuantityRequired(slot, reagent)
+end
+
+function AF:CallWithUnlimitedReagentQuantityContext(context, callback, ...)
+	local previous = self.professionUnlimitedReagentQuantityContext
+	self.professionUnlimitedReagentQuantityContext = context
+	local ok, result = pcall(callback, ...)
+	self.professionUnlimitedReagentQuantityContext = previous
+	if not ok then
+		error(result, 0)
+	end
+	return result
+end
+
+function AF:SyncUnlimitedReagentExemptions(transaction)
+	if not transaction or not transaction.ClearExemptedReagents or not transaction.SetExemptedReagent then
+		return
+	end
+	if transaction.IsRecraft and transaction:IsRecraft() then
+		return
+	end
+
+	transaction:ClearExemptedReagents()
+	if not self:IsUnlimitedReagentsEnabled() then
+		return
+	end
+
+	local schematic = transaction.GetRecipeSchematic and transaction:GetRecipeSchematic()
+	for slotIndex, slot in ipairs(schematic and schematic.reagentSlotSchematics or {}) do
+		if IsUnlimitedSelectableReagentSlot(slot) then
+			local allocations = transaction.GetAllocations and transaction:GetAllocations(slotIndex)
+			if allocations and allocations.Enumerate then
+				for _, allocation in allocations:Enumerate() do
+					local reagent = allocation.GetReagent and allocation:GetReagent()
+					if reagent and ReagentBelongsToSlot(slot, reagent) then
+						transaction:SetExemptedReagent(reagent, slot.dataSlotIndex)
+					end
+				end
+			end
+		end
+	end
+end
+
+function AF:PatchUnlimitedReagentFlyoutBehavior(behavior, transaction, reagentSlotSchematic, slot)
+	if not behavior or behavior.artisanFinderUnlimitedReagentsPatched then
+		return behavior
+	end
+
+	local context = {
+		transaction = transaction,
+		reagentSlotSchematic = reagentSlotSchematic,
+		slot = slot,
+	}
+	if not self:IsUnlimitedReagentFlyoutContextActive(context) then
+		return behavior
+	end
+
+	behavior.artisanFinderUnlimitedReagentsPatched = true
+	behavior.artisanFinderUnlimitedReagentsContext = context
+
+	local originalGetUnownedFlags = behavior.GetUnownedFlags
+	behavior.GetUnownedFlags = function(patchedBehavior)
+		if AF:IsUnlimitedReagentFlyoutContextActive(context) then
+			return true, true
+		end
+		return originalGetUnownedFlags(patchedBehavior)
+	end
+
+	behavior.PopulateDataProvider = function(_, dataProvider, elements)
+		for _, item in ipairs(elements and elements.items or {}) do
+			local reagent = Professions and Professions.CreateItemReagent and Professions.CreateItemReagent(item:GetItemID())
+			dataProvider:Insert({
+				item = item,
+				reagent = reagent,
+				forceAccumulateInventory = true,
+				artisanFinderUnlimitedReagents = true,
+				artisanFinderUnlimitedReagentsContext = context,
+			})
+		end
+		for _, reagent in ipairs(elements and elements.currencyReagents or {}) do
+			dataProvider:Insert({
+				reagent = reagent,
+				artisanFinderUnlimitedReagents = true,
+				artisanFinderUnlimitedReagentsContext = context,
+			})
+		end
+	end
+
+	local originalOnElementEnter = behavior.OnElementEnter
+	behavior.OnElementEnter = function(patchedBehavior, elementData, tooltip)
+		if elementData and elementData.artisanFinderUnlimitedReagents and AF:IsUnlimitedReagentFlyoutContextActive(context) then
+			return AF:CallWithUnlimitedReagentQuantityContext(context, originalOnElementEnter, patchedBehavior, elementData, tooltip)
+		end
+		return originalOnElementEnter(patchedBehavior, elementData, tooltip)
+	end
+
+	local originalIsElementEnabled = behavior.IsElementEnabled
+	behavior.IsElementEnabled = function(patchedBehavior, elementData, count)
+		if not elementData or not elementData.artisanFinderUnlimitedReagents or not AF:IsUnlimitedReagentFlyoutContextActive(context) then
+			return originalIsElementEnabled(patchedBehavior, elementData, count)
+		end
+
+		local reagent = elementData.reagent
+		local activeTransaction = context.transaction
+		if not reagent or activeTransaction:HasAllocatedReagent(reagent) then
+			return false
+		end
+		if activeTransaction.AreDependentReagentsAllocated and not activeTransaction:AreDependentReagentsAllocated(reagent) then
+			return false
+		end
+
+		local recraftAllocation = activeTransaction.GetRecraftAllocation and activeTransaction:GetRecraftAllocation()
+		if recraftAllocation and C_TradeSkillUI.IsRecraftReagentValid and not C_TradeSkillUI.IsRecraftReagentValid(recraftAllocation, reagent) then
+			return false
+		end
+
+		return true
+	end
+
+	return behavior
+end
+
+function AF:RefreshUnlimitedReagentFlyoutButton(button, elementData, behavior)
+	if not button or not elementData or not elementData.artisanFinderUnlimitedReagents then
+		return
+	end
+	local context = elementData.artisanFinderUnlimitedReagentsContext
+	if not self:IsUnlimitedReagentFlyoutContextActive(context) then
+		return
+	end
+	local quantity = GetReagentQuantityRequired(context.reagentSlotSchematic, elementData.reagent)
+	if button.SetItemButtonCount then
+		button:SetItemButtonCount(quantity)
+	end
+	if button.UpdateState then
+		button:UpdateState(quantity, elementData, behavior)
+	end
+end
+
+function AF:HookUnlimitedReagentFlyouts()
+	if self.unlimitedReagentFlyoutsHooked then
+		return
+	end
+	if not CreateProfessionsMCRFlyout or not ProfessionsUtil or not ProfessionsUtil.GetReagentQuantityInPossession then
+		return
+	end
+	self.unlimitedReagentFlyoutsHooked = true
+
+	-- Blizzard's reagent picker checks ownership inside local flyout callbacks,
+	-- so the quantity override only exists while one of our patched flyouts runs.
+	local originalGetReagentQuantity = ProfessionsUtil.GetReagentQuantityInPossession
+	ProfessionsUtil.GetReagentQuantityInPossession = function(reagent, ...)
+		local override = AF.GetUnlimitedReagentQuantityOverride and AF:GetUnlimitedReagentQuantityOverride(reagent)
+		if override then
+			return override
+		end
+		return originalGetReagentQuantity(reagent, ...)
+	end
+
+	local originalCreateProfessionsMCRFlyout = CreateProfessionsMCRFlyout
+	CreateProfessionsMCRFlyout = function(transaction, reagentSlotSchematic, slot)
+		local behavior = originalCreateProfessionsMCRFlyout(transaction, reagentSlotSchematic, slot)
+		return AF:PatchUnlimitedReagentFlyoutBehavior(behavior, transaction, reagentSlotSchematic, slot)
+	end
+
+	if ProfessionsFlyoutItemButtonMixin and ProfessionsFlyoutItemButtonMixin.Init then
+		hooksecurefunc(ProfessionsFlyoutItemButtonMixin, "Init", function(button, elementData, behavior)
+			AF:RefreshUnlimitedReagentFlyoutButton(button, elementData, behavior)
+		end)
+	end
+	if ProfessionsFlyoutCurrencyButtonMixin and ProfessionsFlyoutCurrencyButtonMixin.Init then
+		hooksecurefunc(ProfessionsFlyoutCurrencyButtonMixin, "Init", function(button, elementData, behavior)
+			AF:RefreshUnlimitedReagentFlyoutButton(button, elementData, behavior)
+		end)
+	end
+
+	if ProfessionsFlyoutMixin and ProfessionsFlyoutMixin.TriggerEvent then
+		local originalTriggerEvent = ProfessionsFlyoutMixin.TriggerEvent
+		ProfessionsFlyoutMixin.TriggerEvent = function(flyout, event, ...)
+			local flyoutSelf, elementData = ...
+			local behavior = flyout and flyout.GetBehavior and flyout:GetBehavior()
+			local context = behavior and behavior.artisanFinderUnlimitedReagentsContext
+			if event == ProfessionsFlyoutMixin.Event.ItemSelected
+				and flyoutSelf == flyout
+				and elementData
+				and elementData.artisanFinderUnlimitedReagents
+				and AF:IsUnlimitedReagentFlyoutContextActive(context) then
+				local result = AF:CallWithUnlimitedReagentQuantityContext(context, originalTriggerEvent, flyout, event, ...)
+				AF:SyncUnlimitedReagentExemptions(context.transaction)
+				return result
+			end
+			return originalTriggerEvent(flyout, event, ...)
+		end
+	end
+end
+
 function AF:RefreshCraftingSchematicStats(form)
 	form = form or self:GetCraftingSchematicForm()
 	if form and form.UpdateDetailsStats then
@@ -1147,6 +1400,7 @@ function AF:ApplyUnlimitedReagentsToCraftingForm(force)
 		and Professions.ShouldAllocateBestQualityReagents
 		and Professions.ShouldAllocateBestQualityReagents() == true
 	local allocated = false
+	local hasSelectableUnlimitedSlots = false
 	for slotIndex, slot in ipairs(schematic.reagentSlotSchematics) do
 		if IsBasicQualityReagentSlot(slot) then
 			local allocations = transaction.GetAllocations and transaction:GetAllocations(slotIndex)
@@ -1158,15 +1412,18 @@ function AF:ApplyUnlimitedReagentsToCraftingForm(force)
 					allocated = true
 				end
 			end
+		elseif IsUnlimitedSelectableReagentSlot(slot) then
+			hasSelectableUnlimitedSlots = true
 		end
 	end
 
-	if not allocated then
+	if not allocated and not hasSelectableUnlimitedSlots then
 		return false
 	end
-	if transaction.SetManuallyAllocated then
+	if allocated and transaction.SetManuallyAllocated then
 		transaction:SetManuallyAllocated(true)
 	end
+	self:SyncUnlimitedReagentExemptions(transaction)
 	if form.UpdateAllSlots then
 		form:UpdateAllSlots()
 	end
@@ -1188,6 +1445,12 @@ function AF:RestoreOwnedReagentAllocations()
 
 	local useBestQuality = Professions.ShouldAllocateBestQualityReagents
 		and Professions.ShouldAllocateBestQualityReagents() == true
+	if not (transaction.IsRecraft and transaction:IsRecraft()) then
+		self:SyncUnlimitedReagentExemptions(transaction)
+		if transaction.SanitizeAllocations then
+			transaction:SanitizeAllocations()
+		end
+	end
 	Professions.AllocateAllBasicReagents(transaction, useBestQuality)
 	if form.UpdateAllSlots then
 		form:UpdateAllSlots()
@@ -1574,6 +1837,7 @@ function AF:AttachCrafterUI()
 
 	self:EnsureUnlimitedReagentsCheckbox(form)
 	self:HookUnlimitedReagentsQualityDialog(form)
+	self:HookUnlimitedReagentFlyouts()
 	if form.Init then
 		hooksecurefunc(form, "Init", function()
 			AF:RefreshUnlimitedReagentsCheck()

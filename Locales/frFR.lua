@@ -146,9 +146,14 @@ L.OPTIONS_SECTION_TRADE_LEADS = "Artisans du canal Commerce"
 L.OPTIONS_SECTION_SCANNING = "Scan"
 L.OPTIONS_SECTION_AVAILABILITY = "Disponibilité"
 L.OPTIONS_SECTION_MINIMAP = "Minicarte"
+L.OPTIONS_SECTION_PROFESSION_PANEL = "Panneau de métier"
 L.OPTIONS_SECTION_ADVERTISING = "Annonce multi-personnages"
 L.OPTIONS_SECTION_ADVERTISING_DESC = "Choisissez quels métiers scannés peuvent répondre aux recherches de clients lorsque vous êtes disponible."
 L.OPTIONS_ADVERTISE_PROFESSION_DESC = "Autoriser ce métier de personnage à apparaître dans les recherches de clients."
+L.OPTIONS_PROFESSION_PANEL_DEFAULT_STATE = "État par défaut"
+L.OPTIONS_PROFESSION_PANEL_DEFAULT_STATE_DESC = "Choisissez si ArtisanFinder s'ouvre réduit ou agrandi à côté de la fenêtre de métier."
+L.OPTIONS_PROFESSION_PANEL_DEFAULT_MAXIMIZED = "Agrandie"
+L.OPTIONS_PROFESSION_PANEL_DEFAULT_MINIMIZED = "Réduite"
 L.OPTIONS_DEFAULT_SORT = "Tri par défaut"
 L.OPTIONS_DEFAULT_SORT_DESC = "Choisissez le tri utilisé à l'ouverture des résultats client."
 L.OPTIONS_SHOW_OWN_CHARACTER_ROWS = "Afficher vos personnages"
@@ -220,6 +225,8 @@ L.EDITMODE_GROW_DOWN = "Vers le bas"
 L.EDITMODE_GROW_UP = "Vers le haut"
 L.DEFAULT_COMMISSION_TOOLTIP = "Ces champs s'appliquent aux recettes du métier actuel lorsqu'aucune commission propre à l'objet n'est indiquée."
 L.CRAFTER_PANEL_SCAN_SECTION = "Scan"
+L.PROFESSION_PANEL_UNLIMITED_REAGENTS = "Composants illimités"
+L.PROFESSION_PANEL_UNLIMITED_REAGENTS_TOOLTIP = "Prévisualise les répartitions de qualité des composants sans les limiter à ceux que vous possédez. La fabrication requiert toujours des composants réels."
 L.CRAFTER_PANEL_ADVERTISING_SECTION = "Liste de disponibilité"
 L.CRAFTER_PANEL_ITEM_SECTION = "Par objet"
 L.ITEM_CONTEXT_HEADER = "Pour : %s"
@@ -419,6 +426,16 @@ L.CHANGELOG_DESCRIPTION = "Changements récents pour cette version."
 L.CHANGELOG_ACKNOWLEDGE = "Compris"
 L.CHANGELOG_VERSION = "Version %s"
 L.CHANGELOG_UNRELEASED = "Prochaine mise à jour"
+L.CHANGELOG_ENTRY_2_1_1 = [[### Ajouté
+
+* Les aperçus de composants du panneau de métier peuvent maintenant utiliser une option "Composants illimités" pour simuler les répartitions de qualité sans posséder tous les composants.
+* Les contrôles du panneau de métier peuvent maintenant s'ouvrir par défaut en mode maximisé ou minimisé depuis les options de l'addon.
+
+### Corrigé
+
+* Les scans des données de compétence des composants tolèrent maintenant les données de base incomplètes au lieu d'échouer.
+* Le traitement de la file de scan de métier se termine maintenant sans erreur si les données de progression du scan sont absentes ou mal formées.
+* L'analyse des métiers depuis les liens de commerce ignore maintenant les jetons numériques mal formés sans erreur.]]
 L.CHANGELOG_ENTRY_2_1_0 = [[### Ajouté
 
 * L'importation/exportation d'artisans offre un moyen d'annoncer les artisans d'un autre compte en plus de ceux de votre compte principal.

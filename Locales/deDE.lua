@@ -145,9 +145,14 @@ L.OPTIONS_SECTION_TRADE_LEADS = "Handelschat-Hinweise"
 L.OPTIONS_SECTION_SCANNING = "Scannen"
 L.OPTIONS_SECTION_AVAILABILITY = "Verfügbarkeit"
 L.OPTIONS_SECTION_MINIMAP = "Minimap"
+L.OPTIONS_SECTION_PROFESSION_PANEL = "Berufsfenster"
 L.OPTIONS_SECTION_ADVERTISING = "Mehrcharakter-Werbung"
 L.OPTIONS_SECTION_ADVERTISING_DESC = "Wähle, welche gescannten Charakterberufe auf Kundensuchen antworten dürfen, während du verfügbar bist."
 L.OPTIONS_ADVERTISE_PROFESSION_DESC = "Erlaubt diesem Charakterberuf, in Kundensuchen zu erscheinen."
+L.OPTIONS_PROFESSION_PANEL_DEFAULT_STATE = "Standardzustand"
+L.OPTIONS_PROFESSION_PANEL_DEFAULT_STATE_DESC = "Wähle, ob ArtisanFinder neben dem Berufsfenster maximiert oder minimiert geöffnet wird."
+L.OPTIONS_PROFESSION_PANEL_DEFAULT_MAXIMIZED = "Maximiert"
+L.OPTIONS_PROFESSION_PANEL_DEFAULT_MINIMIZED = "Minimiert"
 L.OPTIONS_DEFAULT_SORT = "Standardsortierung"
 L.OPTIONS_DEFAULT_SORT_DESC = "Wähle die Sortierung, die beim Öffnen der Kundenergebnisse verwendet wird."
 L.OPTIONS_SHOW_OWN_CHARACTER_ROWS = "Eigene Charakterzeilen anzeigen"
@@ -219,6 +224,8 @@ L.EDITMODE_GROW_DOWN = "Nach unten"
 L.EDITMODE_GROW_UP = "Nach oben"
 L.ITEM_SPECIFIC_COMMISSION = "Gegenstandsspezifische Kommission"
 L.CRAFTER_PANEL_SCAN_SECTION = "Scannen"
+L.PROFESSION_PANEL_UNLIMITED_REAGENTS = "Unbegrenzte Reagenzien"
+L.PROFESSION_PANEL_UNLIMITED_REAGENTS_TOOLTIP = "Zeigt Vorschauen für Reagenzienqualität ohne Begrenzung auf vorhandene Reagenzien. Zum Herstellen werden weiterhin echte Reagenzien benötigt."
 L.CRAFTER_PANEL_ADVERTISING_SECTION = "Verfügbarkeitsliste"
 L.CRAFTER_PANEL_ITEM_SECTION = "Pro Gegenstand"
 L.ITEM_CONTEXT_HEADER = "Für: %s"
@@ -419,6 +426,16 @@ L.CHANGELOG_DESCRIPTION = "Aktuelle Änderungen für diese Version."
 L.CHANGELOG_ACKNOWLEDGE = "Verstanden"
 L.CHANGELOG_VERSION = "Version %s"
 L.CHANGELOG_UNRELEASED = "Nächstes Update"
+L.CHANGELOG_ENTRY_2_1_1 = [[### Hinzugefügt
+
+* Reagenzienvorschauen im Berufsfenster können jetzt einen Schalter "Unbegrenzte Reagenzien" verwenden, um Qualitätsverteilungen zu simulieren, ohne jedes Reagenz zu besitzen.
+* Die Steuerelemente im Berufsfenster können in den Addon-Optionen jetzt standardmäßig maximiert oder minimiert starten.
+
+### Behoben
+
+* Scans von Reagenzien-Fertigkeitsdaten tolerieren jetzt unvollständige Basisdaten, statt fehlzuschlagen.
+* Die Verarbeitung der Berufsscan-Warteschlange beendet sich jetzt sicher, wenn Scanfortschrittsdaten fehlen oder fehlerhaft sind.
+* Die Auswertung von Handelslink-Berufen ignoriert fehlerhafte numerische Tokens jetzt sicher.]]
 L.CHANGELOG_ENTRY_2_1_0 = [[### Hinzugefügt
 
 * Handwerker-Import/-Export bietet eine Möglichkeit, Handwerker eines anderen Accounts zusätzlich zu deinem Hauptaccount zu bewerben.

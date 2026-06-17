@@ -146,9 +146,14 @@ L.OPTIONS_SECTION_TRADE_LEADS = "Contactos del chat de comercio"
 L.OPTIONS_SECTION_SCANNING = "Escaneo"
 L.OPTIONS_SECTION_AVAILABILITY = "Disponibilidad"
 L.OPTIONS_SECTION_MINIMAP = "Minimapa"
+L.OPTIONS_SECTION_PROFESSION_PANEL = "Panel de profesión"
 L.OPTIONS_SECTION_ADVERTISING = "Anuncio multipersonaje"
 L.OPTIONS_SECTION_ADVERTISING_DESC = "Elige qué profesiones escaneadas de tus personajes pueden responder a búsquedas de clientes mientras estás disponible."
 L.OPTIONS_ADVERTISE_PROFESSION_DESC = "Permite que esta profesión del personaje aparezca en búsquedas de clientes."
+L.OPTIONS_PROFESSION_PANEL_DEFAULT_STATE = "Estado predeterminado"
+L.OPTIONS_PROFESSION_PANEL_DEFAULT_STATE_DESC = "Elige si ArtisanFinder se abre maximizado o minimizado junto a la ventana de profesión."
+L.OPTIONS_PROFESSION_PANEL_DEFAULT_MAXIMIZED = "Maximizado"
+L.OPTIONS_PROFESSION_PANEL_DEFAULT_MINIMIZED = "Minimizado"
 L.OPTIONS_DEFAULT_SORT = "Ordenación predeterminada"
 L.OPTIONS_DEFAULT_SORT_DESC = "Elige el modo de ordenación usado al abrir los resultados de cliente."
 L.OPTIONS_SHOW_OWN_CHARACTER_ROWS = "Mostrar tus personajes"
@@ -220,6 +225,8 @@ L.EDITMODE_GROW_DOWN = "Abajo"
 L.EDITMODE_GROW_UP = "Arriba"
 L.ITEM_SPECIFIC_COMMISSION = "Comisión específica del objeto"
 L.CRAFTER_PANEL_SCAN_SECTION = "Escaneo"
+L.PROFESSION_PANEL_UNLIMITED_REAGENTS = "Componentes ilimitados"
+L.PROFESSION_PANEL_UNLIMITED_REAGENTS_TOOLTIP = "Previsualiza asignaciones de calidad de componentes sin limitarlas a los componentes que tienes. Para fabricar se siguen necesitando componentes reales."
 L.CRAFTER_PANEL_ADVERTISING_SECTION = "Listado de disponibilidad"
 L.CRAFTER_PANEL_ITEM_SECTION = "Por objeto"
 L.ITEM_CONTEXT_HEADER = "Para: %s"
@@ -420,6 +427,16 @@ L.CHANGELOG_DESCRIPTION = "Cambios recientes de esta versión."
 L.CHANGELOG_ACKNOWLEDGE = "Entendido"
 L.CHANGELOG_VERSION = "Versión %s"
 L.CHANGELOG_UNRELEASED = "Próxima actualización"
+L.CHANGELOG_ENTRY_2_1_1 = [[### Añadido
+
+* Las vistas previas de componentes del panel de profesión ahora pueden usar un interruptor "Componentes ilimitados" para simular asignaciones de calidad sin poseer todos los componentes.
+* Los controles del panel de profesión ahora pueden abrirse por defecto maximizados o minimizados desde las opciones del addon.
+
+### Corregido
+
+* Los escaneos de datos de habilidad de componentes ahora toleran datos base incompletos en lugar de fallar.
+* El procesamiento de la cola de escaneo de profesiones ahora sale de forma segura si faltan datos de progreso del escaneo o están mal formados.
+* El análisis de profesiones desde enlaces de comercio ahora ignora de forma segura tokens numéricos mal formados.]]
 L.CHANGELOG_ENTRY_2_1_0 = [[### Añadido
 
 * La importación/exportación de artesanos ofrece una forma de anunciar los artesanos de otra cuenta además de los de tu cuenta principal.

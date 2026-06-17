@@ -146,9 +146,14 @@ L.OPTIONS_SECTION_TRADE_LEADS = "交易频道线索"
 L.OPTIONS_SECTION_SCANNING = "扫描"
 L.OPTIONS_SECTION_AVAILABILITY = "可用状态"
 L.OPTIONS_SECTION_MINIMAP = "小地图"
+L.OPTIONS_SECTION_PROFESSION_PANEL = "专业面板"
 L.OPTIONS_SECTION_ADVERTISING = "多角色公开"
 L.OPTIONS_SECTION_ADVERTISING_DESC = "选择你处于可用状态时，哪些已扫描角色专业可以响应客户搜索。"
 L.OPTIONS_ADVERTISE_PROFESSION_DESC = "允许此角色的专业出现在客户搜索中。"
+L.OPTIONS_PROFESSION_PANEL_DEFAULT_STATE = "默认面板状态"
+L.OPTIONS_PROFESSION_PANEL_DEFAULT_STATE_DESC = "选择 ArtisanFinder 在专业窗口旁默认最大化还是最小化。"
+L.OPTIONS_PROFESSION_PANEL_DEFAULT_MAXIMIZED = "最大化"
+L.OPTIONS_PROFESSION_PANEL_DEFAULT_MINIMIZED = "最小化"
 L.OPTIONS_DEFAULT_SORT = "默认排序"
 L.OPTIONS_DEFAULT_SORT_DESC = "选择客户结果面板打开时使用的排序方式。"
 L.OPTIONS_SHOW_OWN_CHARACTER_ROWS = "显示自己的角色"
@@ -220,6 +225,8 @@ L.EDITMODE_GROW_DOWN = "向下"
 L.EDITMODE_GROW_UP = "向上"
 L.ITEM_SPECIFIC_COMMISSION = "物品专属佣金"
 L.CRAFTER_PANEL_SCAN_SECTION = "扫描"
+L.PROFESSION_PANEL_UNLIMITED_REAGENTS = "无限材料"
+L.PROFESSION_PANEL_UNLIMITED_REAGENTS_TOOLTIP = "预览材料品质分配，不受已拥有材料数量限制。实际制造仍需要真实材料。"
 L.CRAFTER_PANEL_ADVERTISING_SECTION = "可用列表"
 L.CRAFTER_PANEL_ITEM_SECTION = "按物品"
 L.ITEM_CONTEXT_HEADER = "用于：%s"
@@ -420,6 +427,16 @@ L.CHANGELOG_DESCRIPTION = "此版本的最近更改。"
 L.CHANGELOG_ACKNOWLEDGE = "知道了"
 L.CHANGELOG_VERSION = "版本 %s"
 L.CHANGELOG_UNRELEASED = "下次更新"
+L.CHANGELOG_ENTRY_2_1_1 = [[### 新增
+
+* 专业面板的材料预览现在可以使用“无限材料”开关，在不拥有所有材料的情况下模拟品质分配。
+* 专业面板控件现在可以在插件选项中设为默认最大化或最小化。
+
+### 已修复
+
+* 材料技能数据扫描现在会容忍不完整的基准材料数据，而不是直接失败。
+* 如果扫描进度数据缺失或格式异常，专业扫描队列处理现在会安全退出。
+* 交易链接的专业解析现在会安全忽略格式异常的数字标记。]]
 L.CHANGELOG_ENTRY_2_1_0 = [[### 新增
 
 * 工匠导入/导出现在可同时宣传另一个账号的工匠和你主账号的工匠。

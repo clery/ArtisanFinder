@@ -106,6 +106,8 @@ L.ITEM_SPECIFIC_TOOLTIP = "Estes campos aplicam-se apenas ao fabrico selecionado
 L.DEFAULT_COMMISSION = "Comissão predefinida"
 L.DEFAULT_COMMISSION_TOOLTIP = "Estes campos aplicam-se aos fabricos da profissão atual quando não há comissão específica do item."
 L.CRAFTER_PANEL_SCAN_SECTION = "Análise"
+L.PROFESSION_PANEL_UNLIMITED_REAGENTS = "Reagentes ilimitados"
+L.PROFESSION_PANEL_UNLIMITED_REAGENTS_TOOLTIP = "Pré-visualiza distribuições de qualidade dos reagentes sem as limitar aos reagentes que possuis. O fabrico continua a exigir reagentes reais."
 L.CRAFTER_PANEL_ADVERTISING_SECTION = "Lista de disponibilidade"
 L.CRAFTER_PANEL_ITEM_SECTION = "Por item"
 L.ITEM_CONTEXT_HEADER = "Para: %s"
@@ -241,9 +243,14 @@ L.OPTIONS_HIDE_SELF_ALT_FULFILLED_NOTIFICATIONS_DESC = "Oculta notificações de
 L.OPTIONS_SECTION_SCANNING = "Análise"
 L.OPTIONS_SECTION_AVAILABILITY = "Disponibilidade"
 L.OPTIONS_SECTION_MINIMAP = "Minimapa"
+L.OPTIONS_SECTION_PROFESSION_PANEL = "Painel de profissão"
 L.OPTIONS_SECTION_ADVERTISING = "Anúncio multi-personagem"
 L.OPTIONS_SECTION_ADVERTISING_DESC = "Escolhe que profissões analisadas das personagens podem responder a pesquisas de clientes enquanto estás disponível."
 L.OPTIONS_ADVERTISE_PROFESSION_DESC = "Permite que a profissão desta personagem apareça nas pesquisas de clientes."
+L.OPTIONS_PROFESSION_PANEL_DEFAULT_STATE = "Estado predefinido"
+L.OPTIONS_PROFESSION_PANEL_DEFAULT_STATE_DESC = "Escolhe se o ArtisanFinder abre maximizado ou minimizado junto à janela de profissão."
+L.OPTIONS_PROFESSION_PANEL_DEFAULT_MAXIMIZED = "Maximizado"
+L.OPTIONS_PROFESSION_PANEL_DEFAULT_MINIMIZED = "Minimizado"
 L.OPTIONS_DEFAULT_SORT = "Ordenação predefinida"
 L.OPTIONS_DEFAULT_SORT_DESC = "Escolhe o modo de ordenação usado quando o painel de resultados de cliente abre."
 L.OPTIONS_SHOW_OWN_CHARACTER_ROWS = "Mostrar as tuas personagens"
@@ -426,6 +433,16 @@ L.CHANGELOG_DESCRIPTION = "Alterações recentes desta versão."
 L.CHANGELOG_ACKNOWLEDGE = "Entendi"
 L.CHANGELOG_VERSION = "Versão %s"
 L.CHANGELOG_UNRELEASED = "Próxima atualização"
+L.CHANGELOG_ENTRY_2_1_1 = [[### Adicionado
+
+* As pré-visualizações de reagentes no painel de profissão podem agora usar a opção "Reagentes ilimitados" para simular distribuições de qualidade sem possuir todos os reagentes.
+* Os controlos do painel de profissão podem agora abrir por defeito maximizados ou minimizados nas opções do addon.
+
+### Corrigido
+
+* As análises dos dados de perícia dos reagentes agora toleram dados base incompletos em vez de falharem.
+* O processamento da fila de análise de profissão agora termina em segurança se os dados de progresso da análise estiverem em falta ou mal formados.
+* A análise de profissões a partir de ligações de comércio agora ignora em segurança tokens numéricos mal formados.]]
 L.CHANGELOG_ENTRY_2_1_0 = [[### Adicionado
 
 * A importação/exportação de artesãos oferece uma forma de anunciar artesãos de outra conta, bem como da tua conta principal.

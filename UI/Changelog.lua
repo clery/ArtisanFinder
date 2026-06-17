@@ -1,9 +1,13 @@
 local addonName, AF = ...
 
-AF.CHANGELOG_FALLBACK_VERSION = "2.0.6"
+AF.CHANGELOG_FALLBACK_VERSION = "2.1.1"
 AF.CHANGELOG_RECENT_ENTRIES = {
 	{
-		version = "2.0.6",
+		version = "2.1.1",
+		key = "CHANGELOG_ENTRY_2_1_1",
+	},
+	{
+		version = "2.1.0",
 		key = "CHANGELOG_ENTRY_2_1_0",
 	},
 	{
@@ -104,7 +108,7 @@ function AF:GetChangelogEntries(sinceVersion)
 	if #entries == 0 then
 		table.insert(entries, {
 			version = self:GetAddonVersion(),
-			content = self:Text("CHANGELOG_ENTRY_2_1_0"),
+			content = self:Text("CHANGELOG_ENTRY_2_1_1"),
 		})
 	end
 	return entries
@@ -387,12 +391,14 @@ local function CreateChangelogMinimalScrollBar(parent, scrollFrame, scrollBar)
 end
 
 function AF:BuildChangelogMarkdown(sinceVersion, selectedVersion)
-	local entry = FindChangelogEntry(self:GetChangelogEntries(sinceVersion), selectedVersion)
+	local entries = selectedVersion and self:GetChangelogEntries() or self:GetChangelogEntries(sinceVersion)
+	local entry = FindChangelogEntry(entries, selectedVersion)
 	return BuildChangelogMarkdownEntry(self, entry)
 end
 
 function AF:BuildChangelogText(sinceVersion, selectedVersion)
-	local entry = FindChangelogEntry(self:GetChangelogEntries(sinceVersion), selectedVersion)
+	local entries = selectedVersion and self:GetChangelogEntries() or self:GetChangelogEntries(sinceVersion)
+	local entry = FindChangelogEntry(entries, selectedVersion)
 	return BuildChangelogTextEntry(self, entry)
 end
 
@@ -464,7 +470,7 @@ function AF:RefreshChangelogFrame(sinceVersion, selectedVersion)
 		sinceVersion = frame.sinceVersion
 	end
 	local version = self:GetAddonVersion()
-	local entries = self:GetChangelogEntries(sinceVersion)
+	local entries = self:GetChangelogEntries()
 	local selectedEntry = FindChangelogEntry(entries, selectedVersion or frame.selectedChangelogVersion)
 	selectedVersion = selectedEntry and selectedEntry.version or nil
 	frame.sinceVersion = sinceVersion

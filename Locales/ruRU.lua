@@ -145,9 +145,14 @@ L.OPTIONS_SECTION_TRADE_LEADS = "Подсказки из торгового ча
 L.OPTIONS_SECTION_SCANNING = "Сканирование"
 L.OPTIONS_SECTION_AVAILABILITY = "Доступность"
 L.OPTIONS_SECTION_MINIMAP = "Миникарта"
+L.OPTIONS_SECTION_PROFESSION_PANEL = "Панель профессии"
 L.OPTIONS_SECTION_ADVERTISING = "Реклама нескольких персонажей"
 L.OPTIONS_SECTION_ADVERTISING_DESC = "Выберите, какие просканированные профессии персонажей могут отвечать на поиски клиентов, пока вы доступны."
 L.OPTIONS_ADVERTISE_PROFESSION_DESC = "Разрешить этой профессии персонажа появляться в поиске клиентов."
+L.OPTIONS_PROFESSION_PANEL_DEFAULT_STATE = "Состояние по умолчанию"
+L.OPTIONS_PROFESSION_PANEL_DEFAULT_STATE_DESC = "Выберите, будет ли ArtisanFinder открываться развернутым или свернутым рядом с окном профессии."
+L.OPTIONS_PROFESSION_PANEL_DEFAULT_MAXIMIZED = "Развернута"
+L.OPTIONS_PROFESSION_PANEL_DEFAULT_MINIMIZED = "Свернута"
 L.OPTIONS_DEFAULT_SORT = "Сортировка по умолчанию"
 L.OPTIONS_DEFAULT_SORT_DESC = "Выберите сортировку при открытии результатов клиента."
 L.OPTIONS_SHOW_OWN_CHARACTER_ROWS = "Показывать своих персонажей"
@@ -219,6 +224,8 @@ L.EDITMODE_GROW_DOWN = "Вниз"
 L.EDITMODE_GROW_UP = "Вверх"
 L.ITEM_SPECIFIC_COMMISSION = "Комиссия для предмета"
 L.CRAFTER_PANEL_SCAN_SECTION = "Сканирование"
+L.PROFESSION_PANEL_UNLIMITED_REAGENTS = "Неограниченные реагенты"
+L.PROFESSION_PANEL_UNLIMITED_REAGENTS_TOOLTIP = "Предпросмотр распределения качества реагентов без ограничения имеющимися реагентами. Для изготовления все равно нужны настоящие реагенты."
 L.CRAFTER_PANEL_ADVERTISING_SECTION = "Список доступности"
 L.CRAFTER_PANEL_ITEM_SECTION = "Для предмета"
 L.ITEM_CONTEXT_HEADER = "Для: %s"
@@ -419,6 +426,16 @@ L.CHANGELOG_DESCRIPTION = "Последние изменения этой вер
 L.CHANGELOG_ACKNOWLEDGE = "Понятно"
 L.CHANGELOG_VERSION = "Версия %s"
 L.CHANGELOG_UNRELEASED = "Следующее обновление"
+L.CHANGELOG_ENTRY_2_1_1 = [[### Добавлено
+
+* Предпросмотры реагентов на панели профессии теперь могут использовать переключатель "Неограниченные реагенты", чтобы моделировать распределения качества без наличия всех реагентов.
+* Элементы управления панели профессии теперь могут по умолчанию открываться развернутыми или свернутыми через настройки аддона.
+
+### Исправлено
+
+* Сканирование данных навыка реагентов теперь допускает неполные базовые данные вместо сбоя.
+* Обработка очереди сканирования профессии теперь безопасно завершается, если данные прогресса сканирования отсутствуют или имеют неверный формат.
+* Разбор профессии из торговой ссылки теперь безопасно игнорирует некорректные числовые токены.]]
 L.CHANGELOG_ENTRY_2_1_0 = [[### Добавлено
 
 * Импорт/экспорт ремесленников теперь позволяет рекламировать ремесленников другого аккаунта вместе с ремесленниками вашей основной учётной записи.

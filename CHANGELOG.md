@@ -1,27 +1,17 @@
 # ArtisanFinder
 
-## Unreleased
+## [v2.1.1](https://github.com/clery/ArtisanFinder/releases/tag/v2.1.1) (2026-06-11)
+[Full Changelog](https://github.com/clery/ArtisanFinder/compare/v2.1.0...v2.1.1) | [Previous Releases](https://github.com/clery/ArtisanFinder/releases)
 
 ### Added
 
-* Profession panel reagent previews can now use an Unlimited reagents toggle to simulate quality allocations without owning every reagent.
+* Profession panel reagent previews can now use an "Unlimited reagents" toggle to simulate quality allocations without owning every reagent.
 * Profession panel controls can now default to either maximized or minimized from addon options.
-
-### Changed
-
-* Offline test harnesses and editor diagnostics now use cleaner explicit global handling.
-* Follow-up ideas for profession panel simulation and artisan availability are now tracked in TODO.
 
 ### Fixed
 
-* Imported customer cache entries now use the addon clock when filling missing timestamps.
-* Transfer imports now skip artisan records that cannot produce a valid character identity.
 * Reagent skill fact scans now tolerate incomplete baseline reagent data instead of failing.
 * Profession scan queue processing now exits safely if scan progress data is missing or malformed.
-* Customer row action buttons now use consistent compact sizing and safer crafting-order labels.
-* Crafting order notifications now request stable sort order and avoid unsafe optional global reads.
-* Preparation tracker, minimap, and LibMarkdown demo integrations now guard optional UI globals before use.
-* LibMarkdown email autolinks now have a local encoder fallback instead of calling an undefined helper.
 * Trade-link profession parsing now ignores malformed numeric tokens safely.
 
 ## [v2.1.0](https://github.com/clery/ArtisanFinder/releases/tag/v2.1.0) (2026-06-11)
