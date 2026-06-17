@@ -1155,8 +1155,7 @@ function AF:PatchUnlimitedReagentReplacementPopup()
 	end
 	self.unlimitedReagentReplacementPopupHooked = true
 
-	local originalStaticPopupShow = StaticPopup_Show
-	StaticPopup_Show = function(which, textArg1, textArg2, data, ...)
+	local function WrapReplacementCallback(which, textArg1, textArg2, data)
 		if which == "PROFESSIONS_RECRAFT_REPLACE_OPTIONAL_REAGENT"
 			and type(data) == "table"
 			and type(data.callback) == "function"
@@ -1181,8 +1180,9 @@ function AF:PatchUnlimitedReagentReplacementPopup()
 				end
 			end
 		end
-		return originalStaticPopupShow(which, textArg1, textArg2, data, ...)
 	end
+
+	hooksecurefunc("StaticPopup_Show", WrapReplacementCallback)
 end
 
 function AF:RefreshUnlimitedReagentFlyoutButton(button, elementData, behavior)

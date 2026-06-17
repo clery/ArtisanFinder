@@ -75,7 +75,8 @@
         "ColorPickerFrame",
         "ITEM_BIND_ON_PICKUP",
         "UISpecialFrames",
-        "GameTooltip_Hide"
+        "GameTooltip_Hide",
+        "StaticPopup_Show"
     ],
     "Lua.type.weakUnionCheck": true
 }
