@@ -267,7 +267,7 @@
 				</Anchors>
 			</Button>
 			<Button parentKey="prepare" hidden="true">
-				<Size x="22" y="22"/>
+				<Size x="18" y="18"/>
 				<Anchors>
 					<Anchor point="RIGHT" relativeKey="$parent.action" relativePoint="LEFT" x="-1" y="0"/>
 				</Anchors>

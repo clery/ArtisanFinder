@@ -21,7 +21,13 @@ local CUSTOMER_OPEN_REFRESH_DEDUPE_SECONDS = 0.25
 local CUSTOMER_ROW_HIGHLIGHT_ALPHA = 0.28
 local CUSTOMER_ROW_OWN_HIGHLIGHT_ALPHA = 0.22
 local CUSTOMER_ROW_BUTTON_TEXT_RIGHT_OFFSET = -90
+local CUSTOMER_ROW_AUX_BUTTON_SIZE = 18
 local CUSTOMER_PREPARE_ATLAS = "UI-HUD-Minimap-CraftingOrder-Up"
+local CUSTOMER_PREPARE_ICON_SIZE = 16
+
+local function GetOptionalGlobal(name)
+	return rawget(_G, name)
+end
 
 local function GetSortMode(index)
 	return SORT_MODES[index or 1] or SORT_MODES[1]
@@ -78,12 +84,14 @@ local function GetCustomerOrderFillData(AF, entry)
 	end
 
 	local isGuildOrder = AF:IsGuildOrderEntry(entry)
+	local guildOrderLabel = GetOptionalGlobal("PROFESSIONS_CRAFTING_FORM_ORDER_RECIPIENT_GUILD")
+		or GetOptionalGlobal("PROFESSIONS_CRAFTING_FORM_ORDER_RECIPIENT_GUILD_ORDER")
+		or AF:Text("GUILD_ORDER")
+	local personalOrderLabel = GetOptionalGlobal("PROFESSIONS_CRAFTING_FORM_ORDER_RECIPIENT_PRIVATE") or AF:Text("PERSONAL_ORDER")
 	local data = {
 		isGuildOrder = isGuildOrder,
 		orderType = isGuildOrder and Enum.CraftingOrderType.Guild or Enum.CraftingOrderType.Personal,
-		orderLabel = isGuildOrder
-			and (_G.PROFESSIONS_CRAFTING_FORM_ORDER_RECIPIENT_GUILD or _G.PROFESSIONS_CRAFTING_FORM_ORDER_RECIPIENT_GUILD_ORDER or AF:Text("GUILD_ORDER"))
-			or (_G.PROFESSIONS_CRAFTING_FORM_ORDER_RECIPIENT_PRIVATE or AF:Text("PERSONAL_ORDER")),
+		orderLabel = isGuildOrder and guildOrderLabel or personalOrderLabel,
 	}
 
 	if not isGuildOrder then
@@ -540,14 +548,14 @@ local function ConfigureCustomerRow(row)
 	end)
 
 	row.prepare:ClearAllPoints()
-	row.prepare:SetSize(22, 22)
+	row.prepare:SetSize(CUSTOMER_ROW_AUX_BUTTON_SIZE, CUSTOMER_ROW_AUX_BUTTON_SIZE)
 	row.prepare:SetPoint("RIGHT", row.action, "LEFT", -1, 0)
 	row.prepare:SetFrameLevel((row.action:GetFrameLevel() or row:GetFrameLevel() or 0) + 2)
 	SetButtonAtlas(row.prepare, CUSTOMER_PREPARE_ATLAS, CUSTOMER_PREPARE_ATLAS, CUSTOMER_PREPARE_ATLAS, CUSTOMER_PREPARE_ATLAS)
-	PositionButtonTexture(row.prepare:GetNormalTexture(), 20, 15)
-	PositionButtonTexture(row.prepare:GetPushedTexture(), 20, 15, 1, -1)
-	PositionButtonTexture(row.prepare:GetDisabledTexture(), 20, 15)
-	PositionButtonTexture(row.prepare:GetHighlightTexture(), 20, 15)
+	PositionButtonTexture(row.prepare:GetNormalTexture(), CUSTOMER_PREPARE_ICON_SIZE, CUSTOMER_PREPARE_ICON_SIZE)
+	PositionButtonTexture(row.prepare:GetPushedTexture(), CUSTOMER_PREPARE_ICON_SIZE, CUSTOMER_PREPARE_ICON_SIZE, 1, -1)
+	PositionButtonTexture(row.prepare:GetDisabledTexture(), CUSTOMER_PREPARE_ICON_SIZE, CUSTOMER_PREPARE_ICON_SIZE)
+	PositionButtonTexture(row.prepare:GetHighlightTexture(), CUSTOMER_PREPARE_ICON_SIZE, CUSTOMER_PREPARE_ICON_SIZE)
 	if row.prepare:GetDisabledTexture() and row.prepare:GetDisabledTexture().SetDesaturated then
 		row.prepare:GetDisabledTexture():SetDesaturated(true)
 		row.prepare:GetDisabledTexture():SetVertexColor(0.55, 0.55, 0.55)
@@ -571,7 +579,7 @@ local function ConfigureCustomerRow(row)
 	end)
 
 	row.whoRefresh:ClearAllPoints()
-	row.whoRefresh:SetSize(18, 18)
+	row.whoRefresh:SetSize(CUSTOMER_ROW_AUX_BUTTON_SIZE, CUSTOMER_ROW_AUX_BUTTON_SIZE)
 	row.whoRefresh:SetPoint("RIGHT", row.prepare, "LEFT", -1, 0)
 	row.whoRefresh:SetFrameLevel((row.prepare:GetFrameLevel() or row:GetFrameLevel() or 0) + 2)
 	SetButtonAtlas(row.whoRefresh, "UI-RefreshButton", "UI-RefreshButton", "UI-RefreshButton", "UI-RefreshButton")
