@@ -14,6 +14,99 @@ local SECTION_GAP = 28
 local SECTION_BOTTOM_GAP = 6
 local COLLAPSED_SECTION_HEIGHT = 30
 local COLLAPSED_TITLE_OFFSET = 4
+local CRAFTER_PANEL_DEFAULT_MAXIMIZED = "maximized"
+local CRAFTER_PANEL_DEFAULT_MINIMIZED = "minimized"
+
+local function ReagentMatches(left, right)
+	if not left or not right then
+		return false
+	end
+	if ProfessionsUtil and ProfessionsUtil.CraftingReagentMatches then
+		return ProfessionsUtil.CraftingReagentMatches(left, right)
+	end
+	if left.itemID and right.itemID then
+		return tonumber(left.itemID) == tonumber(right.itemID)
+	end
+	if left.currencyID and right.currencyID then
+		return tonumber(left.currencyID) == tonumber(right.currencyID)
+	end
+	return false
+end
+
+local function GetReagentQuantityRequired(slot, reagent)
+	for _, variableQuantity in ipairs(slot and slot.variableQuantities or {}) do
+		if ReagentMatches(variableQuantity.reagent, reagent) then
+			return tonumber(variableQuantity.quantity) or tonumber(slot.quantityRequired) or 1
+		end
+	end
+	return tonumber(slot and slot.quantityRequired) or 1
+end
+
+local function IsBasicReagentSlot(slot)
+	return slot
+		and Enum
+		and Enum.CraftingReagentType
+		and slot.reagentType == Enum.CraftingReagentType.Basic
+end
+
+local function IsBasicQualityReagentSlot(slot)
+	return IsBasicReagentSlot(slot)
+		and Professions
+		and Professions.ReagentInputMode
+		and Professions.GetReagentInputMode
+		and Professions.GetReagentInputMode(slot) == Professions.ReagentInputMode.Quality
+end
+
+local function GetUnlimitedReagentForSlot(slot, useBestQuality)
+	local reagents = type(slot and slot.reagents) == "table" and slot.reagents or nil
+	if not reagents then
+		return nil
+	end
+	local startIndex = useBestQuality and #reagents or 1
+	local endIndex = useBestQuality and 1 or #reagents
+	local step = useBestQuality and -1 or 1
+	for reagentIndex = startIndex, endIndex, step do
+		local reagent = reagents[reagentIndex]
+		if type(reagent) == "table" and (reagent.itemID or reagent.currencyID) then
+			return reagent
+		end
+	end
+	return nil
+end
+
+local function SetCheckboxText(check, text)
+	local fontString = check and (check.Text or check.text)
+	if fontString then
+		fontString:SetText(text)
+		fontString:Show()
+	end
+end
+
+local function PositionUnlimitedReagentsCheckbox(form, check)
+	local nativeCheck = form and form.AllocateBestQualityCheckbox
+	if not nativeCheck or not check then
+		return
+	end
+
+	local nativeText = nativeCheck.Text or nativeCheck.text
+	check:ClearAllPoints()
+	if nativeText then
+		check:SetPoint("LEFT", nativeText, "RIGHT", 12, 0)
+	else
+		check:SetPoint("LEFT", nativeCheck, "RIGHT", 160, 0)
+	end
+end
+
+local function ClampWholeNumber(value, minimum, maximum)
+	value = math.floor(tonumber(value) or 0)
+	if minimum and value < minimum then
+		value = minimum
+	end
+	if maximum and value > maximum then
+		value = maximum
+	end
+	return value
+end
 
 local function UpdatePlaceholder(box)
 	box.Placeholder:SetShown((box:GetText() or "") == "")
@@ -340,6 +433,13 @@ local function GetDefaultsRefreshProfessionID(AF, defaults, currentProfessionID)
 	return nil
 end
 
+local function NormalizeCrafterPanelDefaultState(state)
+	if state == CRAFTER_PANEL_DEFAULT_MINIMIZED then
+		return CRAFTER_PANEL_DEFAULT_MINIMIZED
+	end
+	return CRAFTER_PANEL_DEFAULT_MAXIMIZED
+end
+
 local function SetDefaultsLoadedState(AF, defaults, professionID, default)
 	local priceText = default and AF:FormatCommissionInput(default) or ""
 	local noteText = default and default.note or ""
@@ -427,6 +527,7 @@ function AF:RefreshCrafterLocale()
 		end
 		self:UpdateScanControls()
 	end
+	self:RefreshUnlimitedReagentsCheck()
 end
 
 function AF:LayoutCrafterSections()
@@ -599,8 +700,56 @@ function AF:ApplyCrafterDefaultsCollapsed(collapsed)
 end
 
 function AF:SetCrafterDefaultsCollapsed(collapsed)
+	collapsed = collapsed and true or false
+	self.crafterDefaultsManualCollapsed = true
+	self:SetCrafterPanelSessionCollapsed(collapsed)
 	self:ApplyCrafterDefaultsCollapsed(collapsed)
 	self:RefreshCrafterUI()
+end
+
+function AF:GetCrafterPanelDefaultState()
+	local state = NormalizeCrafterPanelDefaultState(self.db and self.db.crafterPanelDefaultState)
+	if self.db and self.db.crafterPanelDefaultState ~= state then
+		self.db.crafterPanelDefaultState = state
+	end
+	return state
+end
+
+function AF:IsCrafterPanelDefaultCollapsed()
+	return self:GetCrafterPanelDefaultState() == CRAFTER_PANEL_DEFAULT_MINIMIZED
+end
+
+function AF:GetCrafterPanelSessionCollapsed()
+	if self.crafterDefaultsSessionCollapsed == nil then
+		self.crafterDefaultsSessionCollapsed = self:IsCrafterPanelDefaultCollapsed()
+	end
+	return self.crafterDefaultsSessionCollapsed == true
+end
+
+function AF:SetCrafterPanelSessionCollapsed(collapsed)
+	self.crafterDefaultsSessionCollapsed = collapsed and true or false
+end
+
+function AF:SetCrafterPanelDefaultState(state)
+	if not self.db then
+		return
+	end
+	self.db.crafterPanelDefaultState = NormalizeCrafterPanelDefaultState(state)
+	local collapsed = self:IsCrafterPanelDefaultCollapsed()
+	self:SetCrafterPanelSessionCollapsed(collapsed)
+	if self.crafterDefaultsPanelOpen == true then
+		self.crafterDefaultsCollapsed = collapsed
+		self:RefreshCrafterUI()
+	end
+end
+
+function AF:ResetCrafterPanelDefaultState()
+	if self.crafterDefaultsCollapsed ~= nil then
+		self:SetCrafterPanelSessionCollapsed(self.crafterDefaultsCollapsed)
+	end
+	self.crafterDefaultsPanelOpen = false
+	self.crafterDefaultsManualCollapsed = false
+	self.crafterDefaultsCollapsed = nil
 end
 
 function AF:GetCraftingSchematicForm()
@@ -608,6 +757,37 @@ function AF:GetCraftingSchematicForm()
 		return nil
 	end
 	return ProfessionsFrame.CraftingPage.SchematicForm
+end
+
+function AF:EnsureUnlimitedReagentsCheckbox(form)
+	form = form or self:GetCraftingSchematicForm()
+	if not form or not form.AllocateBestQualityCheckbox then
+		return nil
+	end
+	if form.ArtisanFinderUnlimitedReagentsCheckbox then
+		return form.ArtisanFinderUnlimitedReagentsCheckbox
+	end
+
+	local check = CreateFrame("CheckButton", nil, form, "UICheckButtonTemplate")
+	check:SetSize(26, 26)
+	PositionUnlimitedReagentsCheckbox(form, check)
+	check:SetFrameLevel((form.AllocateBestQualityCheckbox:GetFrameLevel() or form:GetFrameLevel() or 0) + 1)
+	SetCheckboxText(check, LIGHTGRAY_FONT_COLOR:WrapTextInColorCode(self:Text("PROFESSION_PANEL_UNLIMITED_REAGENTS")))
+	check:SetScript("OnClick", function(button)
+		AF:SetUnlimitedReagentsEnabled(button:GetChecked() == true)
+		PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+	end)
+	check:SetScript("OnEnter", function(button)
+		GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
+		GameTooltip:SetText(AF:Text("PROFESSION_PANEL_UNLIMITED_REAGENTS"), 1, 0.82, 0)
+		GameTooltip:AddLine(AF:Text("PROFESSION_PANEL_UNLIMITED_REAGENTS_TOOLTIP"), 1, 1, 1, true)
+		GameTooltip:Show()
+	end)
+	check:SetScript("OnLeave", GameTooltip_Hide)
+	check:Hide()
+
+	form.ArtisanFinderUnlimitedReagentsCheckbox = check
+	return check
 end
 
 function AF:IsLinkedProfessionOpen()
@@ -740,6 +920,318 @@ end
 function AF:GetCurrentSupportedProfessionID()
 	local profession = self:GetCurrentProfessionInfo()
 	return self:GetSupportedProfessionID(profession and profession.id, profession), profession
+end
+
+function AF:IsUnlimitedReagentsEnabled()
+	return self.db and self.db.unlimitedReagents == true
+end
+
+function AF:RefreshCraftingSchematicStats(form)
+	form = form or self:GetCraftingSchematicForm()
+	if form and form.UpdateDetailsStats then
+		pcall(form.UpdateDetailsStats, form)
+	end
+	if form and form.UpdateOutputItem then
+		pcall(form.UpdateOutputItem, form)
+	end
+	local page = ProfessionsFrame and ProfessionsFrame.CraftingPage
+	if page and page.ValidateControls then
+		pcall(page.ValidateControls, page)
+	end
+end
+
+function AF:RefreshCraftingQualityDialog(form)
+	form = form or self:GetCraftingSchematicForm()
+	local dialog = form and form.QualityDialog
+	local transaction = form and form.GetTransaction and form:GetTransaction()
+	if not dialog or not transaction or not dialog:IsShown() or not dialog.GetSlotIndex or not dialog.ReinitAllocations then
+		return
+	end
+
+	local slotIndex = dialog:GetSlotIndex()
+	if not slotIndex or not transaction.GetAllocationsCopy then
+		return
+	end
+	local ok, allocations = pcall(transaction.GetAllocationsCopy, transaction, slotIndex)
+	if ok and allocations then
+		pcall(dialog.ReinitAllocations, dialog, allocations)
+	end
+end
+
+function AF:IsUnlimitedReagentDialog(dialog)
+	local form = self:GetCraftingSchematicForm()
+	local slot = dialog and dialog.reagentSlotSchematic
+	return self:IsUnlimitedReagentsEnabled()
+		and self:IsOwnProfessionWindowOpen()
+		and form
+		and dialog == form.QualityDialog
+		and IsBasicQualityReagentSlot(slot)
+end
+
+function AF:RefreshUnlimitedReagentsQualityDialog(dialog)
+	if not self:IsUnlimitedReagentDialog(dialog) then
+		return
+	end
+
+	local quantityRequired = ClampWholeNumber(dialog.GetQuantityRequired and dialog:GetQuantityRequired() or 0, 0)
+	for _, container in ipairs(dialog.containers or {}) do
+		local editBox = container.EditBox
+		local button = container.Button
+		if editBox then
+			editBox:SetMinMaxValues(0, quantityRequired)
+			editBox:SetEnabled(true)
+		end
+		if button then
+			button:SetItemButtonCount(quantityRequired)
+			button:DesaturateHierarchy(0)
+		end
+	end
+
+	local quantityAllocated = dialog.Accumulate and dialog:Accumulate() or 0
+	local canEnable = not dialog.disallowZeroAllocations and quantityAllocated == 0
+	if dialog.AcceptButton then
+		dialog.AcceptButton:SetEnabled(canEnable or quantityAllocated >= quantityRequired)
+	end
+end
+
+function AF:AllocateUnlimitedQualityReagent(dialog, qualityIndex, value)
+	if not self:IsUnlimitedReagentDialog(dialog) or not dialog.allocations then
+		return nil
+	end
+
+	local quantityRequired = ClampWholeNumber(dialog:GetQuantityRequired(), 0)
+	value = ClampWholeNumber(value, 0, quantityRequired)
+	local reagent = dialog:GetReagent(qualityIndex)
+	if reagent then
+		dialog.allocations:Allocate(reagent, value)
+	end
+
+	local overflow = math.max(0, (dialog:Accumulate() or 0) - quantityRequired)
+	if overflow > 0 then
+		for deallocateIndex = 1, dialog:GetReagentSlotCount() do
+			if deallocateIndex ~= qualityIndex then
+				local deallocateReagent = dialog:GetReagent(deallocateIndex)
+				local oldQuantity = dialog.allocations:GetQuantityAllocated(deallocateReagent)
+				local deallocatable = math.min(overflow, oldQuantity)
+				if deallocatable > 0 then
+					overflow = overflow - deallocatable
+					dialog.allocations:Allocate(deallocateReagent, oldQuantity - deallocatable)
+				end
+			end
+			if overflow <= 0 then
+				break
+			end
+		end
+	end
+
+	dialog.artisanFinderUpdatingEditBoxes = true
+	for reagentIndex = 1, dialog:GetReagentSlotCount() do
+		local container = dialog.containers and dialog.containers[reagentIndex]
+		local editBox = container and container.EditBox
+		local editReagent = dialog:GetReagent(reagentIndex)
+		if editBox and editReagent then
+			editBox:SetValue(dialog.allocations:GetQuantityAllocated(editReagent))
+		end
+	end
+	dialog.artisanFinderUpdatingEditBoxes = nil
+
+	self:RefreshUnlimitedReagentsQualityDialog(dialog)
+	return value
+end
+
+function AF:HookUnlimitedReagentsQualityDialog(form)
+	local dialog = form and form.QualityDialog
+	if not dialog or dialog.artisanFinderUnlimitedReagentsHooked then
+		return
+	end
+
+	dialog.artisanFinderUnlimitedReagentsHooked = true
+	if dialog.Setup then
+		hooksecurefunc(dialog, "Setup", function(hookedDialog)
+			AF:RefreshUnlimitedReagentsQualityDialog(hookedDialog)
+		end)
+	end
+	if dialog.Open then
+		hooksecurefunc(dialog, "Open", function(hookedDialog)
+			AF:RefreshUnlimitedReagentsQualityDialog(hookedDialog)
+		end)
+	end
+	if dialog.ReinitAllocations then
+		hooksecurefunc(dialog, "ReinitAllocations", function(hookedDialog)
+			AF:RefreshUnlimitedReagentsQualityDialog(hookedDialog)
+		end)
+	end
+
+	for qualityIndex, container in ipairs(dialog.containers or {}) do
+		local editBox = container.EditBox
+		if editBox then
+			editBox.artisanFinderOriginalOnEnterPressed = editBox:GetScript("OnEnterPressed")
+			editBox:SetScript("OnEnterPressed", function(box)
+				if AF:IsUnlimitedReagentDialog(dialog) then
+					return AF:AllocateUnlimitedQualityReagent(dialog, qualityIndex, tonumber(box:GetText()) or 0)
+				end
+				local original = box.artisanFinderOriginalOnEnterPressed
+				if original then
+					return original(box)
+				end
+			end)
+
+			editBox.artisanFinderOriginalOnEditFocusLost = editBox:GetScript("OnEditFocusLost")
+			editBox:SetScript("OnEditFocusLost", function(box)
+				if AF:IsUnlimitedReagentDialog(dialog) then
+					return AF:AllocateUnlimitedQualityReagent(dialog, qualityIndex, tonumber(box:GetText()) or 0)
+				end
+				local original = box.artisanFinderOriginalOnEditFocusLost
+				if original then
+					return original(box)
+				end
+			end)
+
+			editBox.artisanFinderOriginalOnTextChanged = editBox:GetScript("OnTextChanged")
+			editBox:SetScript("OnTextChanged", function(box, userChanged)
+				if dialog.artisanFinderUpdatingEditBoxes then
+					return
+				end
+				if AF:IsUnlimitedReagentDialog(dialog) then
+					if not userChanged then
+						return AF:AllocateUnlimitedQualityReagent(dialog, qualityIndex, tonumber(box:GetText()) or 0)
+					end
+					return
+				end
+				local original = box.artisanFinderOriginalOnTextChanged
+				if original then
+					return original(box, userChanged)
+				end
+			end)
+		end
+
+		local button = container.Button
+		if button then
+			button.artisanFinderOriginalOnClick = button:GetScript("OnClick")
+			button:SetScript("OnClick", function(clickedButton, buttonName, down)
+				if AF:IsUnlimitedReagentDialog(dialog) and not IsShiftKeyDown() then
+					if buttonName == "LeftButton" then
+						return AF:AllocateUnlimitedQualityReagent(dialog, qualityIndex, dialog:GetQuantityRequired())
+					elseif buttonName == "RightButton" then
+						return AF:AllocateUnlimitedQualityReagent(dialog, qualityIndex, 0)
+					end
+				end
+				local original = clickedButton.artisanFinderOriginalOnClick
+				if original then
+					return original(clickedButton, buttonName, down)
+				end
+			end)
+		end
+	end
+end
+
+function AF:ApplyUnlimitedReagentsToCraftingForm(force)
+	if not self:IsUnlimitedReagentsEnabled() or not self:IsOwnProfessionWindowOpen() then
+		return false
+	end
+
+	local form = self:GetCraftingSchematicForm()
+	local transaction = form and form.GetTransaction and form:GetTransaction()
+	local schematic = transaction and transaction.GetRecipeSchematic and transaction:GetRecipeSchematic()
+	if not transaction or type(schematic) ~= "table" or type(schematic.reagentSlotSchematics) ~= "table" then
+		return false
+	end
+	if transaction.IsRecraft and transaction:IsRecraft() then
+		return false
+	end
+	if not force and transaction.IsManuallyAllocated and transaction:IsManuallyAllocated() then
+		return false
+	end
+
+	local useBestQuality = Professions
+		and Professions.ShouldAllocateBestQualityReagents
+		and Professions.ShouldAllocateBestQualityReagents() == true
+	local allocated = false
+	for slotIndex, slot in ipairs(schematic.reagentSlotSchematics) do
+		if IsBasicQualityReagentSlot(slot) then
+			local allocations = transaction.GetAllocations and transaction:GetAllocations(slotIndex)
+			if allocations and allocations.Clear and allocations.Allocate then
+				allocations:Clear()
+				local reagent = GetUnlimitedReagentForSlot(slot, useBestQuality)
+				if reagent then
+					allocations:Allocate(reagent, GetReagentQuantityRequired(slot, reagent))
+					allocated = true
+				end
+			end
+		end
+	end
+
+	if not allocated then
+		return false
+	end
+	if transaction.SetManuallyAllocated then
+		transaction:SetManuallyAllocated(true)
+	end
+	if form.UpdateAllSlots then
+		form:UpdateAllSlots()
+	end
+	self:RefreshCraftingQualityDialog(form)
+	self:RefreshCraftingSchematicStats(form)
+	return true
+end
+
+function AF:RestoreOwnedReagentAllocations()
+	if not self:IsOwnProfessionWindowOpen() then
+		return false
+	end
+
+	local form = self:GetCraftingSchematicForm()
+	local transaction = form and form.GetTransaction and form:GetTransaction()
+	if not transaction or not Professions or not Professions.AllocateAllBasicReagents then
+		return false
+	end
+
+	local useBestQuality = Professions.ShouldAllocateBestQualityReagents
+		and Professions.ShouldAllocateBestQualityReagents() == true
+	Professions.AllocateAllBasicReagents(transaction, useBestQuality)
+	if form.UpdateAllSlots then
+		form:UpdateAllSlots()
+	end
+	self:RefreshCraftingQualityDialog(form)
+	self:RefreshCraftingSchematicStats(form)
+	return true
+end
+
+function AF:ApplyProfessionReagentMode()
+	if self:IsUnlimitedReagentsEnabled() then
+		return self:ApplyUnlimitedReagentsToCraftingForm(true)
+	end
+	return self:RestoreOwnedReagentAllocations()
+end
+
+function AF:SetUnlimitedReagentsEnabled(enabled)
+	if not self.db then
+		return
+	end
+	self.db.unlimitedReagents = enabled == true
+	self:RefreshUnlimitedReagentsCheck()
+	self:ApplyProfessionReagentMode()
+end
+
+function AF:RefreshUnlimitedReagentsCheck()
+	local form = self:GetCraftingSchematicForm()
+	local check = self:EnsureUnlimitedReagentsCheckbox(form)
+	if not check then
+		return
+	end
+
+	SetCheckboxText(check, LIGHTGRAY_FONT_COLOR:WrapTextInColorCode(self:Text("PROFESSION_PANEL_UNLIMITED_REAGENTS")))
+	PositionUnlimitedReagentsCheckbox(form, check)
+	check:SetChecked(self:IsUnlimitedReagentsEnabled())
+	local nativeCheck = form and form.AllocateBestQualityCheckbox
+	local shown = self:IsOwnProfessionWindowOpen() and nativeCheck and nativeCheck:IsShown()
+	check:SetShown(shown)
+	if shown then
+		check:Enable()
+		check:SetAlpha(1)
+	else
+		check:Disable()
+	end
 end
 
 function AF:EnsureCurrentRecipeEntry(context, options)
@@ -1067,14 +1559,27 @@ function AF:AttachCrafterUI()
 
 	if form.RegisterCallback and ProfessionsRecipeSchematicFormMixin then
 		local refresh = function()
+			AF:RefreshUnlimitedReagentsCheck()
 			AF:RefreshCrafterUI()
 		end
+		local useBestRefresh = function()
+			if AF:IsUnlimitedReagentsEnabled() then
+				AF:ApplyUnlimitedReagentsToCraftingForm(true)
+			end
+			refresh()
+		end
 		form:RegisterCallback(ProfessionsRecipeSchematicFormMixin.Event.AllocationsModified, refresh)
-		form:RegisterCallback(ProfessionsRecipeSchematicFormMixin.Event.UseBestQualityModified, refresh)
+		form:RegisterCallback(ProfessionsRecipeSchematicFormMixin.Event.UseBestQualityModified, useBestRefresh)
 	end
 
+	self:EnsureUnlimitedReagentsCheckbox(form)
+	self:HookUnlimitedReagentsQualityDialog(form)
 	if form.Init then
 		hooksecurefunc(form, "Init", function()
+			AF:RefreshUnlimitedReagentsCheck()
+			if AF:IsUnlimitedReagentsEnabled() then
+				AF:ApplyUnlimitedReagentsToCraftingForm(false)
+			end
 			AF:RefreshCrafterUI()
 		end)
 	end
@@ -1216,7 +1721,11 @@ function AF:RefreshCrafterUI()
 		return
 	end
 
-	if not self:IsOwnProfessionWindowOpen() or self:IsProfessionPanelMinimized() then
+	local ownProfessionWindowOpen = self:IsOwnProfessionWindowOpen()
+	if not ownProfessionWindowOpen or self:IsProfessionPanelMinimized() then
+		if not ownProfessionWindowOpen then
+			self:ResetCrafterPanelDefaultState()
+		end
 		frame:Hide()
 		defaults:Hide()
 		if self.crafterDefaultsCollapseButton then
@@ -1226,6 +1735,11 @@ function AF:RefreshCrafterUI()
 		return
 	end
 	self:RefreshCrafterReopenButton()
+	if self.crafterDefaultsPanelOpen ~= true then
+		self.crafterDefaultsPanelOpen = true
+		self.crafterDefaultsManualCollapsed = false
+		self.crafterDefaultsCollapsed = self:GetCrafterPanelSessionCollapsed()
+	end
 
 	self:PositionCrafterUI()
 
@@ -1240,6 +1754,7 @@ function AF:RefreshCrafterUI()
 		end
 		return
 	end
+	self:RefreshUnlimitedReagentsCheck()
 	self:UpdateScanControls()
 
 	local itemProfessionID = context and context.professionID or currentProfessionID

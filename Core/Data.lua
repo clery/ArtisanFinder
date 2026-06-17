@@ -747,6 +747,12 @@ function ApplyDBDefaults(db)
 	db.tutorial = db.tutorial or {}
 	db.changelog = db.changelog or {}
 	db.crafterSections = db.crafterSections or {}
+	if db.unlimitedReagents == nil then
+		db.unlimitedReagents = false
+	end
+	if db.crafterPanelDefaultState ~= "minimized" and db.crafterPanelDefaultState ~= "maximized" then
+		db.crafterPanelDefaultState = "maximized"
+	end
 
 	if db.debugSelfResults == true then
 		db.debugEnabled = true

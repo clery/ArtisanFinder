@@ -56,6 +56,11 @@ local OFFLINE_FALLBACK_MAX_OPTIONS = {
 	{ count = 50, labelKey = "OPTIONS_OFFLINE_FALLBACK_50" },
 }
 
+local CRAFTER_PANEL_DEFAULT_STATE_OPTIONS = {
+	{ key = "maximized", labelKey = "OPTIONS_PROFESSION_PANEL_DEFAULT_MAXIMIZED" },
+	{ key = "minimized", labelKey = "OPTIONS_PROFESSION_PANEL_DEFAULT_MINIMIZED" },
+}
+
 local AUTO_AVAILABILITY_ACTIVITY_OPTIONS = {
 	{ key = "party", labelKey = "OPTIONS_AUTO_DISABLE_PARTY", descKey = "OPTIONS_AUTO_DISABLE_PARTY_DESC" },
 	{ key = "raid", labelKey = "OPTIONS_AUTO_DISABLE_RAID", descKey = "OPTIONS_AUTO_DISABLE_RAID_DESC" },
@@ -202,6 +207,23 @@ function AF:InitializeOptions()
 		self:Text("OPTIONS_RESET_MINIMAP_POSITION_DESC"),
 		true
 	))
+
+	AddSection("OPTIONS_SECTION_PROFESSION_PANEL")
+	local professionPanelDefaultState = RegisterProxySetting(
+		"ArtisanFinder_ProfessionPanelDefaultState",
+		Settings.VarType.String,
+		"OPTIONS_PROFESSION_PANEL_DEFAULT_STATE",
+		"maximized",
+		function()
+			return AF:GetCrafterPanelDefaultState()
+		end,
+		function(value)
+			AF:SetCrafterPanelDefaultState(value)
+		end
+	)
+	Settings.CreateDropdown(category, professionPanelDefaultState, function()
+		return CreateRadioOptions(CRAFTER_PANEL_DEFAULT_STATE_OPTIONS, "key")
+	end, self:Text("OPTIONS_PROFESSION_PANEL_DEFAULT_STATE_DESC"))
 
 	AddSection("OPTIONS_SECTION_AVAILABILITY")
 	local autoAvailability = RegisterProxySetting(

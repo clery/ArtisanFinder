@@ -1,6 +1,8 @@
 local AF = {
 	HEAVY_JOB_QUALITY_TIER_THRESHOLD = 12,
 }
+local LoadFile = rawget(_G, "loadfile")
+local Clock = rawget(rawget(_G, "os") or {}, "clock")
 
 local function Check(condition, message)
 	if not condition then
@@ -9,15 +11,15 @@ local function Check(condition, message)
 end
 
 local function LoadAddonFile(path)
-	local chunk, err = loadfile(path)
+	local chunk, err = LoadFile(path)
 	Check(chunk, err)
 	return chunk("ArtisanFinder", AF)
 end
 
 local function Measure(callback)
-	local started = os.clock()
+	local started = Clock()
 	callback()
-	return os.clock() - started
+	return Clock() - started
 end
 
 local NativePairs = pairs
@@ -62,7 +64,7 @@ end
 _G.issecretvalue = function(value)
 	return type(value) == "table" and value.secret == true
 end
-_G.GetTime = os.clock
+_G.GetTime = Clock
 _G.C_Item = {}
 
 LoadAddonFile("Core/Util.lua")
@@ -77,6 +79,7 @@ local activeItemCount = 50000
 local altItemCount = 1000
 local totalItemCount = activeItemCount + ((characterCount - 1) * altItemCount)
 local activeCharacter = "Crafter01-Realm"
+---@type string?
 local currentLink = "trade:profession-v1"
 
 AF.NormalizeName = function(_, value)
@@ -88,6 +91,7 @@ end
 AF.IsOwnProfessionWindowOpen = function()
 	return true
 end
+---@diagnostic disable-next-line: duplicate-set-field
 AF.GetCurrentProfessionInfo = function()
 	return { id = 755, icon = 12345 }
 end
@@ -208,6 +212,7 @@ Check(activeProfile.professions["755"].professionLink == "trade:profession-v2", 
 local professionInfoCalls = 0
 local signatureCalls = 0
 local manualBuildCalls = 0
+---@diagnostic disable-next-line: duplicate-set-field
 AF.GetCurrentProfessionInfo = function()
 	professionInfoCalls = professionInfoCalls + 1
 	return { id = 755, name = "Jewelcrafting" }
@@ -234,6 +239,33 @@ local disabledResumeProfessionInfoCalls = professionInfoCalls
 local disabledResumeSignatureCalls = signatureCalls
 AF:StartOrResumeCurrentProfessionScan(true, true)
 Check(manualBuildCalls == 1, "manual force scan did not remain available while automatic scans disabled")
+
+AF.db.crafterPanelDefaultState = "minimized"
+AF.crafterDefaultsSessionCollapsed = nil
+AF.crafterDefaultsCollapsed = nil
+AF.crafterDefaultsPanelOpen = false
+Check(AF:GetCrafterPanelSessionCollapsed() == true, "session state did not seed from saved minimized default")
+AF.db.crafterPanelDefaultState = "maximized"
+Check(AF:GetCrafterPanelSessionCollapsed() == true, "session state reread saved default after first seed")
+
+local originalRefreshCrafterUI = AF.RefreshCrafterUI
+AF.RefreshCrafterUI = function()
+end
+AF:SetCrafterDefaultsCollapsed(false)
+Check(AF:GetCrafterPanelSessionCollapsed() == false, "manual maximize did not update session state")
+AF:SetCrafterDefaultsCollapsed(true)
+Check(AF:GetCrafterPanelSessionCollapsed() == true, "manual minimize did not update session state")
+AF.RefreshCrafterUI = originalRefreshCrafterUI
+
+AF.crafterDefaultsCollapsed = false
+AF:ResetCrafterPanelDefaultState()
+Check(AF:GetCrafterPanelSessionCollapsed() == false, "profession close cleared session state")
+AF:SetCrafterPanelDefaultState("minimized")
+Check(AF.db.crafterPanelDefaultState == "minimized", "settings change did not save minimized default")
+Check(AF:GetCrafterPanelSessionCollapsed() == true, "settings change did not update session state")
+AF:SetCrafterPanelDefaultState("bogus")
+Check(AF.db.crafterPanelDefaultState == "maximized", "invalid settings value did not normalize")
+Check(AF:GetCrafterPanelSessionCollapsed() == false, "normalized settings change did not update session state")
 
 local pendingCount = 100000
 local pendingBacking = {}

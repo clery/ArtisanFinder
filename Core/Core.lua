@@ -459,6 +459,9 @@ AF.frame:SetScript("OnEvent", function(_, event, ...)
 			end
 		end)
 	elseif event == "TRADE_SKILL_CLOSE" then
+		if AF.ResetCrafterPanelDefaultState then
+			AF:ResetCrafterPanelDefaultState()
+		end
 		if AF.StopProfessionEquipmentWatch then
 			AF:StopProfessionEquipmentWatch()
 		end
