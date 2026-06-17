@@ -976,14 +976,35 @@ end
 
 function AF:GetUnlimitedReagentQuantityOverride(reagent)
 	local context = self.professionUnlimitedReagentQuantityContext
-	if not reagent or not self:IsUnlimitedReagentFlyoutContextActive(context) then
+	if not reagent then
 		return nil
 	end
-	local slot = context.reagentSlotSchematic
-	if not ReagentBelongsToSlot(slot, reagent) then
+	if self:IsUnlimitedReagentFlyoutContextActive(context) then
+		local slot = context.reagentSlotSchematic
+		if ReagentBelongsToSlot(slot, reagent) then
+			return GetReagentQuantityRequired(slot, reagent)
+		end
+	end
+
+	if not self:IsUnlimitedReagentsEnabled() or not self:IsOwnProfessionWindowOpen() then
 		return nil
 	end
-	return GetReagentQuantityRequired(slot, reagent)
+	local form = self:GetCraftingSchematicForm()
+	local transaction = form and form.GetTransaction and form:GetTransaction()
+	local schematic = transaction and transaction.GetRecipeSchematic and transaction:GetRecipeSchematic()
+	if not transaction or type(schematic) ~= "table" or type(schematic.reagentSlotSchematics) ~= "table" then
+		return nil
+	end
+	if transaction.IsRecraft and transaction:IsRecraft() then
+		return nil
+	end
+
+	for _, slot in ipairs(schematic.reagentSlotSchematics) do
+		if IsUnlimitedSelectableReagentSlot(slot) and ReagentBelongsToSlot(slot, reagent) then
+			return GetReagentQuantityRequired(slot, reagent)
+		end
+	end
+	return nil
 end
 
 function AF:CallWithUnlimitedReagentQuantityContext(context, callback, ...)
@@ -991,6 +1012,17 @@ function AF:CallWithUnlimitedReagentQuantityContext(context, callback, ...)
 	self.professionUnlimitedReagentQuantityContext = context
 	local ok, result = pcall(callback, ...)
 	self.professionUnlimitedReagentQuantityContext = previous
+	if not ok then
+		error(result, 0)
+	end
+	return result
+end
+
+function AF:CallWithUnlimitedReagentPopupContext(context, callback, ...)
+	local previous = self.professionUnlimitedReagentPopupContext
+	self.professionUnlimitedReagentPopupContext = context
+	local ok, result = pcall(callback, ...)
+	self.professionUnlimitedReagentPopupContext = previous
 	if not ok then
 		error(result, 0)
 	end
@@ -1024,6 +1056,18 @@ function AF:SyncUnlimitedReagentExemptions(transaction)
 			end
 		end
 	end
+end
+
+function AF:PrepareUnlimitedReagentSelection(context, reagent)
+	if not reagent or not self:IsUnlimitedReagentFlyoutContextActive(context) then
+		return
+	end
+	local slot = context.reagentSlotSchematic
+	local transaction = context.transaction
+	if not ReagentBelongsToSlot(slot, reagent) or not transaction or not transaction.SetExemptedReagent then
+		return
+	end
+	transaction:SetExemptedReagent(reagent, slot.dataSlotIndex)
 end
 
 function AF:PatchUnlimitedReagentFlyoutBehavior(behavior, transaction, reagentSlotSchematic, slot)
@@ -1105,6 +1149,42 @@ function AF:PatchUnlimitedReagentFlyoutBehavior(behavior, transaction, reagentSl
 	return behavior
 end
 
+function AF:PatchUnlimitedReagentReplacementPopup()
+	if self.unlimitedReagentReplacementPopupHooked or not StaticPopup_Show then
+		return
+	end
+	self.unlimitedReagentReplacementPopupHooked = true
+
+	local originalStaticPopupShow = StaticPopup_Show
+	StaticPopup_Show = function(which, textArg1, textArg2, data, ...)
+		if which == "PROFESSIONS_RECRAFT_REPLACE_OPTIONAL_REAGENT"
+			and type(data) == "table"
+			and type(data.callback) == "function"
+			and not data.artisanFinderUnlimitedReagentsWrapped then
+			local context = AF.professionUnlimitedReagentPopupContext
+			local reagent = context and context.reagent
+			if reagent and AF:IsUnlimitedReagentFlyoutContextActive(context) then
+				local popupContext = {
+					transaction = context.transaction,
+					reagentSlotSchematic = context.reagentSlotSchematic,
+					slot = context.slot,
+				}
+				local popupReagent = reagent
+				local originalCallback = data.callback
+				data.artisanFinderUnlimitedReagentsWrapped = true
+				data.callback = function(...)
+					AF:PrepareUnlimitedReagentSelection(popupContext, popupReagent)
+					local result = AF:CallWithUnlimitedReagentQuantityContext(popupContext, originalCallback, ...)
+					AF:SyncUnlimitedReagentExemptions(popupContext.transaction)
+					AF:RefreshCraftingSchematicStats()
+					return result
+				end
+			end
+		end
+		return originalStaticPopupShow(which, textArg1, textArg2, data, ...)
+	end
+end
+
 function AF:RefreshUnlimitedReagentFlyoutButton(button, elementData, behavior)
 	if not button or not elementData or not elementData.artisanFinderUnlimitedReagents then
 		return
@@ -1131,8 +1211,8 @@ function AF:HookUnlimitedReagentFlyouts()
 	end
 	self.unlimitedReagentFlyoutsHooked = true
 
-	-- Blizzard's reagent picker checks ownership inside local flyout callbacks,
-	-- so the quantity override only exists while one of our patched flyouts runs.
+	-- Blizzard's reagent picker checks ownership inside local flyout and popup callbacks.
+	-- Keep overrides scoped to the active crafting form and its unlimited-selectable slots.
 	local originalGetReagentQuantity = ProfessionsUtil.GetReagentQuantityInPossession
 	ProfessionsUtil.GetReagentQuantityInPossession = function(reagent, ...)
 		local override = AF.GetUnlimitedReagentQuantityOverride and AF:GetUnlimitedReagentQuantityOverride(reagent)
@@ -1147,6 +1227,7 @@ function AF:HookUnlimitedReagentFlyouts()
 		local behavior = originalCreateProfessionsMCRFlyout(transaction, reagentSlotSchematic, slot)
 		return AF:PatchUnlimitedReagentFlyoutBehavior(behavior, transaction, reagentSlotSchematic, slot)
 	end
+	self:PatchUnlimitedReagentReplacementPopup()
 
 	if ProfessionsFlyoutItemButtonMixin and ProfessionsFlyoutItemButtonMixin.Init then
 		hooksecurefunc(ProfessionsFlyoutItemButtonMixin, "Init", function(button, elementData, behavior)
@@ -1170,7 +1251,11 @@ function AF:HookUnlimitedReagentFlyouts()
 				and elementData
 				and elementData.artisanFinderUnlimitedReagents
 				and AF:IsUnlimitedReagentFlyoutContextActive(context) then
-				local result = AF:CallWithUnlimitedReagentQuantityContext(context, originalTriggerEvent, flyout, event, ...)
+				context.reagent = elementData.reagent
+				AF:PrepareUnlimitedReagentSelection(context, context.reagent)
+				local result = AF:CallWithUnlimitedReagentPopupContext(context, function(...)
+					return AF:CallWithUnlimitedReagentQuantityContext(context, originalTriggerEvent, flyout, event, ...)
+				end, ...)
 				AF:SyncUnlimitedReagentExemptions(context.transaction)
 				return result
 			end
