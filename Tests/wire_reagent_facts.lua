@@ -1,4 +1,5 @@
 local AF = {}
+local LoadFile = rawget(_G, "loadfile")
 
 local function Check(condition, message)
 	if not condition then
@@ -7,7 +8,7 @@ local function Check(condition, message)
 end
 
 local function LoadAddonFile(path)
-	local chunk, err = loadfile(path)
+	local chunk, err = LoadFile(path)
 	Check(chunk, err)
 	return chunk("ArtisanFinder", AF)
 end
@@ -286,6 +287,7 @@ Check(entry.hasReagentSummary == true, "compact response should keep reagent det
 
 -- 5. Failed rehydration keeps the wire payload for a later retry.
 local origSchematic = C_TradeSkillUI.GetRecipeSchematic
+---@diagnostic disable-next-line: duplicate-set-field
 C_TradeSkillUI.GetRecipeSchematic = function()
 	return nil
 end

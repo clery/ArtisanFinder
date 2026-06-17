@@ -819,7 +819,7 @@ function AF:BuildRecipeReagentSkillFacts(recipeID)
 		return nil
 	end
 	local facts, requiredSlots, baselineReagentInfo, baselineBySlot, recipeInfo, optionalSlots = BuildReagentFactsSkeleton(recipeID)
-	if not facts then
+	if not facts or type(requiredSlots) ~= "table" or type(baselineBySlot) ~= "table" then
 		return nil
 	end
 
@@ -853,7 +853,10 @@ function AF:BuildRecipeReagentSkillFacts(recipeID)
 			local reagent = SelectRepresentativeQualityReagent(reagentSlotSchematic, quality)
 			local probeReagentInfo = {}
 			for baselineSlotIndex, baselineSlot in ipairs(requiredSlots) do
-				AddCraftingReagentInfo(probeReagentInfo, baselineSlot, baselineSlotIndex == slotIndex and reagent or baselineBySlot[baselineSlotIndex])
+				local selectedReagent = baselineSlotIndex == slotIndex and reagent or baselineBySlot[baselineSlotIndex]
+				if selectedReagent then
+					AddCraftingReagentInfo(probeReagentInfo, baselineSlot, selectedReagent)
+				end
 			end
 			local operationInfo = GetOperationInfoForReagentInfo(recipeID, probeReagentInfo)
 			local delta = operationInfo and ((GetOperationTotalSkill(operationInfo) or baselineTotalSkill) - baselineTotalSkill) or 0
@@ -874,7 +877,10 @@ function AF:BuildRecipeReagentSkillFacts(recipeID)
 			if storedReagent then
 				local probeReagentInfo = {}
 				for baselineSlotIndex, baselineSlot in ipairs(requiredSlots) do
-					AddCraftingReagentInfo(probeReagentInfo, baselineSlot, baselineBySlot[baselineSlotIndex])
+					local baselineReagent = baselineBySlot[baselineSlotIndex]
+					if baselineReagent then
+						AddCraftingReagentInfo(probeReagentInfo, baselineSlot, baselineReagent)
+					end
 				end
 				probeReagentInfo[#probeReagentInfo + 1] = {
 					reagent = reagent,
