@@ -54,14 +54,16 @@ end
 local function GetTradeLinkProfessionCandidates(link)
 	local body = tostring(link or ""):match("|Htrade:([^|]+)|h")
 	local candidates = {}
-	for number in tostring(body or ""):gmatch("(%d+)") do
-		number = tonumber(number)
-		local mappedSkillLine = PROFESSION_SPELL_TO_SKILL_LINE[number]
-		if mappedSkillLine then
-			candidates[mappedSkillLine] = true
-		end
-		if KNOWN_PROFESSION_SKILL_LINES[number] then
-			candidates[number] = true
+	for numberText in tostring(body or ""):gmatch("(%d+)") do
+		local number = tonumber(numberText)
+		if number then
+			local mappedSkillLine = PROFESSION_SPELL_TO_SKILL_LINE[number]
+			if mappedSkillLine then
+				candidates[mappedSkillLine] = true
+			end
+			if KNOWN_PROFESSION_SKILL_LINES[number] then
+				candidates[number] = true
+			end
 		end
 	end
 	return candidates

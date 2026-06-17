@@ -17,6 +17,7 @@
 * Crafting order notifications now request stable sort order and avoid unsafe optional global reads.
 * Preparation tracker, minimap, and LibMarkdown demo integrations now guard optional UI globals before use.
 * LibMarkdown email autolinks now have a local encoder fallback instead of calling an undefined helper.
+* Trade-link profession parsing now ignores malformed numeric tokens safely.
 
 ## [v2.1.0](https://github.com/clery/ArtisanFinder/releases/tag/v2.1.0) (2026-06-11)
 [Full Changelog](https://github.com/clery/ArtisanFinder/compare/v2.0.5...v2.1.0) | [Previous Releases](https://github.com/clery/ArtisanFinder/releases)
