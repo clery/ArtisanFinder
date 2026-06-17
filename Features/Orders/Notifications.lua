@@ -21,6 +21,14 @@ local DEV_CUSTOMER_NAMES = {
 	"Lyrielle",
 }
 
+local function GetOptionalGlobal(name)
+	return rawget(_G, name)
+end
+
+local function GetCraftingOrdersTitle(self)
+	return GetOptionalGlobal("PROFESSIONS_CRAFTING_ORDERS") or self:Text("CRAFTING_ORDERS_TITLE")
+end
+
 local function GetOrderSound()
 	local soundKey = AF.db and AF.db.orderNotificationSound or ORDER_SOUND_FALLBACK
 	return SOUNDKIT and (SOUNDKIT[soundKey] or SOUNDKIT[ORDER_SOUND_FALLBACK])
@@ -818,6 +826,8 @@ function AF:RefreshCustomerOrderStates(reason)
 		local ok = pcall(C_CraftingOrders.ListMyOrders, {
 			offset = tonumber(offset) or 0,
 			callback = callback,
+			primarySort = { sortType = Enum.CraftingOrderSortType.ItemName, reversed = false },
+			secondarySort = { sortType = Enum.CraftingOrderSortType.TimeRemaining, reversed = false },
 		})
 		if not ok then
 			AF.customerOrderStateRequestActive = nil
@@ -949,7 +959,7 @@ function AF:CapturePersonalOrderDetails(orderInfo, form)
 			if outputItemInfo then
 				details.itemLink = outputItemInfo.hyperlink
 				details.itemID = tonumber(outputItemInfo.itemID) or self:GetItemIDFromLink(outputItemInfo.hyperlink)
-				details.itemName = details.itemID and self:GetItemName(details.itemID) or outputItemInfo.itemName
+				details.itemName = details.itemID and self:GetItemName(details.itemID) or rawget(outputItemInfo, "itemName")
 				details.itemIcon = outputItemInfo.icon or (details.itemID and C_Item.GetItemIconByID(details.itemID))
 			end
 		end
@@ -964,7 +974,7 @@ function AF:CapturePersonalOrderDetails(orderInfo, form)
 				if okOutput and type(outputItemInfo) == "table" then
 					details.itemLink = details.itemLink or outputItemInfo.hyperlink
 					details.itemID = details.itemID or tonumber(outputItemInfo.itemID) or self:GetItemIDFromLink(outputItemInfo.hyperlink)
-					details.itemName = details.itemName or outputItemInfo.itemName
+					details.itemName = details.itemName or rawget(outputItemInfo, "itemName")
 					details.itemIcon = details.itemIcon or outputItemInfo.icon
 				end
 			end
@@ -1453,7 +1463,7 @@ function AF:AddCraftingOrderIndicatorTooltip(owner)
 	self.craftingOrderTooltipOwner = owner or GetCraftingOrderFrame() or UIParent
 	if not GameTooltip:IsShown() then
 		GameTooltip:SetOwner(self.craftingOrderTooltipOwner, "ANCHOR_LEFT")
-		GameTooltip:SetText(PROFESSIONS_CRAFTING_ORDERS or self:Text("CRAFTING_ORDERS_TITLE"), 1, 0.82, 0)
+		GameTooltip:SetText(GetCraftingOrdersTitle(self), 1, 0.82, 0)
 	end
 	GameTooltip_AddBlankLineToTooltip(GameTooltip)
 	GameTooltip_AddNormalLine(GameTooltip, "ArtisanFinder", false)
@@ -1480,7 +1490,7 @@ function AF:RefreshOpenCraftingOrderIndicatorTooltip()
 	end
 	GameTooltip:ClearLines()
 	GameTooltip:SetOwner(self.craftingOrderTooltipOwner, "ANCHOR_LEFT")
-	GameTooltip:SetText(PROFESSIONS_CRAFTING_ORDERS or self:Text("CRAFTING_ORDERS_TITLE"), 1, 0.82, 0)
+	GameTooltip:SetText(GetCraftingOrdersTitle(self), 1, 0.82, 0)
 	self:AddCraftingOrderIndicatorTooltip(self.craftingOrderTooltipOwner)
 end
 
@@ -1492,7 +1502,7 @@ function AF:RefreshCraftingOrderIndicator()
 	end
 	local currentTotal, altTotal = GetOrderTotals(self)
 	local hasAlt = altTotal > 0
-	local icon = frame.Icon or _G.MiniMapCraftingOrderIcon
+	local icon = frame.Icon or GetOptionalGlobal("MiniMapCraftingOrderIcon")
 	if hasAlt and icon then
 		icon:SetVertexColor(0.15, 0.95, 1)
 	elseif icon then
