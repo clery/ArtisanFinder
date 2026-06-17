@@ -80,39 +80,44 @@ tinsert(UISpecialFrames, "LMDDemoFrame");
 
 -- This is a minimal hyperlink handler...
 --
+local StaticPopup_Show = rawget(_G, "StaticPopup_Show")
+local StaticPopupDialogs = rawget(_G, "StaticPopupDialogs")
+
 frame.html:SetScript("OnHyperlinkClick", 
   function(f, link, text, ...) 
     if     link=="window:close" 
     then   f:GetParent():Hide() 
-    elseif link:match("https?://")
-    then   StaticPopup_Show("LIBMARKDOWNDEMOFRAME_URL", nil, nil, { title = text, url = link });
+    elseif link:match("https?://") and StaticPopup_Show
+    then   StaticPopup_Show("LIBMARKDOWNDEMOFRAME_URL", nil, nil, { title = text, url = link })
     end 
-  end);
+  end)
 
 frame.html:SetScript("OnHyperlinkEnter", function(f) f:SetCursor("Interface\\CURSOR\\vehichleCursor.PNG") end);
 frame.html:SetScript("OnHyperlinkLeave", function(f) f:SetCursor()                                        end);
 
 -- ... and this is the popup it opens.
 --
-StaticPopupDialogs["LIBMARKDOWNDEMOFRAME_URL"] = 
-{ OnShow = 
-    function(self, data)
-      self.text:SetFormattedText("Here's a link to " .. data.title);
-      self.editBox:SetText(data.url);
-      self.editBox:SetAutoFocus(true);
-      self.editBox:HighlightText();
-    end,
-  text         = "",
-  wide         = true,
-  closeButton  = true,
-  button1      = "OK",
-  timeout      = 60,
-  hasEditBox   = true,
-  hideOnEscape = true,
-  OnAccept               = function(self) self:Hide() end,
-  EditBoxOnEnterPressed  = function(self) self:Hide() end,
-  EditBoxOnEscapePressed = function(self) self:Hide() end 
-};
+if StaticPopupDialogs then
+  StaticPopupDialogs["LIBMARKDOWNDEMOFRAME_URL"] =
+  { OnShow =
+      function(self, data)
+        self.text:SetFormattedText("Here's a link to " .. data.title)
+        self.editBox:SetText(data.url)
+        self.editBox:SetAutoFocus(true)
+        self.editBox:HighlightText()
+      end,
+    text         = "",
+    wide         = true,
+    closeButton  = true,
+    button1      = "OK",
+    timeout      = 60,
+    hasEditBox   = true,
+    hideOnEscape = true,
+    OnAccept               = function(self) self:Hide() end,
+    EditBoxOnEnterPressed  = function(self) self:Hide() end,
+    EditBoxOnEscapePressed = function(self) self:Hide() end
+  }
+end
 
 frame:SetScript("OnShow", 
   function(self)

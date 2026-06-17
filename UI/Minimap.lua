@@ -8,6 +8,10 @@ local STANDALONE_SCALE_MAX = 3
 local ICON_COORDS = { 0, 1, 0, 1 }
 local OUTDATED_BADGE_TEXTURE = "Interface\\DialogFrame\\UI-Dialog-Icon-AlertNew"
 
+local function GetOptionalGlobal(name)
+	return rawget(_G, name)
+end
+
 local function ClampNumber(value, minValue, maxValue, fallback)
 	value = tonumber(value) or fallback
 	if value < minValue then
@@ -34,7 +38,7 @@ local function HasOutdatedProfessionRows(rows)
 end
 
 local function GetMinimapButton()
-	return _G.LibDBIcon10_ArtisanFinder
+	return GetOptionalGlobal("LibDBIcon10_ArtisanFinder")
 end
 
 local OpenOptionsPanel
@@ -71,8 +75,9 @@ end
 
 HideMinimapTooltip = function()
 	AF.minimapTooltipShown = false
-	if _G.LibDBIconTooltip then
-		_G.LibDBIconTooltip:Hide()
+	local libDBIconTooltip = GetOptionalGlobal("LibDBIconTooltip")
+	if libDBIconTooltip then
+		libDBIconTooltip:Hide()
 	end
 	if GameTooltip then
 		GameTooltip:Hide()
@@ -169,7 +174,7 @@ function AF:PopulateMinimapTooltip(tooltip)
 end
 
 function AF:RefreshOpenMinimapTooltip()
-	local tooltip = _G.LibDBIconTooltip
+	local tooltip = GetOptionalGlobal("LibDBIconTooltip")
 	if not self.minimapTooltipShown then
 		return
 	end

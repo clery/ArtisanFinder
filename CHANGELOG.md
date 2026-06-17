@@ -15,6 +15,7 @@
 * Profession scan queue processing now exits safely if scan progress data is missing or malformed.
 * Customer row action buttons now use consistent compact sizing and safer crafting-order labels.
 * Crafting order notifications now request stable sort order and avoid unsafe optional global reads.
+* Preparation tracker, minimap, and LibMarkdown demo integrations now guard optional UI globals before use.
 
 ## [v2.1.0](https://github.com/clery/ArtisanFinder/releases/tag/v2.1.0) (2026-06-11)
 [Full Changelog](https://github.com/clery/ArtisanFinder/compare/v2.0.5...v2.1.0) | [Previous Releases](https://github.com/clery/ArtisanFinder/releases)

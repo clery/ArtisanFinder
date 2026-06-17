@@ -6,6 +6,10 @@ local TRACKER_MODULE_ORDER = 8.5
 local PreparationObjectiveTrackerMixin = {}
 local auctionatorLoadAttempted = false
 
+local function GetOptionalGlobal(name)
+	return rawget(_G, name)
+end
+
 local function ReagentMatches(left, right)
 	if not left or not right then
 		return false
@@ -751,11 +755,16 @@ function AF:ApplyTrackedCraftToCustomerOrder(entry)
 end
 
 local function GetUntrackText()
-	return OBJECTIVES_TRACKER_UNTRACK or UNTRACK or PROFESSIONS_UNTRACK_RECIPE or OBJECTIVES_STOP_TRACKING or "Untrack"
+	return GetOptionalGlobal("OBJECTIVES_TRACKER_UNTRACK")
+		or GetOptionalGlobal("UNTRACK")
+		or PROFESSIONS_UNTRACK_RECIPE
+		or OBJECTIVES_STOP_TRACKING
+		or "Untrack"
 end
 
 local function IsAuctionHouseShown()
-	return (AuctionHouseFrame and AuctionHouseFrame:IsShown()) or (AuctionFrame and AuctionFrame:IsShown())
+	local auctionFrame = GetOptionalGlobal("AuctionFrame")
+	return (AuctionHouseFrame and AuctionHouseFrame:IsShown()) or (auctionFrame and auctionFrame:IsShown())
 end
 
 local function TryLoadAuctionator()
@@ -774,7 +783,8 @@ end
 
 local function GetAuctionatorMultiSearchAPI()
 	TryLoadAuctionator()
-	local api = Auctionator and Auctionator.API and Auctionator.API.v1
+	local auctionator = GetOptionalGlobal("Auctionator")
+	local api = auctionator and auctionator.API and auctionator.API.v1
 	if type(api) == "table"
 		and type(api.MultiSearchAdvanced) == "function" then
 		return api
@@ -896,8 +906,9 @@ local function AddItemContinuable(container, itemID)
 end
 
 local function GetAuctionatorTemporarySearchName()
-	if type(AUCTIONATOR_L_REAGENT_SEARCH) == "string" and AUCTIONATOR_L_REAGENT_SEARCH ~= "" then
-		return AUCTIONATOR_L_REAGENT_SEARCH
+	local reagentSearchText = GetOptionalGlobal("AUCTIONATOR_L_REAGENT_SEARCH")
+	if type(reagentSearchText) == "string" and reagentSearchText ~= "" then
+		return reagentSearchText
 	end
 	return AF:Text("PREP_TRACKER_AUCTIONATOR_SEARCH_NAME")
 end
