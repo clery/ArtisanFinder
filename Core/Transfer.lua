@@ -1034,7 +1034,7 @@ function AF:ImportArtisanTransferPayload(text)
 		local characterName = type(rawName) == "string" and self:NormalizeName(rawName) or nil
 		local characterIdentity = characterName and characterName:lower() or nil
 		characterName = characterIdentity and localNamesByIdentity[characterIdentity] or characterName
-		if not IsValidTransferCharacterName(characterName) or not IsTransferArtisanShapeValid(transfer) then
+		if not characterIdentity or not IsValidTransferCharacterName(characterName) or not IsTransferArtisanShapeValid(transfer) then
 			summary.skippedInvalid = summary.skippedInvalid + 1
 		elseif characterIdentity == currentIdentity then
 			summary.skippedCurrent = summary.skippedCurrent + 1

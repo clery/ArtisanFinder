@@ -10,6 +10,7 @@
 ### Fixed
 
 * Imported customer cache entries now use the addon clock when filling missing timestamps.
+* Transfer imports now skip artisan records that cannot produce a valid character identity.
 
 ## [v2.1.0](https://github.com/clery/ArtisanFinder/releases/tag/v2.1.0) (2026-06-11)
 [Full Changelog](https://github.com/clery/ArtisanFinder/compare/v2.0.5...v2.1.0) | [Previous Releases](https://github.com/clery/ArtisanFinder/releases)

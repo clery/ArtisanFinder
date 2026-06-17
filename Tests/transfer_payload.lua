@@ -2,6 +2,7 @@ local AF = {
 	SCHEMA_VERSION = 17,
 	SCAN_MODEL_VERSION = 5,
 }
+local LoadFile = rawget(_G, "loadfile")
 
 local function Check(condition, message)
 	if not condition then
@@ -10,7 +11,7 @@ local function Check(condition, message)
 end
 
 local function LoadAddonFile(path)
-	local chunk, err = loadfile(path)
+	local chunk, err = LoadFile(path)
 	Check(chunk, err)
 	return chunk("ArtisanFinder", AF)
 end
@@ -256,13 +257,21 @@ Check(capturedEnvelope.exportedAt == nil, "exportedAt should not be exported")
 Check(capturedEnvelope.artisans == nil, "verbose artisan map should not be exported")
 
 local packedArtisan = FindPackedArtisan(capturedEnvelope, "Crafter-Realm")
-Check(packedArtisan, "artisan should be exported")
+if not packedArtisan then
+	error("artisan should be exported", 2)
+end
 Check(packedArtisan[2] ~= profile, "export should copy profile, not reuse saved table")
-Check(packedArtisan.a and packedArtisan.a[1][1] == "164" and packedArtisan.a[1][2] == false, "advertising should keep scalar settings only")
-Check(packedArtisan.k and packedArtisan.k[1][1] == "164" and packedArtisan.k[1][2] == true, "known advertising should be packed")
-Check(packedArtisan.l and packedArtisan.l[1][1] == "164" and packedArtisan.l[1][2] == professionLink, "profession link should be exported once per profession")
+local packedAdvertising = type(packedArtisan.a) == "table" and packedArtisan.a[1] or nil
+local packedKnownAdvertising = type(packedArtisan.k) == "table" and packedArtisan.k[1] or nil
+local packedProfessionLink = type(packedArtisan.l) == "table" and packedArtisan.l[1] or nil
+Check(type(packedAdvertising) == "table" and packedAdvertising[1] == "164" and packedAdvertising[2] == false, "advertising should keep scalar settings only")
+Check(type(packedKnownAdvertising) == "table" and packedKnownAdvertising[1] == "164" and packedKnownAdvertising[2] == true, "known advertising should be packed")
+Check(type(packedProfessionLink) == "table" and packedProfessionLink[1] == "164" and packedProfessionLink[2] == professionLink, "profession link should be exported once per profession")
 
 local packedProfile = packedArtisan[2]
+if type(packedProfile) ~= "table" then
+	error("packed profile should be table", 2)
+end
 local packedProfession = packedProfile[1][1]
 Check(packedProfession[1] == 164 and packedProfession.i == 123, "profession identity should be preserved")
 Check(packedProfession.l == nil, "profession link should not be duplicated on profession row")
