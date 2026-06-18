@@ -427,6 +427,10 @@ L.CHANGELOG_DESCRIPTION = "此版本的最近更改。"
 L.CHANGELOG_ACKNOWLEDGE = "知道了"
 L.CHANGELOG_VERSION = "版本 %s"
 L.CHANGELOG_UNRELEASED = "下次更新"
+L.CHANGELOG_ENTRY_2_1_2 = [[### 已修复
+
+* 唤魔师的蓄力施法（如火焰吐息）不再会被 ArtisanFinder 打断。
+* 客户制造订单轮询和列表刷新现在只会在客户订单界面打开时运行，在你施法/引导或受限制时会延后，并且客户订单刷新事件不再排队客户轮询。]]
 L.CHANGELOG_ENTRY_2_1_1 = [[### 新增
 
 * 专业面板的材料预览现在可以使用“无限材料”开关，在不拥有所有材料的情况下模拟品质分配。

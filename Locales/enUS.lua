@@ -244,6 +244,10 @@ L.CHANGELOG_DESCRIPTION = "Recent changes for this version."
 L.CHANGELOG_ACKNOWLEDGE = "Got It"
 L.CHANGELOG_VERSION = "Version %s"
 L.CHANGELOG_UNRELEASED = "Next update"
+L.CHANGELOG_ENTRY_2_1_2 = [[### Fixed
+
+* Evoker empowered casts such as Fire Breath are no longer interrupted by ArtisanFinder.
+* Customer order polling and list refresh now only run while the customer orders UI is open, defer while you are casting/channeling or restricted, and are no longer queued by customer order refresh events.]]
 L.CHANGELOG_ENTRY_2_1_1 = [[### Added
 
 * Profession panel reagent previews can now use an "Unlimited reagents" toggle to simulate quality allocations without owning every reagent.

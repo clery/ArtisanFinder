@@ -428,6 +428,10 @@ L.CHANGELOG_DESCRIPTION = "Cambios recientes de esta versión."
 L.CHANGELOG_ACKNOWLEDGE = "Entendido"
 L.CHANGELOG_VERSION = "Versión %s"
 L.CHANGELOG_UNRELEASED = "Próxima actualización"
+L.CHANGELOG_ENTRY_2_1_2 = [[### Corregido
+
+* Los lanzamientos potenciados de evocador, como Aliento de fuego, ya no son interrumpidos por ArtisanFinder.
+* La consulta y actualización de lista de pedidos de fabricación de cliente ahora solo se ejecutan cuando la interfaz de pedidos de cliente está abierta, se aplazan mientras estás lanzando/canalizando o estás restringido, y los eventos de actualización de pedidos de cliente ya no las ponen en cola.]]
 L.CHANGELOG_ENTRY_2_1_1 = [[### Añadido
 
 * Las vistas previas de componentes del panel de profesión ahora pueden usar un interruptor "Componentes ilimitados" para simular asignaciones de calidad sin poseer todos los componentes.

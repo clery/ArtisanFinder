@@ -9,6 +9,7 @@ lua Tests/cache_invalidation.lua
 lua Tests/imported_alt_merge.lua
 lua Tests/guild_roster_cache.lua
 lua Tests/customer_reagent_detail.lua
+lua Tests/customer_order_state_refresh.lua
 lua Tests/wire_reagent_facts.lua
 lua Tests/transfer_payload.lua
 ```
@@ -24,6 +25,8 @@ The [imported alt merge harness](imported_alt_merge.lua) verifies imported artis
 The guild roster cache harness verifies partial roster refreshes, authoritative pruning, and connected-realm member name key preservation.
 
 The customer reagent detail harness verifies chunked reagent detail delivery, compact response fallbacks, and shopping list context adoption for refreshed rows.
+
+The [customer order state refresh harness](customer_order_state_refresh.lua) verifies customer order state polling stays idle on `CRAFTINGORDERS_CAN_REQUEST`, while the customer orders UI is closed, and while the player is casting or channeling.
 
 The wire reagent facts harness verifies the lean reagent-skill-facts wire format: crafter-side shrinking (skill-neutral slots omitted), customer-side rehydration from the local recipe schematic, compact responses never downgrading cached detailed facts, failed-rehydration retry payloads, and legacy full-facts acceptance.
 

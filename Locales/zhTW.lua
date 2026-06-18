@@ -433,6 +433,10 @@ L.CHANGELOG_DESCRIPTION = "此版本的最近變更。"
 L.CHANGELOG_ACKNOWLEDGE = "知道了"
 L.CHANGELOG_VERSION = "版本 %s"
 L.CHANGELOG_UNRELEASED = "下次更新"
+L.CHANGELOG_ENTRY_2_1_2 = [[### 已修正
+
+* 喚能師的蓄力施法（如火焰吐息）不再會被 ArtisanFinder 打斷。
+* 客戶製造訂單輪詢和清單重新整理現在只會在客戶訂單介面開啟時執行，在你施法/引導或受限制時會延後，且客戶訂單重新整理事件不再排隊客戶輪詢。]]
 L.CHANGELOG_ENTRY_2_1_1 = [[### 新增
 
 * 專業技能面板的材料預覽現在可以使用「無限材料」切換，在未擁有所有材料時模擬品質分配。

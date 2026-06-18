@@ -434,6 +434,10 @@ L.CHANGELOG_DESCRIPTION = "Mudanças recentes desta versão."
 L.CHANGELOG_ACKNOWLEDGE = "Entendi"
 L.CHANGELOG_VERSION = "Versão %s"
 L.CHANGELOG_UNRELEASED = "Próxima atualização"
+L.CHANGELOG_ENTRY_2_1_2 = [[### Corrigido
+
+* Conjurações potencializadas de Evocador, como Sopro de Fogo, não são mais interrompidas pelo ArtisanFinder.
+* A consulta e atualização da lista de pedidos de criação do cliente agora só rodam quando a interface de pedidos do cliente está aberta, esperam enquanto você está conjurando/canalizando ou restrito, e os eventos de atualização de pedidos do cliente não colocam mais isso na fila.]]
 L.CHANGELOG_ENTRY_2_1_1 = [[### Adicionado
 
 * As prévias de reagentes do painel de profissão agora podem usar a opção "Reagentes ilimitados" para simular alocações de qualidade sem possuir todos os reagentes.

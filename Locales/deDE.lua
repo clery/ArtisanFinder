@@ -426,6 +426,10 @@ L.CHANGELOG_DESCRIPTION = "Aktuelle Änderungen für diese Version."
 L.CHANGELOG_ACKNOWLEDGE = "Verstanden"
 L.CHANGELOG_VERSION = "Version %s"
 L.CHANGELOG_UNRELEASED = "Nächstes Update"
+L.CHANGELOG_ENTRY_2_1_2 = [[### Behoben
+
+* Ermächtigte Evoker-Zauber wie Feueratem werden nicht mehr von ArtisanFinder unterbrochen.
+* Die Abfrage und Listenaktualisierung von Kunden-Handwerksaufträgen laufen jetzt nur noch, wenn die Kundenauftrags-UI geöffnet ist, warten während du zauberst/kanalisierst oder eingeschränkt bist, und werden nicht mehr durch Aktualisierungsereignisse für Kundenaufträge eingereiht.]]
 L.CHANGELOG_ENTRY_2_1_1 = [[### Hinzugefügt
 
 * Reagenzienvorschauen im Berufsfenster können jetzt einen Schalter "Unbegrenzte Reagenzien" verwenden, um Qualitätsverteilungen zu simulieren, ohne jedes Reagenz zu besitzen.

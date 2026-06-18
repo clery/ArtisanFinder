@@ -9,6 +9,7 @@ local TOAST_HOLD_SECONDS = 4.4
 local TOAST_FADE_OUT_SECONDS = 0.7
 local ORDER_NOTIFICATION_FALLBACK_DELAY_SECONDS = 1
 local CUSTOMER_ORDER_REFRESH_DELAY_SECONDS = 0.5
+local CUSTOMER_ORDER_REFRESH_DEFER_DELAY_SECONDS = 1.5
 local DEV_ORDER_ITEM_ID = 240949
 local DEV_CUSTOMER_NAMES = {
 	"Aelindra",
@@ -25,8 +26,34 @@ local function GetOptionalGlobal(name)
 	return rawget(_G, name)
 end
 
+local function IsFrameShown(frame)
+	return frame and frame.IsShown and frame:IsShown()
+end
+
 local function GetCraftingOrdersTitle(self)
 	return GetOptionalGlobal("PROFESSIONS_CRAFTING_ORDERS") or self:Text("CRAFTING_ORDERS_TITLE")
+end
+
+local function IsCustomerOrdersFrameOpen()
+	local ordersFrame = GetOptionalGlobal("ProfessionsCustomerOrdersFrame")
+	return IsFrameShown(ordersFrame)
+end
+
+local function GetCustomerOrderStateRefreshBlockReason(self)
+	if self.IsProtectedActionRestricted and self:IsProtectedActionRestricted() then
+		return "restricted"
+	end
+	if self.IsPlayerCastingOrChanneling and self:IsPlayerCastingOrChanneling() then
+		return "player-casting"
+	end
+	if not IsCustomerOrdersFrameOpen() then
+		return "orders-ui-closed"
+	end
+	return nil
+end
+
+local function ShouldRetryCustomerOrderStateRefresh(blockReason)
+	return blockReason == "restricted" or blockReason == "player-casting"
 end
 
 local function GetOrderSound()
@@ -767,10 +794,20 @@ function AF:QueueCustomerOrderStateRefresh(reason, delay)
 	if not C_CraftingOrders or not C_CraftingOrders.ListMyOrders then
 		return
 	end
+	if reason == "craftingorders_can_request" then
+		return
+	end
 	self.customerOrderStateRefreshToken = (self.customerOrderStateRefreshToken or 0) + 1
 	local token = self.customerOrderStateRefreshToken
 	C_Timer.After(delay or CUSTOMER_ORDER_REFRESH_DELAY_SECONDS, function()
 		if AF.customerOrderStateRefreshToken ~= token then
+			return
+		end
+		local blockReason = GetCustomerOrderStateRefreshBlockReason(AF)
+		if blockReason then
+			if ShouldRetryCustomerOrderStateRefresh(blockReason) then
+				AF:QueueCustomerOrderStateRefresh(reason, CUSTOMER_ORDER_REFRESH_DEFER_DELAY_SECONDS)
+			end
 			return
 		end
 		AF:RefreshCustomerOrderStates(reason)
@@ -779,6 +816,13 @@ end
 
 function AF:RefreshCustomerOrderStates(reason)
 	if self.customerOrderStateRequestActive or not C_FunctionContainers or not C_FunctionContainers.CreateCallback or not C_CraftingOrders or not C_CraftingOrders.ListMyOrders then
+		return
+	end
+	local blockReason = GetCustomerOrderStateRefreshBlockReason(self)
+	if blockReason then
+		if ShouldRetryCustomerOrderStateRefresh(blockReason) then
+			self:QueueCustomerOrderStateRefresh(reason, CUSTOMER_ORDER_REFRESH_DEFER_DELAY_SECONDS)
+		end
 		return
 	end
 	self.customerOrderStateRequestActive = true
@@ -809,6 +853,15 @@ function AF:RefreshCustomerOrderStates(reason)
 				AF.customerOrderStateRequestActive = nil
 				AF.customerOrderStateRefreshOrders = nil
 				AF:DebugLog("orders", string.format("customer states failed result=%s reason=%s", tostring(result), tostring(reason or "")))
+				return
+			end
+			local blockReason = GetCustomerOrderStateRefreshBlockReason(AF)
+			if blockReason then
+				AF.customerOrderStateRequestActive = nil
+				AF.customerOrderStateRefreshOrders = nil
+				if ShouldRetryCustomerOrderStateRefresh(blockReason) then
+					AF:QueueCustomerOrderStateRefresh(reason, CUSTOMER_ORDER_REFRESH_DEFER_DELAY_SECONDS)
+				end
 				return
 			end
 			local orders = C_CraftingOrders and C_CraftingOrders.GetMyOrders and C_CraftingOrders.GetMyOrders() or {}

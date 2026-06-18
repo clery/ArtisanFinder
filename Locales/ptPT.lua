@@ -433,6 +433,10 @@ L.CHANGELOG_DESCRIPTION = "Alterações recentes desta versão."
 L.CHANGELOG_ACKNOWLEDGE = "Entendi"
 L.CHANGELOG_VERSION = "Versão %s"
 L.CHANGELOG_UNRELEASED = "Próxima atualização"
+L.CHANGELOG_ENTRY_2_1_2 = [[### Corrigido
+
+* Lançamentos potencializados de Evocador, como Sopro de Fogo, já não são interrompidos pelo ArtisanFinder.
+* A consulta e atualização da lista de encomendas de criação do cliente agora só são executadas quando a interface de encomendas do cliente está aberta, aguardam enquanto estás a lançar/canalizar ou estás restrito, e os eventos de atualização de encomendas do cliente já não as colocam em fila.]]
 L.CHANGELOG_ENTRY_2_1_1 = [[### Adicionado
 
 * As pré-visualizações de reagentes no painel de profissão podem agora usar a opção "Reagentes ilimitados" para simular distribuições de qualidade sem possuir todos os reagentes.

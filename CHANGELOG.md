@@ -1,5 +1,13 @@
 # ArtisanFinder
 
+## [v2.1.2](https://github.com/clery/ArtisanFinder/releases/tag/v2.1.2) (2026-06-18)
+[Full Changelog](https://github.com/clery/ArtisanFinder/compare/v2.1.1...v2.1.2) | [Previous Releases](https://github.com/clery/ArtisanFinder/releases)
+
+### Fixed
+
+* Evoker empowered casts such as Fire Breath are no longer interrupted by ArtisanFinder.
+* Customer crafting-order polling (`ListMyOrders` / customer order state refresh) now only runs while the customer orders UI is open, defers while the player is casting/channeling or restricted, and `CRAFTINGORDERS_CAN_REQUEST` no longer queues customer polling.
+
 ## [v2.1.1](https://github.com/clery/ArtisanFinder/releases/tag/v2.1.1) (2026-06-11)
 [Full Changelog](https://github.com/clery/ArtisanFinder/compare/v2.1.0...v2.1.1) | [Previous Releases](https://github.com/clery/ArtisanFinder/releases)
 

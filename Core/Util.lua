@@ -205,6 +205,24 @@ function AF:IsSecretValue(value)
 	return issecretvalue and issecretvalue(value) == true
 end
 
+local function HasPlayerCastInfo(callback)
+	if type(callback) ~= "function" then
+		return false
+	end
+	local ok, name = pcall(callback, "player")
+	if not ok then
+		return false
+	end
+	if issecretvalue and issecretvalue(name) then
+		return true
+	end
+	return name ~= nil
+end
+
+function AF:IsPlayerCastingOrChanneling()
+	return HasPlayerCastInfo(UnitCastingInfo) or HasPlayerCastInfo(UnitChannelInfo)
+end
+
 function AF:HideEmbeddedItemTooltip(tooltip)
 	local itemTooltip = tooltip and tooltip.ItemTooltip
 	if itemTooltip and itemTooltip.Hide then

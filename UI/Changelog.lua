@@ -1,7 +1,11 @@
 local addonName, AF = ...
 
-AF.CHANGELOG_FALLBACK_VERSION = "2.1.1"
+AF.CHANGELOG_FALLBACK_VERSION = "2.1.2"
 AF.CHANGELOG_RECENT_ENTRIES = {
+	{
+		version = "2.1.2",
+		key = "CHANGELOG_ENTRY_2_1_2",
+	},
 	{
 		version = "2.1.1",
 		key = "CHANGELOG_ENTRY_2_1_1",

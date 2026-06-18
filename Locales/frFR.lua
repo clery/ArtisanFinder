@@ -426,6 +426,10 @@ L.CHANGELOG_DESCRIPTION = "Changements récents pour cette version."
 L.CHANGELOG_ACKNOWLEDGE = "Compris"
 L.CHANGELOG_VERSION = "Version %s"
 L.CHANGELOG_UNRELEASED = "Prochaine mise à jour"
+L.CHANGELOG_ENTRY_2_1_2 = [[### Corrigé
+
+* Les sorts renforcés d'évocateur comme Souffle de feu ne sont plus interrompus par ArtisanFinder.
+* La vérification et l'actualisation de la liste des commandes d'artisanat côté client ne s'exécutent désormais que lorsque l'interface des commandes client est ouverte, attendent pendant que vous incantez/canalisez ou êtes en état restreint, et ne sont plus mises en file par les événements d'actualisation des commandes client.]]
 L.CHANGELOG_ENTRY_2_1_1 = [[### Ajouté
 
 * Les aperçus de composants du panneau de métier peuvent maintenant utiliser une option "Composants illimités" pour simuler les répartitions de qualité sans posséder tous les composants.
