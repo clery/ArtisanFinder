@@ -1,4 +1,4 @@
-## Interface: 120005, 120007
+## Interface: 120005, 120007, 120100
 
 ## Title: ArtisanFinder
 ## Notes: Find available artisans from Crafting Orders and manage crafter availability from Professions.
