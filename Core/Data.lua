@@ -1775,13 +1775,17 @@ function AF:TableCount(tbl)
 	return count
 end
 
-function AF:GetProfessionScannedCount(profile, professionID)
+function AF:GetProfessionScannedCount(profile, professionID, scanSummary)
 	if not profile or not professionID then
 		return 0
 	end
 	local baseProfessionID = self:GetSupportedProfessionID(professionID)
 	if not baseProfessionID then
 		return 0
+	end
+	if scanSummary then
+		local professionSummary = scanSummary[baseProfessionID]
+		return professionSummary and professionSummary.count or 0
 	end
 	local count = 0
 	for _, item in pairs(profile.items or {}) do
@@ -1790,6 +1794,33 @@ function AF:GetProfessionScannedCount(profile, professionID)
 		end
 	end
 	return count
+end
+
+function AF:GetProfileProfessionScanSummary(profile)
+	local summary = {}
+	if type(profile) ~= "table" then
+		return summary
+	end
+	for itemKey, item in pairs(profile.items or {}) do
+		if type(item) == "table" then
+			local professionID = self:GetSupportedProfessionID(item.professionID, item)
+			if professionID then
+				local professionSummary = summary[professionID]
+				if not professionSummary then
+					professionSummary = {
+						count = 0,
+						coreDataUsable = true,
+					}
+					summary[professionID] = professionSummary
+				end
+				professionSummary.count = professionSummary.count + 1
+				if not tonumber(item.itemID or itemKey) or not tonumber(item.recipeID) or not HasCurrentScanModel(item) then
+					professionSummary.coreDataUsable = false
+				end
+			end
+		end
+	end
+	return summary
 end
 
 local function GetScanSignatureVersion(signature)
@@ -1802,13 +1833,21 @@ local function IsCompatibleScanSignatureVersion(version, currentVersion)
 	return version and currentVersion and version >= MIN_COMPATIBLE_SCAN_SIGNATURE_VERSION and version <= currentVersion
 end
 
-function AF:IsScannedProfessionCoreDataUsable(profile, professionID)
+function AF:IsScannedProfessionCoreDataUsable(profile, professionID, scanSummary)
 	if type(profile) ~= "table" or not professionID then
 		return false
 	end
+	local baseProfessionID = self:GetSupportedProfessionID(professionID)
+	if not baseProfessionID then
+		return false
+	end
+	if scanSummary and baseProfessionID then
+		local professionSummary = scanSummary[baseProfessionID]
+		return professionSummary and professionSummary.count > 0 and professionSummary.coreDataUsable == true
+	end
 	local found = false
 	for itemKey, item in pairs(profile.items or {}) do
-		if type(item) == "table" and self:GetSupportedProfessionID(item.professionID, item) == self:GetSupportedProfessionID(professionID) then
+		if type(item) == "table" and self:GetSupportedProfessionID(item.professionID, item) == baseProfessionID then
 			found = true
 			if not tonumber(item.itemID or itemKey) or not tonumber(item.recipeID) or not HasCurrentScanModel(item) then
 				return false
@@ -1818,14 +1857,20 @@ function AF:IsScannedProfessionCoreDataUsable(profile, professionID)
 	return found
 end
 
-function AF:IsDeprecatedScannedProfession(profile, professionID, profession)
+function AF:IsDeprecatedScannedProfession(profile, professionID, profession, scanSummary, currentVersion)
 	if not profile or not professionID then
 		return false
 	end
-	if self:GetProfessionScannedCount(profile, professionID) <= 0 then
+	local baseProfessionID = self:GetSupportedProfessionID(professionID)
+	local professionSummary = scanSummary and baseProfessionID and scanSummary[baseProfessionID] or nil
+	if professionSummary then
+		if professionSummary.count <= 0 then
+			return false
+		end
+	elseif self:GetProfessionScannedCount(profile, professionID, scanSummary) <= 0 then
 		return false
 	end
-	local currentVersion = self:GetCurrentProfessionScanSignatureVersion()
+	currentVersion = currentVersion or self:GetCurrentProfessionScanSignatureVersion()
 	if not currentVersion then
 		return false
 	end
@@ -1833,7 +1878,7 @@ function AF:IsDeprecatedScannedProfession(profile, professionID, profession)
 	if scanVersion == currentVersion then
 		return false
 	end
-	if IsCompatibleScanSignatureVersion(scanVersion, currentVersion) and self:IsScannedProfessionCoreDataUsable(profile, professionID) then
+	if IsCompatibleScanSignatureVersion(scanVersion, currentVersion) and self:IsScannedProfessionCoreDataUsable(profile, professionID, scanSummary) then
 		return false
 	end
 	return true
@@ -1841,25 +1886,29 @@ end
 
 function AF:GetDeprecatedScanSummaries()
 	local summaries = {}
+	local currentVersion = self:GetCurrentProfessionScanSignatureVersion()
 	self:ForEachArtisanProfile(function(characterName, profile)
 		characterName = self:NormalizeName(characterName) or characterName
 		if characterName then
+			local scanSummary = self:GetProfileProfessionScanSummary(profile)
 			local professions = {}
 			local seenProfessions = {}
 			for professionKey, profession in pairs(profile.professions or {}) do
 				local professionID = self:GetSupportedProfessionID(professionKey, profession)
-				if self:IsDeprecatedScannedProfession(profile, professionID, profession) then
+				if self:IsDeprecatedScannedProfession(profile, professionID, profession, scanSummary, currentVersion) then
 					seenProfessions[professionID] = true
 					table.insert(professions, self:GetProfessionName(professionID, profile))
 				end
 			end
 			for _, item in pairs(profile.items or {}) do
-				local professionID = self:GetSupportedProfessionID(item.professionID, item)
-				if professionID and not seenProfessions[professionID] then
-					local profession = profile.professions and profile.professions[tostring(professionID)]
-					if self:IsDeprecatedScannedProfession(profile, professionID, profession) then
-						seenProfessions[professionID] = true
-						table.insert(professions, self:GetProfessionName(professionID, profile))
+				if type(item) == "table" then
+					local professionID = self:GetSupportedProfessionID(item.professionID, item)
+					if professionID and not seenProfessions[professionID] then
+						local profession = profile.professions and profile.professions[tostring(professionID)]
+						if self:IsDeprecatedScannedProfession(profile, professionID, profession, scanSummary, currentVersion) then
+							seenProfessions[professionID] = true
+							table.insert(professions, self:GetProfessionName(professionID, profile))
+						end
 					end
 				end
 			end
@@ -1892,18 +1941,13 @@ end
 
 function AF:GetScannedProfessionRows()
 	local rows = {}
+	local currentVersion = self:GetCurrentProfessionScanSignatureVersion()
 	self:ForEachArtisanProfile(function(characterName, profile)
 		local added = {}
-		local counts = {}
-		for _, item in pairs(profile.items or {}) do
-			local professionID = self:GetSupportedProfessionID(item.professionID, item)
-			if professionID then
-				counts[professionID] = (counts[professionID] or 0) + 1
-			end
-		end
+		local scanSummary = self:GetProfileProfessionScanSummary(profile)
 		for professionKey, profession in pairs(profile.professions or {}) do
 			local professionID = self:GetSupportedProfessionID(professionKey, profession)
-			local count = professionID and counts[professionID] or 0
+			local count = self:GetProfessionScannedCount(profile, professionID, scanSummary)
 			if professionID and count > 0 then
 				local displayProfessionID = self:GetProfessionDefaultAdvertisingID(professionID, profession)
 				added[professionID] = true
@@ -1916,26 +1960,28 @@ function AF:GetScannedProfessionRows()
 					professionIcon = profession.icon or profession.professionIcon or profession.iconTexture,
 					count = count,
 					advertised = self:IsProfessionAdvertised(characterName, professionID),
-					outdated = self:IsDeprecatedScannedProfession(profile, professionID, profession),
+					outdated = self:IsDeprecatedScannedProfession(profile, professionID, profession, scanSummary, currentVersion),
 				})
 			end
 		end
 		for _, item in pairs(profile.items or {}) do
-			local professionID = self:GetSupportedProfessionID(item.professionID, item)
-			if professionID and not added[professionID] then
-				local displayProfessionID = self:GetProfessionDefaultAdvertisingID(professionID, item)
-				added[professionID] = true
-				table.insert(rows, {
-					characterName = characterName,
-					professionID = professionID,
-					baseProfessionID = displayProfessionID,
-					parentProfessionID = item.parentProfessionID,
-					professionName = self:GetProfessionName(displayProfessionID, profile),
-					professionIcon = item.professionIcon or item.icon or item.iconTexture,
-					count = counts[professionID] or 0,
-					advertised = self:IsProfessionAdvertised(characterName, professionID),
-					outdated = self:IsDeprecatedScannedProfession(profile, professionID, profile.professions and profile.professions[tostring(professionID)]),
-				})
+			if type(item) == "table" then
+				local professionID = self:GetSupportedProfessionID(item.professionID, item)
+				if professionID and not added[professionID] then
+					local displayProfessionID = self:GetProfessionDefaultAdvertisingID(professionID, item)
+					added[professionID] = true
+					table.insert(rows, {
+						characterName = characterName,
+						professionID = professionID,
+						baseProfessionID = displayProfessionID,
+						parentProfessionID = item.parentProfessionID,
+						professionName = self:GetProfessionName(displayProfessionID, profile),
+						professionIcon = item.professionIcon or item.icon or item.iconTexture,
+						count = self:GetProfessionScannedCount(profile, professionID, scanSummary),
+						advertised = self:IsProfessionAdvertised(characterName, professionID),
+						outdated = self:IsDeprecatedScannedProfession(profile, professionID, profile.professions and profile.professions[tostring(professionID)], scanSummary, currentVersion),
+					})
+				end
 			end
 		end
 	end)
