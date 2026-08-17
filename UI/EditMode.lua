@@ -4,7 +4,67 @@ local TOAST_DEFAULT_POSITION = { point = "TOP", x = 0, y = -170 }
 local MINIMAP_DEFAULT_POSITION = { point = "CENTER", x = -180, y = -120 }
 
 local function GetLibEditMode()
-	return LibStub and LibStub("LibEditMode", true)
+	return AF.LibEditMode or LibStub and LibStub("LibEditMode", true)
+end
+
+local function ResetLibEditModeCustomSelections(lib)
+	local internal = lib and lib.internal
+	if internal then
+		if internal.dialog then
+			internal.dialog:Hide()
+		end
+		if internal.extension then
+			internal.extension:Hide()
+		end
+	end
+	for frame, selection in next, lib and lib.frameSelections or {} do
+		if selection.isSelected then
+			frame:SetMovable(false)
+		end
+		if lib.isEditing then
+			selection:ShowHighlighted()
+		else
+			selection:Hide()
+			selection.isSelected = false
+		end
+	end
+end
+
+local function SelectLibEditModeCustomFrame(selection)
+	if InCombatLockdown and InCombatLockdown() then
+		return
+	end
+	if AF.IsProtectedActionRestricted and AF:IsProtectedActionRestricted() then
+		return
+	end
+
+	local lib = selection.artisanFinderLibEditMode
+	local dialog = lib and lib.internal and lib.internal.dialog
+	local parent = selection.parent or selection:GetParent()
+	if not lib or not dialog or not parent then
+		return
+	end
+
+	ResetLibEditModeCustomSelections(lib)
+	parent:SetMovable(true)
+	selection:ShowSelected(true)
+
+	if dialog.selection ~= selection then
+		dialog:Reset()
+	end
+	dialog:Update(selection)
+end
+
+local function PatchLibEditModeSelection(lib, frame)
+	local selection = lib and lib.frameSelections and lib.frameSelections[frame]
+	if not selection or selection.artisanFinderSafeSelectionPatched then
+		return
+	end
+	selection.artisanFinderSafeSelectionPatched = true
+	selection.artisanFinderLibEditMode = lib
+	-- LibEditMode's default handler clears Blizzard's selected Edit Mode system from addon code,
+	-- which can taint action bars and later break protected button visibility/cooldown updates.
+	selection:SetScript("OnMouseDown", SelectLibEditModeCustomFrame)
 end
 
 local function GetToastDefault()
@@ -100,6 +160,7 @@ function AF:RegisterOrderNotificationEditModeFrame(lib)
 	lib:AddFrame(anchor, function(_, _, point, x, y)
 		AF:SetOrderNotificationAnchorPosition(point, x, y)
 	end, GetToastDefault(), self:Text("EDITMODE_ORDER_TOAST"))
+	PatchLibEditModeSelection(lib, anchor)
 	lib:AddFrameSettings(anchor, {
 		CreateSliderSetting(
 			self:Text("EDITMODE_TOAST_SCALE"),
@@ -148,6 +209,7 @@ function AF:RegisterStandaloneMinimapEditModeFrame(lib)
 		AF.db.minimap.standaloneY = math.floor((tonumber(y) or 0) + 0.5)
 		AF:PositionStandaloneMinimapButton()
 	end, GetMinimapDefault(), self:Text("EDITMODE_STANDALONE_BUTTON"))
+	PatchLibEditModeSelection(lib, button)
 	lib:AddFrameSettings(button, {
 		CreateSliderSetting(
 			self:Text("EDITMODE_STANDALONE_SCALE"),
