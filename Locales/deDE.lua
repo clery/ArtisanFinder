@@ -426,6 +426,17 @@ L.CHANGELOG_DESCRIPTION = "Aktuelle Änderungen für diese Version."
 L.CHANGELOG_ACKNOWLEDGE = "Verstanden"
 L.CHANGELOG_VERSION = "Version %s"
 L.CHANGELOG_UNRELEASED = "Nächstes Update"
+L.CHANGELOG_ENTRY_2_1_4 = [[### Geändert
+
+* Die Interface-Version wurde für World of Warcraft Patch 12.1.5 aktualisiert.]]
+L.CHANGELOG_ENTRY_2_1_3 = [[### Geändert
+
+* Wiederholte Berechnungen beim Prüfen veralteter Berufsscans und Anzeigen gescannter Berufe wurden reduziert, damit große Handwerkerprofile schneller reagieren.
+
+### Behoben
+
+* Aktionsleistenfehler nach der Auswahl von ArtisanFinder-Steuerelementen im Bearbeitungsmodus wurden behoben.
+* Fehlerhafte gespeicherte Scaneinträge werden beim Erstellen von Berufslisten und Übersichten veralteter Scans nun sicher übersprungen.]]
 L.CHANGELOG_ENTRY_2_1_2 = [[### Behoben
 
 * Ermächtigte Evoker-Zauber wie Feueratem werden nicht mehr von ArtisanFinder unterbrochen.

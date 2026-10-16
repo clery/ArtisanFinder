@@ -244,6 +244,17 @@ L.CHANGELOG_DESCRIPTION = "Recent changes for this version."
 L.CHANGELOG_ACKNOWLEDGE = "Got It"
 L.CHANGELOG_VERSION = "Version %s"
 L.CHANGELOG_UNRELEASED = "Next update"
+L.CHANGELOG_ENTRY_2_1_4 = [[### Changed
+
+* Updated the interface version for World of Warcraft patch 12.1.5.]]
+L.CHANGELOG_ENTRY_2_1_3 = [[### Changed
+
+* Reduced repeated processing when checking outdated profession scans and displaying scanned professions, improving responsiveness with large artisan profiles.
+
+### Fixed
+
+* Prevented action-bar errors after selecting ArtisanFinder controls in Edit Mode.
+* Malformed saved scan entries are now safely skipped when building profession lists and outdated-scan summaries.]]
 L.CHANGELOG_ENTRY_2_1_2 = [[### Fixed
 
 * Evoker empowered casts such as Fire Breath are no longer interrupted by ArtisanFinder.

@@ -428,6 +428,17 @@ L.CHANGELOG_DESCRIPTION = "Cambios recientes de esta versión."
 L.CHANGELOG_ACKNOWLEDGE = "Entendido"
 L.CHANGELOG_VERSION = "Versión %s"
 L.CHANGELOG_UNRELEASED = "Próxima actualización"
+L.CHANGELOG_ENTRY_2_1_4 = [[### Cambiado
+
+* Se actualizó la versión de interfaz para el parche 12.1.5 de World of Warcraft.]]
+L.CHANGELOG_ENTRY_2_1_3 = [[### Cambiado
+
+* Se redujo el procesamiento repetido al comprobar escaneos de profesiones obsoletos y mostrar profesiones escaneadas, mejorando la respuesta con perfiles de artesanos grandes.
+
+### Corregido
+
+* Se corrigieron los errores de las barras de acción después de seleccionar controles de ArtisanFinder en el modo de edición.
+* Las entradas de escaneo guardadas con formato incorrecto ahora se omiten de forma segura al crear listas de profesiones y resúmenes de escaneos obsoletos.]]
 L.CHANGELOG_ENTRY_2_1_2 = [[### Corregido
 
 * Los lanzamientos potenciados de evocador, como Aliento de fuego, ya no son interrumpidos por ArtisanFinder.

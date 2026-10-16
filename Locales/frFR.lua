@@ -426,6 +426,17 @@ L.CHANGELOG_DESCRIPTION = "Changements récents pour cette version."
 L.CHANGELOG_ACKNOWLEDGE = "Compris"
 L.CHANGELOG_VERSION = "Version %s"
 L.CHANGELOG_UNRELEASED = "Prochaine mise à jour"
+L.CHANGELOG_ENTRY_2_1_4 = [[### Modifié
+
+* Mise à jour de la version d'interface pour le patch 12.1.5 de World of Warcraft.]]
+L.CHANGELOG_ENTRY_2_1_3 = [[### Modifié
+
+* Réduction des traitements répétés lors de la vérification des scans de métiers obsolètes et de l'affichage des métiers scannés, pour une meilleure réactivité avec les profils d'artisans volumineux.
+
+### Corrigé
+
+* Correction des erreurs de barres d'action après la sélection des contrôles d'ArtisanFinder en mode Édition.
+* Les entrées de scan enregistrées mal formées sont désormais ignorées sans erreur lors de la création des listes de métiers et des résumés de scans obsolètes.]]
 L.CHANGELOG_ENTRY_2_1_2 = [[### Corrigé
 
 * Les sorts renforcés d'évocateur comme Souffle de feu ne sont plus interrompus par ArtisanFinder.

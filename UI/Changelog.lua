@@ -1,7 +1,15 @@
 local addonName, AF = ...
 
-AF.CHANGELOG_FALLBACK_VERSION = "2.1.2"
+AF.CHANGELOG_FALLBACK_VERSION = "2.1.4"
 AF.CHANGELOG_RECENT_ENTRIES = {
+	{
+		version = "2.1.4",
+		key = "CHANGELOG_ENTRY_2_1_4",
+	},
+	{
+		version = "2.1.3",
+		key = "CHANGELOG_ENTRY_2_1_3",
+	},
 	{
 		version = "2.1.2",
 		key = "CHANGELOG_ENTRY_2_1_2",
@@ -112,7 +120,7 @@ function AF:GetChangelogEntries(sinceVersion)
 	if #entries == 0 then
 		table.insert(entries, {
 			version = self:GetAddonVersion(),
-			content = self:Text("CHANGELOG_ENTRY_2_1_1"),
+			content = self:Text("CHANGELOG_ENTRY_2_1_4"),
 		})
 	end
 	return entries

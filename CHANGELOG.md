@@ -1,5 +1,26 @@
 # ArtisanFinder
 
+## [v2.1.4](https://github.com/clery/ArtisanFinder/releases/tag/v2.1.4) (2026-10-16)
+
+[Full Changelog](https://github.com/clery/ArtisanFinder/compare/v2.1.3...v2.1.4) | [Previous Releases](https://github.com/clery/ArtisanFinder/releases)
+
+### Changed
+
+* Updated the interface version for World of Warcraft patch 12.1.5.
+
+## [v2.1.3](https://github.com/clery/ArtisanFinder/releases/tag/v2.1.3) (2026-08-17)
+
+[Full Changelog](https://github.com/clery/ArtisanFinder/compare/v2.1.2b...v2.1.3) | [Previous Releases](https://github.com/clery/ArtisanFinder/releases)
+
+### Changed
+
+* Reduced repeated processing when checking outdated profession scans and displaying scanned professions, improving responsiveness with large artisan profiles.
+
+### Fixed
+
+* Prevented action-bar errors after selecting ArtisanFinder controls in Edit Mode.
+* Malformed saved scan entries are now safely skipped when building profession lists and outdated-scan summaries.
+
 ## [v2.1.2](https://github.com/clery/ArtisanFinder/releases/tag/v2.1.2) (2026-06-18)
 [Full Changelog](https://github.com/clery/ArtisanFinder/compare/v2.1.1...v2.1.2) | [Previous Releases](https://github.com/clery/ArtisanFinder/releases)
 

@@ -433,6 +433,17 @@ L.CHANGELOG_DESCRIPTION = "Alterações recentes desta versão."
 L.CHANGELOG_ACKNOWLEDGE = "Entendi"
 L.CHANGELOG_VERSION = "Versão %s"
 L.CHANGELOG_UNRELEASED = "Próxima atualização"
+L.CHANGELOG_ENTRY_2_1_4 = [[### Alterado
+
+* A versão da interface foi atualizada para o patch 12.1.5 de World of Warcraft.]]
+L.CHANGELOG_ENTRY_2_1_3 = [[### Alterado
+
+* Foi reduzido o processamento repetido ao verificar análises de profissões desatualizadas e apresentar profissões analisadas, melhorando a resposta com perfis de artesãos grandes.
+
+### Corrigido
+
+* Foram corrigidos erros nas barras de ação após selecionar controlos do ArtisanFinder no modo de edição.
+* As entradas de análise guardadas com formato incorreto são agora ignoradas em segurança ao criar listas de profissões e resumos de análises desatualizadas.]]
 L.CHANGELOG_ENTRY_2_1_2 = [[### Corrigido
 
 * Lançamentos potencializados de Evocador, como Sopro de Fogo, já não são interrompidos pelo ArtisanFinder.

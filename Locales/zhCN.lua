@@ -427,6 +427,17 @@ L.CHANGELOG_DESCRIPTION = "此版本的最近更改。"
 L.CHANGELOG_ACKNOWLEDGE = "知道了"
 L.CHANGELOG_VERSION = "版本 %s"
 L.CHANGELOG_UNRELEASED = "下次更新"
+L.CHANGELOG_ENTRY_2_1_4 = [[### 已更改
+
+* 更新了接口版本，以适配《魔兽世界》12.1.5补丁。]]
+L.CHANGELOG_ENTRY_2_1_3 = [[### 已更改
+
+* 减少检查过期专业扫描数据和显示已扫描专业时的重复计算，提高大型工匠档案的响应速度。
+
+### 已修复
+
+* 修复在编辑模式中选择ArtisanFinder控件后出现的动作条错误。
+* 生成专业列表和过期扫描摘要时，现在会安全跳过格式错误的已保存扫描记录。]]
 L.CHANGELOG_ENTRY_2_1_2 = [[### 已修复
 
 * 唤魔师的蓄力施法（如火焰吐息）不再会被 ArtisanFinder 打断。

@@ -433,6 +433,17 @@ L.CHANGELOG_DESCRIPTION = "此版本的最近變更。"
 L.CHANGELOG_ACKNOWLEDGE = "知道了"
 L.CHANGELOG_VERSION = "版本 %s"
 L.CHANGELOG_UNRELEASED = "下次更新"
+L.CHANGELOG_ENTRY_2_1_4 = [[### 已變更
+
+* 更新了介面版本，以支援《魔獸世界》12.1.5更新。]]
+L.CHANGELOG_ENTRY_2_1_3 = [[### 已變更
+
+* 減少檢查過期專業掃描資料及顯示已掃描專業時的重複計算，提升大型工匠檔案的反應速度。
+
+### 已修正
+
+* 修正在編輯模式中選取ArtisanFinder控制項後出現的快捷列錯誤。
+* 建立專業清單及過期掃描摘要時，現在會安全略過格式錯誤的已儲存掃描紀錄。]]
 L.CHANGELOG_ENTRY_2_1_2 = [[### 已修正
 
 * 喚能師的蓄力施法（如火焰吐息）不再會被 ArtisanFinder 打斷。
