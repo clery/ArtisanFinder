@@ -235,11 +235,11 @@ function AF:InitializeEditMode()
 		return
 	end
 	local lib = GetLibEditMode()
-	if not lib then
+	if not lib or not Enum or not Enum.EditModeSettingDisplayType or not EditModeManagerFrame then
 		return
 	end
 	self.editModeInitialized = true
-	self:RegisterOrderNotificationEditModeFrame(lib)
+	if not self.IsForever then self:RegisterOrderNotificationEditModeFrame(lib) end
 	self:RegisterStandaloneMinimapEditModeFrame(lib)
 	PatchReadOnlySliderValues(lib)
 end

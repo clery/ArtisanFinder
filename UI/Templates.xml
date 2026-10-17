@@ -488,10 +488,6 @@
 		</Layers>
 	</Frame>
 
-	<Button name="ArtisanFinderCustomerPreviewButtonTemplate" virtual="true">
-		<Size x="18" y="18"/>
-	</Button>
-
 	<Button name="ArtisanFinderCrafterReopenButtonTemplate" virtual="true" inherits="UIPanelButtonTemplate">
 		<Size x="32" y="32"/>
 		<Layers>

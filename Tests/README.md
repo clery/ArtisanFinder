@@ -1,33 +1,23 @@
-# Offline Regression Tests
+# Retail and Forever regression tests
 
-Run from repository root:
+Run `rtk proxy python3 Tests/run.py` from the addon directory, or use the script's absolute path from another directory.
 
-```sh
-lua Tests/profession_open_regression.lua
-lua Tests/recommendation.lua
-lua Tests/cache_invalidation.lua
-lua Tests/imported_alt_merge.lua
-lua Tests/guild_roster_cache.lua
-lua Tests/customer_reagent_detail.lua
-lua Tests/customer_order_state_refresh.lua
-lua Tests/wire_reagent_facts.lua
-lua Tests/transfer_payload.lua
-```
+The runner validates recursive Lua/XML dependencies for all three manifests, checks client module isolation and shared modules, parses all Lua source, and runs every Lua fixture. It also builds both distribution archives and checks their runtime includes without relying on the source checkout.
 
-The profession-open regression harness creates a synthetic multi-character saved-data set without loading or changing live WoW saved variables. It verifies profession-link capture scaling, changed-link propagation, disabled automatic scan behavior, manual force scans, and pending-scan UI lookup scaling.
+The original Retail suites cover customer order-state refresh, preparation/reagent details, quality wire data, recommendation calculations, guild cache, imports, transfers and large profession-open workloads. [retail_startup.lua](retail_startup.lua) verifies Retail order events, notification/preparation startup and lazy order-panel attachment.
 
-The recommendation harness verifies customer-side quality breakpoints, optional difficulty, concentration quality caps, lowest-sufficient reagent suggestions, highest-impact tie-breaks, and missing-fact rescan handling.
+Forever fixtures cover startup with order APIs absent, learned-only scanning and itemless enchant output, protocol isolation and commissions, directory/search/row reuse, recipe controls, nameplate setup/rollback and pooled indicator expiry. [flavor_behavior.lua](flavor_behavior.lua) loads the actual shared crafter UI and checks that each flavor retains its own placement, reagent behavior and command/protocol routing.
 
-The cache invalidation harness verifies stale alt/customer cache scan entries are preserved as rescan-needed rows without computed recommendations.
+Live acceptance still requires both game clients. Check profession open/scan, default and recipe commission/note save/discard, advertising, persistence across reload, another player's query/reply and shared profession links. On Retail, check the order panel, preparation and notifications. On Forever, check the standalone directory, advertising controls, minimap modifiers, nameplate settings and combat suppression.
 
-The [imported alt merge harness](imported_alt_merge.lua) verifies imported artisan profiles collapse with same-name live/cache rows, preserve online responder contacts, and move cleanly back to customer cache when cleared.
+Forever table/identity coverage includes grouped full-name rows, header filters, retained discovery history, item name ambiguity, item link/drag queries, queued lookup cancellation, native surname handling, legacy preference migration, nameplate matching and import identities. [forever_item_query.lua](forever_item_query.lua) exercises the real query/reply functions for an item whose profession is unknown, with Retail wildcard rejection preserved.
 
-The guild roster cache harness verifies partial roster refreshes, authoritative pruning, and connected-realm member name key preservation.
+Trade Chat diagnosis: `/af debug on`, wait for a profession advertisement, then `/af debug trade`. The copyable log includes escaped raw hyperlinks, channel names, parser decisions, cached counts and directory filter state. `/af debug off` disables logging.
 
-The customer reagent detail harness verifies chunked reagent detail delivery, compact response fallbacks, and shopping list context adoption for refreshed rows.
+`forever_linkedinn.lua` covers direct Linked Inn H1/Q1/Q2/D1 interoperability, out-of-order chunks, recipe lookup, source filters, link import, malformed input, rate limits, expiry and coinstallation. Optionally pass a local upstream source directory to validate both encoders/decoders against the actual reference implementation: `rtk proxy lua5.1 Tests/forever_linkedinn.lua /path/to/Linked-Inn`.
 
-The [customer order state refresh harness](customer_order_state_refresh.lua) verifies customer order state polling stays idle on `CRAFTINGORDERS_CAN_REQUEST`, while the customer orders UI is closed, and while the player is casting or channeling.
+`forever_pricing.lua` verifies item/default commission precedence, explicit any-commission overrides, announced default rates, unknown Trade/Linked Inn prices and grouped starting prices. Discovery tests also exercise default commission exchange between clients.
 
-The wire reagent facts harness verifies the lean reagent-skill-facts wire format: crafter-side shrinking (skill-neutral slots omitted), customer-side rehydration from the local recipe schematic, compact responses never downgrading cached detailed facts, failed-rehydration retry payloads, and legacy full-facts acceptance.
+`forever_hierarchy.lua` covers artisan/profession/craft expansion, merged recipe sources, deduplication, collapse state, pagination and default-versus-item pricing. The UI fixture verifies that row clicks expand without whispering; discovery tests verify default notes, including chunked long notes and note-only professions.
 
-The transfer payload harness verifies artisan export slimming: runtime scan state, localized/cache text, debug fields, repeated profession links, derivable recipe sets, and full reagent-fact skeletons are removed without mutating saved data.
+`shared_flavor_modules.lua` checks shared implementation ownership, client recipe policy, item-data callback composition and initialization of every Forever discovery transport. Manifest checks also enforce that Retail reagent controls never enter the Forever package.

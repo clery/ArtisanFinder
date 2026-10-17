@@ -20,24 +20,25 @@ local GUILD_PROFESSION_SPELL_IDS = {
 	[45357] = 773, -- Inscription
 }
 
-local function NormalizeGuildProfessionID(AF, professionID)
+local function NormalizeGuildProfessionID(addon, professionID)
 	professionID = tonumber(professionID)
-	return AF:GetBaseProfessionID(GUILD_PROFESSION_SPELL_IDS[professionID] or professionID)
+	return addon:GetBaseProfessionID(GUILD_PROFESSION_SPELL_IDS[professionID] or professionID)
 end
 
 local function IsOnlineFlag(value)
 	return value == true or value == 1
 end
 
-local function IsGuildMemberTooStale(AF, online, lastAvailableAt)
+local function IsGuildMemberTooStale(addon, online, lastAvailableAt)
 	if online then
 		return false
 	end
 	lastAvailableAt = tonumber(lastAvailableAt)
-	return lastAvailableAt and AF:Now() - lastAvailableAt > GUILD_OFFLINE_MAX_AGE
+	return lastAvailableAt and addon:Now() - lastAvailableAt > GUILD_OFFLINE_MAX_AGE
 end
 
 local function GetGuildCacheNameKey(name)
+	if AF.IsForever then return AF:NormalizeName(name) and AF:NormalizeName(name):lower() end
 	name = tostring(name or ""):gsub("%s+", "")
 	name = name:lower()
 	return name ~= "" and name or nil
@@ -51,6 +52,7 @@ local function GetCurrentGuildInfo()
 	if not guildName or guildName == "" then
 		return nil, nil
 	end
+	if AF.IsForever then return guildName end
 	guildRealm = guildRealm or (GetNormalizedRealmName and GetNormalizedRealmName()) or GetRealmName()
 	return guildName, guildRealm
 end
@@ -60,6 +62,7 @@ local function BuildGuildCacheKey(guildName, guildRealm)
 	if not guildKey then
 		return nil
 	end
+	if AF.IsForever then return guildKey end
 	local realmKey = GetGuildCacheNameKey(guildRealm)
 	return realmKey and (guildKey .. "-" .. realmKey) or guildKey
 end
@@ -85,6 +88,7 @@ local function HasLegacyGuildCacheData(guildCache)
 end
 
 local function GetGuildShortNameKey(name)
+	if AF.IsForever then return AF:NormalizeName(name) and AF:NormalizeName(name):lower() end
 	name = tostring(name or ""):gsub("%s+", "")
 	local shortName = name:match("^([^-]+)") or name
 	shortName = shortName:lower()
@@ -92,11 +96,13 @@ local function GetGuildShortNameKey(name)
 end
 
 local function HasExplicitRealm(name)
+	if AF.IsForever then return false end
 	return tostring(name or ""):find("-", 1, true) ~= nil
 end
 
-local function IsLocalRealmName(AF, name)
-	local realm = AF.GetNameRealm and AF:GetNameRealm(name) or tostring(name or ""):match("^[^-]+%-(.+)$")
+local function IsLocalRealmName(addon, name)
+	if addon.IsForever then return true end
+	local realm = addon.GetNameRealm and addon:GetNameRealm(name) or tostring(name or ""):match("^[^-]+%-(.+)$")
 	local realmKey = GetGuildCacheNameKey(realm)
 	if not realmKey then
 		return false
@@ -105,12 +111,12 @@ local function IsLocalRealmName(AF, name)
 		or realmKey == GetGuildCacheNameKey(GetNormalizedRealmName and GetNormalizedRealmName() or nil)
 end
 
-local function IsConnectedRealmName(AF, name)
-	return not AF.IsNameOnConnectedRealm or AF:IsNameOnConnectedRealm(name)
+local function IsConnectedRealmName(addon, name)
+	return not addon.IsNameOnConnectedRealm or addon:IsNameOnConnectedRealm(name)
 end
 
-local function IsRemoteConnectedRealmName(AF, name)
-	return HasExplicitRealm(name) and not IsLocalRealmName(AF, name) and IsConnectedRealmName(AF, name)
+local function IsRemoteConnectedRealmName(addon, name)
+	return HasExplicitRealm(name) and not IsLocalRealmName(addon, name) and IsConnectedRealmName(addon, name)
 end
 
 local function CreateGuildRosterLookup()
@@ -122,8 +128,8 @@ local function CreateGuildRosterLookup()
 	}
 end
 
-local function AddGuildRosterLookupName(AF, lookup, name)
-	local normalizedName = AF:NormalizeName(name)
+local function AddGuildRosterLookupName(addon, lookup, name)
+	local normalizedName = addon:NormalizeName(name)
 	if not normalizedName then
 		return nil
 	end
@@ -145,19 +151,19 @@ local function AddGuildRosterLookupGUID(lookup, guid, name)
 	end
 end
 
-local function EnsureGuildRosterLookup(AF, rosterNames)
+local function EnsureGuildRosterLookup(addon, rosterNames)
 	if type(rosterNames) == "table" and rosterNames.names then
 		return rosterNames
 	end
 	local lookup = CreateGuildRosterLookup()
 	for name in pairs(rosterNames or {}) do
-		AddGuildRosterLookupName(AF, lookup, name)
+		AddGuildRosterLookupName(addon, lookup, name)
 	end
 	return lookup
 end
 
-local function GuildRosterLookupHasName(AF, lookup, name)
-	local normalizedName = AF:NormalizeName(name)
+local function GuildRosterLookupHasName(addon, lookup, name)
+	local normalizedName = addon:NormalizeName(name)
 	if normalizedName and lookup.names[normalizedName] then
 		return true
 	end
@@ -173,8 +179,8 @@ local function GuildRosterLookupHasGUID(lookup, guid)
 	return guid and guid ~= "" and lookup.guids[guid] == true or false
 end
 
-local function GuildRosterLookupHasMember(AF, lookup, name, guid)
-	return GuildRosterLookupHasGUID(lookup, guid) or GuildRosterLookupHasName(AF, lookup, name)
+local function GuildRosterLookupHasMember(addon, lookup, name, guid)
+	return GuildRosterLookupHasGUID(lookup, guid) or GuildRosterLookupHasName(addon, lookup, name)
 end
 
 -- Snapshot keys for loops that insert entries while iterating; adding keys
@@ -187,20 +193,20 @@ local function GetTableKeys(tbl)
 	return keys
 end
 
-local function IsCurrentPlayer(AF, name)
-	return AF:NormalizeName(name) == AF:NormalizeName(AF.playerName or AF:GetPlayerFullName())
+local function IsCurrentPlayer(addon, name)
+	return addon:NormalizeName(name) == addon:NormalizeName(addon.playerName or addon:GetPlayerFullName())
 end
 
-local function GetOnlineGuildContact(AF, name)
-	if not AF.GetRememberedArtisanContact then
+local function GetOnlineGuildContact(addon, name)
+	if not addon.GetRememberedArtisanContact then
 		return nil, nil
 	end
-	local normalizedName = AF:NormalizeName(name)
-	local contactName = AF:GetRememberedArtisanContact(normalizedName, AF:GetCurrentGuildCacheKey())
+	local normalizedName = addon:NormalizeName(name)
+	local contactName = addon:GetRememberedArtisanContact(normalizedName, addon:GetCurrentGuildCacheKey())
 	if not contactName or contactName == normalizedName then
 		return nil, nil
 	end
-	local contactEntry = AF:GetCachedGuildRosterEntry(contactName)
+	local contactEntry = addon:GetCachedGuildRosterEntry(contactName)
 	if contactEntry and contactEntry.online == true then
 		return contactName, contactEntry
 	end
@@ -223,11 +229,18 @@ local function MarkSeenGuildContact(seenNames, name, contactName)
 	end
 end
 
+local function EnsureOfflineRoster()
+    local needsOffline = not AF.guildRosterOfflineConfigured
+    if GetGuildRosterShowOffline then needsOffline = not GetGuildRosterShowOffline() end
+    if SetGuildRosterShowOffline and (not AF.IsForever or needsOffline) then
+        pcall(SetGuildRosterShowOffline, true)
+        AF.guildRosterOfflineConfigured = true
+    end
+end
+
 local function RequestGuildRoster()
-	if SetGuildRosterShowOffline then
-		pcall(SetGuildRosterShowOffline, true)
-	end
-	pcall(C_GuildInfo.GuildRoster)
+    EnsureOfflineRoster()
+    pcall(C_GuildInfo.GuildRoster)
 end
 
 local function QueryGuildRecipeData()
@@ -256,8 +269,8 @@ local function GetRosterInfo(index)
 	return name, online, isMobile, guid
 end
 
-local function GetGuildRosterLastAvailableAt(AF, index, online)
-	local now = AF:Now()
+local function GetGuildRosterLastAvailableAt(addon, index, online)
+	local now = addon:Now()
 	if IsOnlineFlag(online) then
 		return now
 	end
@@ -363,22 +376,22 @@ function AF:RebuildGuildRosterNameLookup()
 	end
 end
 
-local function RenameGuildRosterMember(AF, oldName, newName)
+local function RenameGuildRosterMember(addon, oldName, newName)
 	if not oldName or not newName or oldName == newName then
 		return false
 	end
-	local rosterEntry = AF.guildRosterByName and AF.guildRosterByName[oldName]
-	if not rosterEntry or AF.guildRosterByName[newName] then
+	local rosterEntry = addon.guildRosterByName and addon.guildRosterByName[oldName]
+	if not rosterEntry or addon.guildRosterByName[newName] then
 		return false
 	end
 
-	AF.guildRosterByName[oldName] = nil
-	AF.guildRosterByName[newName] = rosterEntry
+	addon.guildRosterByName[oldName] = nil
+	addon.guildRosterByName[newName] = rosterEntry
 	rosterEntry.name = newName
 	rosterEntry.rosterName = newName
 	rosterEntry.rosterNameHasExplicitRealm = true
 
-	for _, professionCache in pairs(AF.guildProfessionMembers or {}) do
+	for _, professionCache in pairs(addon.guildProfessionMembers or {}) do
 		local members = professionCache.members
 		local member = members and members[oldName]
 		if member and not members[newName] then
@@ -388,7 +401,7 @@ local function RenameGuildRosterMember(AF, oldName, newName)
 		end
 	end
 
-	for _, recipeCache in pairs(AF.guildRecipeMembers or {}) do
+	for _, recipeCache in pairs(addon.guildRecipeMembers or {}) do
 		for index, memberName in ipairs(recipeCache.members or {}) do
 			if memberName == oldName then
 				recipeCache.members[index] = newName
@@ -404,11 +417,11 @@ local function RenameGuildRosterMember(AF, oldName, newName)
 		end
 	end
 
-	AF:RebuildGuildRosterNameLookup()
+	addon:RebuildGuildRosterNameLookup()
 	return true
 end
 
-local function FindCachedRemoteRosterNameByGUID(AF, guid, name)
+local function FindCachedRemoteRosterNameByGUID(addon, guid, name)
 	guid = guid and tostring(guid) or nil
 	if not guid or guid == "" then
 		return nil
@@ -417,10 +430,10 @@ local function FindCachedRemoteRosterNameByGUID(AF, guid, name)
 	if not shortKey then
 		return nil
 	end
-	for cachedName, entry in pairs(AF.guildRosterByName or {}) do
+	for cachedName, entry in pairs(addon.guildRosterByName or {}) do
 		if entry and tostring(entry.guid or "") == guid
 			and GetGuildShortNameKey(cachedName) == shortKey
-			and IsRemoteConnectedRealmName(AF, cachedName)
+			and IsRemoteConnectedRealmName(addon, cachedName)
 		then
 			return cachedName
 		end
@@ -428,29 +441,29 @@ local function FindCachedRemoteRosterNameByGUID(AF, guid, name)
 	return nil
 end
 
-local function GetCanonicalGuildRosterName(AF, rawName, guid)
-	local name = AF:NormalizeName(rawName)
+local function GetCanonicalGuildRosterName(addon, rawName, guid)
+	local name = addon:NormalizeName(rawName)
 	if not name then
 		return nil
 	end
-	if HasExplicitRealm(rawName) then
+	if addon.IsForever or HasExplicitRealm(rawName) then
 		return name
 	end
-	return FindCachedRemoteRosterNameByGUID(AF, guid, name) or name
+	return FindCachedRemoteRosterNameByGUID(addon, guid, name) or name
 end
 
-local function PromoteResolvedGuildMemberName(AF, resolvedName, normalizedName, sourceName)
+local function PromoteResolvedGuildMemberName(addon, resolvedName, normalizedName, sourceName)
 	if normalizedName
 		and HasExplicitRealm(sourceName)
-		and IsRemoteConnectedRealmName(AF, normalizedName)
+		and IsRemoteConnectedRealmName(addon, normalizedName)
 		and resolvedName
 		and resolvedName ~= normalizedName
-		and AF.guildRosterByName
-		and AF.guildRosterByName[resolvedName]
-		and not AF.guildRosterByName[normalizedName]
-		and AF.guildRosterByName[resolvedName].rosterNameHasExplicitRealm == false
+		and addon.guildRosterByName
+		and addon.guildRosterByName[resolvedName]
+		and not addon.guildRosterByName[normalizedName]
+		and addon.guildRosterByName[resolvedName].rosterNameHasExplicitRealm == false
 	then
-		RenameGuildRosterMember(AF, resolvedName, normalizedName)
+		RenameGuildRosterMember(addon, resolvedName, normalizedName)
 		return normalizedName
 	end
 	return resolvedName
@@ -488,7 +501,7 @@ local function EntryHasCachedGuildAffiliation(entry, guildKey)
 		or guildKey ~= nil and entry.guildKey == guildKey
 end
 
-local function ForEachCustomerGuildNameCandidate(AF, entry, cacheKey, callback)
+local function ForEachCustomerGuildNameCandidate(addon, entry, cacheKey, callback)
 	if type(entry) ~= "table" then
 		return
 	end
@@ -502,7 +515,7 @@ local function ForEachCustomerGuildNameCandidate(AF, entry, cacheKey, callback)
 	end
 	local seen = {}
 	for _, candidate in ipairs(candidates) do
-		local normalizedName = AF:NormalizeName(candidate)
+		local normalizedName = addon:NormalizeName(candidate)
 		if normalizedName and not seen[normalizedName] then
 			seen[normalizedName] = true
 			if callback(candidate, normalizedName) then
@@ -512,7 +525,7 @@ local function ForEachCustomerGuildNameCandidate(AF, entry, cacheKey, callback)
 	end
 end
 
-local function CacheEntryMatchesDepartedGuildMember(AF, entry, cacheKey, rosterLookup, departedLookup, guildKey)
+local function CacheEntryMatchesDepartedGuildMember(addon, entry, cacheKey, rosterLookup, departedLookup, guildKey)
 	if not EntryHasCachedGuildAffiliation(entry, guildKey) then
 		return nil
 	end
@@ -522,13 +535,13 @@ local function CacheEntryMatchesDepartedGuildMember(AF, entry, cacheKey, rosterL
 	local matchedRoster
 	local departedName
 	local firstName
-	ForEachCustomerGuildNameCandidate(AF, entry, cacheKey, function(candidate, normalizedName)
+	ForEachCustomerGuildNameCandidate(addon, entry, cacheKey, function(candidate, normalizedName)
 		firstName = firstName or normalizedName
 		if departedLookup.names[normalizedName] then
 			departedName = normalizedName
 			return true
 		end
-		if GuildRosterLookupHasName(AF, rosterLookup, candidate) then
+		if GuildRosterLookupHasName(addon, rosterLookup, candidate) then
 			matchedRoster = true
 			return true
 		end
@@ -722,6 +735,15 @@ function AF:ResolveGuildMemberName(name, requestRefresh)
 		return PromoteResolvedGuildMemberName(self, resolvedName, normalizedName, name)
 	end
 
+    if requestRefresh and self.IsForever then
+        -- Cache misses include nonguild crafters: never rescan the entire roster per lookup.
+        -- Once a snapshot exists, absence is a valid nonguild result. Requesting
+        -- again here creates render -> miss -> roster -> render feedback loops.
+        if not self.currentGuildCacheKey or self.foreverGuildRosterReadyKey~=self.currentGuildCacheKey then
+            self:QueueGuildRosterCacheRefresh(true)
+        end
+        return normalizedName
+    end
 	if requestRefresh and self:RefreshGuildRosterCache(true) > 0 then
 		resolvedName = shortKey and self.guildRosterNameByShort and self.guildRosterNameByShort[shortKey]
 		if resolvedName then
@@ -783,7 +805,7 @@ function AF:ClearGuildMemberData(skipRefresh)
 		self:QueueGuildRecipeMemberQuery(self.currentCustomerProfessionID, self.currentCustomerRecipeID)
 	end
 	if self.RefreshCustomerResults then
-		self:RefreshCustomerResults()
+		self:RequestCustomerResultsRefresh()
 	end
 end
 
@@ -793,9 +815,7 @@ function AF:RefreshGuildRosterCache(requestRefresh)
 		self:EnsureGuildCache()
 		return 0
 	end
-	if SetGuildRosterShowOffline then
-		pcall(SetGuildRosterShowOffline, true)
-	end
+	EnsureOfflineRoster()
 	if requestRefresh then
 		RequestGuildRoster()
 	end
@@ -804,6 +824,8 @@ function AF:RefreshGuildRosterCache(requestRefresh)
 	self.guildRosterNameByShort = {}
 	local rosterLookup = CreateGuildRosterLookup()
 	local count = 0
+    local availability={}
+    local changed=false
 	for index = 1, GetGuildRosterCount() do
 		local rawName, online, isMobile, guid = GetRosterInfo(index)
 		local name = GetCanonicalGuildRosterName(self, rawName, guid)
@@ -814,6 +836,8 @@ function AF:RefreshGuildRosterCache(requestRefresh)
 			self:RememberGuildRosterNameLookup(name)
 			local entry = self.guildRosterByName[name] or {}
 			local isOnline = IsOnlineFlag(online)
+            if entry.name~=name or entry.online~=isOnline or entry.guid~=guid
+                or entry.isMobile~=IsOnlineFlag(isMobile) then changed=true end
 			local lastAvailableAt = GetGuildRosterLastAvailableAt(self, index, online)
 			self.guildRosterByName[name] = entry
 			entry.name = name
@@ -824,40 +848,50 @@ function AF:RefreshGuildRosterCache(requestRefresh)
 			entry.guid = guid
 			local now = self:Now()
 			entry.updatedAt = now
+            if isOnline then entry.lastObservedOnlineAt=now end
 			if lastAvailableAt then
 				entry.lastAvailableAt = lastAvailableAt
 			end
-			for _, professionCache in pairs(self.guildProfessionMembers or {}) do
-				local member = professionCache.members and professionCache.members[name]
-				if member then
-					member.online = entry.online
-					if lastAvailableAt then
-						member.lastAvailableAt = lastAvailableAt
-					end
-					if entry.online or lastAvailableAt then
-						member.updatedAt = now
-					end
-				end
-			end
-			for _, recipeCache in pairs(self.guildRecipeMembers or {}) do
-				if recipeCache.online and recipeCache.online[name] ~= nil then
-					recipeCache.online[name] = entry.online
-					if lastAvailableAt then
-						recipeCache.lastAvailableAt = recipeCache.lastAvailableAt or {}
-						recipeCache.lastAvailableAt[name] = lastAvailableAt
-					end
-				end
-			end
+            availability[name]=lastAvailableAt
+
 			count = count + 1
 		end
 	end
+    changed=changed or self.guildRosterCount~=count
+    if count>0 then self.foreverGuildRosterReadyKey=self.currentGuildCacheKey end
+    local needsReconcile=self.guildRosterNeedsReconcile
+    self.guildRosterNeedsReconcile=requestRefresh==true
+    if self.IsForever and not changed and not needsReconcile then return count,false end
+    for _,professionCache in pairs(self.guildProfessionMembers or {}) do
+        for name,member in pairs(professionCache.members or {}) do
+            local entry=self.guildRosterByName[name]
+            if entry then
+                member.online=entry.online
+                local stamp=availability[name]
+                if stamp then member.lastAvailableAt=stamp end
+                if entry.online or stamp then member.updatedAt=entry.updatedAt end
+            end
+        end
+    end
+    for _,recipeCache in pairs(self.guildRecipeMembers or {}) do
+        for name in pairs(recipeCache.online or {}) do
+            local entry=self.guildRosterByName[name]
+            if entry then
+                recipeCache.online[name]=entry.online
+                if availability[name] then
+                    recipeCache.lastAvailableAt=recipeCache.lastAvailableAt or {}
+                    recipeCache.lastAvailableAt[name]=availability[name]
+                end
+            end
+        end
+    end
 	self.guildRosterCount = count
 	if count > 0 and not requestRefresh then
 		self:ReconcileGuildCachesToRoster(rosterLookup)
 	elseif count > 0 then
 		self:RebuildGuildRosterNameLookup()
 	end
-	return count
+	return count,changed
 end
 
 function AF:QueueGuildRosterCacheRefresh(requestRefresh)
@@ -867,13 +901,23 @@ function AF:QueueGuildRosterCacheRefresh(requestRefresh)
 	end
 	self.guildRosterRefreshQueued = true
 	self.guildRosterRefreshRequest = requestRefresh == true
-	C_Timer.After(0.2, function()
+    local delay=0.2
+    if self.IsForever then
+        delay=math.max(0.5,5-(self:Now()-(self.guildRosterRefreshAt or -5)))
+    end
+    C_Timer.After(delay, function()
+        AF.guildRosterRefreshAt=AF:Now()
 		AF.guildRosterRefreshQueued = nil
 		local shouldRequest = AF.guildRosterRefreshRequest == true
 		AF.guildRosterRefreshRequest = nil
-		AF:RefreshGuildRosterCache(shouldRequest)
+        local started=debugprofilestop and debugprofilestop()
+        local count,changed=AF:RefreshGuildRosterCache(shouldRequest)
+        if started and AF.DebugLog then
+            AF:DebugLog("guild-performance",string.format("roster=%.2fms members=%d changed=%s requested=%s",
+                debugprofilestop()-started,count,tostring(changed),tostring(shouldRequest)))
+        end
 		if AF.RefreshCustomerResults then
-			AF:RefreshCustomerResults()
+			AF:RequestCustomerResultsRefresh()
 		end
 	end)
 end
@@ -931,7 +975,7 @@ function AF:RefreshGuildTradeSkills()
 	QueryGuildRecipeData()
 end
 
-function AF:RememberGuildProfessionMember(professionID, name, professionName, online, recipeID, knowsRecipe, updatedAt)
+function AF:RememberGuildProfessionMember(professionID, name, _, online, recipeID, knowsRecipe, updatedAt)
 	self:EnsureGuildCache()
 	professionID = NormalizeGuildProfessionID(self, professionID)
 	name = self:ResolveGuildMemberName(name, true)
@@ -1209,7 +1253,7 @@ function AF:HandleGuildRecipeKnownByMembers()
 		updatedAt = self:Now(),
 	}
 	if self.RefreshCustomerResults then
-		self:RefreshCustomerResults()
+		self:RequestCustomerResultsRefresh()
 	end
 end
 

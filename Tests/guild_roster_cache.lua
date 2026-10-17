@@ -91,6 +91,7 @@ AF.db = {
 	artisanContacts = {},
 }
 
+LoadAddonFile("Core/Bootstrap.lua")
 LoadAddonFile("Features/Social/Guild.lua")
 
 AF:EnsureGuildCache()
@@ -178,3 +179,67 @@ Check(AF.guildRosterByName["Delta-OtherRealm"], "authoritative short roster shou
 Check(not AF.guildRosterByName["Delta-Realm"], "cached remote connected-realm key should win over local fallback for same GUID")
 
 print("guild roster cache tests: PASS")
+
+-- Large Forever guilds must not scan all cached members/recipes per roster row.
+AF.IsForever=true
+AF.NormalizeName=function(_,name) return name end
+AF:EnsureGuildCache()
+AF.guildRosterByName={}
+AF.guildProfessionMembers={}
+AF.guildRecipeMembers={}
+AF.guildCache.rosterByName=AF.guildRosterByName
+AF.guildCache.professionMembers=AF.guildProfessionMembers
+AF.guildCache.recipeMembers=AF.guildRecipeMembers
+roster={}
+for index=1,1000 do
+    local name="Member "..index
+    roster[index]={name=name,online=true,guid="Player-"..index}
+    AF.guildRosterByName[name]={name=name,guid="Player-"..index}
+    AF.guildRecipeMembers[index]={members={name},online={[name]=false}}
+end
+local originalPairs=pairs
+local traversals=0
+pairs=function(value)
+    if value==AF.guildRosterByName or value==AF.guildRecipeMembers then traversals=traversals+1 end
+    return originalPairs(value)
+end
+AF:RefreshGuildRosterCache(false)
+pairs=originalPairs
+Check(traversals<12,"large guild refresh must use a constant number of full cache traversals")
+Check(AF.guildRecipeMembers[1000].online["Member 1000"],"linear pass still updates cached recipe availability")
+local pending={}
+C_Timer={After=function(delay,callback) pending[#pending+1]={delay=delay,callback=callback} end}
+local reads=0
+local originalInfo=GetGuildRosterInfo
+GetGuildRosterInfo=function(index) reads=reads+1 return originalInfo(index) end
+for index=1,1000 do AF:ResolveGuildMemberName("Unknown "..index,true) end
+Check(reads==0 and #pending==0,"nonguild crafters must not request fresh roster data once a snapshot exists")
+AF.foreverGuildRosterReadyKey=nil
+for index=1,1000 do AF:ResolveGuildMemberName("Unknown "..index,true) end
+Check(reads==0 and #pending==1,"initial unknown lookups batch into one roster request")
+pending[1].callback()
+Check(reads==1000,"batched refresh reads each roster member once")
+AF:QueueGuildRosterCacheRefresh(false)
+Check(pending[2].delay>=5,"Forever guild event bursts are limited to one rebuild per five seconds")
+print("PASS large Forever guild linear cache traversal, deferred unknown-name lookups and event throttling")
+
+-- A completed roster refresh must not schedule another through a discovery lookup.
+pending={}
+AF.guildRosterRefreshQueued=nil
+AF.RefreshCustomerResults=function() AF:ResolveGuildMemberName("Nonguild Crafter",true) end
+AF.QueueCustomerResultsRefresh=nil
+AF:QueueGuildRosterCacheRefresh(false)
+pending[1].callback()
+Check(#pending==1,"roster -> discovery -> nonguild lookup cannot perpetuate its own timer")
+local recipeScans=0
+pairs=function(value)
+    if value==AF.guildRecipeMembers then recipeScans=recipeScans+1 end
+    return originalPairs(value)
+end
+local _,changed=AF:RefreshGuildRosterCache(false)
+pairs=originalPairs
+Check(changed==false and recipeScans==0,"unchanged Forever roster skips all recipe cache propagation and reconciliation")
+roster[1].online=false
+local _,updated=AF:RefreshGuildRosterCache(false)
+Check(updated and not AF.guildRecipeMembers[1].online["Member 1"],"real roster status changes still propagate")
+print("PASS nonguild lookup feedback loop stops; unchanged roster skips recipe work and real changes propagate")

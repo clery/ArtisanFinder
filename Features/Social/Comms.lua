@@ -6,6 +6,7 @@ function AF:InitializeComms()
 	C_ChatInfo.RegisterAddonMessagePrefix(self.PREFIX)
 	self.responseThrottle = {}
 	self:QueueDiscoveryChannelJoin(8)
+    if self.InitializeFlavorDiscovery then self:InitializeFlavorDiscovery() end
 end
 
 local function HasVisibleServerChannel(channelName, ...)
@@ -64,7 +65,7 @@ function AF:GetVisibleServerChannelSignature()
 	local channels = { GetChannelList() }
 	local parts = {}
 	for index, value in ipairs(channels) do
-		if type(value) == "string" and value ~= self.CHANNEL_NAME then
+		if type(value) == "string" and not self:IsDiscoveryNetworkChannel(value) then
 			table.insert(parts, tostring(channels[index - 1] or 0) .. ":" .. value)
 		end
 	end
@@ -82,86 +83,110 @@ function AF:VisibleServerChannelsStable(requiredSeconds)
 	return now - (tonumber(self.discoveryVisibleChannelStableAt) or now) >= (requiredSeconds or 3)
 end
 
-function AF:DiscoveryChannelNeedsRejoin()
-	local discoveryID = GetChannelName(self.CHANNEL_NAME)
-	if discoveryID == 0 then
-		return false
-	end
-	local lastVisibleID = self:GetLastVisibleServerChannelID()
-	return lastVisibleID and discoveryID < lastVisibleID
+-- Discovery networks belong after the player's channels, never in a leave/join
+-- cycle. Swapping adjacent channels preserves the relative order of both groups.
+function AF:IsDiscoveryNetworkChannel(name)
+    return name == self.CHANNEL_NAME or self.IsForever and
+        (name == "LinkedInnSync" or name == "CraftBoardF" or name == "RGamingAddonChan")
+end
+
+function AF:MoveDiscoveryChannelsToEnd()
+    local swap = C_ChatInfo and C_ChatInfo.SwapChatChannelsByChannelIndex
+    if not swap or not GetChannelList or self.discoveryChannelOrdering or self:IsProtectedActionRestricted() then return end
+    self.discoveryChannelOrdering = true
+    local channels, entries = { GetChannelList() }, {}
+    for index, value in ipairs(channels) do
+        if type(value) == "string" then
+            entries[#entries + 1] = {id=channels[index-1], managed=self:IsDiscoveryNetworkChannel(value)}
+        end
+    end
+    for index=2,#entries do
+        local cursor=index
+        while cursor>1 and not entries[cursor].managed and entries[cursor-1].managed do
+            swap(entries[cursor-1].id, entries[cursor].id)
+            entries[cursor-1].managed, entries[cursor].managed = entries[cursor].managed, entries[cursor-1].managed
+            cursor=cursor-1
+        end
+    end
+    self.discoveryChannelOrdering = nil
+end
+
+function AF:EnsureDiscoveryNetworkChannel(name, temporary)
+    if self:IsProtectedActionRestricted() then return 0 end
+    local id = GetChannelName(name) or 0
+    if id > 0 then
+        self:MoveDiscoveryChannelsToEnd()
+        return GetChannelName(name) or 0
+    end
+    -- All four networks wait for the player's normal channels to settle, and
+    -- share a retry throttle even when queried repeatedly before join completes.
+    if not self:HasJoinedTradeChannel() or not self:VisibleServerChannelsStable(3) then return 0 end
+    self.discoveryNetworkJoinAt = self.discoveryNetworkJoinAt or {}
+    local now = self:Now()
+    local previous = self.discoveryNetworkJoinAt[name]
+    if previous and now-previous < 30 then return 0 end
+    self.discoveryNetworkJoinAt[name] = now
+    if temporary then JoinTemporaryChannel(name, nil, nil, false) else JoinChannelByName(name, nil, nil, false) end
+    self:MoveDiscoveryChannelsToEnd()
+    return GetChannelName(name) or 0
 end
 
 function AF:QueueDiscoveryChannelJoin(delay)
-	if self.discoveryChannelJoinQueued then
-		return
-	end
-	if GetChannelName(self.CHANNEL_NAME) ~= 0 and not self:DiscoveryChannelNeedsRejoin() then
-		self:HideDiscoveryChannelFromChat()
-		return
-	end
-	self.discoveryChannelJoinQueued = true
-	C_Timer.After(delay or 8, function()
-		AF.discoveryChannelJoinQueued = false
-		if AF:IsProtectedActionRestricted() then
-			AF.deferredDiscoveryChannelJoin = true
-			return
-		end
-		if AF:DiscoveryChannelNeedsRejoin() then
-			LeaveChannelByName(AF.CHANNEL_NAME)
-			AF:QueueDiscoveryChannelJoin(2)
-			return
-		end
-		if not AF:HasJoinedTradeChannel() then
-			AF:QueueDiscoveryChannelJoin(2)
-			return
-		end
-		if not AF:VisibleServerChannelsStable(3) then
-			AF:QueueDiscoveryChannelJoin(2)
-			return
-		end
-		AF:JoinDiscoveryChannel()
-	end)
+    if self.discoveryChannelJoinQueued then return end
+    if GetChannelName(self.CHANNEL_NAME) ~= 0 then
+        self:MoveDiscoveryChannelsToEnd()
+        self:HideDiscoveryChannelFromChat()
+        return
+    end
+    self.discoveryChannelJoinQueued = true
+    C_Timer.After(delay or 8, function()
+        AF.discoveryChannelJoinQueued = false
+        if AF:IsProtectedActionRestricted() then
+            AF.deferredDiscoveryChannelJoin = true
+            return
+        end
+        AF:JoinDiscoveryChannel()
+        if GetChannelName(AF.CHANNEL_NAME) == 0 then AF:QueueDiscoveryChannelJoin(5) end
+    end)
 end
 
 function AF:JoinDiscoveryChannel()
-	if GetChannelName(self.CHANNEL_NAME) == 0 then
-		JoinTemporaryChannel(self.CHANNEL_NAME)
-	end
-	self:HideDiscoveryChannelFromChat()
-	self:HideDiscoveryChannelFromChat(0.5)
-	self:HideDiscoveryChannelFromChat(2)
-	self:HideDiscoveryChannelFromChat(5)
+    self:EnsureDiscoveryNetworkChannel(self.CHANNEL_NAME, true)
+    self:HideDiscoveryChannelFromChat()
+    self:HideDiscoveryChannelFromChat(0.5)
+    self:HideDiscoveryChannelFromChat(2)
+    self:HideDiscoveryChannelFromChat(5)
 end
 
 function AF:GetDiscoveryChannelID()
-	local id = GetChannelName(self.CHANNEL_NAME)
-	if id == 0 then
-		if not self:HasJoinedTradeChannel() then
-			self:QueueDiscoveryChannelJoin(2)
-			return 0
-		end
-		self:JoinDiscoveryChannel()
-		id = GetChannelName(self.CHANNEL_NAME)
-	end
-	self:HideDiscoveryChannelFromChat()
-	return id
+    local id = GetChannelName(self.CHANNEL_NAME) or 0
+    if id == 0 then self:QueueDiscoveryChannelJoin(5) end
+    return id
+end
+
+function AF:HideDiscoveryNetworkChannelFromChat(name)
+    for index=1,(NUM_CHAT_WINDOWS or 0) do
+        local attached = not GetChatWindowChannels
+        if GetChatWindowChannels then
+            for _, channel in ipairs({GetChatWindowChannels(index)}) do
+                if type(channel)=="string" and channel:lower()==name:lower() then attached=true break end
+            end
+        end
+        -- Removing a channel can itself emit channel updates; don't remove it
+        -- again when that event is received.
+        if attached then
+            local frame = _G["ChatFrame"..index]
+            if frame and ChatFrame_RemoveChannel then ChatFrame_RemoveChannel(frame,name) end
+            if RemoveChatWindowChannel then RemoveChatWindowChannel(index,name) end
+        end
+    end
 end
 
 function AF:HideDiscoveryChannelFromChat(delay)
-	C_Timer.After(delay or 0.25, function()
-		if AF:IsProtectedActionRestricted() then
-			return
-		end
-		for i = 1, (NUM_CHAT_WINDOWS or 0) do
-			local chatFrame = _G["ChatFrame" .. i]
-			if chatFrame and ChatFrame_RemoveChannel then
-				ChatFrame_RemoveChannel(chatFrame, AF.CHANNEL_NAME)
-			end
-			if RemoveChatWindowChannel then
-				RemoveChatWindowChannel(i, AF.CHANNEL_NAME)
-			end
-		end
-	end)
+    C_Timer.After(delay or 0.25, function()
+        if AF:IsProtectedActionRestricted() then return end
+        AF:HideDiscoveryNetworkChannelFromChat(AF.CHANNEL_NAME)
+    end)
 end
 
 local function BuildPayload(parts)
@@ -180,11 +205,11 @@ local function HasTablePayloadPart(parts)
 	return false
 end
 
-local function IsOnlineGuildWhisperTarget(AF, target)
-	if not AF.GetCachedGuildRosterEntry then
+local function IsOnlineGuildWhisperTarget(addon, target)
+	if not addon.GetCachedGuildRosterEntry then
 		return false
 	end
-	local rosterEntry = AF:GetCachedGuildRosterEntry(target)
+	local rosterEntry = addon:GetCachedGuildRosterEntry(target)
 	return rosterEntry and rosterEntry.online == true
 end
 
@@ -487,8 +512,8 @@ function AF:BuildCompactResponsePayloadParts(item, itemID, responseProfessionID,
 		timestamp,
 		encodedLink,
 		queryToken,
-		self:EncodeField(crafterName, 48),
-		responseTarget and self:EncodeField(responseTarget, 48) or "",
+		self:EncodeField(crafterName, self.IsForever and 128 or 48),
+		responseTarget and self:EncodeField(responseTarget, self.IsForever and 128 or 48) or "",
 		afk and 1 or 0,
 		"C1",
 		tonumber(item and item.recipeDifficulty) or 0,
@@ -533,7 +558,7 @@ function AF:BroadcastQuery(itemID, professionID)
 	end
 	local requestTime = self:Now()
 	local normalizedProfessionID = self:GetSupportedProfessionID(professionID) or 0
-	if normalizedProfessionID == 0 then
+	if normalizedProfessionID == 0 and (not self.IsForever or (tonumber(professionID) or 0) ~= 0) then
 		return false
 	end
 	if self:IsAddonCommsUnavailable() then
@@ -564,7 +589,7 @@ function AF:BroadcastQuery(itemID, professionID)
 		itemID,
 		normalizedProfessionID,
 		requestTime,
-		self:EncodeField(self.playerName or self:GetPlayerFullName(), 48),
+		self:EncodeField(self.playerName or self:GetPlayerFullName(), self.IsForever and 128 or 48),
 	}, "|")
 
 	local sent = false
@@ -626,7 +651,7 @@ function AF:QueueBroadcastQuery(itemID, professionID)
 			AF:BroadcastQuery(pendingItemID, pendingProfessionID)
 			AF:InjectDebugSelfResult(pendingItemID, pendingProfessionID)
 			AF:InjectDebugTradeLeads()
-			AF:RefreshCustomerResults()
+			AF:RequestCustomerResultsRefresh()
 		end
 	end)
 	return true
@@ -637,6 +662,7 @@ function AF:OnAddonMessage(prefix, message, channel, sender)
 		self:DebugLog("recv", "skipped secret addon payload")
 		return
 	end
+    if self.HandleCompatibilityAddonMessage and self:HandleCompatibilityAddonMessage(prefix, message, channel, sender) then return end
 	if prefix ~= self.PREFIX then
 		return
 	end
@@ -652,7 +678,10 @@ function AF:OnAddonMessage(prefix, message, channel, sender)
 		return
 	end
 	if kind == COMPRESSED_PAYLOAD_KIND then
-		parts = self:DecodeCompressedPayloadParts(parts[3]) or {}
+		-- Compressed addon-channel bytes may contain our field delimiter.
+        -- Only the envelope is delimited; preserve the entire encoded tail.
+        local encoded = message:match("^[^|]*|[^|]*|(.*)$")
+        parts = self:DecodeCompressedPayloadParts(encoded) or {}
 		kind, version = parts[1], parts[2]
 		if version ~= self.PROTOCOL_VERSION then
 			return
@@ -662,6 +691,7 @@ function AF:OnAddonMessage(prefix, message, channel, sender)
 		self:DebugLog("recv", string.format("%s %s %s", tostring(channel or "?"), tostring(normalizedSender or "?"), tostring(message or "")))
 	end
 
+    if self.HandleFlavorAddonMessage and self:HandleFlavorAddonMessage(kind, parts, normalizedSender, channel) then return end
 	if kind == "Q" then
 		self:HandleQuery(parts, normalizedSender, channel)
 	elseif kind == "R" then
@@ -670,9 +700,9 @@ function AF:OnAddonMessage(prefix, message, channel, sender)
 		self:HandleReagentDetailRequest(parts, normalizedSender)
 	elseif kind == "D" then
 		self:HandleReagentDetail(parts, normalizedSender)
-	elseif kind == "O" then
+	elseif not self.IsForever and kind == "O" then
 		self:HandleOrderNotification(parts, normalizedSender)
-	elseif kind == "F" then
+	elseif not self.IsForever and kind == "F" then
 		self:HandleFulfilledOrderNotification(parts, normalizedSender)
 	end
 end
@@ -693,24 +723,24 @@ local function ItemMatchesQuery(item, itemID, professionID)
 	return AF:GetSupportedProfessionID(item.professionID, item) == AF:GetSupportedProfessionID(professionID)
 end
 
-local function CanRespondForCrafter(AF, crafterName, requesterName, channel)
-	crafterName = AF:NormalizeName(crafterName)
-	requesterName = AF:NormalizeName(requesterName)
+local function CanRespondForCrafter(addon, crafterName, requesterName, channel)
+	crafterName = addon:NormalizeName(crafterName)
+	requesterName = addon:NormalizeName(requesterName)
 	if not crafterName then
 		return false
 	end
-	if requesterName and AF:IsNameOnConnectedRealm(requesterName) and AF:IsNameOnConnectedRealm(crafterName) then
+	if requesterName and addon:IsNameOnConnectedRealm(requesterName) and addon:IsNameOnConnectedRealm(crafterName) then
 		return true
 	end
-	if not AF.GetCachedGuildRosterEntry then
+	if not addon.GetCachedGuildRosterEntry then
 		return false
 	end
 	if channel == "GUILD" then
-		return AF:GetCachedGuildRosterEntry(crafterName) ~= nil
+		return addon:GetCachedGuildRosterEntry(crafterName) ~= nil
 	end
 	return requesterName
-		and AF:GetCachedGuildRosterEntry(requesterName) ~= nil
-		and AF:GetCachedGuildRosterEntry(crafterName) ~= nil
+		and addon:GetCachedGuildRosterEntry(requesterName) ~= nil
+		and addon:GetCachedGuildRosterEntry(crafterName) ~= nil
 end
 
 function AF:GetAdvertisedItemMatches(itemID, professionID, requesterName, channel)
@@ -778,7 +808,7 @@ function AF:HandleQuery(parts, sender, channel)
 	local professionID = self:GetSupportedProfessionID(tonumber(parts[4])) or 0
 	local queryToken = tonumber(parts[5]) or self:Now()
 	local requesterName = self:NormalizeName(self:DecodeField(parts[6])) or sender
-	if not itemID or professionID == 0 then
+	if not itemID or (professionID == 0 and (not self.IsForever or tonumber(parts[4]) ~= 0)) then
 		return
 	end
 
@@ -809,7 +839,10 @@ function AF:HandleQuery(parts, sender, channel)
 			local responseTimestamp = self:Now()
 			local afk = UnitIsAFK and UnitIsAFK("player")
 			local wireFacts = type(item.wireReagentSkillFacts) == "table" and item.wireReagentSkillFacts
-				or self:BuildWireReagentSkillFacts(item.reagentSkillFacts)
+				or (self.BuildWireReagentSkillFacts and self:BuildWireReagentSkillFacts(item.reagentSkillFacts))
+			if item.foreverRecipe then
+				wireFacts = { foreverRecipe = true, reagents = item.reagents or item.bestReagents }
+			end
 			local payloadParts = {
 				"R",
 				self.PROTOCOL_VERSION,
@@ -822,8 +855,8 @@ function AF:HandleQuery(parts, sender, channel)
 				responseTimestamp,
 				encodedLink,
 				queryToken,
-				self:EncodeField(crafterName, 48),
-				channel == "GUILD" and self:EncodeField(requesterName, 48) or "",
+				self:EncodeField(crafterName, self.IsForever and 128 or 48),
+				channel == "GUILD" and self:EncodeField(requesterName, self.IsForever and 128 or 48) or "",
 				afk and 1 or 0,
 				wireFacts,
 			}
@@ -890,7 +923,7 @@ function AF:SendReagentDetail(item, target, queryToken, crafterName)
 		1,
 		1,
 		self:EncodeField(detailText),
-		self:EncodeField(crafterName, 48),
+		self:EncodeField(crafterName, self.IsForever and 128 or 48),
 	}
 	if self:SendPayloadParts(fullPayload, "WHISPER", target, "BULK", queueName) then
 		return true
@@ -916,7 +949,7 @@ function AF:SendReagentDetail(item, target, queryToken, crafterName)
 			index,
 			#chunks,
 			chunk,
-			self:EncodeField(crafterName, 48),
+			self:EncodeField(crafterName, self.IsForever and 128 or 48),
 		}, "|")
 		sent = self:SendAddon(payload, "WHISPER", target, "BULK", queueName) or sent
 	end
@@ -1013,7 +1046,10 @@ function AF:HandleResponse(parts, sender)
 	if not itemID then
 		return
 	end
-	if compactResponse then
+	local foreverRecipe = reagentSkillFacts and reagentSkillFacts.foreverRecipe == true and recipeID > 0
+	if foreverRecipe then
+		factsMode = "forever"
+	elseif compactResponse then
 		reagentSkillFacts = nil
 		compactOptionalReagentDeltas = self:DecodeCompactOptionalReagentDeltas(parts[26])
 		factsMode = "compact"
@@ -1076,7 +1112,7 @@ function AF:HandleResponse(parts, sender)
 			}
 		end
 	end
-	local hasDetailedFacts = reagentSkillFacts.compact ~= true
+	local hasDetailedFacts = not foreverRecipe and reagentSkillFacts.compact ~= true
 	local suggestionEntry = {
 		recipeID = recipeID,
 		itemID = itemID,
@@ -1107,6 +1143,8 @@ function AF:HandleResponse(parts, sender)
 	end
 	local cacheEntry = {
 		name = crafterName,
+		foreverRecipe = foreverRecipe or nil,
+		reagents = foreverRecipe and reagentSkillFacts.reagents or nil,
 		target = responseSender,
 		orderTarget = crafterName,
 		itemID = itemID,
@@ -1184,14 +1222,14 @@ function AF:HandleResponse(parts, sender)
 	))
 	self:ApplyPendingReagentDetail(sender, itemID, recipeID, queryToken, crafterName)
 
-	self:RefreshCustomerResults()
+	self:RequestCustomerResultsRefresh()
 end
 
 function AF:GetReagentDetailKey(sender, itemID, recipeID, queryToken, crafterName)
 	return table.concat({ sender, crafterName or "", itemID or 0, recipeID or 0, queryToken or 0 }, ":")
 end
 
-local function CustomerCacheEntryMatchesDetail(AF, entry, sender, recipeID, queryToken, crafterName)
+local function CustomerCacheEntryMatchesDetail(addon, entry, sender, recipeID, queryToken, crafterName)
 	if not entry then
 		return false
 	end
@@ -1199,10 +1237,10 @@ local function CustomerCacheEntryMatchesDetail(AF, entry, sender, recipeID, quer
 	if tonumber(entry.lastQueryToken) ~= tonumber(queryToken) or entryRecipeID ~= (tonumber(recipeID) or 0) then
 		return false
 	end
-	local normalizedCrafter = AF:NormalizeName(crafterName)
-	local normalizedSender = AF:NormalizeName(sender)
+	local normalizedCrafter = addon:NormalizeName(crafterName)
+	local normalizedSender = addon:NormalizeName(sender)
 	for _, name in ipairs({ entry.orderTarget, entry.name, entry.target }) do
-		local normalizedName = AF:NormalizeName(name)
+		local normalizedName = addon:NormalizeName(name)
 		if normalizedName and (normalizedName == normalizedCrafter or normalizedName == normalizedSender) then
 			return true
 		end
@@ -1210,17 +1248,17 @@ local function CustomerCacheEntryMatchesDetail(AF, entry, sender, recipeID, quer
 	return false
 end
 
-local function FindCustomerCacheEntryForDetail(AF, itemID, sender, recipeID, queryToken, crafterName)
-	local itemCache = AF.db and AF.db.customerCache and AF.db.customerCache[tostring(itemID)]
+local function FindCustomerCacheEntryForDetail(addon, itemID, sender, recipeID, queryToken, crafterName)
+	local itemCache = addon.db and addon.db.customerCache and addon.db.customerCache[tostring(itemID)]
 	if not itemCache then
 		return nil
 	end
 	local direct = itemCache[crafterName]
-	if CustomerCacheEntryMatchesDetail(AF, direct, sender, recipeID, queryToken, crafterName) then
+	if CustomerCacheEntryMatchesDetail(addon, direct, sender, recipeID, queryToken, crafterName) then
 		return direct
 	end
 	for _, entry in pairs(itemCache) do
-		if CustomerCacheEntryMatchesDetail(AF, entry, sender, recipeID, queryToken, crafterName) then
+		if CustomerCacheEntryMatchesDetail(addon, entry, sender, recipeID, queryToken, crafterName) then
 			return entry
 		end
 	end
@@ -1266,7 +1304,7 @@ function AF:RequestReagentDetail(entry)
 		itemID,
 		recipeID,
 		queryToken,
-		self:EncodeField(crafterName, 48),
+		self:EncodeField(crafterName, self.IsForever and 128 or 48),
 	}, "|")
 	if not self:SendAddon(payload, "WHISPER", target, "NORMAL", table.concat({ "DR", target or "", crafterName or "", itemID, recipeID }, ":")) then
 		return false
@@ -1381,6 +1419,6 @@ function AF:HandleReagentDetail(parts, sender)
 		if self.reagentDetailRequests then
 			self.reagentDetailRequests[key] = nil
 		end
-		self:RefreshCustomerResults()
+		self:RequestCustomerResultsRefresh()
 	end
 end

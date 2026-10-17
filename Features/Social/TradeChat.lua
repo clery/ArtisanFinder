@@ -196,7 +196,7 @@ function AF:InjectDebugTradeLeads()
 		end
 		local candidates = {}
 		candidates[profession.id] = true
-		local name = DEBUG_TRADE_NAMES[index] .. "-" .. (GetRealmName() or "")
+		local name = self.IsForever and (DEBUG_TRADE_NAMES[index] .. " Hearthstone") or (DEBUG_TRADE_NAMES[index] .. "-" .. (GetRealmName() or ""))
 		self.tradeLeads["__debug_trade_" .. tostring(index)] = {
 			name = name,
 			target = name,
@@ -211,30 +211,59 @@ function AF:InjectDebugTradeLeads()
 end
 
 function AF:OnTradeChatMessage(message, sender, _, channelName, _, _, _, _, channelBaseName)
+    self.tradeChatDiagnostics = self.tradeChatDiagnostics or {received=0, stored=0}
+    local diagnostic = self.tradeChatDiagnostics
+    diagnostic.received = diagnostic.received + 1
+    diagnostic.stage = "received"
 	if self:IsProtectedActionRestricted() then
+        diagnostic.stage = "protected activity restriction"
+        self:DebugLog("trade", "skipped chat: protected activity restriction")
 		return
 	end
 	if self:IsSecretValue(message) or self:IsSecretValue(sender) or self:IsSecretValue(channelName) or self:IsSecretValue(channelBaseName) then
-		self:DebugLog("trade", "skipped secret chat payload")
+		diagnostic.stage = "secret payload"
+        self:DebugLog("trade", "skipped secret chat payload")
 		return
 	end
-	if self:IsInUnavailableActivity() then
+    if self.db and self.db.debugEnabled then
+        local hyperlink = tostring(message or ""):find("|H", 1, true)
+        if diagnostic.received <= 3 or hyperlink or self:IsTradeChannelName(channelName) or self:IsTradeChannelName(channelBaseName) then
+            self:DebugLog("trade", string.format("received #%d sender=%s channel=%s base=%s payload=%s",
+                diagnostic.received, tostring(sender), tostring(channelName), tostring(channelBaseName), tostring(message):sub(1,2048)))
+        end
+    end
+	if not (self.capabilities and self.capabilities.passiveTradeDiscovery) and self:IsInUnavailableActivity() then
+        diagnostic.stage = "unavailable activity"
+        self:DebugLog("trade", "skipped chat: unavailable activity")
 		return
 	end
 	if not self:IsTradeChannelName(channelName) and not self:IsTradeChannelName(channelBaseName) then
+        diagnostic.stage = "not a Trade channel"
+        if tostring(message or ""):find("|Htrade:", 1, true) then
+            self:DebugLog("trade", "skipped profession link: channel="..tostring(channelName).." base="..tostring(channelBaseName))
+        end
 		return
 	end
 
 	local links = ExtractTradeLinks(message)
+    if self.GetAdditionalTradeAdvertisements then
+        for _, info in ipairs(self:GetAdditionalTradeAdvertisements(message)) do links[#links + 1] = info end
+    end
 	if self:IsDevTrafficLogsEnabled() and #links > 0 then
 		self:DebugLog("trade", string.format("%s: %d profession link(s)", tostring(sender or "?"), #links))
 	end
+    diagnostic.stage = "parsed"
+    self:DebugLog("trade", "parsed advertisements="..#links)
 	if #links == 0 or not sender then
+        diagnostic.stage = #links == 0 and "no recognized links" or "missing sender"
+        self:DebugLog("trade", "skipped: "..diagnostic.stage)
 		return
 	end
 
 	local name = self:NormalizeName(sender)
 	if not name or name == self:NormalizeName(self.playerName or self:GetPlayerFullName()) then
+        diagnostic.stage = not name and "invalid sender" or "own advertisement"
+        self:DebugLog("trade", "skipped: "..diagnostic.stage.." normalized="..tostring(name))
 		return
 	end
 
@@ -253,19 +282,51 @@ function AF:OnTradeChatMessage(message, sender, _, channelName, _, _, _, _, chan
 		local lead = {
 			name = name,
 			target = name,
-			professionLink = linkInfo.link,
-			professionCandidates = GetTradeLinkProfessionCandidates(linkInfo.link),
+			professionLink = not linkInfo.recipeID and linkInfo.link or nil,
+            recipeLink = linkInfo.recipeID and linkInfo.link or nil,
+            recipeID = linkInfo.recipeID,
+			professionCandidates = linkInfo.professionCandidates or (self.GetTradeAdvertisementProfessionCandidates
+                and self:GetTradeAdvertisementProfessionCandidates(linkInfo.link)
+                or GetTradeLinkProfessionCandidates(linkInfo.link)),
 			updatedAt = now,
 			tradeLead = true,
 			certified = false,
 		}
+        if self.IsForever and self.RememberProfessionLink and lead.professionLink then
+            for id in pairs(lead.professionCandidates) do self:RememberProfessionLink(name,id,lead.professionLink) end
+        end
+        self:DebugLog("trade", "link="..tostring(linkInfo.key).." profession="..tostring(next(lead.professionCandidates or {}) or "unresolved"))
 		self.tradeLeads[leadKey] = lead
 		self.db.tradeLeadCache[leadKey] = lead
 	end
+    diagnostic.stage = "stored"
+    diagnostic.stored = diagnostic.stored + #links
 	self:DebugLog("trade", string.format("stored leads sender=%s count=%d", tostring(name or ""), #links))
-	if not (self.db and self.db.freezeTradeLeadRows == true) and self.RefreshCustomerResults then
-		self:RefreshCustomerResults()
+    local frozen = not self.IsForever and self.db and self.db.freezeTradeLeadRows == true
+    self:DebugLog("trade", "refresh frozen="..tostring(frozen).." handler="..tostring(type(self.RefreshCustomerResults)).." panel="..tostring(self.customerFrame ~= nil))
+	if not frozen and self.RefreshCustomerResults then
+		self:RequestCustomerResultsRefresh()
 	end
+end
+
+function AF:PrintTradeChatDiagnostics()
+    local state = self.tradeChatDiagnostics or {}
+    local registered = self.frame and self.frame.IsEventRegistered and self.frame:IsEventRegistered("CHAT_MSG_CHANNEL")
+    self:DebugLog("trade", string.format("STATUS registered=%s received=%d stored=%d lastStage=%s flavor=%s",
+        tostring(registered), state.received or 0, state.stored or 0, tostring(state.stage), tostring(self.flavor)))
+    local active, cached, unresolved = 0, 0, 0
+    for _, lead in pairs(self.tradeLeads or {}) do
+        active = active + 1
+        if not next(lead.professionCandidates or {}) then unresolved = unresolved + 1 end
+    end
+    for _ in pairs(self.db.tradeLeadCache or {}) do cached = cached + 1 end
+    self:DebugLog("trade", string.format("CACHE active=%d cached=%d unresolved=%d frozen=%s item=%s professionFilter=%s sourceFilter=%s",
+        active, cached, unresolved, tostring(self.db.freezeTradeLeadRows), tostring(self.currentCustomerItemID), tostring(self.directoryProfession), tostring(self.directorySource)))
+    if self.GetForeverDirectoryRows then
+        local query = self.customerFrame and self.customerFrame.search and self.customerFrame.search:GetText() or ""
+        local rows = self:GetForeverDirectoryRows(query, self.directoryProfession, self.directorySource)
+        self:DebugLog("trade", "DIRECTORY rows="..#rows.." search="..tostring(query))
+    end
 end
 
 function AF:PruneTradeLeads()
@@ -326,7 +387,7 @@ function AF:GetCachedTradeLeadFallbackRows(itemID, professionID, filterText, see
 	local hasRecipeProfessionCandidates = next(recipeProfessionCandidates) ~= nil
 	filterText = tostring(filterText or ""):lower()
 	local sourceLeads = self.db and self.db.tradeLeadCache or {}
-	if self.db and self.db.freezeTradeLeadRows == true then
+	if not self.IsForever and self.db and self.db.freezeTradeLeadRows == true then
 		sourceLeads = self:GetCustomerTradeLeadSnapshotLeads(itemID, normalizedProfessionID, recipeID, true) or {}
 	end
 
@@ -386,7 +447,7 @@ function AF:GetTradeLeadRows(itemID, professionID, filterText, seenNames, recipe
 	local hasRecipeProfessionCandidates = next(recipeProfessionCandidates) ~= nil
 	filterText = tostring(filterText or ""):lower()
 	local sourceLeads = self.tradeLeads or {}
-	if self.db and self.db.freezeTradeLeadRows == true then
+	if not self.IsForever and self.db and self.db.freezeTradeLeadRows == true then
 		sourceLeads = self:GetCustomerTradeLeadSnapshotLeads(itemID, normalizedProfessionID, recipeID) or {}
 	end
 

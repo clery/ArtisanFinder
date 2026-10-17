@@ -65,16 +65,16 @@ local function AddTransferProfessionLink(links, professionID, link)
 	end
 end
 
-local function CopyTransferProfessionLinks(AF, db, characterName, profile)
+local function CopyTransferProfessionLinks(addon, db, characterName, profile)
 	local links = CopyCharacterLinks(db, characterName)
 	for professionKey, profession in pairs(profile and profile.professions or {}) do
 		if type(profession) == "table" then
-			AddTransferProfessionLink(links, AF:GetSupportedProfessionID(professionKey, profession), profession.professionLink)
+			AddTransferProfessionLink(links, addon:GetSupportedProfessionID(professionKey, profession), profession.professionLink)
 		end
 	end
 	for _, item in pairs(profile and profile.items or {}) do
 		if type(item) == "table" then
-			AddTransferProfessionLink(links, AF:GetSupportedProfessionID(item.professionID, item), item.professionLink)
+			AddTransferProfessionLink(links, addon:GetSupportedProfessionID(item.professionID, item), item.professionLink)
 		end
 	end
 	return links
@@ -145,19 +145,19 @@ local function BuildOptionalDeltaMapFromWire(wire)
 	return next(target) and target or nil
 end
 
-local function BuildCompactReagentSkillFacts(AF, item)
+local function BuildCompactReagentSkillFacts(addon, item)
 	local facts = type(item) == "table" and item.reagentSkillFacts or nil
 	if type(facts) ~= "table" then
 		return nil, nil, CopyOptionalDeltaMap(item and item.compactOptionalReagentDeltas)
 	end
 	local scanModelVersion = tonumber(facts.scanModelVersion)
-	if scanModelVersion ~= tonumber(AF.SCAN_MODEL_VERSION or 2) then
+	if scanModelVersion ~= tonumber(addon.SCAN_MODEL_VERSION or 2) then
 		return nil, nil, CopyOptionalDeltaMap(item.compactOptionalReagentDeltas)
 	end
 
 	local wireFacts = type(item.wireReagentSkillFacts) == "table" and item.wireReagentSkillFacts or nil
-	if type(AF.BuildWireReagentSkillFacts) == "function" and facts.compact ~= true then
-		local ok, builtWireFacts = pcall(AF.BuildWireReagentSkillFacts, AF, facts)
+	if type(addon.BuildWireReagentSkillFacts) == "function" and facts.compact ~= true then
+		local ok, builtWireFacts = pcall(addon.BuildWireReagentSkillFacts, addon, facts)
 		if ok and type(builtWireFacts) == "table" then
 			wireFacts = builtWireFacts
 		end
@@ -173,8 +173,9 @@ local function BuildCompactReagentSkillFacts(AF, item)
 	return compactFacts, wireFacts, BuildOptionalDeltaMapFromWire(wireFacts) or CopyOptionalDeltaMap(item.compactOptionalReagentDeltas)
 end
 
-local function CopyItemTransferEntry(AF, item, professionID)
+local function CopyItemTransferEntry(addon, item, professionID)
 	local entry = CopyScalarFields(item, {
+		"foreverRecipe",
 		"itemID",
 		"recipeID",
 		"recipeDifficulty",
@@ -201,7 +202,7 @@ local function CopyItemTransferEntry(AF, item, professionID)
 	entry.bestReagents = CopyReagentList(item.bestReagents)
 	entry.optionalReagents = CopyReagentList(item.optionalReagents)
 	entry.optionalBestReagents = CopyReagentList(item.optionalBestReagents)
-	entry.reagentSkillFacts, entry.wireReagentSkillFacts, entry.compactOptionalReagentDeltas = BuildCompactReagentSkillFacts(AF, item)
+	entry.reagentSkillFacts, entry.wireReagentSkillFacts, entry.compactOptionalReagentDeltas = BuildCompactReagentSkillFacts(addon, item)
 	return entry
 end
 
@@ -226,7 +227,7 @@ local function CopyProfessionSettings(settings)
 	return next(target) and target or nil
 end
 
-local function CopyProfileForTransfer(AF, profile, professionLinks)
+local function CopyProfileForTransfer(addon, profile, professionLinks)
 	local exportProfile = {
 		professions = {},
 		items = {},
@@ -234,7 +235,7 @@ local function CopyProfileForTransfer(AF, profile, professionLinks)
 	}
 	for professionKey, profession in pairs(profile.professions or {}) do
 		if type(profession) == "table" then
-			local professionID = AF:GetSupportedProfessionID(professionKey, profession)
+			local professionID = addon:GetSupportedProfessionID(professionKey, profession)
 			if professionID then
 				exportProfile.professions[tostring(professionID)] = CopyProfessionTransferEntry(professionID, profession, professionLinks)
 			end
@@ -242,10 +243,10 @@ local function CopyProfileForTransfer(AF, profile, professionLinks)
 	end
 	for itemKey, item in pairs(profile.items or {}) do
 		if type(item) == "table" then
-			local professionID = AF:GetSupportedProfessionID(item.professionID, item)
+			local professionID = addon:GetSupportedProfessionID(item.professionID, item)
 			if professionID then
 				local professionKey = tostring(professionID)
-				exportProfile.items[itemKey] = CopyItemTransferEntry(AF, item, professionID)
+				exportProfile.items[itemKey] = CopyItemTransferEntry(addon, item, professionID)
 				if not exportProfile.professions[professionKey] then
 					exportProfile.professions[professionKey] = CopyProfessionTransferEntry(professionID, {}, professionLinks)
 				end
@@ -253,7 +254,7 @@ local function CopyProfileForTransfer(AF, profile, professionLinks)
 		end
 	end
 	for professionKey, entry in pairs(profile.professionPrices or {}) do
-		local professionID = AF:GetSupportedProfessionID(professionKey)
+		local professionID = addon:GetSupportedProfessionID(professionKey)
 		local copied = professionID and type(entry) == "table" and CopyProfessionPriceEntry(entry) or nil
 		if copied then
 			exportProfile.professionPrices[tostring(professionID)] = copied
@@ -483,6 +484,7 @@ local function PackItem(itemKey, item)
 	if tonumber(item.itemID) ~= tonumber(packed[1]) then
 		SetPackedField(packed, "i", item.itemID)
 	end
+	SetPackedField(packed, "F", item.foreverRecipe)
 	SetPackedField(packed, "r", item.recipeID)
 	SetPackedField(packed, "p", item.professionID)
 	SetPackedField(packed, "d", item.recipeDifficulty)
@@ -529,6 +531,7 @@ local function UnpackItem(packed)
 	end
 	local item = {
 		itemID = packed.i or tonumber(itemKey),
+		foreverRecipe = packed.F == true or nil,
 		recipeID = packed.r,
 		professionID = packed.p,
 		recipeDifficulty = packed.d,
@@ -914,7 +917,8 @@ end
 local function IsValidTransferCharacterName(characterName)
 	return type(characterName) == "string"
 		and #characterName <= 128
-		and characterName:find("-", 1, true) ~= nil
+		and ((AF.IsForever and characterName:match("%S") ~= nil)
+			or (not AF.IsForever and characterName:find("-", 1, true) ~= nil))
 		and characterName:find("[%c]") == nil
 end
 

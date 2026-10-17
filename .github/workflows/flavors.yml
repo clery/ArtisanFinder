@@ -1,0 +1,25 @@
+name: Validate and package both flavors
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Lua 5.1
+        run: sudo apt-get update && sudo apt-get install -y lua5.1
+      - name: Validate both clients
+        run: python3 Tests/run.py
+      - name: Build separate distributions
+        run: python3 Tools/package.py --flavor all
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ArtisanFinder-flavors
+          path: .release/ArtisanFinder-*.zip

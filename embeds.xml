@@ -7,6 +7,4 @@
 	<Script file="Libs\ChatThrottleLib\ChatThrottleLib.lua"/>
 	<Script file="Libs\LibSerialize\LibSerialize.lua"/>
 	<Script file="Libs\LibDeflate\LibDeflate.lua"/>
-	<Script file="Libs\LibEditMode\namespaced.lua"/>
-	<Include file="Libs\LibEditMode\embed.xml"/>
 </Ui>

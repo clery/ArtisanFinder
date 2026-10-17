@@ -3,9 +3,6 @@ local addonName, AF = ...
 _G.ArtisanFinder = AF
 
 AF.ADDON_NAME = addonName
-AF.PREFIX = "ARTFIND1"
-AF.PROTOCOL_VERSION = "5"
-AF.CHANNEL_NAME = "ArtisanFinder"
 AF.AVAILABILITY_UNAVAILABLE = "unavailable"
 AF.AVAILABILITY_CURRENT = "current"
 AF.AVAILABILITY_ACCOUNT = "account"
@@ -26,3 +23,9 @@ AF.SCHEMA_VERSION = 17
 AF.SCAN_MODEL_VERSION = 5
 AF.HEAVY_JOB_QUALITY_TIER_THRESHOLD = 12
 AF.Locales = AF.Locales or {}
+
+-- Background data changes use the flavor's scheduler; direct UI actions refresh immediately.
+function AF:RequestCustomerResultsRefresh()
+    local refresh=self.QueueCustomerResultsRefresh or self.RefreshCustomerResults
+    if refresh then return refresh(self) end
+end

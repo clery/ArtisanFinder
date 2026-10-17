@@ -134,7 +134,8 @@ C_Item = {
 
 LoadAddonFile("Core/Bootstrap.lua")
 LoadAddonFile("Features/Customer/Recommendation.lua")
-LoadAddonFile("Features/Crafter/RecipeCapability.lua")
+LoadAddonFile("Features/Retail/Crafter/RecipeCapability.lua")
+LoadAddonFile("Features/Crafter/ProfessionRecipes.lua")
 LoadAddonFile("Features/Social/Comms.lua")
 
 function AF:IsSecretValue()

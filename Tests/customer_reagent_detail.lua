@@ -54,10 +54,12 @@ LoadAddonFile("Core/Bootstrap.lua")
 LoadAddonFile("Utils/Formatting.lua")
 LoadAddonFile("Core/Data.lua")
 LoadAddonFile("Features/Customer/Recommendation.lua")
-LoadAddonFile("Features/Crafter/RecipeCapability.lua")
+LoadAddonFile("Features/Retail/Crafter/RecipeCapability.lua")
+LoadAddonFile("Features/Crafter/ProfessionRecipes.lua")
 LoadAddonFile("Features/Social/Comms.lua")
+LoadAddonFile("Features/Retail/Customer/PreparationTracker.lua")
 LoadAddonFile("Features/Customer/PreparationTracker.lua")
-LoadAddonFile("Features/Customer/ShoppingList.lua")
+LoadAddonFile("Features/Retail/Customer/ShoppingList.lua")
 
 AF.db = {
 	customerCache = {

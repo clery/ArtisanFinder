@@ -1,0 +1,1714 @@
+local _, AF = ...
+
+local SORT_MODES = {
+	{ key = "best", labelKey = "SORT_RECOMMENDED" },
+	{ key = "commission", labelKey = "SORT_COMMISSION" },
+	{ key = "quality", labelKey = "SORT_QUALITY" },
+}
+
+local ROW_HEIGHT = 58
+local ROW_BOTTOM_PADDING = 7
+local ROW_TOP_PADDING = 4
+local CUSTOMER_PANEL_WIDTH = 482
+local CUSTOMER_PANEL_COLLAPSED_WIDTH = 28
+local CUSTOMER_PANEL_ATTACH_OFFSET_X = -5
+local CUSTOMER_COLLAPSE_BUTTON_LEVEL_OFFSET = 1000
+local CUSTOMER_REFRESH_COOLDOWN = 5
+local CUSTOMER_QUERY_POLL_INTERVAL = 1.5
+local CUSTOMER_DEBUG_QUERY_POLL_INTERVAL = 5
+local CUSTOMER_ROW_AGE_TICK_INTERVAL = 30
+local CUSTOMER_OPEN_REFRESH_DEDUPE_SECONDS = 0.25
+local CUSTOMER_ROW_HIGHLIGHT_ALPHA = 0.28
+local CUSTOMER_ROW_OWN_HIGHLIGHT_ALPHA = 0.22
+local CUSTOMER_ROW_BUTTON_TEXT_RIGHT_OFFSET = -90
+local CUSTOMER_ROW_AUX_BUTTON_SIZE = 18
+local CUSTOMER_PREPARE_ATLAS = "UI-HUD-Minimap-CraftingOrder-Up"
+local CUSTOMER_PREPARE_ICON_SIZE = 16
+
+local function GetOptionalGlobal(name)
+	return rawget(_G, name)
+end
+
+local function GetSortMode(index)
+	return SORT_MODES[index or 1] or SORT_MODES[1]
+end
+
+local function GetSortLabel(index)
+	return AF:Text(GetSortMode(index).labelKey)
+end
+
+local function GetSortIndexByKey(key)
+	for index, mode in ipairs(SORT_MODES) do
+		if mode.key == key then
+			return index
+		end
+	end
+	return 1
+end
+
+local function GetCustomerRowSource(entry)
+	if not entry then
+		return "none"
+	end
+	if entry.customerSource then
+		return entry.customerSource
+	end
+	if entry.ownAlt then
+		return entry.ownSelf and "own-self" or "own-alt"
+	end
+	if entry.tradeLead then
+		return entry.guildMember and "guild-fallback" or "trade-lead"
+	end
+	if entry.offlineFallback then
+		return "offline-fallback"
+	end
+	if entry.unavailableFavorite then
+		return "favorite-cache"
+	end
+	if entry.guildMember then
+		return "addon-guild"
+	end
+	return "addon"
+end
+
+local function GetCustomerRowOrderType(addon, entry)
+	if not entry then
+		return "none"
+	end
+	return addon:IsGuildOrderEntry(entry) and "guild" or "personal"
+end
+
+local function GetCustomerOrderFillData(addon, entry)
+	if not entry or entry.tutorialFake or (entry.ownSelf and not addon:IsDevEnabled()) then
+		return nil
+	end
+
+	local isGuildOrder = addon:IsGuildOrderEntry(entry)
+	local guildOrderLabel = GetOptionalGlobal("PROFESSIONS_CRAFTING_FORM_ORDER_RECIPIENT_GUILD")
+		or GetOptionalGlobal("PROFESSIONS_CRAFTING_FORM_ORDER_RECIPIENT_GUILD_ORDER")
+		or addon:Text("GUILD_ORDER")
+	local personalOrderLabel = GetOptionalGlobal("PROFESSIONS_CRAFTING_FORM_ORDER_RECIPIENT_PRIVATE") or addon:Text("PERSONAL_ORDER")
+	local data = {
+		isGuildOrder = isGuildOrder,
+		orderType = isGuildOrder and Enum.CraftingOrderType.Guild or Enum.CraftingOrderType.Personal,
+		orderLabel = isGuildOrder and guildOrderLabel or personalOrderLabel,
+	}
+
+	if not isGuildOrder then
+		data.recipient = addon:NormalizeName(entry.orderTarget or entry.name or entry.target)
+	end
+
+	if not entry.freeCommission and tonumber(entry.priceCopper) and tonumber(entry.priceCopper) > 0 then
+		data.commissionCopper = tonumber(entry.priceCopper) or 0
+		data.commissionGold = tostring(math.floor(data.commissionCopper / 10000))
+	end
+
+	return data
+end
+
+local function IsCustomerRowClickable(entry)
+	return entry and not entry.tutorialFake and (not entry.ownSelf or AF:IsDevEnabled())
+end
+
+local function UpdatePrepareMenuButtons(menu, entry)
+	local enabled = IsCustomerRowClickable(entry)
+	menu.standard:SetEnabled(enabled)
+	menu.optional:SetEnabled(enabled)
+	menu.advanced:SetEnabled(enabled)
+end
+
+local function SetCustomerRowHighlight(row, entry)
+	local highlight = row and row:GetHighlightTexture()
+	if not highlight then
+		return
+	end
+
+	if entry and entry.ownSelf then
+		if highlight.SetDesaturated then
+			highlight:SetDesaturated(true)
+		end
+		highlight:SetVertexColor(0.55, 0.55, 0.55)
+		highlight:SetAlpha(CUSTOMER_ROW_OWN_HIGHLIGHT_ALPHA)
+	else
+		if highlight.SetDesaturated then
+			highlight:SetDesaturated(false)
+		end
+		highlight:SetVertexColor(1, 1, 1)
+		highlight:SetAlpha(CUSTOMER_ROW_HIGHLIGHT_ALPHA)
+	end
+end
+
+local function GetCustomerRowAvailability(addon, entry)
+	if not entry then
+		return "none"
+	end
+	if entry.availabilityState then
+		return entry.availabilityState
+	end
+	if addon:IsCustomerEntryOnline(entry) then
+		return "online"
+	end
+	if entry.unavailableCached or entry.unavailableFavorite then
+		return "unavailable"
+	end
+	if addon:IsCustomerEntryOffline(entry) then
+		return "offline"
+	end
+	if entry.offlineCached then
+		return entry.tradeLead and "unknown" or "unavailable"
+	end
+	return "unknown"
+end
+
+local function BuildCustomerResultDebugSummary(addon, rows)
+	local counts = {}
+	for _, entry in ipairs(rows or {}) do
+		local key = table.concat({
+			GetCustomerRowSource(entry),
+			GetCustomerRowAvailability(addon, entry),
+			GetCustomerRowOrderType(addon, entry),
+		}, "/")
+		counts[key] = (counts[key] or 0) + 1
+	end
+	local parts = {}
+	for key, count in pairs(counts) do
+		table.insert(parts, key .. "=" .. tostring(count))
+	end
+	table.sort(parts)
+	return table.concat(parts, ", ")
+end
+
+function AF:GetCustomerSortOptions()
+	local options = {}
+	for _, mode in ipairs(SORT_MODES) do
+		table.insert(options, { key = mode.key, text = self:Text(mode.labelKey) })
+	end
+	return options
+end
+
+function AF:SetDefaultSort(key)
+	self.db.defaultSort = GetSortMode(GetSortIndexByKey(key)).key
+	self.customerSortIndex = GetSortIndexByKey(self.db.defaultSort)
+	if self.customerFrame then
+		self.customerFrame.sort:SetText(self:Text("SORT_BUTTON", GetSortLabel(self.customerSortIndex)))
+	end
+	if self.RefreshCustomerResults then
+		self:RefreshCustomerResults()
+	end
+	if self.RefreshOptionsPanel then
+		self:RefreshOptionsPanel()
+	end
+end
+
+local function SaveFramePoints(frame)
+	local points = {}
+	for i = 1, frame:GetNumPoints() do
+		local point, relativeTo, relativePoint, xOfs, yOfs = frame:GetPoint(i)
+		points[i] = {
+			point = point,
+			relativeTo = relativeTo,
+			relativePoint = relativePoint,
+			xOfs = xOfs,
+			yOfs = yOfs,
+		}
+	end
+	return points
+end
+
+local function RestoreFramePoints(frame, points)
+	if not frame or not points then
+		return
+	end
+	frame:ClearAllPoints()
+	for _, point in ipairs(points) do
+		if point.relativeTo then
+			frame:SetPoint(point.point, point.relativeTo, point.relativePoint, point.xOfs, point.yOfs)
+		else
+			frame:SetPoint(point.point, point.xOfs, point.yOfs)
+		end
+	end
+end
+
+local function GetScrollBar(scrollFrame)
+	return scrollFrame and (scrollFrame.ScrollBar or _G[(scrollFrame:GetName() or "") .. "ScrollBar"])
+end
+
+local function Clamp(value, minValue, maxValue)
+	return math.max(minValue, math.min(maxValue, value))
+end
+
+local function SetButtonAtlas(button, normalAtlas, pushedAtlas, disabledAtlas, highlightAtlas)
+	button:SetNormalAtlas(normalAtlas)
+	button:SetPushedAtlas(pushedAtlas)
+	button:SetDisabledAtlas(disabledAtlas or normalAtlas)
+	button:SetHighlightAtlas(highlightAtlas or normalAtlas, "ADD")
+end
+
+local function PositionButtonTexture(texture, width, height, xOffset, yOffset)
+	if not texture then
+		return
+	end
+	texture:ClearAllPoints()
+	texture:SetSize(width, height)
+	texture:SetPoint("CENTER", xOffset or 0, yOffset or 0)
+end
+
+local function TrySetTextureAtlas(texture, atlas, useAtlasSize)
+	if not texture or not atlas then
+		return false
+	end
+	if not C_Texture.GetAtlasInfo(atlas) then
+		return false
+	end
+	if texture.SetAtlas then
+		texture:SetAtlas(atlas, useAtlasSize)
+		return true
+	end
+	return false
+end
+
+local function SetMinimalThumbAtlas(thumb, state)
+	if not thumb then
+		return
+	end
+	local suffix = ""
+	if state == "over" then
+		suffix = "-over"
+	elseif state == "down" then
+		suffix = "-down"
+	end
+	thumb.Begin:SetAtlas("minimal-scrollbar-small-thumb-top" .. suffix, true)
+	thumb.Middle:SetAtlas("minimal-scrollbar-small-thumb-middle" .. suffix, true)
+	thumb.End:SetAtlas("minimal-scrollbar-small-thumb-bottom" .. suffix, true)
+end
+
+local function SetScrollBarValueFromCursor(bar, cursorOffset)
+	local track = bar.Track
+	local scrollBar = bar.ScrollBar
+	if not track or not scrollBar or not track.GetTop then
+		return
+	end
+
+	local _, maxValue = scrollBar:GetMinMaxValues()
+	maxValue = tonumber(maxValue) or 0
+	if maxValue <= 0 then
+		return
+	end
+
+	local scale = UIParent:GetEffectiveScale()
+	local _, cursorY = GetCursorPosition()
+	cursorY = cursorY / scale
+
+	local trackTop = track:GetTop()
+	local trackHeight = track:GetHeight()
+	local thumbHeight = bar.Thumb:GetHeight()
+	local travel = math.max(1, trackHeight - thumbHeight)
+	local thumbTop = cursorY + (cursorOffset or -(thumbHeight / 2))
+	local offset = Clamp(trackTop - thumbTop, 0, travel)
+	scrollBar:SetValue((offset / travel) * maxValue)
+end
+
+local function UpdateCustomerScrollBar(bar)
+	local scrollBar = bar and bar.ScrollBar
+	if not scrollBar then
+		return
+	end
+
+	local _, maxValue = scrollBar:GetMinMaxValues()
+	maxValue = tonumber(maxValue) or 0
+	local scrollFrame = bar.ScrollFrame
+	local shown = maxValue > 0 and scrollFrame and scrollFrame:IsShown()
+	bar:SetShown(shown)
+	if not shown then
+		return
+	end
+
+	local track = bar.Track
+	local thumb = bar.Thumb
+	local trackHeight = track:GetHeight()
+	local visibleHeight = scrollFrame and scrollFrame:GetHeight() or trackHeight
+	local contentHeight = visibleHeight + maxValue
+	local thumbHeight = Clamp(math.floor(trackHeight * (visibleHeight / contentHeight)), 23, trackHeight)
+	local travel = math.max(1, trackHeight - thumbHeight)
+	local value = Clamp(scrollBar:GetValue() or 0, 0, maxValue)
+
+	thumb:SetHeight(thumbHeight)
+	thumb:ClearAllPoints()
+	thumb:SetPoint("TOP", track, "TOP", 0, -((value / maxValue) * travel))
+end
+
+local function CreateCustomerMinimalScrollBar(parent, scrollFrame, scrollBar)
+	local bar = CreateFrame("Frame", nil, parent, "ArtisanFinderCustomerMinimalScrollBarTemplate")
+	bar.ScrollFrame = scrollFrame
+	bar.ScrollBar = scrollBar
+
+	SetButtonAtlas(bar.Back, "minimal-scrollbar-arrow-top", "minimal-scrollbar-arrow-top-down", "minimal-scrollbar-arrow-top", "minimal-scrollbar-arrow-top-over")
+	bar.Back:SetScript("OnClick", function()
+		scrollBar:SetValue((scrollBar:GetValue() or 0) - ROW_HEIGHT)
+	end)
+
+	SetButtonAtlas(bar.Forward, "minimal-scrollbar-arrow-bottom", "minimal-scrollbar-arrow-bottom-down", "minimal-scrollbar-arrow-bottom", "minimal-scrollbar-arrow-bottom-over")
+	bar.Forward:SetScript("OnClick", function()
+		scrollBar:SetValue((scrollBar:GetValue() or 0) + ROW_HEIGHT)
+	end)
+
+	bar.Track:EnableMouse(true)
+	bar.Track:SetScript("OnMouseDown", function()
+		SetScrollBarValueFromCursor(bar)
+	end)
+
+	bar.Thumb = bar.Track.Thumb
+	bar.Thumb:EnableMouse(true)
+	bar.Thumb:SetHitRectInsets(-4, -4, -4, -4)
+	bar.Thumb:SetScript("OnEnter", function(thumb)
+		if not thumb.isMouseDown then
+			SetMinimalThumbAtlas(thumb, "over")
+		end
+	end)
+	bar.Thumb:SetScript("OnLeave", function(thumb)
+		if not thumb.isMouseDown then
+			SetMinimalThumbAtlas(thumb, "normal")
+		end
+	end)
+	bar.Thumb:SetScript("OnMouseDown", function(thumb)
+		thumb.isMouseDown = true
+		SetMinimalThumbAtlas(thumb, "down")
+		local scale = UIParent:GetEffectiveScale()
+		local _, cursorY = GetCursorPosition()
+		bar.dragCursorOffset = (thumb:GetTop() or (cursorY / scale)) - (cursorY / scale)
+		bar:SetScript("OnUpdate", function()
+			SetScrollBarValueFromCursor(bar, bar.dragCursorOffset)
+		end)
+	end)
+	bar.Thumb:SetScript("OnMouseUp", function(thumb)
+		thumb.isMouseDown = false
+		bar:SetScript("OnUpdate", nil)
+		if thumb:IsMouseOver() then
+			SetMinimalThumbAtlas(thumb, "over")
+		else
+			SetMinimalThumbAtlas(thumb, "normal")
+		end
+	end)
+	bar.Thumb:SetScript("OnHide", function(thumb)
+		thumb.isMouseDown = false
+		bar:SetScript("OnUpdate", nil)
+		SetMinimalThumbAtlas(thumb, "normal")
+	end)
+
+	scrollBar:HookScript("OnValueChanged", function()
+		UpdateCustomerScrollBar(bar)
+	end)
+	bar:SetScript("OnSizeChanged", function()
+		UpdateCustomerScrollBar(bar)
+	end)
+
+	bar:Hide()
+	return bar
+end
+
+local function HideLegacyScrollBar(scrollBar)
+	if not scrollBar then
+		return
+	end
+	scrollBar:SetAlpha(0)
+	scrollBar:EnableMouse(false)
+	if scrollBar.ScrollUpButton then
+		scrollBar.ScrollUpButton:EnableMouse(false)
+	end
+	if scrollBar.ScrollDownButton then
+		scrollBar.ScrollDownButton:EnableMouse(false)
+	end
+end
+
+local function SplitAroundPlaceholder(text)
+	local placeholderStart, placeholderEnd = tostring(text or ""):find("%s", 1, true)
+	if not placeholderStart then
+		return tostring(text or ""), ""
+	end
+	return text:sub(1, placeholderStart - 1), text:sub(placeholderEnd + 1)
+end
+
+local function IsCursorOverRegion(region)
+	if not region or not region.GetLeft then
+		return false
+	end
+	local left, right, top, bottom = region:GetLeft(), region:GetRight(), region:GetTop(), region:GetBottom()
+	if not left or not right or not top or not bottom then
+		return false
+	end
+	local scale = UIParent:GetEffectiveScale()
+	local x, y = GetCursorPosition()
+	x = x / scale
+	y = y / scale
+	return x >= left and x <= right and y >= bottom and y <= top
+end
+
+local function GetCustomerNoteTooltip()
+	if not AF.customerNoteTooltip then
+		AF.customerNoteTooltip = CreateFrame("GameTooltip", "ArtisanFinderCustomerNoteTooltip", UIParent, "GameTooltipTemplate")
+	end
+	return AF.customerNoteTooltip
+end
+
+local function HideCustomerNoteTooltip()
+	local tooltip = AF.customerNoteTooltip
+	if tooltip then
+		tooltip:Hide()
+		tooltip.ownerRow = nil
+		tooltip.ownerRegion = nil
+	end
+end
+
+local function UpdateCustomerTextTooltip(row)
+	local text
+	local region
+	if row and row.nameStatusTooltipText and IsCursorOverRegion(row.name) then
+		text = row.nameStatusTooltipText
+		region = row.name
+	elseif row and row.noteTooltipText and IsCursorOverRegion(row.detail) then
+		text = row.noteTooltipText
+		region = row.detail
+	end
+	if not text then
+		HideCustomerNoteTooltip()
+		return
+	end
+	local tooltip = GetCustomerNoteTooltip()
+	if tooltip.ownerRow == row and tooltip.ownerRegion == region and tooltip:IsShown() then
+		return
+	end
+	tooltip.ownerRow = row
+	tooltip.ownerRegion = region
+	tooltip:SetOwner(row, "ANCHOR_CURSOR")
+	tooltip:SetText(text, 1, 1, 1, 1, true)
+	tooltip:Show()
+end
+
+local function ConfigureCustomerRow(row)
+	AF:StyleListRow(row)
+	row:SetPushedTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
+	if row:GetPushedTexture() then
+		row:GetPushedTexture():SetBlendMode("ADD")
+		row:GetPushedTexture():SetAlpha(0.35)
+	end
+	row:EnableMouse(true)
+	row:RegisterForClicks("LeftButtonUp")
+
+	if not TrySetTextureAtlas(row.favorite, "PetJournal-FavoritesIcon", false)
+		and not TrySetTextureAtlas(row.favorite, "communities-icon-heart", false) then
+		row.favorite:SetTexture("Interface\\Common\\FavoritesIcon")
+	end
+	row.favorite:ClearAllPoints()
+	row.favorite:SetSize(15, 15)
+	row.favorite:SetPoint("TOP", row.certified, "BOTTOM", 0, -2)
+	row.favorite:Hide()
+
+	row.name:ClearAllPoints()
+	row.name:SetPoint("TOPLEFT", row.certified, "TOPRIGHT", 4, 0)
+	row.name:SetPoint("RIGHT", row.updatedAt, "LEFT", -4, 0)
+	if row.name.SetWordWrap then
+		row.name:SetWordWrap(false)
+	end
+	if row.name.SetMaxLines then
+		row.name:SetMaxLines(1)
+	end
+	row.updatedAt:ClearAllPoints()
+	row.updatedAt:SetPoint("TOPRIGHT", CUSTOMER_ROW_BUTTON_TEXT_RIGHT_OFFSET, -6)
+	row.detail:ClearAllPoints()
+	row.detail:SetPoint("TOPLEFT", row.name, "BOTTOMLEFT", 0, -3)
+	row.detail:SetPoint("RIGHT", CUSTOMER_ROW_BUTTON_TEXT_RIGHT_OFFSET, 0)
+	if row.detail.SetWordWrap then
+		row.detail:SetWordWrap(false)
+	end
+	if row.detail.SetMaxLines then
+		row.detail:SetMaxLines(1)
+	end
+	row.capability:ClearAllPoints()
+	row.capability:SetPoint("TOPLEFT", row.detail, "BOTTOMLEFT", 0, -3)
+	row.capability:SetPoint("RIGHT", CUSTOMER_ROW_BUTTON_TEXT_RIGHT_OFFSET, 0)
+
+	row.action:SetNormalTexture("Interface\\Buttons\\UI-OptionsButton")
+	row.action:SetPushedTexture("Interface\\Buttons\\UI-OptionsButton")
+	row.action:SetHighlightTexture("Interface\\Buttons\\UI-OptionsButton", "ADD")
+	row.action:GetNormalTexture():ClearAllPoints()
+	row.action:GetNormalTexture():SetSize(21, 21)
+	row.action:GetNormalTexture():SetPoint("CENTER")
+	row.action:GetPushedTexture():ClearAllPoints()
+	row.action:GetPushedTexture():SetSize(21, 21)
+	row.action:GetPushedTexture():SetPoint("CENTER", 1, -1)
+	row.action:GetHighlightTexture():ClearAllPoints()
+	row.action:GetHighlightTexture():SetSize(21, 21)
+	row.action:GetHighlightTexture():SetPoint("CENTER")
+	row.action:GetHighlightTexture():SetVertexColor(1, 0.82, 0)
+	row.action:SetScript("OnClick", function(buttonFrame)
+		if row.entry then
+			AF:ShowCustomerMenu(row.entry, buttonFrame)
+		end
+	end)
+
+	row.prepare:ClearAllPoints()
+	row.prepare:SetSize(CUSTOMER_ROW_AUX_BUTTON_SIZE, CUSTOMER_ROW_AUX_BUTTON_SIZE)
+	row.prepare:SetPoint("RIGHT", row.action, "LEFT", -1, 0)
+	row.prepare:SetFrameLevel((row.action:GetFrameLevel() or row:GetFrameLevel() or 0) + 2)
+	SetButtonAtlas(row.prepare, CUSTOMER_PREPARE_ATLAS, CUSTOMER_PREPARE_ATLAS, CUSTOMER_PREPARE_ATLAS, CUSTOMER_PREPARE_ATLAS)
+	PositionButtonTexture(row.prepare:GetNormalTexture(), CUSTOMER_PREPARE_ICON_SIZE, CUSTOMER_PREPARE_ICON_SIZE)
+	PositionButtonTexture(row.prepare:GetPushedTexture(), CUSTOMER_PREPARE_ICON_SIZE, CUSTOMER_PREPARE_ICON_SIZE, 1, -1)
+	PositionButtonTexture(row.prepare:GetDisabledTexture(), CUSTOMER_PREPARE_ICON_SIZE, CUSTOMER_PREPARE_ICON_SIZE)
+	PositionButtonTexture(row.prepare:GetHighlightTexture(), CUSTOMER_PREPARE_ICON_SIZE, CUSTOMER_PREPARE_ICON_SIZE)
+	if row.prepare:GetDisabledTexture() and row.prepare:GetDisabledTexture().SetDesaturated then
+		row.prepare:GetDisabledTexture():SetDesaturated(true)
+		row.prepare:GetDisabledTexture():SetVertexColor(0.55, 0.55, 0.55)
+	end
+	if row.prepare:GetHighlightTexture() then
+		row.prepare:GetHighlightTexture():SetVertexColor(1, 0.82, 0)
+	end
+	row.prepare:SetScript("OnClick", function(buttonFrame)
+		if row.entry then
+			GameTooltip:Hide()
+			AF:ShowCustomerPrepareMenu(row.entry, buttonFrame)
+		end
+	end)
+	row.prepare:SetScript("OnEnter", function(buttonFrame)
+		GameTooltip:SetOwner(buttonFrame, "ANCHOR_RIGHT")
+		GameTooltip:SetText(AF:Text("PREPARE_ORDER"), 1, 0.82, 0)
+		GameTooltip:Show()
+	end)
+	row.prepare:SetScript("OnLeave", function()
+		GameTooltip:Hide()
+	end)
+
+	row.whoRefresh:ClearAllPoints()
+	row.whoRefresh:SetSize(CUSTOMER_ROW_AUX_BUTTON_SIZE, CUSTOMER_ROW_AUX_BUTTON_SIZE)
+	row.whoRefresh:SetPoint("RIGHT", row.prepare, "LEFT", -1, 0)
+	row.whoRefresh:SetFrameLevel((row.prepare:GetFrameLevel() or row:GetFrameLevel() or 0) + 2)
+	SetButtonAtlas(row.whoRefresh, "UI-RefreshButton", "UI-RefreshButton", "UI-RefreshButton", "UI-RefreshButton")
+	if row.whoRefresh:GetDisabledTexture() then
+		row.whoRefresh:GetDisabledTexture():SetDesaturated(true)
+		row.whoRefresh:GetDisabledTexture():SetVertexColor(0.55, 0.55, 0.55)
+	end
+	row.whoRefresh:SetScript("OnClick", function()
+		AF:RefreshCustomerEntryWhoStatus(row.entry)
+		AF:UpdateCustomerWhoRefreshButtons()
+	end)
+	row.whoRefresh:SetScript("OnEnter", function(button)
+		if button:IsEnabled() then
+			return
+		end
+		local remaining = AF:GetCustomerWhoStatusReadyRemaining()
+		GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
+		GameTooltip:SetText(remaining > 0 and AF:Text("ROW_REFRESH_DISABLED_TOOLTIP", remaining) or AF:Text("REFRESH_DISABLED_TOOLTIP"), 1, 0.82, 0)
+		GameTooltip:Show()
+	end)
+	row.whoRefresh:SetScript("OnLeave", function()
+		GameTooltip:Hide()
+	end)
+	if AF.ConfigureCustomerOptionalPrepRow then
+		AF:ConfigureCustomerOptionalPrepRow(row)
+	end
+	row:SetScript("OnEnter", function(buttonFrame)
+		if buttonFrame.entry then
+			SetCustomerRowHighlight(buttonFrame, buttonFrame.entry)
+			if buttonFrame.entry.tutorialFake then
+				GameTooltip:Hide()
+				return
+			end
+			GameTooltip:SetOwner(buttonFrame, "ANCHOR_RIGHT")
+			AF:AddCustomerEntryTooltipLines(GameTooltip, buttonFrame.entry, { requestReagentDetails = true })
+			if IsCustomerRowClickable(buttonFrame.entry) then
+				GameTooltip:AddLine(" ")
+				GameTooltip:AddLine(AF:Text("CUSTOMER_ROW_CLICK_TO_AUTOFILL"), 0.65, 0.65, 0.65, true)
+			end
+			AF:StyleCustomerTooltip(GameTooltip)
+			AF:FitTooltipWidthToContent(GameTooltip)
+			GameTooltip:Show()
+			buttonFrame:SetScript("OnUpdate", UpdateCustomerTextTooltip)
+		end
+	end)
+	row:SetScript("OnLeave", function(buttonFrame)
+		buttonFrame:SetScript("OnUpdate", nil)
+		HideCustomerNoteTooltip()
+		GameTooltip:Hide()
+	end)
+	row:SetScript("OnClick", function(buttonFrame)
+		if IsCustomerRowClickable(buttonFrame.entry) then
+			local context = AF.GetCustomerShoppingContext and AF:GetCustomerShoppingContext()
+			local keepShoppingList = context
+				and (context.mode == "optional" or context.mode == "advanced")
+				and AF.GetCustomerShoppingEntryKey
+				and context.entryKey == AF:GetCustomerShoppingEntryKey(buttonFrame.entry)
+			AF:FillPersonalOrder(buttonFrame.entry, keepShoppingList and { keepShoppingList = true } or nil)
+			if AF.ApplyTrackedCraftToCustomerOrder then
+				AF:ApplyTrackedCraftToCustomerOrder(buttonFrame.entry)
+			end
+		end
+	end)
+
+	return row
+end
+
+local function ResetCustomerRow(_, row)
+	row:SetScript("OnUpdate", nil)
+	row.entry = nil
+	row.artisanFinderWhoName = nil
+	row.nameStatusTooltipText = nil
+	row.noteTooltipText = nil
+	if row.whoSpinner then
+		row.whoSpinner:Hide()
+		row.artisanFinderWhoSpinnerName = nil
+	end
+	if row.whoRefresh then
+		row.whoRefresh:Hide()
+	end
+	if row.prepare then
+		row.prepare:Hide()
+	end
+	if row.optionalPrep then
+		row.optionalPrep:Hide()
+		if row.optionalPrep.slotPool then
+			row.optionalPrep.slotPool:ReleaseAll()
+		end
+	end
+	HideCustomerNoteTooltip()
+	row:ClearAllPoints()
+	row:Hide()
+end
+
+function AF:HookCustomerCurrentListings()
+	if self.currentListingsHooked then
+		return
+	end
+
+	local form = ProfessionsCustomerOrdersFrame and ProfessionsCustomerOrdersFrame.Form
+	local listings = form and form.CurrentListings
+	if not listings then
+		return
+	end
+
+	self.currentListingsHooked = true
+	listings:HookScript("OnShow", function()
+		AF:QueueCustomerSidePanelLayout()
+	end)
+	listings:HookScript("OnHide", function()
+		AF:QueueCustomerSidePanelLayout()
+	end)
+end
+
+function AF:RestoreCurrentListingsAnchor()
+	local form = ProfessionsCustomerOrdersFrame and ProfessionsCustomerOrdersFrame.Form
+	local listings = form and form.CurrentListings
+	if self.currentListingsOriginalPoints then
+		RestoreFramePoints(listings, self.currentListingsOriginalPoints)
+		self.currentListingsMoved = false
+	end
+end
+
+function AF:PositionCustomerSidePanels()
+	local ordersFrame = ProfessionsCustomerOrdersFrame
+	local form = ordersFrame and ordersFrame.Form
+	local frame = self.customerFrame
+	if not ordersFrame or not form or not frame then
+		return
+	end
+
+	self:HookCustomerCurrentListings()
+
+	frame:ClearAllPoints()
+	frame:SetPoint("TOPLEFT", ordersFrame, "TOPRIGHT", CUSTOMER_PANEL_ATTACH_OFFSET_X, 0)
+	frame:SetPoint("BOTTOMLEFT", ordersFrame, "BOTTOMRIGHT", CUSTOMER_PANEL_ATTACH_OFFSET_X, 0)
+	frame:SetWidth(frame.collapsed and CUSTOMER_PANEL_COLLAPSED_WIDTH or CUSTOMER_PANEL_WIDTH)
+	local ordersHeight = ordersFrame:GetHeight()
+	if ordersHeight and ordersHeight > 0 then
+		frame:SetHeight(ordersHeight)
+	end
+
+	local listings = form.CurrentListings
+	if not listings then
+		return
+	end
+
+	if not frame:IsShown() or not form:IsShown() or not ordersFrame:IsShown() then
+		self:RestoreCurrentListingsAnchor()
+		return
+	end
+	if not listings:IsShown() then
+		if self.currentListingsMoved then
+			self:RestoreCurrentListingsAnchor()
+		end
+		return
+	end
+
+	if not self.currentListingsOriginalPoints then
+		local originalPoints = SaveFramePoints(listings)
+		if #originalPoints == 0 then
+			return
+		end
+		self.currentListingsOriginalPoints = originalPoints
+	end
+
+	listings:ClearAllPoints()
+	listings:SetPoint("TOPLEFT", frame, "TOPRIGHT", -1, 0)
+	listings:SetPoint("BOTTOMLEFT", frame, "BOTTOMRIGHT", -1, 0)
+	self.currentListingsMoved = true
+end
+
+function AF:QueueCustomerSidePanelLayout()
+	self:PositionCustomerSidePanels()
+	C_Timer.After(0, function()
+		AF:PositionCustomerSidePanels()
+	end)
+end
+
+function AF:SetCustomerStatusText(text)
+	local frame = self.customerFrame
+	if not frame then
+		return
+	end
+	frame.statusText:SetText(text or "")
+	frame.statusText:SetHeight(math.max(16, frame.statusText:GetStringHeight()))
+	if frame.divider then
+		frame.divider:ClearAllPoints()
+		frame.divider:SetPoint("TOPLEFT", frame.statusText, "BOTTOMLEFT", 0, -8)
+		frame.divider:SetPoint("RIGHT", frame, "RIGHT", -12, 0)
+	end
+	frame.statusPrefix:SetText(text or "")
+	frame.statusPrefix:ClearAllPoints()
+	frame.statusPrefix:SetPoint("TOPLEFT", frame, "TOPLEFT", 14, -32)
+	frame.statusPrefix:SetPoint("RIGHT", frame, "RIGHT", -14, 0)
+	frame.statusPrefix:Hide()
+	frame.itemLink:Hide()
+	frame.itemLink.itemLinkText = nil
+	frame.statusSuffix:SetText("")
+end
+
+function AF:SetCustomerStatusItem(itemID, itemName, templateKey)
+	local frame = self.customerFrame
+	if not frame or not itemID then
+		self:SetCustomerStatusText(self:Text("SELECT_ORDER_ITEM"))
+		return
+	end
+
+	itemName = itemName or self:GetDisplayItemName(itemID)
+	local prefix, suffix = SplitAroundPlaceholder(self:Text(templateKey or "AVAILABLE_ARTISANS_FOR", "%s"))
+	frame.statusPrefix:ClearAllPoints()
+	frame.statusPrefix:SetPoint("TOPLEFT", frame, "TOPLEFT", 14, -32)
+	frame.statusPrefix:SetText(prefix)
+	frame.statusPrefix:SetWidth(math.max(1, frame.statusPrefix:GetStringWidth() + 2))
+	frame.statusPrefix:Hide()
+
+	local itemLink = "item:" .. tostring(itemID)
+	local displayText = "[" .. tostring(itemName) .. "]"
+	local _, link = C_Item.GetItemInfo(itemID)
+	itemLink = link or itemLink
+	displayText = link or displayText
+
+	frame.itemLink.itemLinkText = itemLink
+	frame.itemLink.text:SetText(displayText)
+	frame.itemLink:SetWidth(1)
+	frame.itemLink:Show()
+	frame.statusSuffix:SetText(suffix)
+	frame.statusText:SetText(prefix .. displayText .. suffix)
+	frame.statusText:SetHeight(math.max(16, frame.statusText:GetStringHeight()))
+	if frame.divider then
+		frame.divider:ClearAllPoints()
+		frame.divider:SetPoint("TOPLEFT", frame.statusText, "BOTTOMLEFT", 0, -8)
+		frame.divider:SetPoint("RIGHT", frame, "RIGHT", -12, 0)
+	end
+end
+
+function AF:SetCustomerPanelCollapsed(collapsed, skipRefresh)
+	local frame = self.customerFrame
+	if not frame then
+		return
+	end
+
+	frame.collapsed = collapsed and true or false
+	for _, region in ipairs(frame.collapsibleRegions or {}) do
+		region:SetShown(not frame.collapsed)
+	end
+
+	frame.title:SetShown(not frame.collapsed)
+	frame.TitleContainer:SetShown(not frame.collapsed)
+	frame.NineSlice:SetShown(not frame.collapsed)
+	frame.Bg:SetShown(not frame.collapsed)
+	frame.TopTileStreaks:SetShown(not frame.collapsed)
+	frame.collapsedRail:SetShown(frame.collapsed)
+	if frame.collapseButton then
+		frame.collapseButton:Hide()
+	end
+	local collapseButton = self.customerCollapseButton
+	if collapseButton then
+		collapseButton:ClearAllPoints()
+		if frame.collapsed then
+			collapseButton:SetPoint("TOP", frame.collapsedRail, "TOP", 0, 0)
+			collapseButton:SetMaximizedLook()
+		else
+			collapseButton:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 1, 0)
+			collapseButton:SetMinimizedLook()
+		end
+			AF:RaiseButtonAboveAnchor(collapseButton, ProfessionsCustomerOrdersFrame or ProfessionsFrame or UIParent, CUSTOMER_COLLAPSE_BUTTON_LEVEL_OFFSET)
+		collapseButton:SetShown(frame:IsShown())
+	end
+
+	if frame.collapsed then
+		if self.EndCustomerTutorial then
+			self:EndCustomerTutorial()
+		end
+		if self.HideCustomerShoppingList then
+			self:HideCustomerShoppingList()
+		end
+		self:HideCustomerMenu()
+	elseif not skipRefresh then
+		self:RefreshCustomerQuery(true)
+	end
+	self:QueueCustomerSidePanelLayout()
+end
+
+function AF:InitializeCustomerUI()
+	self.customerRows = {}
+	self.customerSortIndex = GetSortIndexByKey(self.db and self.db.defaultSort or "best")
+	self:AttachCustomerUI()
+end
+
+function AF:RefreshCustomerLocale()
+	local frame = self.customerFrame
+	if not frame then
+		return
+	end
+	self.customerSortIndex = SORT_MODES[self.customerSortIndex or 1] and self.customerSortIndex or 1
+	frame.sort:SetText(self:Text("SORT_BUTTON", GetSortLabel(self.customerSortIndex)))
+	frame.refresh:SetText(self:Text("REFRESH"))
+	self:UpdateCustomerRefreshButton()
+	frame.menu.favorite:SetText(self:Text(frame.menu.entry and self:IsFavoriteArtisan(frame.menu.entry) and "UNFAVORITE" or "FAVORITE"))
+	frame.menu.whisper:SetText(self:Text("WHISPER"))
+	frame.menu.link:SetText(self:Text("PROFESSION"))
+	frame.prepareMenu.standard:SetText(self:Text("PREPARE_ORDER_STANDARD"))
+	frame.prepareMenu.optional:SetText(self:Text("PREPARE_ORDER_OPTIONAL"))
+	frame.prepareMenu.advanced:SetText(self:Text("PREPARE_ORDER_ADVANCED"))
+	for _, row in ipairs(self.customerRows or {}) do
+		if row.optionalPrep then
+			row.optionalPrep.label:SetText(self:Text("OPTIONAL_REAGENTS"))
+			row.optionalPrep.empty:SetText(self:Text("CUSTOMER_SHOPPING_EMPTY"))
+			row.optionalPrep.track:SetText(self:Text("CUSTOMER_SHOPPING_TRACK"))
+		end
+	end
+end
+
+function AF:AttachCustomerUI()
+	if self.customerFrame or not ProfessionsCustomerOrdersFrame or not ProfessionsCustomerOrdersFrame.Form then
+		return
+	end
+
+	local ordersFrame = ProfessionsCustomerOrdersFrame
+	local parent = ordersFrame.Form
+	local panelHeight = ordersFrame:GetHeight()
+	if not panelHeight or panelHeight <= 0 then
+		panelHeight = 568
+	end
+	local frame = CreateFrame("Frame", "ArtisanFinderCustomerFrame", ordersFrame, "ArtisanFinderCustomerPanelTemplate")
+	frame:SetSize(CUSTOMER_PANEL_WIDTH, panelHeight)
+	frame:SetPoint("TOPLEFT", ordersFrame, "TOPRIGHT", CUSTOMER_PANEL_ATTACH_OFFSET_X, 0)
+	frame:SetPoint("BOTTOMLEFT", ordersFrame, "BOTTOMRIGHT", CUSTOMER_PANEL_ATTACH_OFFSET_X, 0)
+	frame:SetFrameLevel(parent:GetFrameLevel())
+	self:ApplyCustomerSidePanel(frame)
+	frame:Hide()
+
+	frame.title = frame.TitleContainer.TitleText
+	frame.title:SetText("ArtisanFinder")
+	if self.SetupCustomerTutorialButton then
+		self:SetupCustomerTutorialButton(frame)
+	end
+
+	frame.collapseButton:Hide()
+	local collapseButton = CreateFrame("Frame", "ArtisanFinderCustomerCollapseButton", ordersFrame, "MaximizeMinimizeButtonFrameTemplate")
+	collapseButton:SetSize(24, 24)
+	self:RaiseButtonAboveAnchor(collapseButton, ProfessionsCustomerOrdersFrame or ProfessionsFrame or UIParent, CUSTOMER_COLLAPSE_BUTTON_LEVEL_OFFSET)
+	collapseButton:SetOnMinimizedCallback(function()
+		AF:SetCustomerPanelCollapsed(true)
+	end)
+	collapseButton:SetOnMaximizedCallback(function()
+		AF:SetCustomerPanelCollapsed(false)
+	end)
+	collapseButton:SetMinimizedLook()
+	collapseButton:Hide()
+	self.customerCollapseButton = collapseButton
+	frame.collapsedRail:SetFrameLevel(frame:GetFrameLevel())
+	self:ApplyProfessionPanel(frame.collapsedRail)
+	frame.collapsedRail:Hide()
+
+	frame.status = frame.statusText
+	frame.status:ClearAllPoints()
+	frame.status:SetPoint("TOPLEFT", frame, "TOPLEFT", 14, -32)
+	frame.status:SetPoint("RIGHT", -14, 0)
+	frame.status:SetJustifyH("LEFT")
+	frame.status:SetText(self:Text("SELECT_ORDER_ITEM"))
+	frame.status:SetHeight(math.max(16, frame.status:GetStringHeight()))
+	frame.statusPrefix:Hide()
+	frame.itemLink:SetHeight(16)
+	frame.itemLink:ClearAllPoints()
+	frame.itemLink:SetPoint("TOPLEFT", frame.status, "TOPLEFT", 0, 0)
+	frame.itemLink.text:SetJustifyH("LEFT")
+	frame.itemLink:Hide()
+	frame.itemLink:SetScript("OnEnter", function(button)
+		if button.itemLinkText then
+			GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
+			AF:HideEmbeddedItemTooltip(GameTooltip)
+			GameTooltip:SetHyperlink(button.itemLinkText)
+			AF:HideEmbeddedItemTooltip(GameTooltip)
+			GameTooltip:Show()
+		end
+	end)
+	frame.itemLink:SetScript("OnLeave", function()
+		GameTooltip:Hide()
+	end)
+	frame.statusSuffix:ClearAllPoints()
+	frame.statusSuffix:SetPoint("LEFT", frame.itemLink, "RIGHT", 0, 0)
+	frame.statusSuffix:SetPoint("RIGHT", -14, 0)
+	frame.statusSuffix:SetJustifyH("LEFT")
+	frame.statusSuffix:Hide()
+	frame.divider = self:AddDivider(frame, frame.status, -8)
+	self:InitializeCustomerShoppingList(frame)
+
+	frame.search:SetSize(172, 22)
+	frame.search:ClearAllPoints()
+	frame.search:SetPoint("TOPLEFT", frame.divider, "BOTTOMLEFT", 0, -8)
+	frame.search:SetAutoFocus(false)
+	frame.search:SetScript("OnTextChanged", function()
+		SearchBoxTemplate_OnTextChanged(frame.search)
+		AF:RefreshCustomerResults()
+	end)
+	frame.search:SetScript("OnEnterPressed", function(editBox)
+		editBox:ClearFocus()
+		AF:RefreshCustomerResults()
+	end)
+
+	frame.sort:SetSize(154, 24)
+	frame.sort:ClearAllPoints()
+	frame.sort:SetPoint("LEFT", frame.search, "RIGHT", 8, 0)
+	self.customerSortIndex = SORT_MODES[self.customerSortIndex or 1] and self.customerSortIndex or 1
+	frame.sort:SetText(self:Text("SORT_BUTTON", GetSortLabel(self.customerSortIndex)))
+	frame.sort:SetScript("OnClick", function()
+		AF.customerSortIndex = (AF.customerSortIndex or 1) + 1
+		if AF.customerSortIndex > #SORT_MODES then
+			AF.customerSortIndex = 1
+		end
+		AF.db.defaultSort = GetSortMode(AF.customerSortIndex).key
+		frame.sort:SetText(AF:Text("SORT_BUTTON", GetSortLabel(AF.customerSortIndex)))
+		AF:RefreshCustomerResults()
+		if AF.RefreshOptionsPanel then
+			AF:RefreshOptionsPanel()
+		end
+	end)
+
+	frame.refresh:SetSize(70, 24)
+	frame.refresh:ClearAllPoints()
+	frame.refresh:SetPoint("LEFT", frame.sort, "RIGHT", 6, 0)
+	frame.refresh:SetText(self:Text("REFRESH"))
+	if frame.refresh.SetMotionScriptsWhileDisabled then
+		frame.refresh:SetMotionScriptsWhileDisabled(true)
+	end
+	frame.refresh:SetScript("OnEnter", function(button)
+		if AF:IsCustomerRefreshAvailable() then
+			return
+		end
+		GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
+		GameTooltip:SetText(AF:Text("REFRESH_DISABLED_TOOLTIP"), 1, 0.82, 0)
+		GameTooltip:Show()
+	end)
+	frame.refresh:SetScript("OnLeave", function()
+		GameTooltip:Hide()
+	end)
+	frame.refresh:SetScript("OnClick", function()
+		if not AF:IsCustomerRefreshAvailable() then
+			AF:UpdateCustomerRefreshButton()
+			return
+		end
+		AF.customerRefreshCooldownUntil = AF:Now() + CUSTOMER_REFRESH_COOLDOWN
+		AF:UpdateCustomerRefreshButton()
+		C_Timer.After(CUSTOMER_REFRESH_COOLDOWN, function()
+			AF:UpdateCustomerRefreshButton()
+		end)
+		AF:RefreshCustomerQuery(true)
+	end)
+
+	frame.scroll:ClearAllPoints()
+	frame.scroll:SetPoint("TOPLEFT", frame.search, "BOTTOMLEFT", 0, -9)
+	frame.scroll:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -30, 35)
+	frame.scroll:SetFrameLevel(frame:GetFrameLevel() + 2)
+	frame.content = frame.scroll.content
+	frame.scroll:SetScrollChild(frame.content)
+	self.customerRows = self.customerRows or {}
+	self.customerRowPool = CreateFramePool("Button", frame.content, "ArtisanFinderCustomerRowTemplate", ResetCustomerRow, nil, ConfigureCustomerRow)
+	frame.scrollInset:ClearAllPoints()
+	frame.scrollInset:SetPoint("TOPLEFT", frame.scroll, "TOPLEFT", -4, 4)
+	frame.scrollInset:SetPoint("BOTTOMRIGHT", frame.scroll, "BOTTOMRIGHT", 23, -4)
+	frame.scrollInset:SetFrameLevel(frame:GetFrameLevel() + 1)
+	self:ApplyCustomerListInset(frame.scrollInset)
+	frame.scrollBar = GetScrollBar(frame.scroll)
+	HideLegacyScrollBar(frame.scrollBar)
+	frame.modernScrollBar = CreateCustomerMinimalScrollBar(frame, frame.scroll, frame.scrollBar)
+	frame.modernScrollBar:SetPoint("TOPLEFT", frame.scrollInset, "TOPRIGHT", -18, -4)
+	frame.modernScrollBar:SetPoint("BOTTOMLEFT", frame.scrollInset, "BOTTOMRIGHT", -18, 4)
+	frame.modernScrollBar:SetFrameLevel(frame:GetFrameLevel() + 6)
+
+	frame.menuBlocker = CreateFrame("Button", "ArtisanFinderCustomerMenuBlocker", UIParent, "ArtisanFinderCustomerMenuBlockerTemplate")
+	frame.menuBlocker:SetAllPoints(UIParent)
+	frame.menuBlocker:SetFrameStrata("FULLSCREEN_DIALOG")
+	frame.menuBlocker:EnableMouse(true)
+	frame.menuBlocker:RegisterForClicks("AnyUp")
+	frame.menuBlocker:Hide()
+	frame.menuBlocker:SetScript("OnClick", function()
+		AF:HideCustomerMenu()
+	end)
+
+	frame.menu = CreateFrame("Frame", "ArtisanFinderCustomerMenu", UIParent, "ArtisanFinderCustomerMenuTemplate")
+	frame.menu:SetFrameStrata("FULLSCREEN_DIALOG")
+	frame.menu:SetFrameLevel(frame.menuBlocker:GetFrameLevel() + 10)
+	self:ApplyCustomerPopupPanel(frame.menu)
+	frame.menu:Hide()
+
+	frame.prepareMenu = CreateFrame("Frame", "ArtisanFinderCustomerPrepareMenu", UIParent, "ArtisanFinderCustomerPrepareMenuTemplate")
+	frame.prepareMenu:SetFrameStrata("FULLSCREEN_DIALOG")
+	frame.prepareMenu:SetFrameLevel(frame.menuBlocker:GetFrameLevel() + 10)
+	self:ApplyCustomerPopupPanel(frame.prepareMenu)
+	frame.prepareMenu:Hide()
+
+	frame.menu.favorite:SetText(self:Text("FAVORITE"))
+	frame.menu.favorite:SetScript("OnClick", function()
+		if frame.menu.entry then
+			if frame.menu.entry.tutorialFake then
+				AF.customerTutorialFavorite = not AF.customerTutorialFavorite
+				frame.menu.favorite:SetText(AF:Text(AF.customerTutorialFavorite and "UNFAVORITE" or "FAVORITE"))
+				AF:RefreshCustomerResults()
+				return
+			else
+				AF:ToggleFavoriteArtisan(frame.menu.entry)
+			end
+			AF:RefreshCustomerResults()
+		end
+		AF:HideCustomerMenu()
+	end)
+
+	frame.menu.whisper:SetText(self:Text("WHISPER"))
+	frame.menu.whisper:SetScript("OnClick", function()
+		if frame.menu.entry and not frame.menu.entry.tutorialFake and not frame.menu.entry.ownAlt then
+			AF:OpenWhisper(frame.menu.entry.target or frame.menu.entry.name)
+		end
+		AF:HideCustomerMenu()
+	end)
+
+	frame.prepareMenu.standard:SetText(self:Text("PREPARE_ORDER_STANDARD"))
+	frame.prepareMenu.standard:SetScript("OnClick", function()
+		if frame.prepareMenu.entry then
+			AF:PrepareCustomerOrder(frame.prepareMenu.entry, "standard")
+		end
+	end)
+	frame.prepareMenu.optional:SetText(self:Text("PREPARE_ORDER_OPTIONAL"))
+	frame.prepareMenu.optional:SetScript("OnClick", function()
+		if frame.prepareMenu.entry then
+			AF:PrepareCustomerOrder(frame.prepareMenu.entry, "optional")
+		end
+	end)
+	frame.prepareMenu.advanced:SetText(self:Text("PREPARE_ORDER_ADVANCED"))
+	frame.prepareMenu.advanced:SetScript("OnClick", function()
+		if frame.prepareMenu.entry then
+			AF:PrepareCustomerOrder(frame.prepareMenu.entry, "advanced")
+		end
+	end)
+
+	frame.menu.link:SetText(self:Text("PROFESSION"))
+	if frame.menu.link.SetMotionScriptsWhileDisabled then
+		frame.menu.link:SetMotionScriptsWhileDisabled(true)
+	end
+	frame.menu.link:SetScript("OnClick", function()
+		if frame.menu.entry then
+			AF:ClearProfessionButtonTooltip()
+			AF:OpenCrafterProfession(frame.menu.entry)
+		end
+	end)
+	frame.menu.link:SetScript("OnEnter", function(button)
+		AF:ShowProfessionButtonTooltip(button)
+	end)
+	frame.menu.link:SetScript("OnLeave", function()
+		GameTooltip:Hide()
+	end)
+
+	frame.collapsibleRegions = {
+		frame.tutorialButton,
+		frame.status,
+		frame.divider,
+		frame.search,
+		frame.sort,
+		frame.refresh,
+		frame.scroll,
+		frame.scrollInset,
+		frame.modernScrollBar,
+	}
+
+	self.customerFrame = frame
+	frame:SetScript("OnShow", function()
+		frame.elapsed = 0
+		frame.ageElapsed = 0
+		AF:SetCustomerPanelCollapsed(frame.collapsed, true)
+		AF:QueueCustomerSidePanelLayout()
+		if not frame.collapsed then
+			AF:RefreshCustomerQueryOnOpen()
+			if AF.MaybeShowCustomerTutorial then
+				AF:MaybeShowCustomerTutorial()
+			end
+		end
+	end)
+	frame:SetScript("OnUpdate", function(_, elapsed)
+		if frame.collapsed then
+			return
+		end
+		frame.ageElapsed = (frame.ageElapsed or 0) + elapsed
+		if frame.ageElapsed >= CUSTOMER_ROW_AGE_TICK_INTERVAL then
+			frame.ageElapsed = 0
+			if AF.RefreshCustomerRowAges then
+				AF:RefreshCustomerRowAges()
+			end
+		end
+		frame.elapsed = (frame.elapsed or 0) + elapsed
+		local pollInterval = AF:IsDevFakeRowsEnabled() and CUSTOMER_DEBUG_QUERY_POLL_INTERVAL or CUSTOMER_QUERY_POLL_INTERVAL
+		if frame.elapsed >= pollInterval then
+			frame.elapsed = 0
+			AF:RefreshCustomerQuery()
+		end
+	end)
+	frame:SetScript("OnHide", function()
+		if AF.EndCustomerTutorial then
+			AF:EndCustomerTutorial()
+		end
+		if AF.HideCustomerShoppingList then
+			AF:HideCustomerShoppingList()
+		end
+		if AF.customerCollapseButton then
+			AF.customerCollapseButton:Hide()
+		end
+	end)
+	parent:HookScript("OnShow", function()
+		AF.customerFrame:Show()
+		AF:QueueCustomerSidePanelLayout()
+		if not AF.customerFrame.collapsed then
+			AF:RefreshCustomerQueryOnOpen()
+			if AF.MaybeShowCustomerTutorial then
+				AF:MaybeShowCustomerTutorial()
+			end
+		end
+	end)
+	parent:HookScript("OnHide", function()
+		if AF.EndCustomerTutorial then
+			AF:EndCustomerTutorial()
+		end
+		AF.customerFrame:Hide()
+		if AF.customerCollapseButton then
+			AF.customerCollapseButton:Hide()
+		end
+		if AF.HideCustomerShoppingList then
+			AF:HideCustomerShoppingList()
+		end
+		AF:HideCustomerMenu()
+		AF:RestoreCurrentListingsAnchor()
+	end)
+	self:HookCustomerCurrentListings()
+
+	if parent:IsShown() then
+		frame:Show()
+		self:QueueCustomerSidePanelLayout()
+		if not frame.collapsed then
+			self:RefreshCustomerQueryOnOpen()
+			if self.MaybeShowCustomerTutorial then
+				self:MaybeShowCustomerTutorial()
+			end
+		end
+	end
+end
+
+function AF:HideCustomerMenu()
+	local frame = self.customerFrame
+	if not frame then
+		return
+	end
+	self:ClearProfessionButtonTooltip()
+	frame.menu:Hide()
+	if frame.prepareMenu then
+		frame.prepareMenu:Hide()
+	end
+	frame.menuBlocker:Hide()
+end
+
+function AF:ShowCustomerPrepareMenu(entry, owner)
+	local frame = self.customerFrame
+	local menu = frame and frame.prepareMenu
+	if not menu or not owner or not IsCustomerRowClickable(entry) then
+		return
+	end
+	self:ClearProfessionButtonTooltip()
+	if frame.menu then
+		frame.menu:Hide()
+	end
+	menu.entry = entry
+	UpdatePrepareMenuButtons(menu, entry)
+	menu:ClearAllPoints()
+	menu:SetPoint("TOPLEFT", owner, "TOPRIGHT", 2, 0)
+	frame.menuBlocker:Show()
+	menu:Show()
+end
+
+function AF:ShowCustomerMenu(entry, owner)
+	local menu = self.customerFrame and self.customerFrame.menu
+	if not menu then
+		return
+	end
+	menu.entry = entry
+	if self.customerFrame.prepareMenu then
+		self.customerFrame.prepareMenu:Hide()
+	end
+	menu.favorite:SetText(self:Text(self:IsFavoriteArtisan(entry) and "UNFAVORITE" or "FAVORITE"))
+	if entry.tutorialFake then
+		menu.favorite:SetText(self:Text(self.customerTutorialFavorite and "UNFAVORITE" or "FAVORITE"))
+		menu.whisper:Disable()
+		menu.link:Disable()
+		self:SetProfessionButtonTooltip(self:Text("TUTORIAL_FAKE_ACTION_TOOLTIP"))
+	elseif entry.ownSelf and not self:IsDevEnabled() then
+		menu.whisper:Disable()
+		menu.link:Disable()
+		self:ClearProfessionButtonTooltip()
+	elseif entry.ownSelf then
+		menu.whisper:Disable()
+		menu.link:Disable()
+		self:ClearProfessionButtonTooltip()
+	elseif entry.ownAlt then
+		menu.whisper:Disable()
+	else
+		menu.whisper:Enable()
+	end
+	if entry.tutorialFake or (entry.ownSelf and not self:IsDevEnabled()) then
+		-- Keep Favorite interactive; side-effecting order/profession actions stay disabled.
+	elseif self:CanReliablyOpenProfession(entry) then
+		menu.link:Enable()
+		self:ClearProfessionButtonTooltip()
+	else
+		menu.link:Disable()
+		self:SetProfessionButtonTooltip(self:Text("PROFESSION_LINK_UNAVAILABLE_TOOLTIP"))
+	end
+	menu:ClearAllPoints()
+	menu:SetPoint("TOPLEFT", owner, "TOPRIGHT", 2, 0)
+	self.customerFrame.menuBlocker:Show()
+	menu:Show()
+end
+
+function AF:GetCustomerOrderItemContext()
+	local form = ProfessionsCustomerOrdersFrame and ProfessionsCustomerOrdersFrame.Form
+	if not form then
+		return nil
+	end
+
+	local transaction = form.transaction
+	local recipeID
+	local itemID
+	local professionID
+
+	if transaction and transaction.GetRecipeID then
+		recipeID = transaction:GetRecipeID()
+	end
+	recipeID = recipeID or (transaction and transaction.recipeID)
+	if transaction and transaction.GetRecipeSchematic then
+		local schematic = transaction:GetRecipeSchematic()
+		recipeID = recipeID or (schematic and schematic.recipeID)
+	end
+
+	if not recipeID and form.GetRecipeInfo then
+		local recipeInfo = form:GetRecipeInfo()
+		recipeID = recipeInfo and recipeInfo.recipeID
+	end
+
+	if recipeID then
+		local outputs = self:GetRecipeOutputItemIDs(recipeID)
+		for outputItemID in pairs(outputs) do
+			if not itemID or tonumber(outputItemID) < tonumber(itemID) then
+				itemID = outputItemID
+			end
+		end
+		local professionInfo = C_TradeSkillUI.GetProfessionInfoByRecipeID(recipeID)
+		professionID = professionInfo and (professionInfo.parentProfessionID or professionInfo.professionID)
+		professionID = self:GetSupportedProfessionID(professionID)
+	end
+
+	return itemID and {
+		itemID = itemID,
+		itemName = self:GetDisplayItemName(itemID),
+		recipeID = recipeID,
+		professionID = professionID or 0,
+	} or nil
+end
+
+function AF:IsCustomerLiveSearchPending()
+	local itemID = tonumber(self.currentCustomerItemID)
+	if not itemID then
+		return false
+	end
+	if tonumber(self.pendingCustomerQueryItemID) == itemID then
+		return true
+	end
+	return tonumber(self.currentCustomerQueryItemID) == itemID
+		and self.lastQueryAt
+		and self:Now() - self.lastQueryAt < self.LIVE_QUERY_TIMEOUT
+end
+
+function AF:IsCustomerRefreshAvailable()
+	if self.customerTutorialActive then
+		return false
+	end
+	if not self.currentCustomerItemID then
+		return false
+	end
+	local cooldownUntil = tonumber(self.customerRefreshCooldownUntil)
+	if cooldownUntil and self:Now() < cooldownUntil then
+		return false
+	end
+	return not self:IsCustomerLiveSearchPending()
+end
+
+function AF:UpdateCustomerRefreshButton()
+	local frame = self.customerFrame
+	if not frame or not frame.refresh then
+		return
+	end
+	if self:IsCustomerRefreshAvailable() then
+		frame.refresh:Enable()
+		if GameTooltip:GetOwner() == frame.refresh then
+			GameTooltip:Hide()
+		end
+	else
+		frame.refresh:Disable()
+	end
+end
+
+function AF:RefreshCustomerQuery(force)
+	self:AttachCustomerUI()
+	self:QueueCustomerSidePanelLayout()
+	local frame = self.customerFrame
+	if not frame or not frame:IsShown() then
+		return
+	end
+	if self.customerTutorialActive then
+		self:RefreshCustomerResults()
+		return
+	end
+
+	local context = self:GetCustomerOrderItemContext()
+	if not context then
+		self.currentCustomerItemID = nil
+		self.currentCustomerItemName = nil
+		self.currentCustomerProfessionID = nil
+		self.currentCustomerRecipeID = nil
+		self.currentCustomerQueryToken = nil
+		self.currentCustomerQueryItemID = nil
+		self.currentCustomerQueryProfessionID = nil
+		self.customerTradeLeadSnapshot = nil
+		self:RefreshCustomerResults(self:Text("SELECT_ORDER_ITEM"))
+		self:UpdateCustomerRefreshButton()
+		return
+	end
+
+	local changed = self.currentCustomerItemID ~= context.itemID
+		or self.currentCustomerProfessionID ~= context.professionID
+		or self.currentCustomerRecipeID ~= context.recipeID
+	self.currentCustomerItemID = context.itemID
+	self.currentCustomerItemName = context.itemName
+	self.currentCustomerProfessionID = context.professionID
+	self.currentCustomerRecipeID = context.recipeID
+
+	if not force and not changed and self.currentCustomerQueryToken and not self:IsCustomerLiveSearchPending() then
+		self:UpdateCustomerRefreshButton()
+		return
+	end
+
+	if force then
+		self:DebugLog("query", string.format("broadcast item=%s profession=%s force=true", tostring(context.itemID), tostring(context.professionID)))
+		self:BroadcastQuery(context.itemID, context.professionID)
+	elseif changed or not self.currentCustomerQueryToken then
+		self.currentCustomerQueryToken = nil
+		self.currentCustomerQueryItemID = nil
+		self.currentCustomerQueryProfessionID = nil
+		self:DebugLog("query", string.format("queue item=%s profession=%s changed=%s", tostring(context.itemID), tostring(context.professionID), tostring(changed == true)))
+		self:QueueBroadcastQuery(context.itemID, context.professionID)
+	end
+	if (force or changed) and not self:IsDevFakeRowsEnabled() then
+		if self.QueueGuildRecipeMemberQuery then
+			self:QueueGuildRecipeMemberQuery(context.professionID, context.recipeID)
+		end
+		if self.RefreshGuildTradeSkills then
+			self.guildTradeSkillLastRefresh = 0
+			self:RefreshGuildTradeSkills()
+		end
+	end
+	self:InjectDebugSelfResult(context.itemID, context.professionID)
+	if self.InjectDebugTradeLeads then
+		self:InjectDebugTradeLeads()
+	end
+	if (force or changed) and self.db.freezeTradeLeadRows == true and self.RebuildCustomerTradeLeadSnapshot then
+		self:RebuildCustomerTradeLeadSnapshot(context.itemID, context.professionID, context.recipeID)
+	end
+
+	self:RefreshCustomerResults()
+	self:DebugLog("query", string.format("refresh item=%s profession=%s changed=%s force=%s", tostring(context.itemID), tostring(context.professionID), tostring(changed == true), tostring(force == true)))
+end
+
+function AF:RefreshCustomerQueryOnOpen()
+	local context = self:GetCustomerOrderItemContext()
+	if context then
+		local now = GetTime and GetTime() or self:Now()
+		local key = table.concat({ context.itemID or 0, context.professionID or 0, context.recipeID or 0 }, ":")
+		if self.lastCustomerOpenRefreshKey == key
+			and self.lastCustomerOpenRefreshAt
+			and now - self.lastCustomerOpenRefreshAt < CUSTOMER_OPEN_REFRESH_DEDUPE_SECONDS
+		then
+			return
+		end
+		self.lastCustomerOpenRefreshKey = key
+		self.lastCustomerOpenRefreshAt = now
+	end
+	self:RefreshCustomerQuery(true)
+end
+
+function AF:AcquireCustomerRows(count)
+	local frame = self.customerFrame
+	if not frame or not self.customerRowPool then
+		return
+	end
+	self.customerRowPool:ReleaseAll()
+	table.wipe(self.customerRows)
+	for i = 1, count do
+		local row = self.customerRowPool:Acquire()
+		row:SetParent(frame.content)
+		self.customerRows[i] = row
+	end
+end
+
+function AF:GetVisibleCustomerEntries()
+	local entries = {}
+	for _, row in ipairs(self.customerRows or {}) do
+		if row:IsShown() and row.entry then
+			table.insert(entries, row.entry)
+		end
+	end
+	return entries
+end
+
+function AF:GetProfessionOpenGuildGUID(entry)
+	if not entry or not entry.guildMember then
+		return nil
+	end
+	return entry.guildMemberGUID or self:GetGuildMemberGUID(entry.orderTarget or entry.name)
+end
+
+function AF:CanReliablyOpenProfession(entry)
+	if not entry then
+		return false
+	end
+	if entry.tutorialFake then
+		return false
+	end
+	if self:GetProfessionOpenGuildGUID(entry) then
+		return tonumber(entry.professionID) ~= nil
+	end
+	if entry.ownAlt then
+		return false
+	end
+	if self:IsGuildOrderEntry(entry) then
+		return false
+	end
+	if entry.offline then
+		return false
+	end
+	if self:IsCustomerEntryOffline(entry) then
+		return false
+	end
+	if entry.tradeLead then
+		return entry.professionLink ~= nil
+	end
+	return entry.professionLink ~= nil
+end
+
+function AF:RefreshCustomerResults(statusOverride)
+	local frame = self.customerFrame
+	if not frame then
+		return
+	end
+
+	local itemID = self.currentCustomerItemID
+	local itemName = self.currentCustomerItemName or self:GetDisplayItemName(itemID)
+	local sortMode = GetSortMode(self.customerSortIndex).key
+	local filterText = frame.search:GetText() or ""
+	local queryToken = self.currentCustomerQueryToken
+	local tutorialActive = self.customerTutorialActive == true
+	local rows = tutorialActive and { self:GetCustomerTutorialRow() } or (itemID and self:GetCachedArtisans(itemID, filterText, sortMode, queryToken) or {})
+	local debugSummary = BuildCustomerResultDebugSummary(self, rows)
+	local debugSignature = table.concat({ tostring(itemID or ""), tostring(#rows), tostring(filterText), tostring(sortMode), debugSummary }, "|")
+	if itemID and frame.debugLastResultSignature ~= debugSignature then
+		frame.debugLastResultSignature = debugSignature
+		self:DebugLog("results", string.format("item=%s rows=%d filter=%s sort=%s classes=%s", tostring(itemID), #rows, tostring(filterText), tostring(sortMode), debugSummary))
+	end
+	if tutorialActive then
+		self:SetCustomerStatusText(self:Text("TUTORIAL_CUSTOMER_STATUS"))
+	elseif statusOverride then
+		self:SetCustomerStatusText(statusOverride)
+	elseif itemID then
+		self:SetCustomerStatusItem(itemID, itemName)
+	else
+		self:SetCustomerStatusText(self:Text("SELECT_ORDER_ITEM"))
+	end
+	frame.search:ClearAllPoints()
+	frame.search:SetPoint("TOPLEFT", frame.divider, "BOTTOMLEFT", 0, -8)
+	self:AcquireCustomerRows(#rows)
+	frame.content:SetWidth(math.max(1, frame.scroll:GetWidth() - 4))
+	frame.scrollBar:SetShown(true)
+	frame.scrollBar:SetAlpha(0)
+
+	local contentHeight = ROW_TOP_PADDING
+	for i, row in ipairs(self.customerRows or {}) do
+		local entry = rows[i]
+		row.entry = entry
+		SetCustomerRowHighlight(row, entry)
+		row:ClearAllPoints()
+		row:SetPoint("TOPLEFT", 0, -contentHeight)
+		row:SetWidth(math.max(280, frame.scroll:GetWidth() - 4))
+		if row.prepare then
+			local canPrepare = IsCustomerRowClickable(entry)
+			row.prepare:SetShown(entry ~= nil)
+			row.prepare:SetEnabled(canPrepare)
+			row.prepare:SetAlpha(canPrepare and 1 or 0.45)
+		end
+		row:Show()
+		row.name:ClearAllPoints()
+		row.name:SetPoint("TOPLEFT", row.certified, "TOPRIGHT", 4, 0)
+		row.name:SetPoint("RIGHT", row.updatedAt, "LEFT", -4, 0)
+		local rowHeight = self:ApplyCustomerRowViewModel(row, self:BuildCustomerRowViewModel(entry), ROW_HEIGHT, ROW_BOTTOM_PADDING)
+		if row.optionalPrep then
+			row.optionalPrep:ClearAllPoints()
+			row.optionalPrep:SetPoint("TOPLEFT", row, "TOPLEFT", 0, -rowHeight)
+			row.optionalPrep:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+		end
+		if self.RefreshCustomerOptionalPrepRow then
+			rowHeight = rowHeight + self:RefreshCustomerOptionalPrepRow(row, entry)
+		end
+		row:SetHeight(rowHeight)
+		contentHeight = contentHeight + rowHeight
+	end
+	frame.content:SetHeight(math.max(1, contentHeight))
+	UpdateCustomerScrollBar(frame.modernScrollBar)
+	if #rows == 0 and itemID then
+		local hasAvailableUnfiltered = false
+		if filterText ~= "" then
+			hasAvailableUnfiltered = #self:GetCachedArtisans(itemID, "", sortMode, queryToken) > 0
+		end
+		if self:IsDevFakeRowsEnabled() and not self.db.artisanProfile.items[tostring(itemID)] then
+			self:SetCustomerStatusItem(itemID, itemName, "DEBUG_NOT_SCANNED")
+		elseif self.IsCustomerQueryBlockedByRestriction and self:IsCustomerQueryBlockedByRestriction(itemID, self.currentCustomerProfessionID) then
+			self:SetCustomerStatusText(self:Text("ADDON_COMMS_UNAVAILABLE_INSTANCE"))
+		elseif filterText ~= "" and hasAvailableUnfiltered then
+			self:SetCustomerStatusItem(itemID, itemName, "NO_FILTER_MATCH")
+		elseif self.pendingCustomerQueryItemID == itemID or (self.lastQueryAt and self:Now() - self.lastQueryAt < self.LIVE_QUERY_TIMEOUT) then
+			self:SetCustomerStatusItem(itemID, itemName, "CHECKING_ARTISANS")
+		else
+			self:SetCustomerStatusItem(itemID, itemName, "NO_ARTISANS_FOUND")
+		end
+	end
+	self:UpdateCustomerRefreshButton()
+end
+
+function AF:PrepareCustomerOrder(entry, mode)
+	if mode == "optional" or mode == "advanced" then
+		self:FillPersonalOrder(entry, { keepShoppingList = true })
+		if self.ShowCustomerShoppingListForEntry then
+			self:ShowCustomerShoppingListForEntry(entry, mode)
+		end
+	else
+		if self.HideCustomerShoppingList then
+			self:HideCustomerShoppingList()
+		end
+		self:FillPersonalOrder(entry)
+		if self.AddPreparedCraftToTracker then
+			self:AddPreparedCraftToTracker(entry, "standard")
+		end
+	end
+	self:HideCustomerMenu()
+end
+
+function AF:SetCustomerOrderFormMessage(message)
+	local form = ProfessionsCustomerOrdersFrame and ProfessionsCustomerOrdersFrame.Form
+	local paymentContainer = form and form.PaymentContainer
+	local button = paymentContainer and paymentContainer.ListOrderButton
+	if not paymentContainer or not button then
+		return false
+	end
+
+	if not self.customerOrderFormMessage then
+		local text = paymentContainer:CreateFontString(nil, "OVERLAY", "GameFontRedSmall")
+		text:SetJustifyH("CENTER")
+		text:SetJustifyV("BOTTOM")
+		text:SetWordWrap(true)
+		self.customerOrderFormMessage = text
+	end
+
+	local text = self.customerOrderFormMessage
+	text:ClearAllPoints()
+	text:SetPoint("BOTTOM", button, "TOP", 0, 4)
+	text:SetWidth(math.max(220, button:GetWidth() or 220))
+	text:SetText(message or "")
+	text:SetShown(message and message ~= "")
+
+	self.customerOrderFormMessageToken = (self.customerOrderFormMessageToken or 0) + 1
+	local token = self.customerOrderFormMessageToken
+	C_Timer.After(6, function()
+		if AF.customerOrderFormMessageToken == token and AF.customerOrderFormMessage then
+			AF.customerOrderFormMessage:Hide()
+		end
+	end)
+	return true
+end
+
+function AF:FillPersonalOrder(entry, options)
+	if entry and entry.tutorialFake then
+		return
+	end
+	if not options or not options.keepShoppingList then
+		if self.HideCustomerShoppingList then
+			self:HideCustomerShoppingList()
+		end
+	end
+	if not entry or not ProfessionsCustomerOrdersFrame or not ProfessionsCustomerOrdersFrame.Form then
+		self:Print(self:Text("PERSONAL_ORDER_NO_FORM"))
+		return
+	end
+
+	local form = ProfessionsCustomerOrdersFrame.Form
+	local fillData = GetCustomerOrderFillData(self, entry)
+	if not fillData then
+		return
+	end
+
+	form:SetOrderRecipient(fillData.orderType)
+	if form.OrderRecipientDropdown then
+		form.OrderRecipientDropdown:SetText(fillData.orderLabel)
+	end
+	if form.OrderRecipientTarget then
+		if fillData.isGuildOrder then
+			form.OrderRecipientTarget:SetText("")
+		elseif fillData.recipient then
+			form.OrderRecipientTarget:SetText(fillData.recipient)
+		end
+	end
+
+	if fillData.commissionGold then
+		form.PaymentContainer.TipMoneyInputFrame.GoldBox:SetText(fillData.commissionGold)
+	end
+
+	form:UpdateListOrderButton()
+	local message = self:Text(fillData.isGuildOrder and "GUILD_ORDER_FILLED" or "PERSONAL_ORDER_FILLED")
+	if not self:SetCustomerOrderFormMessage(message) then
+		self:Print(message)
+	end
+end

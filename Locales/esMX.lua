@@ -32,20 +32,8 @@ L.DEV_HELP_FULFILLED = "/af dev fulfilled [artesano] - simula una notificación 
 L.DEV_HELP_SOUND = "/af dev sound order - reproduce el sonido de notificación de órdenes"
 L.DEV_HELP_ORDERDUMP = "/af dev orderdump - muestra los datos de recetas encargables para tareas de mantenimiento"
 L.DEBUG_ORDERS_STATE = "depuración de órdenes personales: actual=%s últimoRemitente=%s"
-L.OPTIONS_ORDER_SOUND = "Sonido de notificación de órdenes"
-L.OPTIONS_ORDER_SOUND_DESC = "Elige el sonido para las notificaciones de órdenes."
-L.OPTIONS_ORDER_NOTIFICATION_SOUND_ENABLED = "Activar sonido de notificación de órdenes"
-L.OPTIONS_ORDER_NOTIFICATION_SOUND_ENABLED_DESC = "Reproduce un sonido para órdenes personales y órdenes de cliente completadas."
-L.OPTIONS_ORDER_NOTIFICATION_BANNER_ENABLED = "Activar aviso de notificación de órdenes"
-L.OPTIONS_ORDER_NOTIFICATION_BANNER_ENABLED_DESC = "Muestra un aviso en el centro de la pantalla para órdenes personales y órdenes de cliente completadas."
-L.OPTIONS_PLAY_ORDER_SOUND_DESC = "Reproduce el sonido seleccionado para notificaciones de órdenes."
-L.OPTIONS_CLEAR_ORDER_NOTIFICATIONS_DESC = "Borra las notificaciones recordadas de órdenes personales."
 L.ORDER_NOTIFICATIONS_CLEARED = "notificaciones de órdenes personales borradas."
 L.MINIMAP_SHIFT_RIGHT_CLICK = "Mayús-clic derecho: borrar notificaciones de órdenes"
-L.OPTIONS_CLEAR_ORDER_NOTIFICATIONS = "Borrar notificaciones"
-L.TUTORIAL_INTRO = "ArtisanFinder funciona en dos lugares. Abre cada una de tus profesiones una vez para escanear tus datos de fabricación. Después visita al PNJ de órdenes de fabricación para ver artesanos disponibles al crear una orden."
-L.TUTORIAL_CUSTOMER_STATUS = "Selecciona un objeto de orden en el formulario de órdenes de fabricación. ArtisanFinder buscará artesanos compatibles."
-L.TUTORIAL_CUSTOMER_ACTION = "Haz clic en una fila real para llenar automáticamente el formulario de orden de cliente.\n\nUsa el menú de la fila para marcar un artesano como favorito, susurrarle o abrir su profesión si está disponible."
 
 -- Locale parity additions.
 L.ADDON_LOADED = "cargado. La disponibilidad del artesano está desactivada para esta sesión."
@@ -160,9 +148,6 @@ L.COLLAPSE_SECTION = "Contraer %s"
 L.EXPAND_SECTION = "Expandir %s"
 L.CRAFTER_PANEL_ADVERTISE_PROFESSION = "Anunciar esta profesión"
 L.CRAFTER_REOPEN_TOOLTIP = "Mostrar controles de artesano de ArtisanFinder"
-L.CUSTOMER_SIDE_PREVIEW = "Vista previa de cliente"
-L.CUSTOMER_SIDE_PREVIEW_EMPTY = "Aún no hay datos visibles para el cliente guardados en esta fila."
-L.CUSTOMER_SIDE_PREVIEW_SCANNING = "Se está escaneando esta fabricación. La vista previa de cliente se actualizará al terminar."
 L.COMMISSION = "Comisión"
 L.NOTE = "Nota"
 L.COMMISSION_PLACEHOLDER = "Vacío/0 sin esp.\n-1 libre"
@@ -252,7 +237,6 @@ L.LOCALE_CHANGED = "previsualización de idioma establecida en %s."
 L.LOCALE_RESET = "previsualización de idioma restablecida a %s."
 L.LOCALE_UNKNOWN = "idioma desconocido '%s'. Disponibles: %s"
 L.TUTORIAL_HELP_RESET = "/af tutorial reset - restablece y muestra de nuevo el tutorial inicial"
-L.TUTORIAL_RESET_DONE = "tutorial restablecido."
 L.CLEAR_HELP = "/af clear - muestra comandos de borrado"
 L.CLEAR_HELP_ALL = "/af clear all - borra todos los datos de ArtisanFinder"
 L.CLEAR_HELP_OPTIONS = "/af clear options - restablece las opciones de ArtisanFinder"
@@ -270,11 +254,6 @@ L.CACHE_CLEANUP_DONE = "se eliminaron %d artesanos en caché de más de %d días
 L.OPTIONS_SECTION_CUSTOMER = "Resultados de cliente"
 L.OPTIONS_SECTION_CACHE = "Caché"
 L.OPTIONS_SECTION_TRADE_LEADS = "Contactos del chat de comercio"
-L.OPTIONS_SECTION_NOTIFICATIONS = "Notificaciones"
-L.OPTIONS_HIDE_SELF_ALT_ORDER_NOTIFICATIONS = "Ocultar tus órdenes para personajes alternos"
-L.OPTIONS_HIDE_SELF_ALT_ORDER_NOTIFICATIONS_DESC = "Oculta las notificaciones de órdenes personales para tus personajes alternos cuando las envía uno de tus personajes."
-L.OPTIONS_HIDE_SELF_ALT_FULFILLED_NOTIFICATIONS = "Ocultar tus órdenes completadas para personajes alternos"
-L.OPTIONS_HIDE_SELF_ALT_FULFILLED_NOTIFICATIONS_DESC = "Oculta las notificaciones de órdenes de cliente completadas cuando las envía uno de tus personajes."
 L.OPTIONS_SECTION_SCANNING = "Escaneo"
 L.OPTIONS_SECTION_AVAILABILITY = "Disponibilidad"
 L.OPTIONS_SECTION_MINIMAP = "Minimapa"
@@ -319,26 +298,6 @@ L.OPTIONS_STANDALONE_MINIMAP_DESC = "Usa un botón de ArtisanFinder más grande 
 L.OPTIONS_RESET_MINIMAP_POSITION = "Restablecer posición del botón"
 L.OPTIONS_RESET_MINIMAP_POSITION_DESC = "Devuelve el botón del anillo del minimapa a su posición predeterminada, o centra el botón móvil en pantalla."
 L.OPTIONS_RESET_POSITION_BUTTON = "Restablecer posición"
-L.OPTIONS_ORDER_SOUND_CATALOG_SHOP_OPEN = "Abrir panel de tienda"
-L.OPTIONS_ORDER_SOUND_STORE_DELIVERY = "Aviso de entrega de tienda"
-L.OPTIONS_ORDER_SOUND_STORE_OPEN = "Ventana de tienda"
-L.OPTIONS_ORDER_SOUND_BNET_TOAST = "Aviso de Battle.net"
-L.OPTIONS_ORDER_SOUND_PROFESSION_TOAST = "Aviso de profesión"
-L.OPTIONS_ORDER_SOUND_EVENT_SCHEDULER_CHIME = "Campana de calendario"
-L.OPTIONS_ORDER_SOUND_GARRISON_WORK_ORDER = "Inicio de orden de trabajo"
-L.OPTIONS_ORDER_SOUND_BACKPACK_COIN = "Selección de moneda"
-L.OPTIONS_ORDER_SOUND_SOULBIND = "Activación de vínculo de alma"
-L.OPTIONS_ORDER_SOUND_GM_CHAT_WARNING = "Aviso de chat MJ"
-L.OPTIONS_ORDER_SOUND_READY_CHECK = "Comprobación de preparación"
-L.OPTIONS_ORDER_SOUND_AUCTION = "Casa de subastas"
-L.OPTIONS_ORDER_SOUND_CHANNEL = "Canal de sonido"
-L.OPTIONS_ORDER_SOUND_CHANNEL_DESC = "Elige qué canal de sonido del juego reproduce las notificaciones de pedidos."
-L.OPTIONS_SOUND_CHANNEL_DEFAULT = "Maestro"
-L.OPTIONS_SOUND_CHANNEL_SFX = "Efectos de sonido"
-L.OPTIONS_SOUND_CHANNEL_MUSIC = "Música"
-L.OPTIONS_SOUND_CHANNEL_AMBIENCE = "Ambiente"
-L.OPTIONS_SOUND_CHANNEL_DIALOG = "Diálogo"
-L.OPTIONS_PLAY_ORDER_SOUND = "Reproducir sonido"
 L.OPTIONS_CLEANUP_DISABLED = "Desactivado"
 L.OPTIONS_CLEANUP_1_DAY = "1 día"
 L.OPTIONS_CLEANUP_7_DAYS = "7 días"
@@ -365,15 +324,10 @@ L.OPTIONS_TRADE_LEADS_60_MINUTES = "60 minutos"
 L.FORCE_RESCAN_BUTTON = "Reescanear"
 L.FORCE_RESCAN_TOOLTIP = "Fuerza un nuevo escaneo de la profesión abierta."
 L.TUTORIAL_HELP_BUTTON_TOOLTIP = "Mostrar ayuda de ArtisanFinder"
-L.TUTORIAL_MINIMAP_BUTTON = "Usa el botón del minimapa para gestionar ArtisanFinder rápidamente.\nClic izquierdo alterna disponibilidad, clic central alterna disponibilidad automática, clic derecho abre opciones y Mayús-clic oculta el botón."
-L.TUTORIAL_CRAFTER_PREVIEW = "Pasa el cursor sobre el icono de vista previa de cliente para ver lo que verán los clientes para el objeto seleccionado, incluidos valores específicos del objeto combinados con los predeterminados de la profesión."
 L.TUTORIAL_CRAFTER_DEFAULTS = "Define la comisión y la nota predeterminadas para esta profesión. Los ajustes específicos de un objeto pueden reemplazarlas cuando selecciones una receta aprendida."
 L.TUTORIAL_CRAFTER_SCAN = "Abre cada profesión una vez para que ArtisanFinder pueda escanearla. Usa Reescanear para actualizar la profesión actual más adelante."
 L.TUTORIAL_CRAFTER_ADVERTISE = "Elige si la profesión escaneada de este personaje puede aparecer en búsquedas de clientes mientras estás disponible."
-L.TUTORIAL_CUSTOMER_SEARCH = "Filtra, ordena o actualiza los resultados del objeto seleccionado."
-L.TUTORIAL_CUSTOMER_ROW = "Las filas muestran comisión, calidad, disponibilidad, origen de hermandad o chat de comercio y la nota del artesano."
 L.TUTORIAL_FAKE_ARTISAN_NAME = "Rakhnar"
-L.TUTORIAL_PROFESSION_NAME = "Tutorial"
 L.TUTORIAL_FAKE_ARTISAN_NOTE = "¡Bienvenido a ArtisanFinder!"
 L.TUTORIAL_FAKE_ARTISAN_CAPABILITY = "Resultado de ejemplo: comisión, calidad y disponibilidad aparecen aquí."
 L.TUTORIAL_FAKE_ARTISAN_TOOLTIP = "Esta fila contiene datos falsos del tutorial. Puedes probar Favorito; no se guarda nada."
@@ -428,72 +382,3 @@ L.CHANGELOG_DESCRIPTION = "Cambios recientes de esta versión."
 L.CHANGELOG_ACKNOWLEDGE = "Entendido"
 L.CHANGELOG_VERSION = "Versión %s"
 L.CHANGELOG_UNRELEASED = "Próxima actualización"
-L.CHANGELOG_ENTRY_2_1_4 = [[### Cambiado
-
-* Se actualizó la versión de interfaz para el parche 12.1.5 de World of Warcraft.]]
-L.CHANGELOG_ENTRY_2_1_3 = [[### Cambiado
-
-* Se redujo el procesamiento repetido al comprobar escaneos de profesiones obsoletos y mostrar profesiones escaneadas, mejorando la respuesta con perfiles de artesanos grandes.
-
-### Corregido
-
-* Se corrigieron los errores de las barras de acción después de seleccionar controles de ArtisanFinder en el modo de edición.
-* Las entradas de escaneo guardadas con formato incorrecto ahora se omiten de forma segura al crear listas de profesiones y resúmenes de escaneos obsoletos.]]
-L.CHANGELOG_ENTRY_2_1_2 = [[### Corregido
-
-* Los lanzamientos potenciados de evocador, como Aliento de fuego, ya no son interrumpidos por ArtisanFinder.
-* La consulta y actualización de lista de pedidos de fabricación de cliente ahora solo se ejecutan cuando la interfaz de pedidos de cliente está abierta, se aplazan mientras estás lanzando/canalizando o estás restringido, y los eventos de actualización de pedidos de cliente ya no las ponen en cola.]]
-L.CHANGELOG_ENTRY_2_1_1 = [[### Añadido
-
-* Las vistas previas de componentes del panel de profesión ahora pueden usar un interruptor "Componentes ilimitados" para simular asignaciones de calidad sin poseer todos los componentes.
-* Los controles del panel de profesión ahora pueden abrirse por defecto maximizados o minimizados desde las opciones del addon.
-
-### Corregido
-
-* Los escaneos de datos de habilidad de componentes ahora toleran datos base incompletos en lugar de fallar.
-* El procesamiento de la cola de escaneo de profesiones ahora sale de forma segura si faltan datos de progreso del escaneo o están mal formados.
-* El análisis de profesiones desde enlaces de comercio ahora ignora de forma segura tokens numéricos mal formados.]]
-L.CHANGELOG_ENTRY_2_1_0 = [[### Añadido
-
-* La importación/exportación de artesanos ofrece una forma de anunciar los artesanos de otra cuenta además de los de tu cuenta principal.
-* Preparar pedido ahora tiene un modo Avanzado que permite a los clientes elegir calidades de componentes requeridos y componentes opcionales antes de seguir una fabricación.
-* ArtisanFinder ahora puede estimar la calidad de fabricación prevista a partir de la configuración de componentes seleccionada y sugerir combinaciones de componentes que alcancen el mejor resultado conocido sin usar siempre por defecto los materiales de mayor calidad.
-
-### Cambiado
-
-* Los escaneos de profesión ahora guardan los datos de habilidad de componentes necesarios para una simulación fiable del lado del cliente de la calidad, las recomendaciones y la preparación avanzada. Los registros de escaneo antiguos que no admiten el nuevo modelo se borran o se marcan como obsoletos para que los jugadores sepan qué personajes necesitan un nuevo escaneo.
-* Al hacer clic en una fila de cliente coincidente, ahora se pueden aplicar los materiales de fabricación seguidos desde el Objective Tracker al formulario de pedido de fabricación.
-
-### Corregido
-
-* Abrir una profesión ya no debería causar una caída importante de FPS.
-* Los miembros de hermandad que pueden fabricar un objeto ahora muestran su estado de conexión real en lugar de aparecer siempre desconectados.
-* Las funciones del canal de comercio ahora funcionan en clientes de juego rusos.
-* Los escaneos completos de profesión ahora reparten su trabajo de forma más uniforme, con menos bloqueos y tirones en profesiones grandes.]]
-L.CHANGELOG_ENTRY_2_0_5 = [[### Añadido
-
-* Las filas de cliente ahora incluyen acciones de Preparar pedido para fabricaciones estándar y fabricaciones con componentes opcionales.
-* Las fabricaciones preparadas se siguen en el Objective Tracker con componentes requeridos, componentes opcionales seleccionados, cantidades necesarias, recuentos disponibles y faltantes, y marcadores de calidad.
-* Las búsquedas en la casa de subastas desde fabricaciones preparadas ahora usan búsquedas múltiples temporales de Auctionator cuando Auctionator está activado.
-
-### Cambiado
-
-* Los botones "Pedido personal" y "Pedido de hermandad" se han eliminado para que un simple clic en una fila de artesano rellene automáticamente el formulario de la izquierda.]]
-L.CHANGELOG_ENTRY_2_0_3 = [[### Corregido
-
-* Intento de susurro a PNJ de pedidos de patrón o personajes alternativos al completar un pedido de fabricación.]]
-L.CHANGELOG_ENTRY_2_0_2 = [[### Añadido
-
-* Notificaciones para clientes cuando se completa un pedido de fabricación.]]
-L.CHANGELOG_ENTRY_2_0_1 = [[### Añadido
-
-* Localización para chino simplificado, español de Latinoamérica, portugués y portugués de Brasil.
-
-### Cambiado
-
-* Pequeñas optimizaciones de comunicación.
-* La comunicación de mensajes del addon ahora está comprimida.
-
-### Corregido
-
-* Pequeña fuga de memoria en sesiones largas.]]

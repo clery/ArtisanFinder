@@ -40,7 +40,11 @@ local EVENTS = {
 }
 
 for _, event in ipairs(EVENTS) do
-	AF.frame:RegisterEvent(event)
+	if AF.IsForever then
+		if not event:find("CRAFTINGORDERS",1,true) then pcall(AF.frame.RegisterEvent,AF.frame,event) end
+	else
+		AF.frame:RegisterEvent(event)
+	end
 end
 
 local AUTO_AVAILABILITY_EVENTS = {
@@ -64,7 +68,7 @@ local SCAN_CHANGE_EVENTS = {
 
 function AF:OnAddonLoaded(name)
 	if name ~= addonName then
-		if name == "Blizzard_ProfessionsCustomerOrders" and self.InitializeCustomerOrderFormHook then
+		if not self.IsForever and name == "Blizzard_ProfessionsCustomerOrders" and self.InitializeCustomerOrderFormHook then
 			self:InitializeCustomerOrderFormHook()
 		end
 		return
@@ -77,7 +81,9 @@ function AF:OnPlayerLogin()
 	self.playerName = self:GetPlayerFullName()
 	self:SelectActiveArtisanProfile(self.playerName)
 	local initialAvailabilityMode = self.AVAILABILITY_UNAVAILABLE
-	if self.db.rememberManualAvailability == true and self.db.autoAvailability ~= true then
+	if self.GetInitialFlavorAvailabilityMode then
+        initialAvailabilityMode = self:GetInitialFlavorAvailabilityMode()
+	elseif self.db.rememberManualAvailability == true and self.db.autoAvailability ~= true then
 		initialAvailabilityMode = self.db.manualAvailabilityMode or self.AVAILABILITY_UNAVAILABLE
 	end
 	self:SetAvailabilityMode(initialAvailabilityMode, true)
@@ -87,11 +93,11 @@ function AF:OnPlayerLogin()
 	self:InitializeGuild()
 	self:InitializeMinimap()
 	self:InitializeCustomerUI()
-	self:InitializePreparationTracker()
+	if self.InitializePreparationTracker then self:InitializePreparationTracker() end
 	self:InitializeCrafterUI()
 	self:InitializeSlashCommands()
 	self:InitializeTradeChat()
-	self:InitializeOrderNotifications()
+	if not self.IsForever then self:InitializeOrderNotifications() end
 	self:InitializeOptions()
 	self:CleanupCustomerCache()
 	self:InitializeTutorial()
@@ -145,7 +151,7 @@ function AF:SetAvailabilityMode(mode, silent)
 		self:RefreshMinimap()
 	end
 	if self.RefreshCustomerResults then
-		self:RefreshCustomerResults()
+		self:RequestCustomerResultsRefresh()
 	end
 	if oldMode ~= mode then
 		self:DebugLog("state", string.format("availabilityMode=%s silent=%s", tostring(mode), tostring(silent == true)))
@@ -267,7 +273,7 @@ function AF:ToggleAutoAvailability()
 end
 
 function AF:TryAttachProfessionUIs()
-	if self.AttachCustomerUI then
+	if not self.IsForever and self.AttachCustomerUI then
 		self:AttachCustomerUI()
 	end
 	if self.AttachCrafterUI then
@@ -320,7 +326,7 @@ AF.frame:SetScript("OnEvent", function(_, event, ...)
 		FlushDeferredRestrictedWork()
 	elseif event == "ADDON_RESTRICTION_STATE_CHANGED" then
 		if AF.RefreshCustomerResults then
-			AF:RefreshCustomerResults()
+			AF:RequestCustomerResultsRefresh()
 		end
 		if AF.RefreshMinimap then
 			AF:RefreshMinimap()
@@ -340,6 +346,7 @@ AF.frame:SetScript("OnEvent", function(_, event, ...)
 		if (event == "CHANNEL_UI_UPDATE" or event == "CHAT_MSG_CHANNEL_NOTICE") and AF.HideDiscoveryChannelFromChat then
 			AF:HideDiscoveryChannelFromChat()
 			AF:HideDiscoveryChannelFromChat(0.5)
+            if AF.MoveDiscoveryChannelsToEnd then AF:MoveDiscoveryChannelsToEnd() end
 		end
 		AF:QueueAutoAvailabilityRefresh()
 	elseif event == "CHAT_MSG_ADDON" then
@@ -350,9 +357,6 @@ AF.frame:SetScript("OnEvent", function(_, event, ...)
 			AF:OnAddonMessage(...)
 		end
 	elseif event == "CHAT_MSG_CHANNEL" then
-		if AF:IsProtectedActionRestricted() then
-			return
-		end
 		if AF.OnTradeChatMessage then
 			AF:OnTradeChatMessage(...)
 		end
@@ -363,12 +367,12 @@ AF.frame:SetScript("OnEvent", function(_, event, ...)
 	elseif event == "GUILD_ROSTER_UPDATE" then
 		if AF.QueueGuildRosterCacheRefresh then
 			local canRequestRosterUpdate = ...
-			AF:QueueGuildRosterCacheRefresh(canRequestRosterUpdate == true)
+			AF:QueueGuildRosterCacheRefresh(not AF.IsForever and canRequestRosterUpdate == true)
 		end
 	elseif event == "GUILD_TRADESKILL_UPDATE" then
 		AF.guildTradeSkillParsedAt = nil
 		if AF.RefreshCustomerResults then
-			AF:RefreshCustomerResults()
+			AF:RequestCustomerResultsRefresh()
 		end
 	elseif event == "GUILD_RECIPE_KNOWN_BY_MEMBERS" then
 		if AF.HandleGuildRecipeKnownByMembers then

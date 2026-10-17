@@ -76,20 +76,20 @@ local function GetDebugConcentrationQuality(bestQuality, enabled)
 	return nil
 end
 
-local function SetDebugWhoStatus(AF, name, online, failed)
-	name = AF:NormalizeName(name)
+local function SetDebugWhoStatus(addon, name, online, failed)
+	name = addon:NormalizeName(name)
 	if not name then
 		return
 	end
-	AF.whoStatus = AF.whoStatus or {}
-	AF.whoStatus[name] = AF.whoStatus[name] or {}
-	local status = AF.whoStatus[name]
+	addon.whoStatus = addon.whoStatus or {}
+	addon.whoStatus[name] = addon.whoStatus[name] or {}
+	local status = addon.whoStatus[name]
 	status.pending = nil
-	status.checkedAt = AF:Now()
+	status.checkedAt = addon:Now()
 	status.online = online
-	status.checkFailedAt = failed and AF:Now() or nil
-	if online ~= true and AF.ClearCustomerWhoOnline then
-		AF:ClearCustomerWhoOnline(name)
+	status.checkFailedAt = failed and addon:Now() or nil
+	if online ~= true and addon.ClearCustomerWhoOnline then
+		addon:ClearCustomerWhoOnline(name)
 	end
 end
 
@@ -111,8 +111,8 @@ local function ApplyDebugCraftFields(entry, item, now)
 	return entry
 end
 
-local function HasDebugSelfResults(AF, itemKey)
-	local cache = AF.db.customerCache[tostring(itemKey or "")]
+local function HasDebugSelfResults(addon, itemKey)
+	local cache = addon.db.customerCache[tostring(itemKey or "")]
 	if not cache then
 		return false
 	end
@@ -124,17 +124,17 @@ local function HasDebugSelfResults(AF, itemKey)
 	return false
 end
 
-local function RefreshExistingDebugSelfResults(AF, itemKey)
-	local cache = AF.db.customerCache[tostring(itemKey or "")]
+local function RefreshExistingDebugSelfResults(addon, itemKey)
+	local cache = addon.db.customerCache[tostring(itemKey or "")]
 	if not cache then
 		return
 	end
-	local now = AF:Now()
+	local now = addon:Now()
 	for key, entry in pairs(cache) do
 		if entry.debug then
 			entry.debugWhoRefresh = nil
 			if key == "__debug_self_5" then
-				SetDebugWhoStatus(AF, entry.orderTarget or entry.name or entry.target, true)
+				SetDebugWhoStatus(addon, entry.orderTarget or entry.name or entry.target, true)
 			end
 			if key == "__debug_self_6" then
 				entry.verifiedAt = nil
@@ -142,8 +142,8 @@ local function RefreshExistingDebugSelfResults(AF, itemKey)
 				entry.lastQueryAt = nil
 			else
 				entry.verifiedAt = entry.verifiedAt or now
-				entry.lastQueryToken = AF.currentCustomerQueryToken
-				entry.lastQueryAt = AF.lastQueryAt
+				entry.lastQueryToken = addon.currentCustomerQueryToken
+				entry.lastQueryAt = addon.lastQueryAt
 			end
 		end
 	end
@@ -223,8 +223,8 @@ function AF:InjectDebugSelfResult(itemID, professionID)
 	}, item, now)
 
 	for i, altBaseName in ipairs(DEBUG_ALT_NAMES) do
-		local altName = altBaseName .. "-" .. (GetRealmName() or "")
-		local contactName = GetDebugValue(DEBUG_ALT_CONTACT_NAMES, i) .. "-" .. (GetRealmName() or "")
+		local altName = self.IsForever and (altBaseName .. " Hearthstone") or (altBaseName .. "-" .. (GetRealmName() or ""))
+		local contactName = self.IsForever and (GetDebugValue(DEBUG_ALT_CONTACT_NAMES, i) .. " Hearthstone") or (GetDebugValue(DEBUG_ALT_CONTACT_NAMES, i) .. "-" .. (GetRealmName() or ""))
 		local priceCopper = i == 1 and 0 or (i * 12500000)
 		local baseQuality = math.min(5, 2 + i)
 		local bestQuality = math.min(5, baseQuality + 1)
@@ -263,7 +263,7 @@ function AF:InjectDebugSelfResult(itemID, professionID)
 		local bestQuality = math.min(5, baseQuality + (i % 3 == 0 and 0 or 1))
 		local concentrationQuality = GetDebugConcentrationQuality(bestQuality, i % 2 == 0)
 		local note = GetDebugValue(DEBUG_NOTES, i)
-		local debugName = GetDebugValue(DEBUG_CRAFTER_NAMES, i) .. "-" .. (GetRealmName() or "")
+		local debugName = self.IsForever and (GetDebugValue(DEBUG_CRAFTER_NAMES, i) .. " Hearthstone") or (GetDebugValue(DEBUG_CRAFTER_NAMES, i) .. "-" .. (GetRealmName() or ""))
 		local pinned = i <= DEBUG_PINNED_COUNT
 		local offline = DEBUG_OFFLINE_ROWS[i] == true
 		if pinned then

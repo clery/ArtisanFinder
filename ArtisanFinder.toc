@@ -1,16 +1,10 @@
-## Interface: 120005, 120007, 120100, 120105
+# Forever fallback for clients that do not select the Camelot TOC. Retail selects ArtisanFinder_Mainline.toc.
+## Interface: 16001
 
 ## Title: ArtisanFinder
-## Notes: Find available artisans from Crafting Orders and manage crafter availability from Professions.
-## Notes-frFR: Trouvez des artisans disponibles depuis les commandes d'artisanat et gérez votre disponibilité depuis les métiers.
-## Notes-deDE: Findet verfuegbare Handwerker ueber Handwerksauftraege und verwaltet die Verfuegbarkeit ueber Berufe.
-## Notes-esES: Encuentra artesanos disponibles desde los pedidos de fabricación y gestiona la disponibilidad desde las profesiones.
-## Notes-esMX: Encuentra artesanos disponibles desde las órdenes de fabricación y administra la disponibilidad desde las profesiones.
-## Notes-ptPT: Encontra artesãos disponíveis a partir das encomendas de fabrico e gere a disponibilidade a partir das profissões.
-## Notes-ptBR: Encontre artesãos disponíveis nas ordens de criação e gerencie a disponibilidade pelas profissões.
-## Notes-ruRU: Находите доступных ремесленников через заказы на изготовление и управляйте доступностью через профессии.
-## Notes-zhCN: 从制造订单中查找可用工匠，并在专业界面管理工匠可用状态。
-## Notes-zhTW: 從製造訂單中尋找可用工匠，並在專業技能介面管理工匠可用狀態。
+## X-ArtisanFinder-Flavor: Forever
+## Notes: Discover artisans, share professions, and manage crafting commissions.
+## Notes-frFR: Découvrez des artisans, partagez vos métiers et gérez vos commissions.
 ## IconTexture: Interface\AddOns\ArtisanFinder\Assets\Icon.png
 ## Author: clery
 ## Version: @project-version@
@@ -30,53 +24,71 @@
 ## X-License: All Rights Reserved: You are free to fork and modify on GitHub, please ask us about anything else.
 ## X-Third-Party-Notices: THIRD_PARTY_NOTICES.md
 ## X-Website: https://github.com/clery/ArtisanFinder
-## X-Curse-Project-ID: 1545540
-## X-Wago-ID: 5NR8p1K3
 
 ## SavedVariables: ArtisanFinderDB
 
 embeds.xml
 
+Flavors\Forever.lua
 Core\Bootstrap.lua
 
-Locales\enUS.lua
-Locales\frFR.lua
-Locales\deDE.lua
-Locales\esES.lua
-Locales\esMX.lua
-Locales\ptPT.lua
-Locales\ptBR.lua
-Locales\ruRU.lua
-Locales\zhCN.lua
-Locales\zhTW.lua
+Locales\Shared.xml
 
-Core\Util.lua
-Utils\Formatting.lua
-Core\Data.lua
+Locales\Forever\deDE.lua
+Locales\Forever\enUS.lua
+Locales\Forever\esES.lua
+Locales\Forever\esMX.lua
+Locales\Forever\frFR.lua
+Locales\Forever\ptBR.lua
+Locales\Forever\ptPT.lua
+Locales\Forever\ruRU.lua
+Locales\Forever\zhCN.lua
+Locales\Forever\zhTW.lua
+
+SharedCore.xml
+Features\Forever\Names.lua
 Core\Transfer.lua
-Data\OrderableRecipes.lua
-Features\Customer\Cache.lua
-Features\Customer\Recommendation.lua
-Features\Social\Guild.lua
-Features\Social\WhoStatus.lua
+Features\SharedData.xml
+Features\Forever\Options.lua
 UI\Options.lua
 Core\Core.lua
 Features\Social\Comms.lua
 Features\Social\TradeChat.lua
+Features\Forever\TradeChat.lua
 UI\Templates.xml
 UI\Transfer.lua
+Changelogs\Forever.lua
 UI\Changelog.lua
-Features\Orders\Notifications.lua
-Features\Crafter\RecipeCapability.lua
+Features\Forever\RecipeCapability.lua
+Features\Crafter\ProfessionRecipes.lua
 Features\Crafter\Scanner.lua
 Features\Customer\PreparationTracker.lua
+Features\Forever\PreparationTracker.lua
+Features\Customer\ProfessionOpening.lua
 Features\Customer\Rows.lua
 Features\Customer\DebugData.lua
-Features\Customer\ShoppingList.lua
-Features\Customer\UI.lua
+Features\Forever\DiscoverySources.lua
+Features\Forever\GuildDirectory.lua
+Features\Forever\Directory.lua
+Features\Forever\Pricing.lua
+Features\Forever\Hierarchy.lua
+Features\Forever\Sorting.lua
+Features\Forever\DirectoryUI.lua
 Features\Crafter\UI.lua
+Features\Forever\CrafterBehavior.lua
+Features\Forever\MoneyInputs.lua
+Features\Forever\RecipeControls.lua
+Features\Forever\DiscoveryTab.lua
 UI\Tutorial.lua
-UI\Minimap.lua
-UI\EditMode.lua
-UI\DebugLog.lua
+Features\Forever\Tutorial.lua
+UI\SharedWidgets.xml
+Features\Forever\Indicators.lua
+Features\Forever\NameplateSetup.lua
+Features\Forever\NameplateScaling.lua
+Features\Forever\Nameplates.lua
+Features\Forever\Demo.lua
+Features\Forever\Discovery.lua
+Features\Forever\Availability.lua
+Features\Forever\LinkedInn.lua
+Features\Forever\Compatibility.lua
 Core\Slash.lua

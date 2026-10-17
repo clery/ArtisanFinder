@@ -91,7 +91,7 @@ AF.IsProtectedActionRestricted = function()
 end
 
 LoadAddonFile("Core/Util.lua")
-LoadAddonFile("Features/Orders/Notifications.lua")
+LoadAddonFile("Features/Retail/Orders/Notifications.lua")
 
 AF:QueueCustomerOrderStateRefresh("craftingorders_can_request", 0)
 RunTimers(1)

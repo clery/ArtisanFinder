@@ -2,8 +2,8 @@ local _, AF = ...
 
 local DEBUG_LOG_LIMIT = 300
 
-local function BoolText(AF, value)
-	return value and AF:Text("ENABLED") or AF:Text("DISABLED")
+local function BoolText(addon, value)
+	return value and addon:Text("ENABLED") or addon:Text("DISABLED")
 end
 
 local function EscapeLogText(value)

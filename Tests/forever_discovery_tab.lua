@@ -1,0 +1,67 @@
+local function frame()
+ local f={shown=true,width=750,height=594,points={{"CENTER"}},scripts={},strata="MEDIUM",level=1}
+ function f:SetPoint(...) self.points[#self.points+1]={...} end
+ function f:ClearAllPoints() self.points={} end
+ function f:GetPoint(index) return unpack(self.points[index]) end
+ function f:GetNumPoints() return #self.points end
+ function f:SetSize(w,h) self.width=w self.height=h end
+ function f:GetWidth() return self.width end function f:GetHeight() return self.height end
+ function f:SetParent(parent) self.parent=parent end function f:GetParent() return self.parent end
+ function f:SetFrameStrata(value) self.strata=value end function f:GetFrameStrata() return self.strata end
+ function f:SetFrameLevel(value) self.level=value end function f:GetFrameLevel() return self.level end
+ function f:Show() self.shown=true end
+ function f:Hide() local shown=self.shown self.shown=false if shown and self.scripts.OnHide then self.scripts.OnHide() end end
+ function f:IsShown() return self.shown end function f:SetShown(value) if value then self:Show() else self:Hide() end end
+ function f:SetChecked(value) self.checked=value end function f:SetID(value) self.id=value end
+ function f:HookScript(key,fn) local old=self.scripts[key] self.scripts[key]=function(...) if old then old(...) end fn(...) end end
+ return f
+end
+UIParent=frame() SidePanelTabButtonMixin={}
+CreateFrame=function(_,_,parent,template)
+ assert(template=="LargeSideTabButtonTemplate")
+ local f=frame() f.parent=parent f.Icon={SetTexture=function() end}
+ function f:EnableMouse(enabled) self.mouseEnabled=enabled end
+ function f:SetFillToInterior(value) self.fillToInterior=value end
+ function f:SetCustomOnMouseUpHandler(handler) self.mouseUp=handler end
+ function f:OnMouseUp(button,upInside) if self.mouseUp then self.mouseUp(self,button,upInside) end end
+ return f
+end
+hooksecurefunc=function(object,key,fn) local old=object[key] object[key]=function(...) local result=old(...) fn(...) return result end end
+ProfessionsFrame=frame()
+ProfessionsFrame.BookPage=frame() ProfessionsFrame.CraftingPage=frame()
+ProfessionsFrame.BookPage:Hide()
+ProfessionsFrame.ProfessionsOverviewTab=frame()
+local first,last,hidden=frame(),frame(),frame() hidden:Hide()
+ProfessionsFrame.rightProfessionTabs={first,last,hidden}
+ProfessionsFrame.RefreshRightTabs=function() end
+ProfessionsFrame.RightTabSelected=function(self,selected) self.selected=selected end
+local AF={ADDON_NAME="ArtisanFinder",crafterDefaultsFrame=frame(),crafterDefaultsCollapseButton=frame()}
+AF.customerFrame=frame() AF.customerFrame.parent=UIParent AF.customerFrame:SetSize(840,620)
+AF.AttachCustomerUI=function() end AF.AttachCrafterUI=function() end
+AF.UpdateCrafterRightTabs=function(self,expanded) self.tabsExpanded=expanded end
+AF.IsOwnProfessionWindowOpen=function() return true end
+AF.RefreshCustomerResults=function(self) self.refreshed=true end
+AF.OpenCustomerUI=function(self) self.customerFrame:Show() end AF.ToggleCustomerUI=AF.OpenCustomerUI
+assert(loadfile("Features/Forever/DiscoveryTab.lua"))("ArtisanFinder",AF)
+AF:EnsureForeverDiscoveryTab()
+local tab=AF.foreverDiscoveryTab
+assert(tab and tab.points[1][2]==last,"discovery tab follows the last visible profession, skipping hidden slots")
+assert(tab.mouseEnabled,"native frame tab accepts mouse input")
+tab:OnMouseUp("RightButton",true)
+assert(not AF.directoryInProfessions,"right click does not select discovery")
+tab:OnMouseUp("LeftButton",false)
+assert(not AF.directoryInProfessions,"releasing outside does not select discovery")
+tab:OnMouseUp("LeftButton",true)
+assert(AF.directoryInProfessions and tab.checked and AF.customerFrame.parent==ProfessionsFrame,"selecting discovery embeds the directory and selects the native tab")
+assert(not ProfessionsFrame.BookPage.shown and not ProfessionsFrame.CraftingPage.shown and not AF.crafterDefaultsFrame.shown)
+AF:UpdateCrafterRightTabs(true)
+assert(not AF.tabsExpanded and tab.checked,"embedded discovery keeps tabs on the crafting window and stays selected")
+assert(not AF:IsOwnProfessionWindowOpen(),"discovery never exposes own-recipe advertising controls")
+ProfessionsFrame:RightTabSelected(first)
+assert(not AF.directoryInProfessions and not tab.checked and AF.customerFrame.parent==UIParent and not AF.customerFrame.shown)
+assert(ProfessionsFrame.width==750 and AF.customerFrame.width==840,"profession and standalone directory sizes restore")
+tab:OnMouseUp("LeftButton",true) AF:OpenCustomerUI()
+assert(not AF.directoryInProfessions and AF.customerFrame.parent==UIParent and AF.customerFrame.shown,"minimap/slash access returns to standalone discovery")
+tab:OnMouseUp("LeftButton",true) ProfessionsFrame:Hide()
+assert(not AF.directoryInProfessions and not tab.checked,"closing professions clears discovery selection")
+print("PASS native discovery side tab ordering, selection, embedded view, profession switching, standalone access and close cleanup")

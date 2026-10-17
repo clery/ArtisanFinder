@@ -1,0 +1,87 @@
+## Interface: 120005, 120007, 120100, 120105
+
+## Title: ArtisanFinder
+## X-ArtisanFinder-Flavor: Retail
+## Notes: Find available artisans from Crafting Orders and manage crafter availability from Professions.
+## Notes-frFR: Trouvez des artisans disponibles depuis les commandes d'artisanat et gérez votre disponibilité depuis les métiers.
+## Notes-deDE: Findet verfuegbare Handwerker ueber Handwerksauftraege und verwaltet die Verfuegbarkeit ueber Berufe.
+## Notes-esES: Encuentra artesanos disponibles desde los pedidos de fabricación y gestiona la disponibilidad desde las profesiones.
+## Notes-esMX: Encuentra artesanos disponibles desde las órdenes de fabricación y administra la disponibilidad desde las profesiones.
+## Notes-ptPT: Encontra artesãos disponíveis a partir das encomendas de fabrico e gere a disponibilidade a partir das profissões.
+## Notes-ptBR: Encontre artesãos disponíveis nas ordens de criação e gerencie a disponibilidade pelas profissões.
+## Notes-ruRU: Находите доступных ремесленников через заказы на изготовление и управляйте доступностью через профессии.
+## Notes-zhCN: 从制造订单中查找可用工匠，并在专业界面管理工匠可用状态。
+## Notes-zhTW: 從製造訂單中尋找可用工匠，並在專業技能介面管理工匠可用狀態。
+## IconTexture: Interface\AddOns\ArtisanFinder\Assets\Icon.png
+## Author: clery
+## Version: @project-version@
+## Category: Professions
+## Category-deDE: Berufe
+## Category-esES: Profesiones
+## Category-esMX: Profesiones
+## Category-frFR: Métiers
+## Category-ptPT: Profissões
+## Category-ptBR: Profissões
+## Category-ruRU: Профессии
+## Category-zhCN: 专业
+## Category-zhTW: 專業技能
+
+## X-Credits: clery
+## X-Category: Professions
+## X-License: All Rights Reserved: You are free to fork and modify on GitHub, please ask us about anything else.
+## X-Third-Party-Notices: THIRD_PARTY_NOTICES.md
+## X-Website: https://github.com/clery/ArtisanFinder
+## X-Curse-Project-ID: 1545540
+## X-Wago-ID: 5NR8p1K3
+
+## SavedVariables: ArtisanFinderDB
+
+embeds-retail.xml
+
+Flavors\Retail.lua
+Core\Bootstrap.lua
+
+Locales\Shared.xml
+
+Locales\Retail\deDE.lua
+Locales\Retail\enUS.lua
+Locales\Retail\esES.lua
+Locales\Retail\esMX.lua
+Locales\Retail\frFR.lua
+Locales\Retail\ptBR.lua
+Locales\Retail\ptPT.lua
+Locales\Retail\ruRU.lua
+Locales\Retail\zhCN.lua
+Locales\Retail\zhTW.lua
+
+SharedCore.xml
+Core\Transfer.lua
+Features\Retail\Data\OrderableRecipes.lua
+Features\SharedData.xml
+Features\Retail\Options.lua
+UI\Options.lua
+Core\Core.lua
+Features\Social\Comms.lua
+Features\Social\TradeChat.lua
+UI\Templates.xml
+UI\Transfer.lua
+Changelogs\Retail.lua
+UI\Changelog.lua
+Features\Retail\Orders\Notifications.lua
+Features\Retail\Crafter\RecipeCapability.lua
+Features\Crafter\ProfessionRecipes.lua
+Features\Crafter\Scanner.lua
+Features\Retail\Customer\PreparationTracker.lua
+Features\Customer\PreparationTracker.lua
+Features\Customer\ProfessionOpening.lua
+Features\Customer\Rows.lua
+Features\Customer\DebugData.lua
+Features\Retail\Customer\ShoppingList.lua
+Features\Retail\Customer\UI.lua
+Features\Retail\Crafter\CustomerPreview.lua
+Features\Crafter\UI.lua
+Features\Retail\Crafter\ReagentControls.lua
+UI\Tutorial.lua
+Features\Retail\Tutorial.lua
+UI\SharedWidgets.xml
+Core\Slash.lua

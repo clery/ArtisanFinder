@@ -2,6 +2,20 @@
 
 ArtisanFinder helps players find available crafters directly from the Crafting Orders UI, while giving crafters a simple way to publish prices, notes, quality expectations, reagent recommendations, and availability from the Professions UI.
 
+### WoW Forever
+
+![ArtisanFinder discovery on WoW Forever](https://raw.githubusercontent.com/clery/ArtisanFinder/HEAD/Images/ForeverDiscovery.png)
+
+* Show profession icons above friendly players outdoors and outside combat/instances.
+* Open discovery with `/af`, the minimap button, or the ArtisanFinder tab in the crafting window.
+* Search by artisan, profession or item; expand artisans into professions and known crafts. Filter sources, sort columns and favorite artisans.
+* View known profession levels, profession links, commissions and notes.
+* Manage advertising, default prices and recipe overrides from the crafting sidebar.
+* Discover crafters through ArtisanFinder, guild professions, Trade Chat, Linked Inn, CraftBoard and Release Gaming – Find Crafts. Other addons' data does not imply a confirmed price or current availability.
+* Track an item's required materials in the quest objectives and search missing materials with Auctionator at the auction house.
+
+Forever has no crafting-order panel, customer quality preview, material-quality selection or order notifications.
+
 ## Features
 
 *   Live artisan search from the Crafting Orders form.
@@ -17,13 +31,13 @@ ArtisanFinder helps players find available crafters directly from the Crafting O
 *   Minimap, movable button, Options -> AddOns, and Blizzard Edit Mode controls.
 *   Localization for English, French, German, Spanish, Russian, and Chinese.
 
-![Addon features gif](Images/Example.gif)
+![Addon features gif](https://raw.githubusercontent.com/clery/ArtisanFinder/HEAD/Images/Example.gif)
 
 ## For Customers
 
 When you choose an item in the Crafting Order form, ArtisanFinder shows matching artisans who can help with that craft. Results can include commission, note, quality with recommended or optional reagents, AFK state, guild source, trade-chat leads, and actions for whispering or preparing an order.
 
-![ArtisanFinder customer view](Images/CustomerView.png)
+![ArtisanFinder customer view](https://raw.githubusercontent.com/clery/ArtisanFinder/HEAD/Images/CustomerView.png)
 
 Use the customer row "Prepare order" button to prepare an order as Standard, With optional reagents, or Advanced. Standard preparation adds the craft to the ObjectiveTracker with required components and any artisan quality or reagent recommendations. With optional reagents opens Blizzard-style optional reagent slots inside the artisan row so you can choose one reagent per slot before tracking the craft. Advanced preparation lets you choose required reagent qualities and optional reagents before tracking the craft, with an expected quality preview when ArtisanFinder has enough information.
 
@@ -31,7 +45,7 @@ Prepared crafts appear under ArtisanFinder in the ObjectiveTracker with required
 
 When a prepared craft matches the order you are viewing, clicking a matching artisan row can apply the tracked materials directly to the Crafting Order form so you can review the order faster.
 
-![ArtisanFinder customer view](Images/PrepareOrder.png)
+![ArtisanFinder customer view](https://raw.githubusercontent.com/clery/ArtisanFinder/HEAD/Images/PrepareOrder.png)
 
 ArtisanFinder does not place orders for you. It only helps fill or open the right information so you can review everything before submitting an order yourself.
 
@@ -43,13 +57,13 @@ ArtisanFinder adds lightweight controls to the Professions UI for item-specific 
 
 Availability is session-based and resets after login or reload by default. You can cycle between unavailable, current-character availability, and account-wide availability from the minimap button, optionally remember your last manual availability between sessions, or let automatic availability enable it in trade-chat areas and disable it in selected instance types. Profession scans can refresh automatically by default, or you can disable automatic scans in options and press Rescan in the Professions UI when you want to refresh stored craft data.
 
-![ArtisanFinder crafter view](Images/CrafterView.png)
+![ArtisanFinder crafter view](https://raw.githubusercontent.com/clery/ArtisanFinder/HEAD/Images/CrafterView.png)
 
 ### Notifications
 
 If an addon-enabled customer places a personal order for one of your characters while you are on another character, ArtisanFinder can play your selected notification sound and show a loot-style notification with the item, customer, character, and commission. Notifications are remembered until cleared or completed, and the Blizzard crafting order minimap icon can also show known alt orders.
 
-![ArtisanFinder crafter view](Images/NotificationExample.gif)
+![ArtisanFinder crafter view](https://raw.githubusercontent.com/clery/ArtisanFinder/HEAD/Images/NotificationExample.gif)
 
 ## Reagent Guidance
 
@@ -59,13 +73,13 @@ ArtisanFinder can estimate expected craft quality from the reagents you choose a
 
 ## Commission Values
 
-Commission fields use a single gold input:
+On Retail, commission fields use a single gold input:
 
 *   Empty or `0`: unspecified commission.
 *   `-1`: free commission.
 *   Any positive number: commission in gold.
 
-An item-specific commission takes priority over a profession default. If an item has no specific commission, the profession default can be used instead.
+On Forever, commission fields use separate gold, silver and copper inputs. Leave them blank for an unspecified commission; `-1` in Gold accepts any commission.
 
 ## Options
 
@@ -73,26 +87,16 @@ ArtisanFinder has an Options -> AddOns panel ordered around common controls firs
 
 The scanning section includes **Artisan import / export**. It creates a copy/paste payload containing scanned artisan profiles, profession pricing, advertising choices, and profession links, so another WoW account's artisans can be advertised alongside your main account.
 
-![ArtisanFinder options](Images/Options1.png)
-![ArtisanFinder options](Images/Options2.png)
+![ArtisanFinder options](https://raw.githubusercontent.com/clery/ArtisanFinder/HEAD/Images/Options1.png)
+![ArtisanFinder options](https://raw.githubusercontent.com/clery/ArtisanFinder/HEAD/Images/Options2.png)
 
 ## Languages
 
 ArtisanFinder includes localization support for English, French, German, European Spanish, Latin American Spanish, European Portuguese, Brazilian Portuguese, Russian, Simplified Chinese, and Traditional Chinese.
 
-## Source Layout
-
-Runtime files are loaded from [ArtisanFinder.toc](ArtisanFinder.toc), which preserves the required order for the addon namespace, localization, data, feature services, XML templates, UI attachments, and slash commands.
-
-*   [Core/](Core/) contains bootstrap, saved-variable/data helpers, the event coordinator, shared utilities, and slash command handling.
-*   [Data/](Data/) contains generated/static data tables.
-*   [Utils/](Utils/) contains shared formatting and tooltip helpers.
-*   [Features/](Features/) contains customer, crafter, social/comms, and order-notification modules.
-*   [UI/](UI/) contains XML templates plus options, minimap, edit mode, tutorial, and debug-log UI.
-
 ## Useful Commands
 
-*   `/af`: shows help for ArtisanFinder commands.
+*   `/af`: shows help on Retail; opens discovery on Forever. Use `/af help` for commands.
 *   `/af scan`: force a fresh scan of the currently open profession.
 *   `/af auto`: show current automatic availability state.
 *   `/af auto on`: enable automatic availability in trade-chat areas.
@@ -111,4 +115,4 @@ I would like to thank a few people who made this project possible by their feedb
 
 ## Third-Party Libraries
 
-ArtisanFinder embeds several addon libraries under `Libs/`. Their license and notice information is listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+ArtisanFinder embeds several addon libraries under `Libs/`. Their license and notice information is listed in [THIRD_PARTY_NOTICES.md](https://github.com/clery/ArtisanFinder/blob/HEAD/THIRD_PARTY_NOTICES.md).
