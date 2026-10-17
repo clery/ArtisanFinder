@@ -1,0 +1,93 @@
+## Interface: 16001
+
+## Title: ArtisanFinder
+## X-ArtisanFinder-Flavor: Forever
+## Notes: Discover artisans, share professions, and manage crafting commissions.
+## Notes-frFR: Découvrez des artisans, partagez vos métiers et gérez vos commissions.
+## IconTexture: Interface\AddOns\ArtisanFinder\Assets\Icon.png
+## Author: clery
+## Version: @project-version@
+## Category: Professions
+## Category-deDE: Berufe
+## Category-esES: Profesiones
+## Category-esMX: Profesiones
+## Category-frFR: Métiers
+## Category-ptPT: Profissões
+## Category-ptBR: Profissões
+## Category-ruRU: Профессии
+## Category-zhCN: 专业
+## Category-zhTW: 專業技能
+
+## X-Credits: clery
+## X-Category: Professions
+## X-License: All Rights Reserved: You are free to fork and modify on GitHub, please ask us about anything else.
+## X-Third-Party-Notices: THIRD_PARTY_NOTICES.md
+## X-Website: https://github.com/clery/ArtisanFinder
+
+## SavedVariables: ArtisanFinderDB
+
+embeds.xml
+
+Flavors\Forever.lua
+Core\Bootstrap.lua
+
+Locales\Shared.xml
+
+Locales\Forever\deDE.lua
+Locales\Forever\enUS.lua
+Locales\Forever\esES.lua
+Locales\Forever\esMX.lua
+Locales\Forever\frFR.lua
+Locales\Forever\ptBR.lua
+Locales\Forever\ptPT.lua
+Locales\Forever\ruRU.lua
+Locales\Forever\zhCN.lua
+Locales\Forever\zhTW.lua
+
+SharedCore.xml
+Features\Forever\Names.lua
+Core\Transfer.lua
+Features\SharedData.xml
+Features\Forever\Options.lua
+UI\Options.lua
+Core\Core.lua
+Features\Social\Comms.lua
+Features\Social\TradeChat.lua
+Features\Forever\TradeChat.lua
+UI\Templates.xml
+UI\Transfer.lua
+Changelogs\Forever.lua
+UI\Changelog.lua
+Features\Forever\RecipeCapability.lua
+Features\Crafter\ProfessionRecipes.lua
+Features\Crafter\Scanner.lua
+Features\Customer\PreparationTracker.lua
+Features\Forever\PreparationTracker.lua
+Features\Customer\ProfessionOpening.lua
+Features\Customer\Rows.lua
+Features\Customer\DebugData.lua
+Features\Forever\DiscoverySources.lua
+Features\Forever\GuildDirectory.lua
+Features\Forever\Directory.lua
+Features\Forever\Pricing.lua
+Features\Forever\Hierarchy.lua
+Features\Forever\Sorting.lua
+Features\Forever\DirectoryUI.lua
+Features\Crafter\UI.lua
+Features\Forever\CrafterBehavior.lua
+Features\Forever\MoneyInputs.lua
+Features\Forever\RecipeControls.lua
+Features\Forever\DiscoveryTab.lua
+UI\Tutorial.lua
+Features\Forever\Tutorial.lua
+UI\SharedWidgets.xml
+Features\Forever\Indicators.lua
+Features\Forever\NameplateSetup.lua
+Features\Forever\NameplateScaling.lua
+Features\Forever\Nameplates.lua
+Features\Forever\Demo.lua
+Features\Forever\Discovery.lua
+Features\Forever\Availability.lua
+Features\Forever\LinkedInn.lua
+Features\Forever\Compatibility.lua
+Core\Slash.lua

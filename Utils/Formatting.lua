@@ -280,6 +280,7 @@ function AF:GetRecipeQualityIconMarkup(recipeID, quality, size)
 end
 
 local PROFESSION_ICON_FALLBACKS = {
+	[129] = AF.IsForever and "Interface\\Icons\\Spell_Holy_SealOfSacrifice" or nil,
 	[5] = "Interface\\Icons\\INV_Misc_Food_15",
 	[6] = "Interface\\Icons\\Trade_Mining",
 	[10] = "Interface\\Icons\\Trade_Fishing",
@@ -299,6 +300,7 @@ local PROFESSION_ICON_FALLBACKS = {
 	[773] = "Interface\\Icons\\INV_Inscription_Tradeskill01",
 }
 local PROFESSION_ICON_SPELLS = {
+	[129] = AF.IsForever and 3273 or nil,
 	[5] = 2550,
 	[6] = 2575,
 	[10] = 7620,
@@ -350,7 +352,7 @@ function AF:GetProfessionIconMarkup(professionID, profileOrRow, size)
 		icon = profession and (profession.icon or profession.professionIcon or profession.iconTexture)
 	end
 	if not icon and professionID and PROFESSION_ICON_SPELLS[professionID] then
-		local ok, spellIcon = pcall(C_Spell.GetSpellTexture, PROFESSION_ICON_SPELLS[professionID])
+		local ok, spellIcon = pcall(C_Spell and C_Spell.GetSpellTexture or GetSpellTexture, PROFESSION_ICON_SPELLS[professionID])
 		if ok then
 			icon = spellIcon
 		end
@@ -398,7 +400,7 @@ function AF:GetSavedCommissionState(entry)
 	return "unspecified", 0, false
 end
 
-function AF:SetCommissionFields(entry, priceCopper, freeCommission, state)
+function AF:SetCommissionFields(entry, priceCopper, _, state)
 	if not entry then
 		return
 	end
@@ -605,7 +607,7 @@ local function GetTooltipColorCode(r, g, b)
 	return string.format("|cff%02x%02x%02x", math.floor((r or 1) * 255 + 0.5), math.floor((g or 1) * 255 + 0.5), math.floor((b or 1) * 255 + 0.5))
 end
 
-local function AddItemTooltipLine(AF, tooltip, itemID, text, fallbackR, fallbackG, fallbackB)
+local function AddItemTooltipLine(_, tooltip, itemID, text, fallbackR, fallbackG, fallbackB)
 	local r, g, b = GetTooltipItemQualityColor(itemID)
 	if not C_Item.GetItemInfo(itemID) then
 		r, g, b = fallbackR or r, fallbackG or g, fallbackB or b
@@ -738,7 +740,7 @@ function AF:AddCustomerEntryTooltipLines(tooltip, entry, options)
 	end
 end
 
-local function ReagentHasDisplayQuality(AF, reagent)
+local function ReagentHasDisplayQuality(_, reagent)
 	local itemID = tonumber(reagent and (reagent.itemID or reagent.id))
 	if itemID then
 		local quality = GetReagentDisplayQualityInfo(itemID, reagent)
@@ -751,8 +753,8 @@ local function ReagentChangesDifficulty(reagent)
 	return (tonumber(reagent and (reagent.difficultyAdjustment or reagent.bonusDifficulty or reagent.difficultyDelta)) or 0) > 0
 end
 
-local function ReagentIsSuggestedDisplayable(AF, reagent)
-	return ReagentHasDisplayQuality(AF, reagent) or ReagentChangesDifficulty(reagent)
+local function ReagentIsSuggestedDisplayable(addon, reagent)
+	return ReagentHasDisplayQuality(addon, reagent) or ReagentChangesDifficulty(reagent)
 end
 
 function AF:HasDisplayableReagentLines(reagents, options)
@@ -868,7 +870,7 @@ function AF:AddReagentDetailTooltipLines(tooltip, details)
 	end
 end
 
-function AF:AddReagentSummaryTooltipLines(tooltip, summary, truncated)
+function AF:AddReagentSummaryTooltipLines(tooltip, summary, _)
 	local added = false
 	for reagentText in tostring(summary or ""):gmatch("[^;\n]+") do
 		reagentText = reagentText:match("^%s*(.-)%s*$")
@@ -939,6 +941,10 @@ function AF:GetItemName(itemID)
 	if not itemID then
 		return nil
 	end
+	if itemID < 0 then
+		local getName = C_Spell and C_Spell.GetSpellName or GetSpellInfo
+		return getName and getName(-itemID) or nil
+	end
 	local itemName = C_Item.GetItemInfo(itemID)
 	if not itemName then
 		pcall(C_Item.RequestLoadItemDataByID, itemID)
@@ -951,6 +957,7 @@ function AF:GetDisplayItemName(itemID, fallback)
 end
 
 function AF:OnItemDataLoaded(...)
+    if self.OnDirectoryItemDataLoaded then self:OnDirectoryItemDataLoaded(...) end
 	if self.OnOrderNotificationItemDataLoaded then
 		self:OnOrderNotificationItemDataLoaded(...)
 	end

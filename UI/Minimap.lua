@@ -48,7 +48,9 @@ local function HandleMinimapClick(owner, button)
 	if AF.CloseMinimapTutorial then
 		AF:CloseMinimapTutorial(true)
 	end
-	if button == "RightButton" and IsShiftKeyDown() then
+	if AF.IsForever and button == "LeftButton" and not IsShiftKeyDown() and not IsAltKeyDown() and not IsControlKeyDown() then
+		AF:ToggleCustomerUI()
+	elseif not AF.IsForever and button == "RightButton" and IsShiftKeyDown() then
 		AF:ClearOrderNotifications()
 	elseif IsShiftKeyDown() then
 		AF:SetMinimapHidden(true)
@@ -165,11 +167,16 @@ function AF:PopulateMinimapTooltip(tooltip)
 		tooltip:AddLine(AF:Text("MINIMAP_SCANNED", 0), 1, 1, 1)
 	end
 	tooltip:AddLine(" ")
+	if AF.IsForever then
+		tooltip:AddLine(AF:Text("FOREVER_MINIMAP_OPEN"),0.65,0.65,0.65)
+		tooltip:AddLine(AF:Text("FOREVER_MINIMAP_AVAILABILITY"),0.65,0.65,0.65)
+	else
 	tooltip:AddLine(AF:Text("MINIMAP_LEFT_CLICK"), 0.65, 0.65, 0.65)
+	end
 	tooltip:AddLine(AF:Text("MINIMAP_ALT_LEFT_CLICK"), 0.65, 0.65, 0.65)
 	tooltip:AddLine(AF:Text("MINIMAP_MIDDLE_CLICK"), 0.65, 0.65, 0.65)
 	tooltip:AddLine(AF:Text("MINIMAP_RIGHT_CLICK"), 0.65, 0.65, 0.65)
-	tooltip:AddLine(AF:Text("MINIMAP_SHIFT_RIGHT_CLICK"), 0.65, 0.65, 0.65)
+	if not AF.IsForever then tooltip:AddLine(AF:Text("MINIMAP_SHIFT_RIGHT_CLICK"), 0.65, 0.65, 0.65) end
 	tooltip:AddLine(AF:Text("MINIMAP_SHIFT_CLICK"), 0.65, 0.65, 0.65)
 end
 
@@ -258,11 +265,11 @@ function AF:InitializeStandaloneMinimapButton()
 	button:RegisterForClicks("LeftButtonUp", "RightButtonUp", "MiddleButtonUp")
 	button:SetClampedToScreen(true)
 	button.icon:SetTexture(STANDALONE_ICON)
-	button:SetScript("OnClick", function(self, clickButton)
-		HandleMinimapClick(self, clickButton)
+	button:SetScript("OnClick", function(widget, clickButton)
+		HandleMinimapClick(widget, clickButton)
 	end)
-	button:SetScript("OnEnter", function(self)
-		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+	button:SetScript("OnEnter", function(widget)
+		GameTooltip:SetOwner(widget, "ANCHOR_RIGHT")
 		AF.minimapTooltipShown = true
 		AF:PopulateMinimapTooltip(GameTooltip)
 		GameTooltip:Show()

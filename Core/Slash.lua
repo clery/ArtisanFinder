@@ -6,18 +6,18 @@ local function NormalizeCommand(message)
 	return command and command:lower() or "", rest or ""
 end
 
-local function ClearCustomerQueryState(AF)
-	AF.pendingReagentDetails = nil
-	AF.currentCustomerItemID = nil
-	AF.currentCustomerItemName = nil
-	AF.currentCustomerProfessionID = nil
-	AF.currentCustomerRecipeID = nil
-	AF.currentCustomerQueryToken = nil
-	AF.currentCustomerQueryItemID = nil
-	AF.currentCustomerQueryProfessionID = nil
-	AF.lastQueryItemID = nil
-	AF.lastQueryProfessionID = nil
-	AF.lastQueryAt = nil
+local function ClearCustomerQueryState(addon)
+	addon.pendingReagentDetails = nil
+	addon.currentCustomerItemID = nil
+	addon.currentCustomerItemName = nil
+	addon.currentCustomerProfessionID = nil
+	addon.currentCustomerRecipeID = nil
+	addon.currentCustomerQueryToken = nil
+	addon.currentCustomerQueryItemID = nil
+	addon.currentCustomerQueryProfessionID = nil
+	addon.lastQueryItemID = nil
+	addon.lastQueryProfessionID = nil
+	addon.lastQueryAt = nil
 end
 
 function AF:RefreshMainUI(statusText)
@@ -38,6 +38,8 @@ function AF:SetShowUncertifiedPeople(enabled)
 end
 
 function AF:PrintSlashHelp()
+    if self.PrintFlavorSlashHelp then self:PrintFlavorSlashHelp() end
+	if self.IsForever then self:Print("/af — artisan directory; /af scan — rescan the open profession") end
 	self:Print(self:Text("SCAN_HELP_FORCE"))
 	self:Print(self:Text("AUTO_AVAILABILITY_HELP_ON"))
 	self:Print(self:Text("AUTO_AVAILABILITY_HELP_OFF"))
@@ -71,11 +73,11 @@ function AF:PrintDevHelp()
 	self:Print(self:Text("DEV_HELP_STATE"))
 	self:Print(self:Text("DEV_HELP_FAKE"))
 	self:Print(self:Text("DEV_HELP_TRAFFIC"))
-	self:Print(self:Text("DEV_HELP_NOTIFY"))
-	self:Print(self:Text("DEV_HELP_FULFILLED"))
-	self:Print(self:Text("DEV_HELP_ORDERS"))
-	self:Print(self:Text("DEV_HELP_SOUND"))
-	self:Print(self:Text("DEV_HELP_ORDERDUMP"))
+	if not self.IsForever then self:Print(self:Text("DEV_HELP_NOTIFY")) end
+	if not self.IsForever then self:Print(self:Text("DEV_HELP_FULFILLED")) end
+	if not self.IsForever then self:Print(self:Text("DEV_HELP_ORDERS")) end
+	if not self.IsForever then self:Print(self:Text("DEV_HELP_SOUND")) end
+	if not self.IsForever then self:Print(self:Text("DEV_HELP_ORDERDUMP")) end
 end
 
 function AF:PrintClearHelp()
@@ -222,18 +224,18 @@ function AF:ClearCharacterScans(characterName)
 	if self.db.advertisingKnown then
 		self.db.advertisingKnown[characterName] = nil
 	end
-	
+
 	if self.activeArtisanCharacter == characterName then
 		self.db.artisanProfile = profile
 	end
-	
+
 	for key in pairs(self.db.professionLinks or {}) do
 		local keyCharacter = tostring(key):match("^(.-):([^:]+)$")
 		if keyCharacter == characterName then
 			self.db.professionLinks[key] = nil
 		end
 	end
-	
+
 	self.activeScan = nil
 	self.pendingAutoScanReason = nil
 	self.autoScanQueued = false
@@ -278,6 +280,10 @@ function AF:HandleDebugSlash(rest)
 		self:Print(self:Text("DEBUG_STATE", self:IsDebugEnabled() and self:Text("ENABLED") or self:Text("DISABLED")))
 	elseif command == "" then
 		self:PrintDebugHelp()
+	elseif command == "trade" then
+        self:SetDebugEnabled(true)
+        if self.PrintTradeChatDiagnostics then self:PrintTradeChatDiagnostics() end
+        self:OpenDebugLogFrame()
 	elseif command == "logs" then
 		if self:IsDebugEnabled() and self.PrintOrderDebugState then
 			self:PrintOrderDebugState()
@@ -336,18 +342,18 @@ function AF:HandleDevSlash(rest)
 		else
 			self:Print(self:Text("DEV_TRAFFIC_STATE", self:IsDevTrafficLogsEnabled() and self:Text("ENABLED") or self:Text("DISABLED")))
 		end
-	elseif command == "notify" then
+	elseif not self.IsForever and command == "notify" then
 		local characterName, count = commandRest:match("^(%S+)%s*(%d*)")
 		if tonumber(characterName) and (not count or count == "") then
 			count = characterName
 			characterName = nil
 		end
 		self:DevNotifyOrder(characterName ~= "" and characterName or self:GetPlayerFullName(), tonumber(count) or 1)
-	elseif command == "fulfilled" then
+	elseif not self.IsForever and command == "fulfilled" then
 		if self.DevNotifyFulfilledOrder then
 			self:DevNotifyFulfilledOrder(commandRest)
 		end
-	elseif command == "orders" then
+	elseif not self.IsForever and command == "orders" then
 		local subcommand, subRest = NormalizeCommand(commandRest)
 		if subcommand == "current" then
 			self:DevSetCurrentOrders(tonumber(subRest) or 1)
@@ -362,14 +368,14 @@ function AF:HandleDevSlash(rest)
 		else
 			self:Print(self:Text("DEV_HELP_ORDERS"))
 		end
-	elseif command == "sound" then
+	elseif not self.IsForever and command == "sound" then
 		local subcommand = NormalizeCommand(commandRest)
 		if subcommand == "order" and self.PlayOrderNotificationSound then
 			self:PlayOrderNotificationSound()
 		else
-			self:Print(self:Text("DEV_HELP_SOUND"))
+			if not self.IsForever then self:Print(self:Text("DEV_HELP_SOUND")) end
 		end
-	elseif command == "orderdump" then
+	elseif not self.IsForever and command == "orderdump" then
 		self:DumpOrderableRecipeData()
 	else
 		self:Print(self:Text("DEV_UNKNOWN", rest))
@@ -379,7 +385,10 @@ end
 
 function AF:HandleSlash(message)
 	local command, rest = NormalizeCommand(message)
-	if command == "scan" then
+    if self.HandleFlavorSlash and self:HandleFlavorSlash(command, rest) then return end
+	if self.IsForever and (command == "" or command == "directory") then
+		self:ToggleCustomerUI()
+	elseif command == "scan" then
 		self:StartOrResumeCurrentProfessionScan(true, false)
 	elseif command == "auto" then
 		if rest == "on" then

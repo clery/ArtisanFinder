@@ -11,6 +11,9 @@ local SUPPORTED_PROFESSIONS = {
 	[755] = true, -- Jewelcrafting
 	[773] = true, -- Inscription
 }
+if AF.IsForever then
+    for _, id in ipairs({182,185,186,356,393,129}) do SUPPORTED_PROFESSIONS[id]=true end
+end
 local PROFESSION_ID_ALIASES = {
 	[5] = 185, -- Midnight Cooking
 	[6] = 186, -- Midnight Mining
@@ -22,6 +25,7 @@ local MIN_COMPATIBLE_SCAN_SIGNATURE_VERSION = 33
 local ApplyDBDefaults
 local legacyReagentDisplayCache = {}
 local BASE_PROFESSION_SPELLS = {
+	[129] = AF.IsForever and 3273 or nil, -- First Aid
 	[164] = 2018, -- Blacksmithing
 	[165] = 2108, -- Leatherworking
 	[171] = 2259, -- Alchemy
@@ -37,6 +41,7 @@ local BASE_PROFESSION_SPELLS = {
 	[773] = 45357, -- Inscription
 }
 local BASE_PROFESSION_NAMES = {
+	[129] = AF.IsForever and "First Aid" or nil,
 	[164] = "Blacksmithing",
 	[165] = "Leatherworking",
 	[171] = "Alchemy",
@@ -232,6 +237,9 @@ local function ClearVolatileCraftFields(item)
 end
 
 local function HasCurrentScanModel(entry)
+	if AF.IsForever and type(entry) == "table" and entry.foreverRecipe == true and tonumber(entry.recipeID) and tonumber(entry.recipeID) > 0 then
+		return true
+	end
 	local facts = type(entry) == "table" and entry.reagentSkillFacts or nil
 	local scanModelVersion = tonumber(AF.SCAN_MODEL_VERSION or 2)
 	return type(entry) == "table"
@@ -342,7 +350,7 @@ end
 -- first, then fall back to local recipe probes when the order form can supply
 -- the schematic and operation info.
 function AF:HasAdvancedReagentFacts(entry)
-	if not HasCurrentScanModel(entry) then
+	if not HasCurrentScanModel(entry) or entry.foreverRecipe then
 		return false
 	end
 	local facts = entry.reagentSkillFacts
@@ -1159,6 +1167,8 @@ function AF:ForEachArtisanProfile(callback)
 end
 
 local PROFILE_CACHE_ITEM_FIELDS = {
+	"foreverRecipe",
+	"reagents",
 	"itemID",
 	"professionID",
 	"recipeID",
@@ -1232,14 +1242,14 @@ local function GetProfileItemNote(entry)
 	return type(entry) == "table" and type(entry.note) == "string" and entry.note ~= "" and entry.note or nil
 end
 
-local function GetProfileItemProfessionLink(AF, characterName, profile, item)
+local function GetProfileItemProfessionLink(addon, characterName, profile, item)
 	local profession = profile and profile.professions and profile.professions[tostring(item and item.professionID or "")]
 	return item and item.professionLink
 		or profession and profession.professionLink
-		or AF:GetRememberedProfessionLink(characterName, item and item.professionID)
+		or addon:GetRememberedProfessionLink(characterName, item and item.professionID)
 end
 
-local function BuildCustomerCacheEntryFromProfileItem(AF, characterName, profile, itemKey, item)
+local function BuildCustomerCacheEntryFromProfileItem(addon, characterName, profile, itemKey, item)
 	if type(item) ~= "table" then
 		return nil
 	end
@@ -1248,8 +1258,8 @@ local function BuildCustomerCacheEntryFromProfileItem(AF, characterName, profile
 	if not itemID or not professionID then
 		return nil
 	end
-	local priceCopper, freeCommission, note = AF:GetItemPriceForProfile(profile, itemID, professionID)
-	local now = AF:Now()
+	local priceCopper, freeCommission, note = addon:GetItemPriceForProfile(profile, itemID, professionID)
+	local now = addon:Now()
 	local entry = {
 		name = characterName,
 		target = characterName,
@@ -1270,13 +1280,13 @@ local function BuildCustomerCacheEntryFromProfileItem(AF, characterName, profile
 	entry.priceCopper = tonumber(priceCopper) or 0
 	entry.freeCommission = freeCommission == true or nil
 	entry.note = note ~= "" and note or nil
-	entry.professionLink = GetProfileItemProfessionLink(AF, characterName, profile, item)
+	entry.professionLink = GetProfileItemProfessionLink(addon, characterName, profile, item)
 	entry.updatedAt = item.updatedAt or profile.updatedAt or now
-	local currentQueryItemID = tonumber(AF.currentCustomerQueryItemID) or tonumber(AF.currentCustomerItemID)
-	if AF.currentCustomerQueryToken and currentQueryItemID == itemID then
-		entry.lastQueryToken = AF.currentCustomerQueryToken
+	local currentQueryItemID = tonumber(addon.currentCustomerQueryItemID) or tonumber(addon.currentCustomerItemID)
+	if addon.currentCustomerQueryToken and currentQueryItemID == itemID then
+		entry.lastQueryToken = addon.currentCustomerQueryToken
 		entry.verifiedAt = now
-		entry.lastQueryAt = AF.lastQueryAt
+		entry.lastQueryAt = addon.lastQueryAt
 	end
 	return entry
 end
@@ -1312,7 +1322,7 @@ function AF:GetLocalArtisanProfile(characterName)
 	return self:NormalizeArtisanProfile(profile, characterName), characterName
 end
 
-local function ApplyCustomerCacheEntryToArtisanProfile(AF, profile, normalizedName, entry)
+local function ApplyCustomerCacheEntryToArtisanProfile(addon, profile, normalizedName, entry)
 	if not profile or type(entry) ~= "table" then
 		return false
 	end
@@ -1332,7 +1342,7 @@ local function ApplyCustomerCacheEntryToArtisanProfile(AF, profile, normalizedNa
 	CopyProfileCacheFields(entry, item)
 	item.itemID = itemID
 	item.professionID = professionID
-	item.updatedAt = incomingUpdated > 0 and incomingUpdated or AF:Now()
+	item.updatedAt = incomingUpdated > 0 and incomingUpdated or addon:Now()
 	ApplyProfileItemCommission(item, entry.priceCopper, entry.freeCommission, entry.commissionSpecified)
 	item.note = GetProfileItemNote(entry)
 	profile.items[itemKey] = item
@@ -1346,7 +1356,7 @@ local function ApplyCustomerCacheEntryToArtisanProfile(AF, profile, normalizedNa
 		profession.professionLink = entry.professionLink
 		item.professionLink = entry.professionLink
 	end
-	AF.db.artisanCharacters[normalizedName] = profile
+	addon.db.artisanCharacters[normalizedName] = profile
 	return true
 end
 
@@ -1485,8 +1495,8 @@ function AF:GetProfessionLinkKey(characterName, professionID)
 	return characterName .. ":" .. professionKey
 end
 
-local function GetLegacyProfessionLinkKey(AF, characterName, professionID)
-	characterName = AF:NormalizeName(characterName)
+local function GetLegacyProfessionLinkKey(addon, characterName, professionID)
+	characterName = addon:NormalizeName(characterName)
 	professionID = tonumber(professionID)
 	if not characterName or not professionID then
 		return nil
@@ -1647,38 +1657,38 @@ local function GetConnectedRealmCacheKey()
 	return key ~= "" and key or nil
 end
 
-local function IsConnectedRealmCacheFresh(AF, cacheEntry)
+local function IsConnectedRealmCacheFresh(addon, cacheEntry)
 	local updatedAt = tonumber(cacheEntry and cacheEntry.updatedAt) or 0
-	return updatedAt > 0 and AF:Now() - updatedAt <= REALM_CONNECTION_CACHE_MAX_AGE
+	return updatedAt > 0 and addon:Now() - updatedAt <= REALM_CONNECTION_CACHE_MAX_AGE
 end
 
-local function GetConnectedRealmKeys(AF)
-	if AF.connectedRealmKeys then
-		return AF.connectedRealmKeys
+local function GetConnectedRealmKeys(addon)
+	if addon.connectedRealmKeys then
+		return addon.connectedRealmKeys
 	end
 
 	local cacheKey = GetConnectedRealmCacheKey()
-	local cached = cacheKey and AF.db and AF.db.connectedRealmCache and AF.db.connectedRealmCache[cacheKey]
+	local cached = cacheKey and addon.db and addon.db.connectedRealmCache and addon.db.connectedRealmCache[cacheKey]
 	local keys = cached and cached.realms
-	if type(keys) == "table" and next(keys) and IsConnectedRealmCacheFresh(AF, cached) then
+	if type(keys) == "table" and next(keys) and IsConnectedRealmCacheFresh(addon, cached) then
 		AddRealmKey(keys, GetRealmName())
 		if GetNormalizedRealmName then
 			AddRealmKey(keys, GetNormalizedRealmName())
 		end
-		AF.connectedRealmKeys = keys
+		addon.connectedRealmKeys = keys
 		return keys
 	end
 
 	keys = BuildConnectedRealmKeys()
-	if cacheKey and AF.db then
-		AF.db.connectedRealmCache = AF.db.connectedRealmCache or {}
-		AF.db.connectedRealmCache[cacheKey] = {
+	if cacheKey and addon.db then
+		addon.db.connectedRealmCache = addon.db.connectedRealmCache or {}
+		addon.db.connectedRealmCache[cacheKey] = {
 			realms = keys,
-			updatedAt = AF:Now(),
+			updatedAt = addon:Now(),
 		}
 	end
 
-	AF.connectedRealmKeys = keys
+	addon.connectedRealmKeys = keys
 	return keys
 end
 
@@ -1703,13 +1713,9 @@ function AF:IsNameOnConnectedRealm(name)
 end
 
 function AF:IsGuildOrderEntry(entry)
-	if not entry or not entry.guildMember then
-		return false
-	end
-	if self:IsNameOnConnectedRealm(entry.orderTarget or entry.name or entry.target) then
-		return false
-	end
-	return Enum.CraftingOrderType.Guild ~= nil
+    if self.IsForever or not entry or not entry.guildMember then return false end
+    if self:IsNameOnConnectedRealm(entry.orderTarget or entry.name or entry.target) then return false end
+    return Enum and Enum.CraftingOrderType and Enum.CraftingOrderType.Guild ~= nil or false
 end
 
 function AF:GetDisplayPlayerName(name)
@@ -1824,7 +1830,9 @@ function AF:GetProfileProfessionScanSummary(profile)
 end
 
 local function GetScanSignatureVersion(signature)
-	return tonumber(tostring(signature or ""):match("^(%d+)|"))
+	local version = tostring(signature or ""):match("^([^|]+)|")
+    -- Retail uses numeric versions; Forever uses its own named scan format.
+    return tonumber(version) or version
 end
 
 local function IsCompatibleScanSignatureVersion(version, currentVersion)
@@ -2060,7 +2068,7 @@ function AF:GetAdvertisingProfessionRows()
 	return rows
 end
 
-function AF:GetProfessionName(professionID, profile)
+function AF:GetProfessionName(professionID, _)
 	professionID = GetSupportedProfessionID(professionID) or GetBaseProfessionID(professionID)
 	local spellID = BASE_PROFESSION_SPELLS[professionID]
 	if spellID then

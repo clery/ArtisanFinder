@@ -5,13 +5,16 @@ on:
     tags:
       - 'v*'
 
-jobs:    
+permissions:
+  contents: write
+
+jobs:
   release:
     runs-on: ubuntu-22.04
     env:
       WAGO_API_TOKEN: ${{ secrets.WAGO_API_TOKEN }}
-      GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}  # "GITHUB_TOKEN" is a secret always provided to the workflow
-                                                 # for your own token, the name cannot start with "GITHUB_"
+      GH_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
     steps:
       - name: Checkout repository and submodules
         uses: actions/checkout@v4
@@ -19,5 +22,14 @@ jobs:
           submodules: recursive
           fetch-depth: 0  # gets entire git history, needed for automatic changelogs
 
-      - name: Package and release
+      - name: Install validation dependencies
+        run: sudo apt-get update && sudo apt-get install -y lua5.1
+
+      - name: Validate both clients before publishing
+        run: python3 Tests/run.py
+
+      - name: Prepare changelog for release services
+        run: python3 Tools/release_changelog.py
+
+      - name: Package and release Retail and Forever
         uses: BigWigsMods/packager@v2

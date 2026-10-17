@@ -1,0 +1,6 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/">
+    <Script file="Customer\Cache.lua"/>
+    <Script file="Customer\Recommendation.lua"/>
+    <Script file="Social\Guild.lua"/>
+    <Script file="Social\WhoStatus.lua"/>
+</Ui>

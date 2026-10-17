@@ -69,9 +69,11 @@ _G.C_Item = {}
 
 LoadAddonFile("Core/Util.lua")
 LoadAddonFile("Core/Data.lua")
-LoadAddonFile("Features/Crafter/RecipeCapability.lua")
+LoadAddonFile("Features/Retail/Crafter/RecipeCapability.lua")
+LoadAddonFile("Features/Crafter/ProfessionRecipes.lua")
 LoadAddonFile("Features/Crafter/Scanner.lua")
 LoadAddonFile("Features/Crafter/UI.lua")
+LoadAddonFile("Features/Retail/Crafter/ReagentControls.lua")
 
 local professionIDs = { 164, 165, 171, 197, 202, 333, 755, 773 }
 local characterCount = 40

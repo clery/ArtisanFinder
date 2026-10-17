@@ -10,7 +10,7 @@ local SCAN_BUILD_PROGRESS_BUDGET_MS = 6
 local SCAN_BUILD_PROGRESS_DELAY = 0.01
 local SCAN_TICK_WARNING_MS = 1000
 local SCAN_GC_STEP_SIZE = 32
-local HEAVY_JOB_QUALITY_TIER_THRESHOLD = AF.HEAVY_JOB_QUALITY_TIER_THRESHOLD
+local HEAVY_JOB_QUALITY_TIER_THRESHOLD = AF.HEAVY_JOB_QUALITY_TIER_THRESHOLD or 12
 local scanBuildYieldState
 local CopyTable = AF.CopyTable
 
@@ -120,9 +120,9 @@ local function GetProfessionEquipmentState(profession)
 	return nil
 end
 
-local function GetProfessionEntry(AF, professionOrID)
+local function GetProfessionEntry(addon, professionOrID)
 	local professionID = type(professionOrID) == "table" and professionOrID.id or professionOrID
-	local profile = AF.db and AF.db.artisanProfile
+	local profile = addon.db and addon.db.artisanProfile
 	return profile and profile.professions and profile.professions[tostring(professionID)]
 end
 
@@ -338,6 +338,10 @@ function AF:PrepareProfessionForScan(profession)
 	professionEntry.parentProfessionID = profession.parentProfessionID
 	professionEntry.skillLineID = profession.skillLineID
 	professionEntry.childProfessionID = profession.childProfessionID
+    if self.IsForever then
+        professionEntry.skillLevel=tonumber(profession.skillLevel)
+        professionEntry.maxSkillLevel=tonumber(profession.maxSkillLevel)
+    end
 	professionEntry.icon = professionEntry.icon or profession.icon
 	professionEntry.updatedAt = self:Now()
 	professionEntry.professionLink = self:CaptureCurrentProfessionLink(profession) or professionEntry.professionLink
@@ -368,9 +372,10 @@ function AF:BuildScanProgress(profession, professionEntry, signature, force, mod
 	local skippedOrderable = 0
 	for _, recipeID in ipairs(recipeIDs) do
 		local recipeInfo = C_TradeSkillUI.GetRecipeInfo(recipeID)
-		local learned = not recipeInfo or recipeInfo.learned ~= false
+		local learned = recipeInfo and recipeInfo.learned == true
+		if not self.IsForever then learned = not recipeInfo or recipeInfo.learned ~= false end
 		if learned then
-			if not self:IsRecipeOrderableForScan(profession, recipeInfo) then
+			if not self.IsForever and not self:IsRecipeOrderableForScan(profession, recipeInfo) then
 				skippedOrderable = skippedOrderable + 1
 			else
 				local outputs = self:GetRecipeOutputItemIDs(recipeID)
@@ -563,6 +568,11 @@ function AF:IsLowerOrEqualEquipmentProbe(existing, probe)
 end
 
 function AF:ScanJob(profession, professionEntry, job)
+	if self.IsForever then return self:ScanForeverRecipeJob(profession,professionEntry,job) end
+	return self:ScanRetailRecipeJob(profession,professionEntry,job)
+end
+
+function AF:ScanRetailRecipeJob(profession, professionEntry, job)
 	if not self:IsOwnProfessionWindowOpen() then
 		self:PauseActiveProfessionScan(true)
 		return false
@@ -924,7 +934,7 @@ function AF:ProcessScanQueue()
 	self.scanProcessing = true
 	self.scanQueueToken = (self.scanQueueToken or 0) + 1
 	local token = self.scanQueueToken
-	local active, professionEntry, progress = self:GetActiveScanProgress()
+	local _, _, progress = self:GetActiveScanProgress()
 	local nextJob = GetNextPendingJob(progress)
 	C_Timer.After(self:GetScanJobDelay(nextJob), function()
 		if token ~= AF.scanQueueToken then
@@ -940,17 +950,17 @@ function AF:ProcessScanQueue()
 			return
 		end
 
-		local active, professionEntry, progress = AF:GetActiveScanProgress()
-		if not active or type(progress) ~= "table" then
+		local active, professionEntry, scanProgress = AF:GetActiveScanProgress()
+		if not active or type(scanProgress) ~= "table" then
 			return
 		end
-		local pending = progress.pending
-		local completed = progress.completed
+		local pending = scanProgress.pending
+		local completed = scanProgress.completed
 		if type(pending) ~= "table" or type(completed) ~= "table" then
 			return
 		end
 
-		local jobsToProcess = AF:GetScanJobsPerTick(GetNextPendingJob(progress))
+		local jobsToProcess = AF:GetScanJobsPerTick(GetNextPendingJob(scanProgress))
 		local tickStarted = GetScanTimeMS()
 		local profession = { id = active.professionID }
 		local processedCount = 0
@@ -958,8 +968,8 @@ function AF:ProcessScanQueue()
 		local slowestJob
 		local slowestJobMS = 0
 		for processed = 1, jobsToProcess do
-			local pendingIndex = GetPendingIndex(progress)
-			local job = GetNextPendingJob(progress)
+			local pendingIndex = GetPendingIndex(scanProgress)
+			local job = GetNextPendingJob(scanProgress)
 			if not job then
 				break
 			end
@@ -976,21 +986,21 @@ function AF:ProcessScanQueue()
 			processedCount = processed
 			lastJob = job
 			if result == "continuing" then
-				progress.updatedAt = AF:Now()
+				scanProgress.updatedAt = AF:Now()
 				break
 			end
-			progress.pendingIndex = pendingIndex + 1
+			scanProgress.pendingIndex = pendingIndex + 1
 			pending[pendingIndex] = nil
-			local pendingKeys = progress.pendingKeys
+			local pendingKeys = scanProgress.pendingKeys
 			if type(pendingKeys) == "table" then
 				pendingKeys[job.key] = nil
 			end
 			completed[job.key] = true
-			progress.completedCount = (tonumber(progress.completedCount) or 0) + 1
+			scanProgress.completedCount = (tonumber(scanProgress.completedCount) or 0) + 1
 			if result ~= "skipped" then
-				progress.scanned = (tonumber(progress.scanned) or 0) + 1
+				scanProgress.scanned = (tonumber(scanProgress.scanned) or 0) + 1
 			end
-			progress.updatedAt = AF:Now()
+			scanProgress.updatedAt = AF:Now()
 			local tickBudget = SCAN_TICK_BUDGET_MS
 			if processed > 0 and GetScanTimeMS() - tickStarted >= tickBudget then
 				break
@@ -1007,12 +1017,12 @@ function AF:ProcessScanQueue()
 				processedCount,
 				jobsToProcess,
 				tostring(active.professionID),
-				tostring(progress.mode),
-				GetPendingCount(progress),
-				GetPendingTotal(progress),
-				tonumber(progress.scanned) or 0,
-				tonumber(progress.completedCount) or 0,
-				tonumber(progress.total) or 0,
+				tostring(scanProgress.mode),
+				GetPendingCount(scanProgress),
+				GetPendingTotal(scanProgress),
+				tonumber(scanProgress.scanned) or 0,
+				tonumber(scanProgress.completedCount) or 0,
+				tonumber(scanProgress.total) or 0,
 				tostring(lastJob and lastJob.kind or ""),
 				tostring(lastJob and lastJob.recipeID or ""),
 				tostring(lastJob and lastJob.itemID or ""),
@@ -1024,8 +1034,8 @@ function AF:ProcessScanQueue()
 		end
 		AF:RefreshScanProgressUI()
 
-		if GetPendingCount(progress) == 0 then
-			AF:CompleteActiveScan(active, professionEntry, progress)
+		if GetPendingCount(scanProgress) == 0 then
+			AF:CompleteActiveScan(active, professionEntry, scanProgress)
 		else
 			AF:ProcessScanQueue()
 		end
@@ -1235,8 +1245,8 @@ function AF:IsKnowledgeApplyPending(professionID)
 	if not professionID then
 		return false
 	end
-	local configID = C_ProfSpecs.GetConfigIDForSkillLine(professionID)
-	return configID and configID ~= 0 and C_Traits.ConfigHasStagedChanges(configID) == true
+	local configID = C_ProfSpecs and C_ProfSpecs.GetConfigIDForSkillLine(professionID)
+	return configID and configID ~= 0 and C_Traits and C_Traits.ConfigHasStagedChanges(configID) == true
 end
 
 function AF:QueueAutoScan(force)
@@ -1382,29 +1392,29 @@ function AF:QueueAutoScanForChange(reason)
 			AF:QueueAutoScanForChange(AF.pendingAutoScanReason or "TRAIT_PENDING")
 			return
 		end
-		local reason = AF.pendingAutoScanReason
-		if AF.deferredProfessionEquipmentSkillLineID and reason == "PROFESSION_EQUIPMENT_CHANGED" then
+		local pendingReason = AF.pendingAutoScanReason
+		if AF.deferredProfessionEquipmentSkillLineID and pendingReason == "PROFESSION_EQUIPMENT_CHANGED" then
 			AF.pendingProfessionEquipmentSkillLineID = AF.deferredProfessionEquipmentSkillLineID
 			AF.deferredProfessionEquipmentSkillLineID = nil
 		end
 		AF.pendingAutoScanReason = nil
 		if AF.knowledgeApplyScanPending then
-			reason = "TRAIT_PENDING_APPLIED"
+			pendingReason = "TRAIT_PENDING_APPLIED"
 			AF.knowledgeApplyScanPending = nil
 		end
-		if reason == "PROFESSION_EQUIPMENT_CHANGED" and not AF:ShouldQueueProfessionEquipmentScan(profession) then
+		if pendingReason == "PROFESSION_EQUIPMENT_CHANGED" and not AF:ShouldQueueProfessionEquipmentScan(profession) then
 			AF.pendingProfessionEquipmentScan = nil
 			return
 		end
-		local force = reason == "FORCE"
+		local force = pendingReason == "FORCE"
 		if force then
 			AF:StartOrResumeCurrentProfessionScan(true, true, "full")
 			return
 		end
-		local shouldStart, forceProbe = AF:ShouldStartAutoScanForReason(reason, profession, currentSignature)
+		local shouldStart, forceProbe = AF:ShouldStartAutoScanForReason(pendingReason, profession, currentSignature)
 		if shouldStart then
-			AF:StartOrResumeCurrentProfessionScan(false, true, "probe", forceProbe, reason)
-			if reason == "PROFESSION_EQUIPMENT_CHANGED" then
+			AF:StartOrResumeCurrentProfessionScan(false, true, "probe", forceProbe, pendingReason)
+			if pendingReason == "PROFESSION_EQUIPMENT_CHANGED" then
 				AF.pendingProfessionEquipmentScan = nil
 			end
 		end

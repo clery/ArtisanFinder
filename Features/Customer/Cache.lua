@@ -32,7 +32,7 @@ local function GetSourceCategorySort(_, entry)
 	return 3
 end
 
-local function GetAvailabilitySort(AF, entry)
+local function GetAvailabilitySort(addon, entry)
 	if not entry then
 		return 3
 	end
@@ -48,10 +48,10 @@ local function GetAvailabilitySort(AF, entry)
 	if entry.unavailableFavorite then
 		return 2
 	end
-	if AF:IsCustomerEntryOnline(entry) then
+	if addon:IsCustomerEntryOnline(entry) then
 		return 0
 	end
-	if AF:IsCustomerEntryOffline(entry) or entry.offlineCached then
+	if addon:IsCustomerEntryOffline(entry) or entry.offlineCached then
 		return 2
 	end
 	return 1
@@ -72,7 +72,7 @@ local function GetSortName(entry)
 	return tostring(entry and (entry.displayName or entry.name) or ""):lower()
 end
 
-local function GetSeenKey(AF, entry)
+local function GetSeenKey(addon, entry)
 	if not entry then
 		return nil
 	end
@@ -80,17 +80,17 @@ local function GetSeenKey(AF, entry)
 		return "trade:" .. tostring(entry.target or entry.name or "") .. ":" .. tostring(entry.professionLink)
 	end
 	if not entry.tradeLead then
-		return AF:GetFavoriteArtisanKey(entry) or entry.orderTarget or entry.name or entry.target
+		return addon:GetFavoriteArtisanKey(entry) or entry.orderTarget or entry.name or entry.target
 	end
 	return entry.target or entry.name
 end
 
-local function MarkSeen(AF, seenNames, entry)
-	local key = GetSeenKey(AF, entry)
+local function MarkSeen(addon, seenNames, entry)
+	local key = GetSeenKey(addon, entry)
 	if key then
 		seenNames[key] = true
 	end
-	local favoriteKey = AF:GetFavoriteArtisanKey(entry)
+	local favoriteKey = addon:GetFavoriteArtisanKey(entry)
 	if favoriteKey then
 		seenNames[favoriteKey] = true
 	end
@@ -113,7 +113,7 @@ local function MarkSeen(AF, seenNames, entry)
 	end
 end
 
-local function EntryMatchesCustomerFilter(AF, entry, filterText)
+local function EntryMatchesCustomerFilter(addon, entry, filterText)
 	if filterText == "" then
 		return true
 	end
@@ -122,13 +122,13 @@ local function EntryMatchesCustomerFilter(AF, entry, filterText)
 		entry.name or "",
 		entry.professionName or "",
 		entry.note or "",
-		AF:FormatMoney(entry.priceCopper, entry.freeCommission),
-		AF:FormatCapability(entry),
+		addon:FormatMoney(entry.priceCopper, entry.freeCommission),
+		addon:FormatCapability(entry),
 	}, " "):lower()
 	return haystack:find(filterText, 1, true)
 end
 
-local function EntryMatchesCustomerContext(AF, entry, itemID, professionID, recipeID)
+local function EntryMatchesCustomerContext(addon, entry, itemID, professionID, recipeID)
 	if not entry then
 		return false
 	end
@@ -136,7 +136,7 @@ local function EntryMatchesCustomerContext(AF, entry, itemID, professionID, reci
 		return false
 	end
 	professionID = tonumber(professionID) or 0
-	if professionID ~= 0 and AF:GetBaseProfessionID(entry.professionID) ~= AF:GetBaseProfessionID(professionID) then
+	if professionID ~= 0 and addon:GetBaseProfessionID(entry.professionID) ~= addon:GetBaseProfessionID(professionID) then
 		return false
 	end
 	recipeID = tonumber(recipeID) or 0
@@ -153,31 +153,31 @@ end
 local FAVORITE_CACHE_ROW_OPTIONS = { unavailableFavorite = true, useOrderTarget = true }
 local OFFLINE_CACHE_ROW_OPTIONS = { offlineCached = true, offlineFallback = true, useOrderTarget = true }
 
-local function RefreshOnlineContact(AF, entry)
+local function RefreshOnlineContact(addon, entry)
 	if not entry or entry.onlineContact ~= true then
 		return entry
 	end
-	local contactName = AF:NormalizeName(entry.target)
-	local crafterName = AF:NormalizeName(entry.orderTarget or entry.name)
+	local contactName = addon:NormalizeName(entry.target)
+	local crafterName = addon:NormalizeName(entry.orderTarget or entry.name)
 	if not contactName or contactName == crafterName then
 		entry.onlineContact = nil
 		return entry
 	end
 	local verifiedAt = tonumber(entry.verifiedAt)
-	if verifiedAt and AF:Now() - verifiedAt <= (tonumber(AF.LIVE_QUERY_TIMEOUT) or 5) then
+	if verifiedAt and addon:Now() - verifiedAt <= (tonumber(addon.LIVE_QUERY_TIMEOUT) or 5) then
 		return entry
 	end
-	local rosterEntry = AF.GetCachedGuildRosterEntry and AF:GetCachedGuildRosterEntry(contactName) or nil
+	local rosterEntry = addon.GetCachedGuildRosterEntry and addon:GetCachedGuildRosterEntry(contactName) or nil
 	if not rosterEntry or rosterEntry.online ~= true then
 		entry.onlineContact = nil
 	end
 	return entry
 end
 
-local function PrepareCachedCustomerEntry(AF, entry, options)
+local function PrepareCachedCustomerEntry(addon, entry, options)
 	local copy = CopyTable(entry)
-	if not AF:IsCurrentScanModelEntry(copy) and AF.MarkScanModelRescanNeeded then
-		AF:MarkScanModelRescanNeeded(copy)
+	if not addon:IsCurrentScanModelEntry(copy) and addon.MarkScanModelRescanNeeded then
+		addon:MarkScanModelRescanNeeded(copy)
 	end
 	copy.certified = true
 	copy.tradeLead = false
@@ -187,8 +187,8 @@ local function PrepareCachedCustomerEntry(AF, entry, options)
 	if options and options.useOrderTarget then
 		copy.target = copy.orderTarget or copy.name
 	end
-	RefreshOnlineContact(AF, copy)
-	copy.professionLink = copy.professionLink or AF:GetRememberedProfessionLink(copy.orderTarget or copy.name, copy.professionID)
+	RefreshOnlineContact(addon, copy)
+	copy.professionLink = copy.professionLink or addon:GetRememberedProfessionLink(copy.orderTarget or copy.name, copy.professionID)
 	return copy
 end
 
@@ -201,23 +201,23 @@ local function ClearGuildAffiliation(entry)
 	return entry
 end
 
-local function GetOnlineImportedArtisanContact(AF, characterName, profile)
-	if type(profile) ~= "table" or profile.importedAlt ~= true or not AF.GetRememberedArtisanContact or not AF.GetCachedGuildRosterEntry then
+local function GetOnlineImportedArtisanContact(addon, characterName, profile)
+	if type(profile) ~= "table" or profile.importedAlt ~= true or not addon.GetRememberedArtisanContact or not addon.GetCachedGuildRosterEntry then
 		return nil, nil
 	end
-	local guildKey = AF.GetCurrentGuildCacheKey and AF:GetCurrentGuildCacheKey() or nil
-	local contactName = AF:GetRememberedArtisanContact(characterName, guildKey)
+	local guildKey = addon.GetCurrentGuildCacheKey and addon:GetCurrentGuildCacheKey() or nil
+	local contactName = addon:GetRememberedArtisanContact(characterName, guildKey)
 	if not contactName or contactName == characterName then
 		return nil, nil
 	end
-	local rosterEntry = AF:GetCachedGuildRosterEntry(contactName)
+	local rosterEntry = addon:GetCachedGuildRosterEntry(contactName)
 	if rosterEntry and rosterEntry.online == true then
 		return contactName, rosterEntry
 	end
 	return nil, nil
 end
 
-local function MarkGuildAffiliation(AF, entry)
+local function MarkGuildAffiliation(addon, entry)
 	if not entry then
 		return entry
 	end
@@ -225,62 +225,62 @@ local function MarkGuildAffiliation(AF, entry)
 		return ClearGuildAffiliation(entry)
 	end
 
-	local rosterEntry = AF:GetCachedGuildRosterEntry(entry.orderTarget or entry.name or entry.target)
+	local rosterEntry = addon:GetCachedGuildRosterEntry(entry.orderTarget or entry.name or entry.target)
 	if rosterEntry then
 		entry.guildMember = true
 		entry.guildOnline = rosterEntry.online
 		entry.guildMemberGUID = rosterEntry.guid
-		entry.guildKey = AF.GetCurrentGuildCacheKey and AF:GetCurrentGuildCacheKey() or entry.guildKey
+		entry.guildKey = addon.GetCurrentGuildCacheKey and addon:GetCurrentGuildCacheKey() or entry.guildKey
 		return entry
 	end
 
 	return ClearGuildAffiliation(entry)
 end
 
-local function AddCachedAddonGuildMemberRows(AF, rows, itemCache, itemID, professionID, recipeID, filterText, seenNames)
-	local now = AF:Now()
+local function AddCachedAddonGuildMemberRows(addon, rows, itemCache, itemID, professionID, recipeID, filterText, seenNames)
+	local now = addon:Now()
 	for _, entry in pairs(itemCache or {}) do
 		local updatedAt = tonumber(entry and entry.updatedAt) or 0
-		local seenKey = GetSeenKey(AF, entry)
+		local seenKey = GetSeenKey(addon, entry)
 		if entry
 			and seenKey
 			and not seenNames[seenKey]
 			and entry.tradeLead ~= true
 			and not entry.debug
 			and updatedAt > 0
-			and now - updatedAt <= AF.CACHE_MAX_AGE
-			and EntryMatchesCustomerContext(AF, entry, itemID, professionID, recipeID)
-			and EntryMatchesCustomerFilter(AF, entry, filterText)
+			and now - updatedAt <= addon.CACHE_MAX_AGE
+			and EntryMatchesCustomerContext(addon, entry, itemID, professionID, recipeID)
+			and EntryMatchesCustomerFilter(addon, entry, filterText)
 		then
-			local rosterEntry = AF:GetCachedGuildRosterEntry(entry.orderTarget or entry.name or entry.target)
+			local rosterEntry = addon:GetCachedGuildRosterEntry(entry.orderTarget or entry.name or entry.target)
 			if rosterEntry then
-				local rowEntry = PrepareCachedCustomerEntry(AF, entry)
-				MarkGuildAffiliation(AF, rowEntry)
+				local rowEntry = PrepareCachedCustomerEntry(addon, entry)
+				MarkGuildAffiliation(addon, rowEntry)
 				rowEntry.unavailableCached = true
 				rowEntry.availabilityState = "unavailable"
 				rowEntry.customerSource = "cached-addon-guild"
-				if AF:IsCustomerEntryOrderEligible(rowEntry) then
+				if addon:IsCustomerEntryOrderEligible(rowEntry) then
 					table.insert(rows, rowEntry)
-					MarkSeen(AF, seenNames, rowEntry)
+					MarkSeen(addon, seenNames, rowEntry)
 				end
 			end
 		end
 	end
 end
 
-local function PrepareOwnAltOrderEligibility(AF, entry)
+local function PrepareOwnAltOrderEligibility(addon, entry)
 	if not entry or not entry.ownAlt then
 		return true
 	end
 	if entry.importedAlt == true then
 		return true
 	end
-	if AF:IsNameOnConnectedRealm(entry.orderTarget or entry.name or entry.target) then
-		MarkGuildAffiliation(AF, entry)
+	if addon:IsNameOnConnectedRealm(entry.orderTarget or entry.name or entry.target) then
+		MarkGuildAffiliation(addon, entry)
 		return true
 	end
 
-	MarkGuildAffiliation(AF, entry)
+	MarkGuildAffiliation(addon, entry)
 	return entry.guildMember == true
 end
 

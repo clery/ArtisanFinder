@@ -16,3 +16,23 @@ Libs/LibMarkdown/LibStub/*
 .release/
 release.sh
 setup-packager.sh
+
+# Forever worktree includes its runtime dependencies for local installation.
+!Libs/LibStub/
+!Libs/LibStub/**
+!Libs/CallbackHandler-1.0/
+!Libs/CallbackHandler-1.0/**
+!Libs/LibDataBroker-1.1/
+!Libs/LibDataBroker-1.1/**
+!Libs/LibDBIcon-1.0/
+!Libs/LibDBIcon-1.0/**
+!Libs/ChatThrottleLib/
+!Libs/ChatThrottleLib/**
+!Libs/LibSerialize/
+!Libs/LibSerialize/**
+!Libs/LibDeflate/
+!Libs/LibDeflate/**
+
+!Libs/LibEditMode/
+!Libs/LibEditMode/**
+**/__pycache__/

@@ -105,3 +105,30 @@ Check(summaries[1]:match("Blacksmithing") ~= nil, "summary should include stale 
 Check(summaries[1]:match("Leatherworking") == nil, "summary should omit compatible usable profession")
 
 print("deprecated scan summary tests: PASS")
+
+-- Exercise actual Forever signature generation against the shared status path.
+LoadAddonFile("Flavors/Forever.lua")
+LoadAddonFile("Features/Forever/RecipeCapability.lua")
+LoadAddonFile("Features/Crafter/ProfessionRecipes.lua")
+AF.GetProfessionRecipeSignature = function() return "2001,2002" end
+local profession = {id=164}
+profession.scanSignature = AF:GetCurrentProfessionScanSignature(profession)
+local foreverProfile = {
+    characterName="Test Crafter", professions={["164"]=profession},
+    items={["1001"]={itemID=1001, recipeID=2001, professionID=164,
+        foreverRecipe=true, scanModelVersion=AF.SCAN_MODEL_VERSION}},
+}
+local foreverSummary=AF:GetProfileProfessionScanSummary(foreverProfile)
+Check(not AF:IsDeprecatedScannedProfession(foreverProfile,164,profession), "fresh Forever scan is current")
+Check(not AF:IsDeprecatedScannedProfession(foreverProfile,164,profession,foreverSummary), "cached summary agrees with fresh status")
+profession.scanSignature="forever-0|164|2001"
+Check(AF:IsDeprecatedScannedProfession(foreverProfile,164,profession), "older Forever format remains outdated")
+profession.scanSignature="34|legacy-retail"
+Check(AF:IsDeprecatedScannedProfession(foreverProfile,164,profession), "Retail format cannot satisfy Forever scan version")
+profession.scanSignature=nil
+Check(AF:IsDeprecatedScannedProfession(foreverProfile,164,profession), "missing signature still needs scanning")
+profession.scanSignature=AF:GetCurrentProfessionScanSignature(profession)
+AF.db={artisanCharacters={["Test Crafter"]=foreverProfile}}
+AF.ForEachArtisanProfile=function(self,callback) callback("Test Crafter",foreverProfile) end
+Check(#AF:GetDeprecatedScanSummaries()==0,"fresh Forever scans do not produce startup warnings")
+print("Forever scan freshness tests: PASS")

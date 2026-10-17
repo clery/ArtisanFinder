@@ -419,4 +419,17 @@ Check(AF.db.professionLinks["Crafter-Realm:164"] == professionLink, "import shou
 Check(AF.db.advertising["Crafter-Realm"]["164"] == false, "import should preserve false settings")
 Check(AF.db.advertisingKnown["Crafter-Realm"]["164"] == true, "import should preserve true settings")
 
-print("transfer payload tests: PASS")
+local function fullNameProfile()
+	return {profile={professions={["164"]={id=164}},items={},professionPrices={}}}
+end
+AF.DecodeArtisanTransferPayload=function()
+	return {artisans={["Fess Oakenshield"]=fullNameProfile(),["Fess Stormcaller"]=fullNameProfile()}}
+end
+AF.IsForever=false
+local retailNames=AF:ImportArtisanTransferPayload("fixture")
+Check(retailNames.skippedInvalid==2,"Retail still requires its realm-qualified transfer identity")
+AF.IsForever=true
+local foreverNames=AF:ImportArtisanTransferPayload("fixture")
+Check(foreverNames.addedArtisans==2,"Forever imports distinct surnames without a server suffix")
+Check(AF.db.artisanCharacters["Fess Oakenshield"] and AF.db.artisanCharacters["Fess Stormcaller"],"full names stay distinct after import")
+print("transfer payload tests: PASS including separate Forever full-name identities")

@@ -61,6 +61,9 @@ local function GetEntryWhoName(entry)
 end
 
 local function GetWhoResultName(result)
+	if AF.IsForever and result and not result.fullName and AF.CombineForeverName then
+		return AF:CombineForeverName(result.Name or result.name,result.surname)
+	end
 	return AF:NormalizeName(result and (result.fullName or result.Name or result.name))
 end
 
@@ -69,6 +72,7 @@ local function IsWhoResultMatch(requestedName, result)
 	if resultName == requestedName then
 		return true
 	end
+	if AF.IsForever then return resultName and requestedName and resultName:lower()==requestedName:lower() end
 	local requestedBase = tostring(requestedName or ""):match("^([^-]+)")
 	local resultBase = tostring(resultName or ""):match("^([^-]+)")
 	return requestedBase and resultBase and requestedBase:lower() == resultBase:lower()
@@ -82,6 +86,9 @@ local function EntryMatchesWhoName(entry, name)
 	local baseName = tostring(normalizedName or name):match("^([^-]+)")
 	local orderTarget = AF:NormalizeName(entry.orderTarget or entry.name)
 	local target = AF:NormalizeName(entry.target)
+	if AF.IsForever then
+		return normalizedName and ((orderTarget and orderTarget:lower()==normalizedName:lower()) or (target and target:lower()==normalizedName:lower())) or false
+	end
 	local orderBase = tostring(orderTarget or ""):match("^([^-]+)")
 	local targetBase = tostring(target or ""):match("^([^-]+)")
 	return orderTarget == normalizedName
@@ -95,7 +102,7 @@ local function RefreshWhoUi()
 		AF:RefreshCustomerWhoLoadingIndicators()
 	end
 	if AF.RefreshCustomerResults then
-		AF:RefreshCustomerResults()
+		AF:RequestCustomerResultsRefresh()
 	end
 end
 
@@ -215,8 +222,8 @@ local function StartManualWhoQuery(name)
 			AF:UpdateCustomerWhoRefreshButtons()
 		end)
 	end
-	pcall(C_FriendList.SetWhoToUi, false)
-	local ok = pcall(C_FriendList.SendWho, request.query, Enum.SocialWhoOrigin.Social)
+	pcall(C_FriendList and C_FriendList.SetWhoToUi or SetWhoToUI, false)
+	local ok = pcall(C_FriendList and C_FriendList.SendWho or SendWho, request.query, Enum and Enum.SocialWhoOrigin and Enum.SocialWhoOrigin.Social)
 	if ok then
 		local token = request
 		C_Timer.After(WHO_RESPONSE_TIMEOUT, function()
@@ -230,7 +237,7 @@ end
 
 function AF:InitializeWhoStatus()
 	self.whoStatus = self.whoStatus or {}
-	pcall(C_AddOns.LoadAddOn, "Blizzard_FriendsFrame")
+	pcall(C_AddOns and C_AddOns.LoadAddOn or LoadAddOn, "Blizzard_FriendsFrame")
 	EnsureWhoFrame()
 	if ChatFrame_AddMessageEventFilter and not self.whoStatusChatFilterRegistered then
 		ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", SuppressOwnWhoSystemMessage)
@@ -433,7 +440,7 @@ function AF:RefreshCustomerEntryWhoStatus(entry)
 		status.online = true
 		status.checkedAt = self:Now()
 		self:MarkCustomerWhoOnline(name)
-		self:RefreshCustomerResults()
+		self:RequestCustomerResultsRefresh()
 	end
 
 	if self.RefreshCustomerWhoLoadingIndicators then

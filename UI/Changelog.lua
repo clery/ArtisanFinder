@@ -1,45 +1,5 @@
 local addonName, AF = ...
 
-AF.CHANGELOG_FALLBACK_VERSION = "2.1.4"
-AF.CHANGELOG_RECENT_ENTRIES = {
-	{
-		version = "2.1.4",
-		key = "CHANGELOG_ENTRY_2_1_4",
-	},
-	{
-		version = "2.1.3",
-		key = "CHANGELOG_ENTRY_2_1_3",
-	},
-	{
-		version = "2.1.2",
-		key = "CHANGELOG_ENTRY_2_1_2",
-	},
-	{
-		version = "2.1.1",
-		key = "CHANGELOG_ENTRY_2_1_1",
-	},
-	{
-		version = "2.1.0",
-		key = "CHANGELOG_ENTRY_2_1_0",
-	},
-	{
-		version = "2.0.5",
-		key = "CHANGELOG_ENTRY_2_0_5",
-	},
-	{
-		version = "2.0.3",
-		key = "CHANGELOG_ENTRY_2_0_3",
-	},
-	{
-		version = "2.0.2",
-		key = "CHANGELOG_ENTRY_2_0_2",
-	},
-	{
-		version = "2.0.1",
-		key = "CHANGELOG_ENTRY_2_0_1",
-	},
-}
-
 local CHANGELOG_CONTENT_WIDTH = 500
 local CHANGELOG_CONTENT_SCROLLBAR_GUTTER = 28
 local CHANGELOG_CONTENT_SCROLL_WIDTH = CHANGELOG_CONTENT_WIDTH + CHANGELOG_CONTENT_SCROLLBAR_GUTTER
@@ -113,14 +73,15 @@ function AF:GetChangelogEntries(sinceVersion)
 		if IsVersionNewerThan(entry.version, sinceVersion) then
 			table.insert(entries, {
 				version = entry.version,
-				content = self:Text(entry.key),
+				content = entry.content or self:Text(entry.key),
 			})
 		end
 	end
 	if #entries == 0 then
 		table.insert(entries, {
 			version = self:GetAddonVersion(),
-			content = self:Text("CHANGELOG_ENTRY_2_1_4"),
+			content = self.CHANGELOG_RECENT_ENTRIES and self.CHANGELOG_RECENT_ENTRIES[1]
+				and (self.CHANGELOG_RECENT_ENTRIES[1].content or self:Text(self.CHANGELOG_RECENT_ENTRIES[1].key)) or "",
 		})
 	end
 	return entries
@@ -167,10 +128,10 @@ local function TrimLeft(text)
 	return tostring(text or ""):gsub("^%s+", "")
 end
 
-local function StripChangelogVersionHeading(AF, entry)
+local function StripChangelogVersionHeading(addon, entry)
 	local content = TrimLeft(entry and entry.content or "")
-	local version = entry and entry.version or AF:Text("CHANGELOG_UNRELEASED")
-	local heading = AF:Text("CHANGELOG_VERSION", version)
+	local version = entry and entry.version or addon:Text("CHANGELOG_UNRELEASED")
+	local heading = addon:Text("CHANGELOG_VERSION", version)
 	local escapedHeading = heading:gsub("([^%w])", "%%%1")
 	content = content:gsub("^#%s*" .. escapedHeading .. "%s*\n+", "", 1)
 	content = content:gsub("^" .. escapedHeading .. "%s*\n+", "", 1)
@@ -186,24 +147,24 @@ local function FindChangelogEntry(entries, version)
 	return entries and entries[1] or nil
 end
 
-local function BuildChangelogMarkdownEntry(AF, entry)
+local function BuildChangelogMarkdownEntry(addon, entry)
 	if not entry then
 		return ""
 	end
 	local lines = {}
-	local content = StripChangelogVersionHeading(AF, entry)
+	local content = StripChangelogVersionHeading(addon, entry)
 	if content ~= "" then
 		AddLine(lines, content)
 	end
 	return table.concat(lines, "\n")
 end
 
-local function BuildChangelogTextEntry(AF, entry)
+local function BuildChangelogTextEntry(addon, entry)
 	if not entry then
 		return ""
 	end
 	local lines = {}
-	local content = StripChangelogVersionHeading(AF, entry)
+	local content = StripChangelogVersionHeading(addon, entry)
 	if content ~= "" then
 		AddLine(lines, content)
 	end
@@ -414,7 +375,53 @@ function AF:BuildChangelogText(sinceVersion, selectedVersion)
 	return BuildChangelogTextEntry(self, entry)
 end
 
+-- Forever uses only SimpleHTML's supported tags, without depending on a
+-- separately registered Markdown library or its list/paragraph conventions.
+local function BuildNativeChangelogHTML(text)
+    local function inline(value)
+        value = value:gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;")
+        value = value:gsub("%[([^%]]+)%]%(([^%)]+)%)", function(label, url)
+            return '<a href="' .. url:gsub('"', "&quot;") .. '">' .. label .. '</a>'
+        end)
+        value = value:gsub("%*%*(.-)%*%*", "|cffffd100%1|r")
+        value = value:gsub("__(.-)__", "|cffffd100%1|r")
+        value = value:gsub("`([^`]+)`", "|cffcccccc%1|r")
+        value = value:gsub("%*([^*]+)%*", "|cffdddddd%1|r")
+        return value
+    end
+    local output, paragraph = {"<html><body>"}, {}
+    local function flush()
+        if #paragraph > 0 then
+            output[#output+1] = "<p>" .. inline(table.concat(paragraph, " ")) .. "</p>"
+            paragraph = {}
+        end
+    end
+    for line in (text:gsub("\r\n", "\n") .. "\n"):gmatch("(.-)\n") do
+        local heading, title = line:match("^%s*(#+)%s+(.+)$")
+        local bullet = line:match("^%s*[%-%*%+]%s+(.+)$")
+        local number, numbered = line:match("^%s*(%d+)[%.)]%s+(.+)$")
+        if heading then
+            flush()
+            local level = math.min(3, #heading)
+            output[#output+1] = "<h"..level..">"..inline(title).."</h"..level..">"
+        elseif bullet or numbered then
+            flush()
+            output[#output+1] = "<p>" .. (bullet and "• " or number..". ") .. inline(bullet or numbered) .. "</p>"
+        elseif line:match("^%s*$") then
+            flush()
+        else
+            paragraph[#paragraph+1] = line
+        end
+    end
+    flush()
+    output[#output+1] = "</body></html>"
+    return table.concat(output, "\n")
+end
+
 function AF:BuildChangelogHTML(sinceVersion, selectedVersion)
+    if self.IsForever then
+        return BuildNativeChangelogHTML(self:BuildChangelogMarkdown(sinceVersion, selectedVersion))
+    end
 	local markdown = GetLibMarkdown()
 	if not markdown then
 		return nil
@@ -427,7 +434,7 @@ function AF:BuildChangelogHTML(sinceVersion, selectedVersion)
 	return nil
 end
 
-local function RefreshChangelogDrawer(AF, frame, entries, selectedVersion)
+local function RefreshChangelogDrawer(addon, frame, entries, selectedVersion)
 	local buttonStep = CHANGELOG_DRAWER_BUTTON_HEIGHT + CHANGELOG_DRAWER_BUTTON_SPACING
 	for index, entry in ipairs(entries or {}) do
 		local button = frame.versionButtons[index]
@@ -436,12 +443,12 @@ local function RefreshChangelogDrawer(AF, frame, entries, selectedVersion)
 			button:SetSize(frame.drawerButtonWidth or CHANGELOG_DRAWER_BUTTON_WIDTH, CHANGELOG_DRAWER_BUTTON_HEIGHT)
 			button:SetPoint("TOPLEFT", 0, -((index - 1) * buttonStep))
 			button:SetScript("OnClick", function(self)
-				AF:RefreshChangelogFrame(frame.sinceVersion, self.entryVersion)
+				addon:RefreshChangelogFrame(frame.sinceVersion, self.entryVersion)
 			end)
 			frame.versionButtons[index] = button
 		end
 		button.entryVersion = entry.version
-		button:SetText(entry.version or AF:Text("CHANGELOG_UNRELEASED"))
+		button:SetText(entry.version or addon:Text("CHANGELOG_UNRELEASED"))
 		button:Show()
 		if button.entryVersion == selectedVersion then
 			button:LockHighlight()
@@ -487,7 +494,7 @@ function AF:RefreshChangelogFrame(sinceVersion, selectedVersion)
 	selectedVersion = selectedEntry and selectedEntry.version or nil
 	frame.sinceVersion = sinceVersion
 	frame.selectedChangelogVersion = selectedVersion
-	frame.title:SetText(self:Text("CHANGELOG_TITLE"))
+	frame.title:SetText(self:Text("CHANGELOG_TITLE") .. " — " .. (self.flavor or "Retail"))
 	frame.versionText:SetText(self:Text("CHANGELOG_VERSION", selectedVersion or version))
 	frame.description:SetText(self:Text("CHANGELOG_DESCRIPTION"))
 	frame.acknowledge:SetText(self:Text("CHANGELOG_ACKNOWLEDGE"))
@@ -627,8 +634,8 @@ function AF:CreateChangelogFrame()
 		frame:Hide()
 	end)
 
-	frame:SetScript("OnHide", function(self)
-		AF:MarkChangelogSeen(self.changelogVersion)
+	frame:SetScript("OnHide", function(widget)
+		AF:MarkChangelogSeen(widget.changelogVersion)
 	end)
 
 	table.insert(UISpecialFrames, "ArtisanFinderChangelogFrame")
