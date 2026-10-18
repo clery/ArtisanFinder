@@ -37,6 +37,22 @@ function AF:ConfigureCrafterPanel()
     self:InstallForeverMoneyInput(self.crafterFrame)
     self:EnsureForeverDiscoveryTab()
     local panel=self.crafterDefaultsFrame
+    -- Match the warm, restrained hierarchy of the discovery table without
+    -- changing the shared panel's dimensions or native control anchors.
+    for _,header in ipairs({panel.defaultsHeader,panel.itemSectionHeader,panel.scanHeader,panel.advertisingHeader}) do
+        if header then header:SetTextColor(1,.82,.36) end
+    end
+    for _,section in ipairs({panel,self.crafterFrame}) do
+        for _,label in ipairs({section.priceLabel,section.noteLabel}) do
+            if label then label:SetTextColor(.78,.74,.64) end
+        end
+    end
+    for _,divider in ipairs({panel.itemDivider,panel.scanDivider,panel.advertisingDivider}) do
+        if divider then
+            divider:SetVertexColor(.72,.57,.31)
+            divider:SetAlpha(.48)
+        end
+    end
     if panel and not panel.foreverDiscoveryBackground then
         panel.foreverDiscoveryBackground=true
         -- Keep the atlas coordinates: resetting them samples the whole atlas sheet.

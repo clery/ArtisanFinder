@@ -24,12 +24,11 @@ local function icon(parent,texture,title,action,help)
     local button=CreateFrame("Button",nil,parent) button:SetSize(22,22)
     local art=button:CreateTexture(nil,"ARTWORK") art:SetAllPoints()
     if texture:sub(1,6)=="atlas:" then art:SetAtlas(texture:sub(7)) else art:SetTexture(texture) end
-    local glow=button:CreateTexture(nil,"HIGHLIGHT")
-    glow:SetAllPoints(art)
-    if texture:sub(1,6)=="atlas:" then glow:SetAtlas(texture:sub(7)) else glow:SetTexture(texture) end
-    glow:SetBlendMode("ADD") glow:SetAlpha(.2)
-    button:SetHighlightTexture(glow) button.art=art
+    button.art=art
+    art:SetVertexColor(.88,.88,.88)
     button:SetScript("OnClick",action) tip(button,title,help)
+    button:HookScript("OnEnter",function() art:SetVertexColor(1,1,1) end)
+    button:HookScript("OnLeave",function() art:SetVertexColor(.88,.88,.88) end)
     return button
 end
 local function sortedIDs(values)
@@ -37,10 +36,10 @@ local function sortedIDs(values)
 end
 local function sourceText(source) return AF:GetForeverDiscoverySourceLabel(source) end
 local function columns(width)
-    local profession=width*.23
+    local profession=width*.285
     local professionWidth=6*ROW_PROFESSION_ICON_SIZE+5*4+12
     local source=profession+professionWidth
-    return profession,source,source+150,source+240
+    return profession,source,source+150,source+250
 end
 local function showItemMatches(owner,matches)
     if #matches==0 or not MenuUtil then
@@ -266,9 +265,15 @@ function AF:InitializeCustomerUI() self:AttachCustomerUI() end
 function AF:AttachCustomerUI()
     if self.customerFrame then return end
     local frame=CreateFrame("Frame","ArtisanFinderDirectory",UIParent,"PortraitFrameTemplate")
-    frame:SetSize(840,620) frame:SetPoint("CENTER") frame:SetFrameStrata("HIGH")
+    local screenWidth=UIParent:GetWidth()
+    local panelWidth=type(screenWidth)=="number" and math.min(920,math.max(840,screenWidth-32)) or 920
+    frame:SetSize(panelWidth,620)
+    if type(screenWidth)=="number" and screenWidth>0 and screenWidth<panelWidth+24 then
+        frame:SetScale((screenWidth-24)/panelWidth)
+    end
+    frame:SetPoint("CENTER") frame:SetFrameStrata("HIGH")
     frame:SetClampedToScreen(true) frame:SetMovable(true) frame:EnableMouse(true) frame:RegisterForDrag("LeftButton")
-    frame:SetScript("OnDragStart",function(owner) owner:StartMoving() end)
+    frame:SetScript("OnDragStart",function(owner) if owner:IsMovable() then owner:StartMoving() end end)
     frame:SetScript("OnDragStop",function(owner) owner:StopMovingOrSizing() end)
     frame:SetTitle("ArtisanFinder")
     frame:SetPortraitToAsset("Interface\\AddOns\\"..(AF.ADDON_NAME or "ArtisanFinder").."\\Assets\\Icon.png")
@@ -279,9 +284,9 @@ function AF:AttachCustomerUI()
     frame.inset:SetPoint("TOPLEFT",7,-35) frame.inset:SetPoint("BOTTOMRIGHT",-7,37)
     frame.inset:EnableMouse(false)
     frame.scroll=CreateFrame("ScrollFrame",nil,frame,"ScrollFrameTemplate")
-    frame.scroll:SetPoint("TOPLEFT",12,-40) frame.scroll:SetPoint("BOTTOMRIGHT",-34,42)
+    frame.scroll:SetPoint("TOPLEFT",12,-40-HEADER) frame.scroll:SetPoint("BOTTOMRIGHT",-34,42)
     frame.scroll.ScrollBar:ClearAllPoints()
-    frame.scroll.ScrollBar:SetPoint("TOPRIGHT",frame,"TOPRIGHT",-12,-40)
+    frame.scroll.ScrollBar:SetPoint("TOPRIGHT",frame,"TOPRIGHT",-12,-40-HEADER)
     frame.scroll.ScrollBar:SetPoint("BOTTOMRIGHT",frame,"BOTTOMRIGHT",-12,42)
     frame.scroll.ScrollBar:SetHideIfUnscrollable(true)
     frame.content=CreateFrame("Frame",nil,frame.scroll) frame.content:SetSize(690,540) frame.scroll:SetScrollChild(frame.content)
@@ -291,7 +296,7 @@ function AF:AttachCustomerUI()
     frame.watermark:SetSize(250,250) frame.watermark:SetPoint("BOTTOMRIGHT",-24,28)
     frame.watermark:SetTexture("Interface\\AddOns\\"..(AF.ADDON_NAME or "ArtisanFinder").."\\Assets\\Icon.png")
     frame.watermark:SetDesaturated(true) frame.watermark:SetAlpha(.035)
-    frame.header=CreateFrame("Frame",nil,frame.content) frame.header:SetPoint("TOPLEFT") frame.header:SetSize(690,HEADER)
+    frame.header=CreateFrame("Frame",nil,frame) frame.header:SetPoint("TOPLEFT",12,-40) frame.header:SetSize(690,HEADER)
     frame.header.shade=frame.header:CreateTexture(nil,"BACKGROUND") frame.header.shade:SetAllPoints()
     frame.header.shade:SetColorTexture(.075,.047,.018,.92)
     frame.header.rule=frame.header:CreateTexture(nil,"BORDER")
@@ -325,7 +330,7 @@ function AF:AttachCustomerUI()
         local kind,id,link=GetCursorInfo()
         if kind=="item" then ClearCursor() box:SetText(link or tostring(id)) AF:SelectCustomerItem(id) end
     end)
-    frame.empty=label(frame.content,"",12,-HEADER-24,640,nil,MUTED)
+    frame.empty=label(frame.content,"",12,-24,640,nil,MUTED)
     frame.footer=CreateFrame("Frame",nil,frame)
     frame.footer:SetPoint("BOTTOMLEFT",8,7) frame.footer:SetPoint("BOTTOMRIGHT",-8,7) frame.footer:SetHeight(28)
     frame.footer:EnableMouse(false)
@@ -470,7 +475,7 @@ function AF:RefreshCustomerResults(statusOverride)
     for _,column in ipairs({{frame.profession,profession},{frame.discovered,source},{frame.price,price},{frame.observed,observed}}) do
         column[1]:ClearAllPoints() column[1]:SetPoint("TOPLEFT",column[2],-10)
     end
-    frame.artisan:ClearAllPoints() frame.artisan:SetPoint("TOPLEFT",64,-10) frame.artisan:SetWidth(profession-88) frame.profession:SetWidth(source-profession-30)
+    frame.artisan:ClearAllPoints() frame.artisan:SetPoint("TOPLEFT",64,-10) frame.artisan:SetWidth(profession-76) frame.profession:SetWidth(source-profession-30)
     frame.discovered:SetWidth(price-source-48) frame.price:SetWidth(observed-price-12) frame.observed:SetWidth(width-observed-10)
     frame.profession:SetWidth(math.min(frame.profession:GetStringWidth() or (source-profession-30),source-profession-30))
     frame.discovered:SetWidth(math.min(frame.discovered:GetStringWidth() or (price-source-48),price-source-48))
@@ -483,15 +488,22 @@ function AF:RefreshCustomerResults(statusOverride)
     frame.professionValue:SetText(self.directoryProfession and self:GetProfessionName(self.directoryProfession) or self:Text("FOREVER_ALL"))
     frame.sourceValue:SetText(self.directorySource and sourceText(self.directorySource) or self:Text("FOREVER_ALL"))
     frame.count:SetText(self:Text("FOREVER_ARTISAN_COUNT",#rows))
+    for _,control in ipairs({{frame.professionFilter,frame.professionValue,self.directoryProfession},
+        {frame.sourceFilter,frame.sourceValue,self.directorySource}}) do
+        local active=control[3]~=nil
+        control[1].art:SetDesaturated(not active)
+        control[1]:SetAlpha(active and 1 or .65)
+        control[2]:SetTextColor(unpack(active and GOLD or MUTED))
+    end
     frame.search:SetWidth(width-24)
     frame.empty:SetShown(#rows==0) frame.empty:SetText(self:Text("FOREVER_DIRECTORY_EMPTY"))
     local pages=math.max(1,math.ceil(#rows/PAGE))
     self.directoryPage=math.max(1,math.min(pages,self.directoryPage or 1))
     local first=(self.directoryPage-1)*PAGE+1
     local last=math.min(first+PAGE-1,#rows)
-    local baseRowHeight=math.max(28,math.floor((height-HEADER-28)/PAGE))
+    local baseRowHeight=math.max(28,math.floor((height-28)/PAGE))
     local expandedRows=self:BuildForeverExpandedRows(rows,first,last,filter,build)
-    local rowOffset=HEADER
+    local rowOffset=0
     local visible=0
     for index,view in ipairs(expandedRows) do
         visible=visible+1 local group=view.group
@@ -506,9 +518,19 @@ function AF:RefreshCustomerResults(statusOverride)
             and row.view.professionID==view.professionID and row.entry.itemID==group.entry.itemID
         row.group,row.entry,row.view=group,group.entry,view row:ClearAllPoints() row:SetPoint("TOPLEFT",0,-rowOffset)
         rowOffset=rowOffset+rowHeight
-        row:SetSize(width,rowHeight) row.shade:SetColorTexture(.24,.15,.04,view.kind=="profession" and .34 or (index%2==0 and .18 or .05))
+        row:SetSize(width,rowHeight)
+        if view.kind=="artisan" then
+            row.shade:SetColorTexture(.12,.08,.025,index%2==0 and .8 or .58)
+            row.rule:SetColorTexture(.52,.36,.14,.3)
+        elseif view.kind=="profession" then
+            row.shade:SetColorTexture(.31,.21,.065,.36)
+            row.rule:SetColorTexture(.52,.36,.14,.2)
+        else
+            row.shade:SetColorTexture(.08,.06,.025,index%2==0 and .28 or .12)
+            row.rule:SetColorTexture(.52,.36,.14,.09)
+        end
         local y=-math.floor((rowHeight-ROW_FONT_SIZE)/2)
-        for _,cell in ipairs({{row.name,12,profession-24},{row.professions,profession,source-profession-10},{row.source,source,price-source-10},{row.price,price,observed-price-12},{row.updatedAt,observed,width-observed-115}}) do
+        for _,cell in ipairs({{row.name,12,profession-24},{row.professions,profession,source-profession-10},{row.source,source,price-source-10},{row.price,price,observed-price-12},{row.updatedAt,observed,math.max(40,width-observed-108)}}) do
             cell[1]:ClearAllPoints() cell[1]:SetPoint("TOPLEFT",cell[2],y) cell[1]:SetWidth(cell[3])
         end
         local depth=view.kind=="artisan" and 0 or (view.kind=="profession" and 1 or 2)
@@ -529,11 +551,13 @@ function AF:RefreshCustomerResults(statusOverride)
             title=row.craftLink
         end
         row.name:SetText(title)
-        row.name:SetTextColor(unpack(view.kind=="profession" and GOLD or {1,.94,.82}))
+        row.name:SetTextColor(unpack(view.kind=="profession" and GOLD or (view.kind=="artisan" and {1,.96,.85} or {.86,.83,.75})))
         local priceContext
         if view.kind=="profession" then priceContext=false elseif view.kind=="craft" then priceContext=row.entry.itemID end
         row.priceText,row.priceDetails=self:GetForeverDirectoryPrice(group,priceContext)
         row.price:SetText(row.priceText)
+        row.price:SetJustifyH("RIGHT")
+        row.price:SetTextColor(unpack(#row.priceDetails>0 and {.95,.85,.6} or MUTED))
         row.professions:ClearAllPoints() row.professions:SetPoint("TOPLEFT",profession,-math.floor((rowHeight-ROW_PROFESSION_ICON_SIZE)/2))
         row.source:SetText(view.kind=="artisan" and sourceText(group.source) or "")
         local crafterName=view.kind=="profession" and self:NormalizeName(group.entry.orderTarget or group.entry.name or group.entry.target)
@@ -576,7 +600,7 @@ function AF:RefreshCustomerResults(statusOverride)
             button:Show()
         end
         for professionIndex=#professionIDs+1,#row.professionButtons do row.professionButtons[professionIndex]:Hide() end
-        row.source:SetTextColor(unpack(group.source=="ADDON" and {.64,.82,.9} or {.85,.75,.55}))
+        row.source:SetTextColor(unpack(MUTED))
         local observedAge=self:FormatForeverObservedAge(group.updatedAt)
         local lifetime=group.source=="TRADE" and (tonumber(self.db.tradeLeadMinutes) or 15)*60 or 300
         local historical=group.updatedAt>0 and not group.entry.ownAlt and self:Now()-group.updatedAt>lifetime

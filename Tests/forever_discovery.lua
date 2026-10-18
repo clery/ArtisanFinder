@@ -73,6 +73,16 @@ assert(browser:GetRememberedProfessionLink("Crafter Surname",333)==crafter.db.ar
 local rows=browser:GetDirectoryEntries("")
 assert(#rows==1 and rows[1].professionID==333 and rows[1].name=="Crafter Surname")
 assert(browser:GetForeverNameplateObservation("Crafter Surname").source=="ADDON")
+browser.db.linkedInnDiscoveries={["Crafter Surname"]={updatedAt=now+1,expiresAt=now+600,professions={[165]={}}}}
+local observation=browser:GetForeverNameplateObservation("Crafter Surname")
+assert(observation.source=="ADDON" and observation.professions[333] and not observation.professions[165],
+    "native advertisement wins over newer Linked Inn observation without mixing professions")
+local nativeExpiry=presence.expiresAt
+presence.expiresAt=now
+observation=browser:GetForeverNameplateObservation("Crafter Surname")
+assert(observation.source=="LINKEDINN" and observation.professions[165] and not observation.professions[333],
+    "expired native advertisement falls back to valid Linked Inn observation")
+presence.expiresAt=nativeExpiry
 local sent=crafter.sends
 crafter:OnAddonMessage(crafter.PREFIX,"FQ|FF1","CHANNEL","Browser Surname") flush()
 assert(crafter.sends==sent,"requests throttled per peer")
@@ -81,6 +91,10 @@ crafter:RefreshForeverDiscovery() flush()
 assert(browser.db.foreverDiscoveries["Crafter Surname"].expiresAt==now+360,"heartbeat refreshes expiry")
 crafter.available=false crafter:RefreshForeverDiscovery(true)
 assert(not browser.db.foreverDiscoveries["Crafter Surname"],"availability off withdraws presence")
+assert(browser:GetForeverNameplateObservation("Crafter Surname").source=="LINKEDINN",
+    "native withdrawal removes native presence while retaining independent Linked Inn observation")
+browser.db.linkedInnDiscoveries=nil
+assert(not browser:GetForeverNameplateObservation("Crafter Surname"),"native withdrawal cannot leave an advertising icon without another source")
 crafter.available=true crafter:RefreshForeverDiscovery(true)
 now=now+361
 assert(not browser:GetForeverNameplateObservation("Crafter Surname"),"expired presence cannot leave overhead icon")

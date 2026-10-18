@@ -250,14 +250,15 @@ function AF:GetForeverNameplateObservation(fullName)
 	fullName = self:NormalizeName(fullName)
 	if not fullName or not self.db then return nil end
 	local now, professions, expiresAt = self:Now(), {}, 0
+    -- Direct advertisements take precedence over third-party observations.
+    local presence = self.db.foreverDiscoveries and self.db.foreverDiscoveries[fullName]
+    if presence and (tonumber(presence.expiresAt) or 0) > now then
+        return {professions=presence.professions, source="ADDON", expiresAt=presence.expiresAt}
+    end
     local linked = self.db.linkedInnDiscoveries and self.db.linkedInnDiscoveries[fullName]
     if linked and (tonumber(linked.expiresAt) or 0)>now then
         local ids={} for id in pairs(linked.professions or {}) do ids[id]=true end
         return {professions=ids,source="LINKEDINN",expiresAt=linked.expiresAt}
-    end
-    local presence = self.db.foreverDiscoveries and self.db.foreverDiscoveries[fullName]
-    if presence and (tonumber(presence.expiresAt) or 0) > now then
-        return {professions=presence.professions, source="ADDON", expiresAt=presence.expiresAt}
     end
 	local function add(id, expiry)
 		id=tonumber(id)

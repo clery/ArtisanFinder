@@ -70,7 +70,7 @@ function AF:InstallForeverMoneyInput(panel)
         end)
         box:SetScript("OnLeave",function() GameTooltip:Hide() end)
         box.coin=box:CreateTexture(nil,"ARTWORK")
-        box.coin:SetSize(12,14) box.coin:SetAtlas(textures[index])
+        box.coin:SetSize(14,16) box.coin:SetAtlas(textures[index])
     end
     local function layout()
         local width=math.max(184,field:GetWidth())

@@ -43,7 +43,7 @@ local function object()
   SetSize=function(s,w,h)s.width=w s.height=h end,GetWidth=function(s)return s.width end,GetHeight=function(s)return s.height end,
   SetPoint=function(s,...)s.point={...}end,SetWidth=function(s,w)s.width=w end,
   SetText=function(s,t)s.text=t end,GetText=function(s)return s.text end,
-  SetTextColor=function(s,...)s.color={...} end,SetRotation=function(s,value)s.rotation=value end,
+  SetTextColor=function(s,...)s.color={...} end,SetJustifyH=function(s,value)s.justifyH=value end,SetVertexColor=function(s,...)s.vertexColor={...} end,SetRotation=function(s,value)s.rotation=value end,
   SetScript=function(s,k,v)s.scripts[k]=v end,
   GetScript=function(s,k)return s.scripts[k] end,
   HookScript=function(s,key,fn)
@@ -63,9 +63,9 @@ local function object()
  return o
 end
 UIParent=object() UISpecialFrames={}
-CreateFrame=function(_,name,_,template)
+CreateFrame=function(_,name,parent,template)
  created=created+1
- local o=object()
+ local o=object() o.parent=parent
  if template=="BasicFrameTemplateWithInset" then o.TitleText=object() end
  if template=="ScrollFrameTemplate" then o.ScrollBar=object() end
  if template=="SearchBoxTemplate" then
@@ -106,6 +106,27 @@ check(AF.customerFrame.previous.point[4]==-180 and AF.customerFrame.next.point[4
 check(AF.customerFrame.scroll.point[4]==nil and AF.customerFrame.scroll.point[2]==-34,"table uses full width with only frame and scrollbar gutters")
 check(AF.customerFrame.scroll.ScrollBar.point[2]==AF.customerFrame and AF.customerFrame.scroll.ScrollBar.point[4]==-12,"scrollbar stays inside the panel")
 check(#AF:GetVisibleCustomerEntries()==3,"standalone UI renders known artisans")
+check(AF.customerFrame.header.parent==AF.customerFrame,"search and headers stay outside scrolling content")
+check(AF.customerFrame.scroll.ScrollBar.scripts.OnEnter==nil,"scrollbar has no row hover hooks")
+check(AF.customerRows[1].point[3]==0,"first row starts immediately below the pinned header")
+check(AF.customerRows[1].price.justifyH=="RIGHT","commissions align on the right edge of their column")
+AF.customerFrame.scroll:SetSize(874,456)
+AF:RefreshCustomerResults()
+check(AF.customerRows[1].name:GetWidth()>200,"full names receive more width while retaining six profession icons")
+check(AF.customerRows[1].updatedAt:GetWidth()>80,"last observed retains room beside fixed hover controls")
+local pinnedHeader=AF.customerFrame.header.point
+AF.customerFrame.scroll:SetVerticalScroll(250)
+check(AF.customerFrame.header.point==pinnedHeader,"scrolling expanded crafts leaves header anchors unchanged")
+local visualRow=AF.customerRows[1]
+visualRow.star.scripts.OnEnter(visualRow.star)
+check(visualRow.star.art.vertexColor[1]==1,"hover brightens the icon itself")
+visualRow.star.scripts.OnLeave(visualRow.star)
+check(visualRow.star.art.vertexColor[1]<1,"leaving restores restrained icon brightness")
+AF.directorySource="TRADE" AF:RefreshCustomerResults()
+check(AF.customerFrame.sourceValue.color[1]==1,"active source filter uses gold text")
+AF.directorySource=nil AF:RefreshCustomerResults()
+check(AF.customerFrame.sourceValue.color[1]<1,"clearing source filter restores muted text")
+print("PASS pinned discovery headers, wider names, price alignment, icon brightness and active filters")
 local allocated=created
 AF:RefreshCustomerResults()
 check(created==allocated,"refresh reuses rows")

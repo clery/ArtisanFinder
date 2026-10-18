@@ -21,7 +21,9 @@ function AF:DetachForeverDiscovery(restorePage)
     self.directoryInProfessions=nil
     local frame=self.customerFrame
     frame:Hide() frame:SetParent(state.parent)
-    frame:ClearAllPoints() frame:SetSize(state.width,state.height)
+    frame:SetMovable(state.movable)
+    if state.professionTitle then state.professionTitle:SetShown(state.professionTitleShown) end
+    frame:ClearAllPoints() frame:SetSize(state.width,state.height) frame:SetScale(state.scale)
     for _,point in ipairs(state.points) do frame:SetPoint(unpack(point)) end
     frame:SetFrameStrata(state.strata)
     ProfessionsFrame:SetSize(state.professionWidth,state.professionHeight)
@@ -38,17 +40,22 @@ function AF:ShowForeverDiscoveryTab()
     self:AttachCustomerUI()
     local frame=self.customerFrame
     local points={} for index=1,frame:GetNumPoints() do points[index]={frame:GetPoint(index)} end
+    local professionTitle=ProfessionsFrame:GetTitleText()
     self.directoryInProfessions={parent=frame:GetParent(),points=points,width=frame:GetWidth(),height=frame:GetHeight(),
-        strata=frame:GetFrameStrata(),professionWidth=ProfessionsFrame:GetWidth(),professionHeight=ProfessionsFrame:GetHeight(),
-        bookShown=ProfessionsFrame.BookPage:IsShown()}
+        scale=frame:GetScale(),strata=frame:GetFrameStrata(),professionWidth=ProfessionsFrame:GetWidth(),professionHeight=ProfessionsFrame:GetHeight(),
+        bookShown=ProfessionsFrame.BookPage:IsShown(),movable=frame:IsMovable(),
+        professionTitle=professionTitle,professionTitleShown=professionTitle and professionTitle:IsShown()}
     ProfessionsFrame:RightTabSelected(self.foreverDiscoveryTab)
     self.foreverDiscoveryTab:SetChecked(true)
     ProfessionsFrame.BookPage:Hide() ProfessionsFrame.CraftingPage:Hide()
+    if professionTitle then professionTitle:Hide() end
+    frame:StopMovingOrSizing()
+    frame:SetMovable(false)
     if self.crafterDefaultsFrame then self.crafterDefaultsFrame:Hide() end
     if self.crafterDefaultsCollapseButton then self.crafterDefaultsCollapseButton:Hide() end
     self:UpdateCrafterRightTabs(false)
-    ProfessionsFrame:SetSize(840,620)
-    frame:SetParent(ProfessionsFrame) frame:ClearAllPoints()
+    ProfessionsFrame:SetSize(frame:GetWidth(),620)
+    frame:SetParent(ProfessionsFrame) frame:SetScale(1) frame:ClearAllPoints()
     frame:SetPoint("TOPLEFT",ProfessionsFrame,"TOPLEFT",0,0)
     frame:SetPoint("BOTTOMRIGHT",ProfessionsFrame,"BOTTOMRIGHT",0,0)
     frame:SetFrameStrata(ProfessionsFrame:GetFrameStrata())
