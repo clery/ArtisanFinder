@@ -44,7 +44,12 @@ for _,flavor in ipairs({"Retail","Forever"}) do
     AF.RefreshCrafterUIScanSafe=function() crafter=crafter+1 end
     C_Timer={After=function(_,fn) fn() end}
     AF:OnItemDataLoaded(100,true)
-    assert(order==1 and directory==1 and crafter==1,"shared item-data handler dispatches all consumers")
+    assert(order==1 and directory==1 and crafter==0,"unrelated item data retains consumers without rebuilding crafter UI")
+    AF.crafterFrame={artisanFinderLoadedContext={itemID=100}}
+    AF:OnItemDataLoaded(100,true)
+    assert(order==2 and directory==2 and crafter==1,"missing crafter output still refreshes")
+    AF:OnItemDataLoaded(100,false)
+    assert(order==2 and directory==2 and crafter==1,"failed item data does not rebuild panels")
 end
 local AF={db={},Now=function() return 1000 end,QueueDiscoveryChannelJoin=function() end}
 load("Flavors/Forever.lua",AF) load("Core/Bootstrap.lua",AF)

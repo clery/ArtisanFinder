@@ -637,7 +637,7 @@ function PreparationObjectiveTrackerMixin:InitModule()
 	self:UpdateSearchButton()
 end
 
-function PreparationObjectiveTrackerMixin:OnEvent(eventName, eventData)
+function PreparationObjectiveTrackerMixin:OnEvent(eventName, eventData, success)
 	if eventName == "PLAYER_INTERACTION_MANAGER_FRAME_SHOW" or eventName == "PLAYER_INTERACTION_MANAGER_FRAME_HIDE" then
 		if not Enum or not Enum.PlayerInteractionType or eventData == Enum.PlayerInteractionType.Auctioneer then
 			self:UpdateSearchButton()
@@ -654,6 +654,20 @@ function PreparationObjectiveTrackerMixin:OnEvent(eventName, eventData)
 	-- prepared crafts are displayed.
 	if GetPreparationCount() == 0 then
 		return
+	end
+	if eventName == "GET_ITEM_INFO_RECEIVED" or eventName == "ITEM_DATA_LOAD_RESULT" then
+		if success == false then return end
+		local itemID = ToSafeNumber(eventData)
+		if not itemID then return end
+		local relevant = false
+		for _, entry in ipairs(GetPreparationEntries()) do
+			if tonumber(entry.itemID) == itemID then relevant = true; break end
+			for _, reagent in ipairs(entry.reagents or {}) do
+				if tonumber(reagent.itemID) == itemID then relevant = true; break end
+			end
+			if relevant then break end
+		end
+		if not relevant then return end
 	end
 	self:MarkDirty()
 end

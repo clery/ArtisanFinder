@@ -817,6 +817,8 @@ function AF:AddReagentLines(tooltip, reagents, r, g, b, options)
 						added = true
 					else
 						requestedItemData = true
+						self.pendingReagentItemIDs = self.pendingReagentItemIDs or {}
+						self.pendingReagentItemIDs[itemID] = true
 					end
 				end
 			end
@@ -956,23 +958,44 @@ function AF:GetDisplayItemName(itemID, fallback)
 	return self:GetItemName(itemID) or fallback or self:Text("ITEM_FALLBACK")
 end
 
-function AF:OnItemDataLoaded(...)
-    if self.OnDirectoryItemDataLoaded then self:OnDirectoryItemDataLoaded(...) end
+function AF:OnItemDataLoaded(itemID, success)
+	if success == false then return end
+	if self.OnDirectoryItemDataLoaded then self:OnDirectoryItemDataLoaded(itemID, success) end
 	if self.OnOrderNotificationItemDataLoaded then
-		self:OnOrderNotificationItemDataLoaded(...)
+		self:OnOrderNotificationItemDataLoaded(itemID, success)
 	end
+	itemID = tonumber(itemID)
+	if not itemID then return end
+	local pending = self.pendingReagentItemIDs
+	local refreshCustomer = pending and pending[itemID]
+	if refreshCustomer then
+		pending[itemID] = nil
+		self.pendingReagentItemData = next(pending) and true or nil
+	end
+	refreshCustomer = refreshCustomer or tonumber(self.currentCustomerItemID) == itemID
+	local crafter = self.crafterFrame
+	local context = crafter and crafter.artisanFinderLoadedContext
+	local refreshCrafter = context and tonumber(context.itemID) == itemID and not crafter.artisanFinderItemLink
+	if not refreshCustomer and not refreshCrafter then return end
+	self.pendingCustomerItemRefresh = self.pendingCustomerItemRefresh or refreshCustomer
+	if refreshCrafter then self.pendingCrafterItemRefresh = itemID end
 	if self.itemDataRefreshQueued then
 		return
 	end
 	self.itemDataRefreshQueued = true
 	C_Timer.After(0.1, function()
 		AF.itemDataRefreshQueued = nil
-		local refreshCustomerResults = AF.pendingReagentItemData
-		AF.pendingReagentItemData = nil
-		if refreshCustomerResults and AF.RefreshCustomerResults then
+		local refreshCustomerResults = AF.pendingCustomerItemRefresh
+		local crafterItemID = AF.pendingCrafterItemRefresh
+		AF.pendingCustomerItemRefresh, AF.pendingCrafterItemRefresh = nil, nil
+		local customer = AF.customerFrame
+		if refreshCustomerResults and customer and customer:IsVisible() and AF.RefreshCustomerResults then
 			AF:RefreshCustomerResults()
 		end
-		if AF.RefreshCrafterUIScanSafe then
+		local frame = AF.crafterFrame
+		local current = frame and frame.artisanFinderLoadedContext
+		if crafterItemID and current and tonumber(current.itemID) == crafterItemID
+			and AF:IsOwnProfessionWindowOpen() and AF.RefreshCrafterUIScanSafe then
 			AF:RefreshCrafterUIScanSafe()
 		end
 	end)
