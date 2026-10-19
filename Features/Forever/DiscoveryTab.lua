@@ -11,8 +11,18 @@ function AF:PositionForeverDiscoveryTab()
     tab:SetPoint("TOPLEFT",last,"BOTTOMLEFT",0,-2)
     tab:SetFrameStrata(ProfessionsFrame:GetFrameStrata())
     tab:SetFrameLevel(ProfessionsFrame:GetFrameLevel()+20)
-    tab:SetChecked(self.directoryInProfessions~=nil)
+    tab.tooltipText="ArtisanFinder - "..self:Text("FOREVER_DISCOVERY_OPTIONS")
+    tab:SetChecked(self.directoryInProfessions~=nil and self.customerFrame.directoryTab~="agreements")
     tab:Show()
+    local agreements=self.foreverAgreementsTab
+    if agreements then
+        agreements:ClearAllPoints() agreements:SetPoint("TOPLEFT",tab,"BOTTOMLEFT",0,-2)
+        agreements:SetFrameStrata(ProfessionsFrame:GetFrameStrata())
+        agreements:SetFrameLevel(ProfessionsFrame:GetFrameLevel()+20)
+        agreements:SetChecked(self.directoryInProfessions~=nil and self.customerFrame.directoryTab=="agreements")
+        agreements:Show()
+    end
+    if self.PositionForeverDirectoryTabs then self:PositionForeverDirectoryTabs() end
 end
 
 function AF:DetachForeverDiscovery(restorePage)
@@ -28,6 +38,8 @@ function AF:DetachForeverDiscovery(restorePage)
     frame:SetFrameStrata(state.strata)
     ProfessionsFrame:SetSize(state.professionWidth,state.professionHeight)
     self.foreverDiscoveryTab:SetChecked(false)
+    if self.foreverAgreementsTab then self.foreverAgreementsTab:SetChecked(false) end
+    if self.PositionForeverDirectoryTabs then self:PositionForeverDirectoryTabs() end
     if restorePage~=false then
         ProfessionsFrame.BookPage:SetShown(state.bookShown)
         ProfessionsFrame.CraftingPage:SetShown(not state.bookShown)
@@ -35,9 +47,11 @@ function AF:DetachForeverDiscovery(restorePage)
     end
 end
 
-function AF:ShowForeverDiscoveryTab()
-    if self.directoryInProfessions then return end
+function AF:ShowForeverDiscoveryTab(kind)
+    kind=kind=="agreements" and "agreements" or "discovery"
+    if self.directoryInProfessions then self:SelectForeverDirectoryTab(kind) return end
     self:AttachCustomerUI()
+    if self.SelectForeverDirectoryTab then self:SelectForeverDirectoryTab(kind) end
     local frame=self.customerFrame
     local points={} for index=1,frame:GetNumPoints() do points[index]={frame:GetPoint(index)} end
     local professionTitle=ProfessionsFrame:GetTitleText()
@@ -54,7 +68,7 @@ function AF:ShowForeverDiscoveryTab()
     if self.crafterDefaultsFrame then self.crafterDefaultsFrame:Hide() end
     if self.crafterDefaultsCollapseButton then self.crafterDefaultsCollapseButton:Hide() end
     self:UpdateCrafterRightTabs(false)
-    ProfessionsFrame:SetSize(frame:GetWidth(),620)
+    ProfessionsFrame:SetSize(frame:GetWidth(),frame:GetHeight())
     frame:SetParent(ProfessionsFrame) frame:SetScale(1) frame:ClearAllPoints()
     frame:SetPoint("TOPLEFT",ProfessionsFrame,"TOPLEFT",0,0)
     frame:SetPoint("BOTTOMRIGHT",ProfessionsFrame,"BOTTOMRIGHT",0,0)
@@ -70,20 +84,30 @@ function AF:EnsureForeverDiscoveryTab()
     self.foreverDiscoveryTab=tab
     tab:EnableMouse(true)
     tab:SetFillToInterior(true)
-    tab.tooltipText="ArtisanFinder"
+    tab.tooltipText="ArtisanFinder - "..self:Text("FOREVER_DISCOVERY_OPTIONS")
     tab.Icon:SetTexture("Interface\\AddOns\\"..(self.ADDON_NAME or "ArtisanFinder").."\\Assets\\Icon.png")
     tab:SetID(100)
     tab:SetCustomOnMouseUpHandler(function(_,button,upInside)
         if button=="LeftButton" and upInside then AF:ShowForeverDiscoveryTab() end
     end)
+    local agreements=CreateFrame("Frame",nil,ProfessionsFrame,"LargeSideTabButtonTemplate")
+    self.foreverAgreementsTab=agreements
+    agreements:EnableMouse(true) agreements:SetFillToInterior(true)
+    agreements.tooltipText="ArtisanFinder - "..self:Text("AGREEMENT_TAB")
+    agreements.Icon:SetTexture("Interface\\Icons\\INV_Scroll_03")
+    agreements.notificationBadgeInsideTab=true agreements:SetID(101)
+    agreements:SetCustomOnMouseUpHandler(function(_,button,inside)
+        if button=="LeftButton" and inside then AF:ShowForeverDiscoveryTab("agreements") end
+    end)
     hooksecurefunc(ProfessionsFrame,"RightTabSelected",function(_,selected)
-        if selected~=tab then AF:DetachForeverDiscovery(false) tab:SetChecked(false) end
+        if selected~=tab and selected~=agreements then AF:DetachForeverDiscovery(false) tab:SetChecked(false) end
     end)
     hooksecurefunc(ProfessionsFrame,"RefreshRightTabs",function() AF:PositionForeverDiscoveryTab() end)
     ProfessionsFrame:HookScript("OnHide",function() AF:DetachForeverDiscovery() end)
     self:AttachCustomerUI()
     self.customerFrame:HookScript("OnHide",function() AF:DetachForeverDiscovery() end)
     self:PositionForeverDiscoveryTab()
+    if self.RefreshAgreementUnreadIndicator then self:RefreshAgreementUnreadIndicator() end
 end
 
 function AF:UpdateCrafterRightTabs(_)

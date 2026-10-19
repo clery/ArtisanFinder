@@ -1,5 +1,12 @@
 # ArtisanFinder
 
+## [v2.2.0](https://github.com/clery/ArtisanFinder/releases/tag/v2.2.0) (2026-10-19)
+
+### Fixed
+- Personal-order notifications now carry recipe and profession identifiers so item and profession names can be resolved in the receiving player's language.
+- Oversized legacy notification messages retain their identifiers while dropping display-name fallbacks, or stop safely if they still exceed the message limit.
+- Item-data updates refresh only the affected panels and tracked crafts, reducing unnecessary work.
+
 ## [v2.1.5](https://github.com/clery/ArtisanFinder/releases/tag/v2.1.5) (2026-10-18)
 
 - ArtisanFinder now supports Retail and WoW Forever in the same download, with features tailored to each version.

@@ -1,5 +1,48 @@
 local _, AF = ...
 
+-- Mouse-transparent child frames keep counters above button artwork and highlights.
+function AF:SetNotificationCountBadge(button, count)
+	if not button then return end
+	count = math.max(0, math.floor(tonumber(count) or 0))
+	local badge = button.artisanFinderNotificationBadge
+	if not badge then
+		badge = CreateFrame("Frame", nil, button)
+		badge:EnableMouse(false)
+		badge:SetPoint("TOPRIGHT", button, "TOPRIGHT", 4, 4)
+		local background = badge:CreateTexture(nil, "BACKGROUND")
+		background:SetPoint("CENTER")
+		background:SetTexture("Interface\\CHARACTERFRAME\\TempPortraitAlphaMask")
+		background:SetVertexColor(0.85, 0.04, 0.04, 1)
+		badge.background = background
+		local text = badge:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+		text:SetAllPoints()
+		text:SetJustifyH("CENTER")
+		text:SetJustifyV("MIDDLE")
+		text:SetTextColor(1, 1, 1, 1)
+		badge.text = text
+		button.artisanFinderNotificationBadge = badge
+	end
+	if button.notificationBadgeInsideTab then
+		badge:ClearAllPoints()
+		badge:SetPoint("TOPRIGHT", button, "TOPRIGHT", -2, -2)
+	end
+	badge:SetFrameLevel(button:GetFrameLevel() + 10)
+	badge:SetSize(count > 9 and 23 or 18, 18)
+	badge.background:SetSize(count > 9 and 19 or 14, 14)
+	badge.text:SetText(count > 9 and "9+" or tostring(count))
+	badge:SetShown(count > 0)
+	return badge
+end
+
+function AF:RefreshNotificationCountBadges()
+	local count = self.GetAgreementUnreadCount and self:GetAgreementUnreadCount() or 0
+	local minimap = self.minimapIcon and self.minimapIcon:GetMinimapButton("ArtisanFinder")
+	self:SetNotificationCountBadge(minimap, count)
+	self:SetNotificationCountBadge(self.standaloneMinimapButton, count)
+	self:SetNotificationCountBadge(self.customerFrame and self.customerFrame.agreements, count)
+	self:SetNotificationCountBadge(self.foreverAgreementsTab, count)
+end
+
 local MINIMAP_ICON = "Interface\\AddOns\\ArtisanFinder\\Assets\\MinimapIcon.tga"
 local STANDALONE_ICON = "Interface\\AddOns\\ArtisanFinder\\Assets\\MinimapStandaloneIcon.tga"
 local MINIMAP_ICON_SIZE = 18
@@ -265,6 +308,8 @@ function AF:InitializeStandaloneMinimapButton()
 	button:RegisterForClicks("LeftButtonUp", "RightButtonUp", "MiddleButtonUp")
 	button:SetClampedToScreen(true)
 	button.icon:SetTexture(STANDALONE_ICON)
+	button.artisanFinderOutdatedBadge:ClearAllPoints()
+	button.artisanFinderOutdatedBadge:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", 6, -4)
 	button:SetScript("OnClick", function(widget, clickButton)
 		HandleMinimapClick(widget, clickButton)
 	end)
@@ -279,6 +324,7 @@ function AF:InitializeStandaloneMinimapButton()
 		GameTooltip:Hide()
 	end)
 	self.standaloneMinimapButton = button
+	self:RefreshNotificationCountBadges()
 end
 
 function AF:GetStandaloneMinimapButton()
@@ -354,6 +400,7 @@ function AF:HasOutdatedScannedRows()
 end
 
 function AF:RefreshMinimapBadge()
+	self:RefreshNotificationCountBadges()
 	local button = GetMinimapButton()
 	if not button then
 		return
@@ -362,7 +409,7 @@ function AF:RefreshMinimapBadge()
 		local badge = button:CreateTexture(nil, "OVERLAY", nil, 7)
 		badge:SetTexture(OUTDATED_BADGE_TEXTURE)
 		badge:SetSize(19, 19)
-		badge:SetPoint("TOPRIGHT", button, "TOPRIGHT", 8, 7)
+		badge:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", 8, -4)
 		button.artisanFinderOutdatedBadge = badge
 	end
 	button.artisanFinderOutdatedBadge:SetShown(self:HasOutdatedScannedRows())

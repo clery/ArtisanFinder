@@ -72,3 +72,109 @@ L.FOREVER_TUTORIAL_PAGES = "使用箭头切换工匠页。在表格内滚动查�
 L.FOREVER_TUTORIAL_RESET = "教程已重置。打开目录或专业即可再次查看。信息图标可随时重新打开帮助。"
 
 L.FOREVER_TUTORIAL_END_HINT = "再次点击此信息图标可结束教程。"
+
+-- Private crafting agreements
+L.AGREEMENT_TITLE = "制造协议"
+L.AGREEMENT_TOAST_TITLE = "制造协议"
+L.AGREEMENT_REQUEST = "请求制造"
+L.AGREEMENT_SLASH_HELP = "/af agreements - 打开私人制造协议"
+L.AGREEMENT_INCOMING = "收到的"
+L.AGREEMENT_OUTGOING = "发出的"
+L.AGREEMENT_DRAFT = "未发送的草稿"
+L.AGREEMENT_PENDING = "待处理"
+L.AGREEMENT_COUNTEROFFERED = "还价"
+L.AGREEMENT_ACCEPTED = "已接受"
+L.AGREEMENT_COMPLETED = "已完成"
+L.AGREEMENT_DECLINED = "已拒绝"
+L.AGREEMENT_CANCELLED = "已取消"
+L.AGREEMENT_EXPIRED = "已过期"
+L.AGREEMENT_AWAITING_CONFIRMATION = "等待完成确认"
+L.AGREEMENT_WAITING_DELIVERY = "等待送达确认"
+L.AGREEMENT_CONTACT = "联系人：%s"
+L.AGREEMENT_CRAFTING_CHARACTER = "制造角色：%s"
+L.AGREEMENT_QUANTITY = "制造次数"
+L.AGREEMENT_TOTAL_COMMISSION = "总佣金（留空表示未指定）"
+L.AGREEMENT_MESSAGE = "可选留言"
+L.AGREEMENT_MATERIALS = "材料 · 拥有 / 所需 · 缺少"
+L.AGREEMENT_MATERIAL_UNKNOWN = "? / %d · 缺少数量未知"
+L.AGREEMENT_MATERIAL_LINE = "%s · %d / %d · 缺少 %d"
+L.AGREEMENT_MORE_MATERIALS = "另有 %d 种材料（悬停查看全部）"
+L.AGREEMENT_OUTPUT = "产出：%d–%d 件物品"
+L.AGREEMENT_DRAFT_HELP = "协议仅记录双方意向。制造、交易和付款仍需手动完成。佣金为零表示免费。"
+L.AGREEMENT_UNSUPPORTED = "尚未确认对方支持此功能。发送将保存未发送的草稿；也可密语联系工匠。"
+L.AGREEMENT_UNKNOWN_CRAFT = "未知制造"
+L.AGREEMENT_EMPTY = "此列表中没有协议。"
+L.AGREEMENT_LIST_COUNT = "%d 份协议 · 滚动浏览"
+L.AGREEMENT_NOTIFICATION = "制造协议已更新：%s"
+L.AGREEMENT_QUANTITY_ERROR = "请输入 1–999 次制造。"
+L.AGREEMENT_PRICE_ERROR = "请输入有效且未超出上限的总佣金。"
+L.AGREEMENT_ACTION_ERROR = "无法完成此操作。请检查协议后重试。"
+L.AGREEMENT_RESTRICTED = "当前活动限制插件消息，无法发送。草稿已保存，请离开此活动后重试。"
+L.AGREEMENT_CAPACITY_ERROR = "已有50份进行中的发出协议。请完成或取消一份后再发送。"
+L.AGREEMENT_INVALID_ERROR = "草稿中的制作详情或消息无效。请选择已知配方、其他收件人，并使用不超过256字且不含链接的消息。"
+L.AGREEMENT_SCHEMA_ERROR = "这些协议由较新版本保存。请更新ArtisanFinder后再发送。"
+L.AGREEMENT_MATERIALS_ERROR = "无法获取此制造的材料信息。"
+L.AGREEMENT_SEND = "发送请求"
+L.AGREEMENT_ACCEPT = "接受这些条款"
+L.AGREEMENT_DECLINE = "拒绝协议"
+L.AGREEMENT_COUNTER = "以此总佣金和留言发送还价"
+L.AGREEMENT_CANCEL = "取消协议"
+L.AGREEMENT_COMPLETE = "声明或确认完成"
+L.AGREEMENT_TRACK = "追踪所需材料"
+L.AGREEMENT_RETRY = "重试送达并同步最新状态"
+L.AGREEMENT_WHISPER = "密语联系人"
+L.AGREEMENT_IGNORE = "忽略此玩家今后的请求"
+L.AGREEMENT_DELETE = "删除此本地记录"
+L.AGREEMENT_IGNORED = "已忽略的请求发送者"
+L.AGREEMENT_NO_IGNORED = "没有已忽略的玩家。"
+L.AGREEMENT_UNIGNORE = "允许 %s 的请求"
+L.AGREEMENT_DELIVERY_FAILED = "送达失败 — 可以重试"
+
+-- Labeled agreement actions
+L.AGREEMENT_BUTTON_SEND = "发送请求"
+L.AGREEMENT_BUTTON_ACCEPT = "接受条款"
+L.AGREEMENT_BUTTON_DECLINE = "拒绝"
+L.AGREEMENT_BUTTON_COUNTER = "还价"
+L.AGREEMENT_BUTTON_CANCEL = "取消协议"
+L.AGREEMENT_BUTTON_COMPLETE = "声明完成"
+L.AGREEMENT_BUTTON_TRACK = "追踪材料"
+L.AGREEMENT_BUTTON_RETRY = "重试发送"
+L.AGREEMENT_BUTTON_WHISPER = "密语"
+L.AGREEMENT_BUTTON_IGNORE = "屏蔽玩家"
+L.AGREEMENT_BUTTON_DELETE = "删除记录"
+L.AGREEMENT_BUTTON_IGNORED = "已屏蔽的玩家"
+L.AGREEMENT_BUTTON_PREVIOUS = "上一页"
+L.AGREEMENT_BUTTON_NEXT = "下一页"
+L.AGREEMENT_BUTTON_CONFIRM = "确认完成"
+
+L.FOREVER_COMPLETED_AGREEMENTS = "已完成的协议"
+L.FOREVER_COMPLETED_COUNTS = "完成 %d · 与你 %d"
+L.FOREVER_COMPLETED_PERSONAL = "与你完成 %d"
+L.FOREVER_COMPLETED_AGREEMENTS_HELP = "工匠报告的所有角色完成总数。“与你”统计与你的角色完成的协议。双方都必须确认完成。以前删除的历史记录无法恢复。"
+
+L.AGREEMENT_TAB = "协议"
+
+L.CHANGELOG_ENTRY_FOREVER_2_1_4 = [[### 新增
+- 在独立工匠目录中使用搜索、收藏和专业链接寻找工匠。
+- 在制造窗口中管理专业与配方的佣金、备注及可用状态。
+- 发布各角色已扫描的专业，导入或导出工匠档案。
+- 通过友方玩家头顶的专业图标识别附近的工匠。]]
+
+L.CHANGELOG_ENTRY_FOREVER_2_1_5 = [[### 新增
+- 按工匠、专业或物品名称查找工匠，包括关联的小号。使用物品链接搜索，或将物品拖入搜索窗口。
+- 除 ArtisanFinder、公会成员和交易频道信息外，还可通过 Linked Inn、CraftBoard 和 Release Gaming – Find Crafts 发现工匠。
+- 在任务目标中追踪制作材料，并使用 Auctionator 搜索缺少的材料。
+
+### 已更改
+- 浏览可展开的工匠目录，查看专业等级、已学配方、佣金及备注。筛选和排序结果、优先显示收藏，并直接打开专业链接或密语工匠。]]
+
+L.CHANGELOG_ENTRY_FOREVER_2_2_0 = [[### 新增
+- 直接从搜索结果发起私人制造协议：请求制作、协商数量和佣金、接受或拒绝条款，并由双方确认完成。
+- 在专用标签页中浏览收到和发出的协议，查看未读标记、通知、送达状态并重试发送。
+- 在搜索结果中查看已完成协议总数，并单独显示与你完成的协议数量。
+- 在目标追踪器中单独追踪已接受的协议，并使用 Auctionator 搜索缺少的材料。
+
+### 已更改
+- 协议采用固定尺寸的羊皮纸页面，配有任务风格物品卡片、醒目的缺少材料提示和完成印章。
+- 材料数量来自客户，并在协议被接受时保存。重新打开已接受的协议不会请求或更改这些数量；无法获取的数量仍显示为未知。
+- 私人协议要求双方使用兼容版本的 ArtisanFinder。协议不会自动制造、交易或转移金币。]]

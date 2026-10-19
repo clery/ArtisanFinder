@@ -123,3 +123,8 @@ L.CUSTOMER_SIDE_PREVIEW = "Pré-visualização de cliente"
 L.CUSTOMER_SIDE_PREVIEW_EMPTY = "Ainda não há dados visíveis ao cliente guardados para esta linha."
 L.CUSTOMER_SIDE_PREVIEW_SCANNING = "Este fabrico está a ser analisado. A pré-visualização de cliente será atualizada quando a análise terminar."
 L.TUTORIAL_CRAFTER_PREVIEW = "Passa o rato sobre o ícone de Pré-visualização de cliente para ver o que os clientes verão para o fabrico selecionado, incluindo valores específicos do item combinados com as predefinições da profissão."
+
+L.CHANGELOG_ENTRY_2_2_0 = [[### Corrigido
+- As notificações de encomendas pessoais incluem agora identificadores de receita e profissão para apresentar os nomes de objetos e profissões no idioma do destinatário.
+- As mensagens antigas demasiado grandes mantêm os identificadores e omitem os nomes alternativos, ou são interrompidas em segurança se ainda excederem o limite da mensagem.
+- As atualizações dos dados de objetos atualizam apenas os painéis e os fabricos acompanhados afetados, reduzindo o processamento desnecessário.]]

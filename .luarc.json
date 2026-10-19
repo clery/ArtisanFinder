@@ -18,6 +18,7 @@
     "diagnostics.globals": [
         "ChatFontNormal",
         "UIParent",
+        "UIErrorsFrame",
         "ProfessionsBookFrame",
         "HideUIPanel",
         "SlashCmdList",

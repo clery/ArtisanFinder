@@ -12,6 +12,10 @@ function AF:SendForeverPresence(chatType, target)
     end
     table.sort(ids)
     local parts={"FA", self.PROTOCOL_VERSION, table.concat(ids, ",")}
+    if self.MarkAgreementSupport then parts[#parts+1]="c:agreements" parts[#parts+1]="1" end
+    if self.GetCompletedAgreementCounts then
+        parts[#parts+1]="a:completed" parts[#parts+1]=tostring(self:GetCompletedAgreementCounts())
+    end
     local notes={}
     for _,id in ipairs(ids) do
         local profession=self.db.artisanProfile.professions[tostring(id)] or self.db.artisanProfile.professions[id]
@@ -122,7 +126,13 @@ function AF:HandleFlavorAddonMessage(kind, parts, sender, channel)
         professions[id] = true
     end
     local commissions,skills={},{}
+    local completedAgreements
     for index=4,math.min(#parts,64),2 do
+        if parts[index]=="c:agreements" and parts[index+1]=="1" and self.MarkAgreementSupport then self:MarkAgreementSupport(sender) end
+        if parts[index]=="a:completed" and type(parts[index+1])=="string" and parts[index+1]:match("^%d+$") then
+            local count=tonumber(parts[index+1])
+            if count and count<=2147483647 then completedAgreements=count end
+        end
         local skillID=type(parts[index])=="string" and tonumber(parts[index]:match("^s:(%d+)$"))
         if skillID and professions[skillID] and type(parts[index+1])=="string" then
             local level,maximum=parts[index+1]:match("^(%d+):(%d+)$")
@@ -157,7 +167,7 @@ function AF:HandleFlavorAddonMessage(kind, parts, sender, channel)
     end
     self.db.foreverDiscoveries = self.db.foreverDiscoveries or {}
     self.db.foreverDiscoveries[sender] = next(professions) and {
-        name=sender, professions=professions, commissions=commissions, skills=skills, updatedAt=self:Now(), expiresAt=self:Now()+LIFETIME,
+        name=sender, professions=professions, commissions=commissions, skills=skills, completedAgreements=completedAgreements, updatedAt=self:Now(), expiresAt=self:Now()+LIFETIME,
     } or nil
     self:DebugLog("discovery", "presence sender="..sender.." professions="..parts[3])
     if self.RefreshCustomerResults then self:RequestCustomerResultsRefresh() end
@@ -166,6 +176,7 @@ function AF:HandleFlavorAddonMessage(kind, parts, sender, channel)
 end
 
 function AF:InitializeFlavorDiscovery()
+    if self.InitializeAgreements then self:InitializeAgreements() end
     if GetChannelName and LeaveChannelByName and GetChannelName("ArtisanFinderForever")~=0 then
         LeaveChannelByName("ArtisanFinderForever")
     end

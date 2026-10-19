@@ -32,6 +32,7 @@ function AF:StartForeverNameplateDemo()
 end
 
 function AF:HandleFlavorSlash(command, rest)
+    if command=="agreements" then self:ShowAgreements() return true end
     if command ~= "demo" then return false end
     if rest == "off" or rest == "stop" then self:StopForeverNameplateDemo()
     elseif rest == "" or rest == "on" then self:StartForeverNameplateDemo()
@@ -41,4 +42,5 @@ end
 
 function AF:PrintFlavorSlashHelp()
     self:Print(self:Text("FOREVER_DEMO_HELP"))
+    self:Print(self:Text("AGREEMENT_SLASH_HELP"))
 end

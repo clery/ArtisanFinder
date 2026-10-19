@@ -68,3 +68,17 @@ assert(label("Guild",190)=="Blacksmithing (190)","guild rank without maximum is 
 assert(label("Unknown")=="Blacksmithing","missing levels are not invented")
 AF.db=savedDB AF.GetProfessionName=savedName
 print("PASS profession labels include known own, remote, Linked Inn and guild skill levels")
+
+-- A French receiver must not search/sort by the English sender's labels.
+local oldDisplay=AF.GetDisplayItemName
+AF.GetDisplayItemName=function(_,id,fallback)
+    return ({[2000]="Épée en mithril",[-3000]="Enchantement de bottes"})[id] or fallback or "Unknown"
+end
+AF.db={artisanProfile={items={},professions={}},customerCache={[2000]={one={name="English Crafter",professionID=164,recipeID=1000,itemName="Mithril Sword"}}},
+    compatibilityDiscoveries={CRAFTBOARD={["English Crafter"]={updatedAt=1000,crafts={{itemID=-3000,recipeID=3000,professionID=333,craftName="Enchant Boots"}}}}}}
+AF.Now=function() return 1000 end
+assert(AF:GetForeverKnownCrafts("English Crafter",164)[1].craftName=="Épée en mithril","native item IDs resolve in receiver locale")
+assert(AF:GetForeverKnownCrafts("English Crafter",333)[1].craftName=="Enchantement de bottes","third-party enchant IDs resolve in receiver locale")
+assert(AF:GetForeverCraftPresentation({itemID=-3000,recipeID=3000,craftName="Enchant Boots"}):find("[Enchantement de bottes]",1,true),"enchant link uses receiver label")
+AF.GetDisplayItemName=oldDisplay
+print("PASS cross-locale native and third-party craft names resolve by item/spell IDs")

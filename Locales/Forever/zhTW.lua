@@ -72,3 +72,109 @@ L.FOREVER_TUTORIAL_PAGES = "使用箭頭切換工匠頁。在表格內捲動查�
 L.FOREVER_TUTORIAL_RESET = "教學已重置。開啟目錄或專業即可再次查看。資訊圖示可隨時重新開啟說明。"
 
 L.FOREVER_TUTORIAL_END_HINT = "再次點擊此資訊圖示即可結束教學。"
+
+-- Private crafting agreements
+L.AGREEMENT_TITLE = "製作協議"
+L.AGREEMENT_TOAST_TITLE = "製作協議"
+L.AGREEMENT_REQUEST = "請求製作"
+L.AGREEMENT_SLASH_HELP = "/af agreements - 開啟私人製作協議"
+L.AGREEMENT_INCOMING = "收到的"
+L.AGREEMENT_OUTGOING = "發出的"
+L.AGREEMENT_DRAFT = "未傳送的草稿"
+L.AGREEMENT_PENDING = "待處理"
+L.AGREEMENT_COUNTEROFFERED = "還價"
+L.AGREEMENT_ACCEPTED = "已接受"
+L.AGREEMENT_COMPLETED = "已完成"
+L.AGREEMENT_DECLINED = "已拒絕"
+L.AGREEMENT_CANCELLED = "已取消"
+L.AGREEMENT_EXPIRED = "已過期"
+L.AGREEMENT_AWAITING_CONFIRMATION = "等待完成確認"
+L.AGREEMENT_WAITING_DELIVERY = "等待送達確認"
+L.AGREEMENT_CONTACT = "聯絡人：%s"
+L.AGREEMENT_CRAFTING_CHARACTER = "製作角色：%s"
+L.AGREEMENT_QUANTITY = "製作次數"
+L.AGREEMENT_TOTAL_COMMISSION = "總佣金（留空表示未指定）"
+L.AGREEMENT_MESSAGE = "選填留言"
+L.AGREEMENT_MATERIALS = "材料 · 擁有 / 所需 · 缺少"
+L.AGREEMENT_MATERIAL_UNKNOWN = "? / %d · 缺少數量未知"
+L.AGREEMENT_MATERIAL_LINE = "%s · %d / %d · 缺少 %d"
+L.AGREEMENT_MORE_MATERIALS = "另有 %d 種材料（滑鼠指向查看全部）"
+L.AGREEMENT_OUTPUT = "產出：%d–%d 件物品"
+L.AGREEMENT_DRAFT_HELP = "協議僅記錄雙方意向。製作、交易及付款仍須手動完成。佣金為零表示免費。"
+L.AGREEMENT_UNSUPPORTED = "尚未確認對方支援此功能。傳送將儲存未傳送的草稿；也可密語聯絡工匠。"
+L.AGREEMENT_UNKNOWN_CRAFT = "未知製作"
+L.AGREEMENT_EMPTY = "此清單中沒有協議。"
+L.AGREEMENT_LIST_COUNT = "%d 份協議 · 捲動瀏覽"
+L.AGREEMENT_NOTIFICATION = "製作協議已更新：%s"
+L.AGREEMENT_QUANTITY_ERROR = "請輸入 1–999 次製作。"
+L.AGREEMENT_PRICE_ERROR = "請輸入有效且未超出上限的總佣金。"
+L.AGREEMENT_ACTION_ERROR = "無法完成此操作。請檢查協議後重試。"
+L.AGREEMENT_RESTRICTED = "目前活動限制插件訊息，無法傳送。草稿已儲存，請離開此活動後重試。"
+L.AGREEMENT_CAPACITY_ERROR = "已有50份進行中的送出協議。請完成或取消一份後再傳送。"
+L.AGREEMENT_INVALID_ERROR = "草稿中的製作詳情或訊息無效。請選擇已知配方、其他收件人，並使用不超過256字且不含連結的訊息。"
+L.AGREEMENT_SCHEMA_ERROR = "這些協議由較新版本儲存。請更新ArtisanFinder後再傳送。"
+L.AGREEMENT_MATERIALS_ERROR = "無法取得此製作的材料資訊。"
+L.AGREEMENT_SEND = "傳送請求"
+L.AGREEMENT_ACCEPT = "接受這些條款"
+L.AGREEMENT_DECLINE = "拒絕協議"
+L.AGREEMENT_COUNTER = "以此總佣金和留言傳送還價"
+L.AGREEMENT_CANCEL = "取消協議"
+L.AGREEMENT_COMPLETE = "聲明或確認完成"
+L.AGREEMENT_TRACK = "追蹤所需材料"
+L.AGREEMENT_RETRY = "重試送達並同步最新狀態"
+L.AGREEMENT_WHISPER = "密語聯絡人"
+L.AGREEMENT_IGNORE = "忽略此玩家往後的請求"
+L.AGREEMENT_DELETE = "刪除此本機紀錄"
+L.AGREEMENT_IGNORED = "已忽略的請求傳送者"
+L.AGREEMENT_NO_IGNORED = "沒有已忽略的玩家。"
+L.AGREEMENT_UNIGNORE = "允許 %s 的請求"
+L.AGREEMENT_DELIVERY_FAILED = "送達失敗 — 可以重試"
+
+-- Labeled agreement actions
+L.AGREEMENT_BUTTON_SEND = "傳送請求"
+L.AGREEMENT_BUTTON_ACCEPT = "接受條款"
+L.AGREEMENT_BUTTON_DECLINE = "拒絕"
+L.AGREEMENT_BUTTON_COUNTER = "還價"
+L.AGREEMENT_BUTTON_CANCEL = "取消協議"
+L.AGREEMENT_BUTTON_COMPLETE = "聲明完成"
+L.AGREEMENT_BUTTON_TRACK = "追蹤材料"
+L.AGREEMENT_BUTTON_RETRY = "重試傳送"
+L.AGREEMENT_BUTTON_WHISPER = "密語"
+L.AGREEMENT_BUTTON_IGNORE = "忽略玩家"
+L.AGREEMENT_BUTTON_DELETE = "刪除紀錄"
+L.AGREEMENT_BUTTON_IGNORED = "已忽略的玩家"
+L.AGREEMENT_BUTTON_PREVIOUS = "上一頁"
+L.AGREEMENT_BUTTON_NEXT = "下一頁"
+L.AGREEMENT_BUTTON_CONFIRM = "確認完成"
+
+L.FOREVER_COMPLETED_AGREEMENTS = "已完成的協議"
+L.FOREVER_COMPLETED_COUNTS = "完成 %d · 與你 %d"
+L.FOREVER_COMPLETED_PERSONAL = "與你完成 %d"
+L.FOREVER_COMPLETED_AGREEMENTS_HELP = "工匠回報的所有角色完成總數。「與你」統計與你的角色完成的協議。雙方都必須確認完成。以前刪除的歷史紀錄無法復原。"
+
+L.AGREEMENT_TAB = "協議"
+
+L.CHANGELOG_ENTRY_FOREVER_2_1_4 = [[### 新增
+- 在獨立工匠目錄中使用搜尋、最愛和專業技能連結尋找工匠。
+- 在製作視窗中管理專業技能與配方的佣金、備註及可用狀態。
+- 發布各角色已掃描的專業技能，匯入或匯出工匠檔案。
+- 透過友方玩家頭頂的專業技能圖示辨識附近的工匠。]]
+
+L.CHANGELOG_ENTRY_FOREVER_2_1_5 = [[### 新增
+- 按工匠、專業技能或物品名稱尋找工匠，包括關聯的分身。使用物品連結搜尋，或將物品拖入搜尋視窗。
+- 除 ArtisanFinder、公會成員和交易頻道資訊外，還可透過 Linked Inn、CraftBoard 和 Release Gaming – Find Crafts 發現工匠。
+- 在任務目標中追蹤製作材料，並使用 Auctionator 搜尋缺少的材料。
+
+### 已變更
+- 瀏覽可展開的工匠目錄，查看專業技能等級、已學配方、佣金及備註。篩選和排序結果、優先顯示最愛，並直接開啟專業技能連結或密語工匠。]]
+
+L.CHANGELOG_ENTRY_FOREVER_2_2_0 = [[### 新增
+- 直接從搜尋結果發起私人製作協議：請求製作、協商數量和佣金、接受或拒絕條款，並由雙方確認完成。
+- 在專用分頁中瀏覽收到和發出的協議，查看未讀標記、通知、送達狀態並重試傳送。
+- 在搜尋結果中查看已完成協議總數，並單獨顯示與你完成的協議數量。
+- 在目標追蹤器中單獨追蹤已接受的協議，並使用 Auctionator 搜尋缺少的材料。
+
+### 已變更
+- 協議採用固定尺寸的羊皮紙頁面，搭配任務風格物品卡片、醒目的缺少材料提示和完成印章。
+- 材料數量來自客戶，並在協議被接受時儲存。重新開啟已接受的協議不會請求或更改這些數量；無法取得的數量仍顯示為未知。
+- 私人協議要求雙方使用相容版本的 ArtisanFinder。協議不會自動製作、交易或轉移金幣。]]

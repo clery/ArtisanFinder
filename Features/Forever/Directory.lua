@@ -138,8 +138,7 @@ function AF:FindForeverItems(query)
     local function add(itemID,item)
         itemID=tonumber(itemID)
         if not itemID or itemID<=0 or seen[itemID] then return end
-        local name=item and (item.itemName or item.recipeName) or self:GetDisplayItemName(itemID)
-        name=name or self:GetDisplayItemName(itemID)
+        local name=self:GetDisplayItemName(itemID,item and (item.itemName or item.recipeName))
         if name and name:lower():find(query,1,true) then
             seen[itemID]=true matches[#matches+1]={itemID=itemID,name=name}
         end
@@ -288,4 +287,35 @@ function AF:GetForeverNameplateObservation(fullName)
 		end
 	end
 	if next(professions) then return {professions=professions,source="TRADE",expiresAt=expiresAt} end
+end
+
+-- Only the aggregate is advertised; customer-specific history remains local.
+function AF:GetForeverGroupAgreementCounts(group)
+    if type(group)~="table" then return end
+    local contacts={}
+    local function add(value)
+        local name=self:NormalizeName(value)
+        if name then contacts[name]=true end
+    end
+    add(group.name)
+    local own=false
+    for _,offer in ipairs(group.offers or {group.entry}) do
+        if type(offer)=="table" then add(offer.target or offer.name) own=own or offer.ownAlt==true end
+    end
+    local reported
+    for contact in pairs(contacts) do
+        local presence=self.db.foreverDiscoveries and self.db.foreverDiscoveries[contact]
+        local count=presence and presence.completedAgreements
+        if type(count)=="number" and count%1==0 and count>=0 and count<=2147483647 then
+            -- Multiple characters can advertise the same account total; never sum it.
+            reported=math.max(reported or 0,count)
+        end
+    end
+    local personal=0
+    if self.GetCompletedAgreementCounts then
+        local total
+        total,personal=self:GetCompletedAgreementCounts(contacts)
+        if own then reported=total end
+    end
+    return reported,personal
 end

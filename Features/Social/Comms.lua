@@ -667,6 +667,8 @@ function AF:OnAddonMessage(prefix, message, channel, sender)
 		return
 	end
 
+    -- Private agreement frames are bounded and uncompressed; bypass the general decoder.
+    if self.OnAgreementMessage and self:OnAgreementMessage(message, channel, sender) then return end
 	local normalizedSender = self:NormalizeName(sender)
 	if normalizedSender == self:NormalizeName(self.playerName or self:GetPlayerFullName()) then
 		return

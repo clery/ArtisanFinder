@@ -123,3 +123,8 @@ L.TUTORIAL_CRAFTER_PREVIEW = "Passe o cursor sobre o ícone de Pré-visualizaç�
 L.CUSTOMER_SIDE_PREVIEW = "Pré-visualização de cliente"
 L.CUSTOMER_SIDE_PREVIEW_EMPTY = "Ainda não há dados visíveis ao cliente guardados para esta linha."
 L.CUSTOMER_SIDE_PREVIEW_SCANNING = "Esta criação está sendo escaneada. A pré-visualização de cliente será atualizada quando o escaneamento terminar."
+
+L.CHANGELOG_ENTRY_2_2_0 = [[### Corrigido
+- As notificações de pedidos pessoais agora incluem identificadores de receita e profissão para exibir os nomes de itens e profissões no idioma de quem recebe.
+- Mensagens antigas grandes demais mantêm seus identificadores e descartam os nomes alternativos, ou são interrompidas com segurança se ainda excederem o limite da mensagem.
+- As atualizações de dados de itens atualizam apenas os painéis e as fabricações rastreadas afetados, reduzindo o processamento desnecessário.]]

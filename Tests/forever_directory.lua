@@ -40,7 +40,9 @@ local created=0
 local function object()
  local o={shown=true,width=680,height=400,text="",scripts={}}
  local methods={
-  SetSize=function(s,w,h)s.width=w s.height=h end,GetWidth=function(s)return s.width end,GetHeight=function(s)return s.height end,
+  SetSize=function(s,w,h)s.width=w s.height=h end,SetHeight=function(s,h)s.height=h end,GetWidth=function(s)return s.width end,GetHeight=function(s)return s.height end,
+  SetScale=function(s,value)s.scale=value end,GetScale=function(s)return s.scale or 1 end,
+  SetClampRectInsets=function(s,...)s.clampInsets={...}end,
   SetPoint=function(s,...)s.point={...}end,SetWidth=function(s,w)s.width=w end,
   SetText=function(s,t)s.text=t end,GetText=function(s)return s.text end,
   SetTextColor=function(s,...)s.color={...} end,SetJustifyH=function(s,value)s.justifyH=value end,SetVertexColor=function(s,...)s.vertexColor={...} end,SetRotation=function(s,value)s.rotation=value end,
@@ -54,27 +56,42 @@ local function object()
   SetFrameLevel=function(s,v)s.level=v end,GetFrameLevel=function(s)return rawget(s,"level") or 0 end,
   EnableMouse=function(s,v)s.mouseEnabled=v end,Show=function(s)s.shown=true end,Hide=function(s)s.shown=false end,
   SetShown=function(s,v)s.shown=v end,IsShown=function(s)return s.shown end,
+  SetScrollChild=function(s,child)s.scrollChild=child end,GetScrollChild=function(s)return s.scrollChild end,
   CreateTexture=function()return object()end,CreateFontString=function()return object()end,
+  CreateAnimationGroup=function()return object()end,CreateAnimation=function()return object()end,
   GetNormalTexture=function(s)s.normal=rawget(s,"normal") or object() return s.normal end,
   GetHighlightTexture=function(s)s.highlight=rawget(s,"highlight") or object() return s.highlight end,
   SetEnabled=function(s,v)s.enabled=v end,
+  GetFont=function()return "font",12,"" end,GetFontString=function(s)return s end,
  }
- setmetatable(o,{__index=function(_,k)return methods[k] or function()end end})
+ setmetatable(o,{__index=function(_,k) if methods[k] then return methods[k] end if k:match("^%u") then return function()end end end})
  return o
 end
 UIParent=object() UISpecialFrames={}
 CreateFrame=function(_,name,parent,template)
  created=created+1
- local o=object() o.parent=parent
+ local o=object() o.parent=parent o.template=template
  if template=="BasicFrameTemplateWithInset" then o.TitleText=object() end
- if template=="ScrollFrameTemplate" then o.ScrollBar=object() end
+ if template=="ScrollFrameTemplate" or template=="UIPanelScrollFrameTemplate" then o.ScrollBar=object() end
+ if template=="SmallItemButtonTemplate" then
+  o.Icon=object() o.Icon:SetSize(30,30)
+  o.NameFrame=object() o.Name=object() o.Name:SetSize(92,36)
+ end
  if template=="SearchBoxTemplate" then
   o.searchIcon=object() o.clearButton=object() o.Instructions=object()
   o.scripts.OnTextChanged=function(box) box.clearButton:SetShown(box:GetText()~="") end
   o.clearButton.scripts.OnClick=function() o:SetText("") o.scripts.OnTextChanged(o) end
  end
+ if template=="LargeSideTabButtonTemplate" then
+  o.Icon=object() o:SetSize(50,50)
+  o.SetChecked=function(tab,value)tab.selected=value end
+  o.SetCustomOnMouseUpHandler=function(tab,handler)tab.scripts.OnClick=function()handler(tab,"LeftButton",true)end end
+ end
  if name then _G[name]=o end
  return o
+end
+ScrollFrame_OnScrollRangeChanged=function(scroll,_,range)
+ scroll.ScrollBar:SetShown(not scroll.scrollBarHideable or range>0)
 end
 GameTooltip=object() GameTooltip.AddLine=function()end
 C_Timer={After=function()end}
@@ -417,3 +434,101 @@ AF:GetDirectoryEntries("")
 AF.GetCachedArtisans=originalCached
 AF.GetOwnAltRows=nil
 print("PASS discovery batches 1000 background events and avoids item-query side effects during general listing")
+
+local oldDisplayName=AF.GetDisplayItemName
+AF.GetDisplayItemName=function(_,id,fallback) return id==98765 and "Épée en mithril" or fallback or "Unknown" end
+AF.db.compatibilityDiscoveries={CRAFTBOARD={["English Crafter"]={updatedAt=AF:Now(),crafts={{itemID=98765,craftName="Mithril Sword"}}}}}
+local localized=AF:FindForeverItems("Épée")
+assert(#localized==1 and localized[1].itemID==98765 and localized[1].name=="Épée en mithril","local-language search resolves third-party craft IDs instead of remote names")
+AF.GetDisplayItemName=oldDisplayName
+print("PASS cross-locale item search uses local labels for third-party item IDs")
+
+-- Completion counts decorate artisan rows without replacing their expansion action.
+AF.customerFrame:Show()
+AF.GetForeverGroupAgreementCounts=function()return 12,3 end
+AF:RefreshCustomerResults()
+local countedRow=AF.customerRows[1]
+check(countedRow.view.kind=="artisan" and countedRow.completed:IsShown(),"artisan displays completed count")
+check(countedRow.completedTip:IsShown(),"count tooltip covers count label")
+local toggled
+local previousToggle=AF.ToggleForeverDirectoryRow
+AF.ToggleForeverDirectoryRow=function(_,view)toggled=view end
+countedRow.completedTip.scripts.OnClick()
+check(toggled==countedRow.view,"clicking count still expands artisan")
+countedRow.completedTip.scripts.OnEnter(countedRow.completedTip)
+check(countedRow.hovered,"count hover retains artisan actions")
+AF.ToggleForeverDirectoryRow=previousToggle
+AF.GetForeverGroupAgreementCounts=function()return nil,0 end
+AF:RefreshCustomerResults()
+check(not AF.customerRows[1].completed:IsShown(),"unknown public total is not shown as zero")
+AF.GetForeverGroupAgreementCounts=function()return 0,0 end
+AF:RefreshCustomerResults()
+check(AF.customerRows[1].completed:IsShown(),"confirmed zero remains visible")
+print("PASS directory completion subline, known zero and expansion click/hover")
+
+-- Exercise the real agreement editor inside the directory shell.
+local agreementRecords={}
+AF.GetAgreements=function(_,direction)
+ local result={} for _,record in pairs(agreementRecords) do
+  if (record.localRole=="artisan" and direction=="incoming") or (record.localRole=="customer" and direction=="outgoing") then result[#result+1]=record end
+ end return result
+end
+AF.GetAgreement=function(_,id)return agreementRecords[id] end
+AF.GetAgreementCraftPresentation=function(_,record)return "Sword","|Hitem:"..record.itemID.."|h[Sword]|h" end
+AF.GetAgreementMaterials=function()return {} end
+AF.HasAgreementSupport=function()return true end
+AF.ProbeAgreementSupport=function()end
+AF.MAX_COMMISSION_COPPER=999999990000
+load("Features/Forever/AgreementUI.lua")
+local host=AF.customerFrame
+local specialCount=#UISpecialFrames
+local editor=AF:OpenAgreementEditor({artisan="Crafting Contact",craftingCharacter="Crafting Alt",itemID=100,recipeID=200,quantity=2,commission=123})
+check(editor:GetHeight()==756 and host:GetHeight()==756,"agreement editor and shared shell reserve their final height immediately")
+check(host.directoryTabs[1].tooltipText=="ArtisanFinder - FOREVER_DISCOVERY_OPTIONS" and host.agreements.tooltipText=="ArtisanFinder - AGREEMENT_TAB","standalone tabs use branded view names")
+check(host.directoryTabs[1].point[2]==host and host.directoryTabs[1].point[3]=="TOPRIGHT" and host.agreements.point[2]==host.directoryTabs[1] and host.agreements.point[3]=="BOTTOMLEFT","standalone native tabs form a vertical right-hand stack")
+check(editor.parent==host and editor.directoryHost==host and editor.template==nil,"agreement editor is plain content of the discovery shell without duplicate title or portrait")
+check(host.directoryTab=="agreements" and editor:IsShown() and not host.header:IsShown(),"request selects Agreements and hides discovery content")
+check(#UISpecialFrames==specialCount,"no independent agreement window or duplicate escape entry")
+check(editor.scripts.OnDragStart==nil,"agreement content cannot be dragged separately")
+check(host.directoryTabs[2].selected and not host.directoryTabs[1].selected,"native selected tab follows visible content")
+editor.detail.quantity:SetText("7") editor.detail.message:SetText("Keep my message") editor.detail.money[3]:SetText("42")
+local input=editor.editorInput
+local builds=0 local originalBuild=AF.GetDirectoryEntries
+AF.GetDirectoryEntries=function(...) builds=builds+1 return originalBuild(...) end
+AF:RefreshCustomerResults()
+check(builds==0,"background discovery refresh does not rebuild hidden results while Agreements is selected")
+host.directoryTabs[1].scripts.OnClick()
+check(host.directoryTab=="discovery" and not editor:IsShown() and host.header:IsShown(),"Discovery restores table without opening another window")
+check(host:GetHeight()==620,"Discovery restores its own panel height")
+host.directoryTabs[2].scripts.OnClick()
+check(editor.editorInput==input and editor.detail.quantity:GetText()=="7" and editor.detail.message:GetText()=="Keep my message" and editor.detail.money[3]:GetText()=="42","outer navigation preserves the unfinished agreement form")
+editor.incoming.scripts.OnClick() editor.outgoing.scripts.OnClick()
+check(editor.editorInput==input and editor.detail.message:GetText()=="Keep my message","inner Incoming/Outgoing navigation still preserves form")
+local notified={id="notify",itemID=100,recipeID=200,localRole="artisan",customer="Customer",artisan="Artisan",status="Pending",stateRevision=1,unread=true}
+agreementRecords.notify=notified
+AF:SelectForeverDirectoryTab("discovery") AF:OpenAgreementNotification(notified)
+check(host.directoryTab=="agreements" and editor.selectedID=="notify" and editor.direction=="incoming" and not notified.unread,"toast opens the matching agreement in the shared tab")
+local agreementScale=host:GetScale()
+for _,state in ipairs({"Draft","Pending","Counteroffered","Accepted","Completed","Declined","Cancelled","Expired"}) do
+ notified.status=state notified.snapshotDelivery={failed=true}
+ AF:RefreshAgreementUI()
+ check(editor:GetHeight()==756 and host:GetHeight()==756 and host:GetScale()==agreementScale,"agreement lifecycle keeps paper, shared shell height and scale fixed: "..state)
+end
+notified.status="Pending" notified.snapshotDelivery=nil
+AF:RefreshAgreementUI()
+AF:SelectForeverDirectoryTab("discovery") AF:ShowAgreements("outgoing")
+check(host.directoryTab=="agreements" and editor.editorInput==input,"slash access restores the outgoing editor in its tab")
+AF:OpenCustomerUI()
+check(host.directoryTab=="discovery" and host:IsShown(),"standalone discovery access returns to Discovery")
+AF:ShowAgreements("incoming") host:Hide() notified.unread=true
+AF:OnAgreementChanged(notified,false)
+check(notified.unread,"hidden shared host never marks an agreement read")
+AF.GetDirectoryEntries=originalBuild
+print("PASS native Discovery/Agreements navigation, shared shell, form preservation, notification routing and hidden-view refresh")
+
+UIParent:SetSize(700,500)
+AF:ResizeForeverDirectoryHost(620)
+local extent=host.agreements:GetWidth()+28
+check((host:GetWidth()+extent)*host:GetScale()<=UIParent:GetWidth()-24,"small-screen fit reserves space for protruding native tabs and the widest notification badge")
+check(host.clampInsets[2]==extent,"drag clamping includes the tabs and notification badge to the right")
+print("PASS small-screen scaling and drag bounds include native side tabs and notification badges")

@@ -103,3 +103,96 @@ L.FOREVER_TUTORIAL_PAGES = "Utilisez les flèches pour changer de page. Faites d
 L.FOREVER_TUTORIAL_RESET = "Tutoriels réinitialisés. Ouvrez la découverte ou un métier pour revoir le guide. Les icônes d’information permettent toujours de rouvrir l’aide."
 
 L.FOREVER_TUTORIAL_END_HINT = "Cliquez à nouveau sur cette icône d’information pour terminer le tutoriel."
+
+-- Private crafting agreements
+L.AGREEMENT_TITLE = "Accords d’artisanat"
+L.AGREEMENT_TOAST_TITLE = "Accord d’artisanat"
+L.AGREEMENT_REQUEST = "Demander cette fabrication"
+L.AGREEMENT_SLASH_HELP = "/af agreements - ouvrir les accords privés d’artisanat"
+L.AGREEMENT_INCOMING = "Reçus"
+L.AGREEMENT_OUTGOING = "Envoyés"
+L.AGREEMENT_DRAFT = "Brouillon non envoyé"
+L.AGREEMENT_PENDING = "En attente"
+L.AGREEMENT_COUNTEROFFERED = "Contre-proposition"
+L.AGREEMENT_ACCEPTED = "Accepté"
+L.AGREEMENT_COMPLETED = "Terminé"
+L.AGREEMENT_DECLINED = "Refusé"
+L.AGREEMENT_CANCELLED = "Annulé"
+L.AGREEMENT_EXPIRED = "Expiré"
+L.AGREEMENT_AWAITING_CONFIRMATION = "En attente de confirmation de fin"
+L.AGREEMENT_WAITING_DELIVERY = "En attente de confirmation de réception"
+L.AGREEMENT_CONTACT = "Contact : %s"
+L.AGREEMENT_CRAFTING_CHARACTER = "Personnage artisan : %s"
+L.AGREEMENT_QUANTITY = "Fabrications"
+L.AGREEMENT_TOTAL_COMMISSION = "Commission totale (vide = non précisée)"
+L.AGREEMENT_MESSAGE = "Message facultatif"
+L.AGREEMENT_MATERIALS = "Composants · possédés / requis · manquants"
+L.AGREEMENT_MATERIAL_UNKNOWN = "? / %d · manquants inconnus"
+L.AGREEMENT_MATERIAL_LINE = "%s · %d / %d · %d manquants"
+L.AGREEMENT_MORE_MATERIALS = "+ %d composants (survoler pour tout voir)"
+L.AGREEMENT_OUTPUT = "Résultat : %d–%d objets"
+L.AGREEMENT_DRAFT_HELP = "Un accord consigne seulement vos intentions. Fabrication, échange et paiement restent manuels. Une commission de zéro signifie gratuit."
+L.AGREEMENT_UNSUPPORTED = "Compatibilité non confirmée. L’envoi conserve un brouillon non envoyé ; vous pouvez chuchoter à l’artisan."
+L.AGREEMENT_UNKNOWN_CRAFT = "Fabrication inconnue"
+L.AGREEMENT_EMPTY = "Aucun accord dans cette liste."
+L.AGREEMENT_LIST_COUNT = "%d accords · faire défiler pour parcourir"
+L.AGREEMENT_NOTIFICATION = "Accord d’artisanat mis à jour : %s"
+L.AGREEMENT_QUANTITY_ERROR = "Saisissez entre 1 et 999 fabrications."
+L.AGREEMENT_PRICE_ERROR = "Saisissez une commission totale valide dans la limite autorisée."
+L.AGREEMENT_ACTION_ERROR = "Cette action a échoué. Vérifiez l’accord puis réessayez."
+L.AGREEMENT_RESTRICTED = "Envoi impossible lorsque les messages d’addon sont restreints. Votre brouillon est conservé ; réessayez après avoir quitté cette activité."
+L.AGREEMENT_CAPACITY_ERROR = "Vous avez déjà 50 accords sortants actifs. Terminez ou annulez un accord avant d’en envoyer un autre."
+L.AGREEMENT_INVALID_ERROR = "Ce brouillon contient des informations de fabrication ou un message invalides. Choisissez une fabrication connue, un autre destinataire et un message de 256 caractères maximum sans lien."
+L.AGREEMENT_SCHEMA_ERROR = "Ces accords ont été enregistrés par une version plus récente. Mettez ArtisanFinder à jour avant l’envoi."
+L.AGREEMENT_MATERIALS_ERROR = "Les composants de cette fabrication sont indisponibles."
+L.AGREEMENT_SEND = "Envoyer la demande"
+L.AGREEMENT_ACCEPT = "Accepter ces conditions"
+L.AGREEMENT_DECLINE = "Refuser l’accord"
+L.AGREEMENT_COUNTER = "Envoyer une contre-proposition avec cette commission totale et ce message"
+L.AGREEMENT_CANCEL = "Annuler l’accord"
+L.AGREEMENT_COMPLETE = "Déclarer ou confirmer la fin"
+L.AGREEMENT_TRACK = "Suivre les composants requis"
+L.AGREEMENT_RETRY = "Réessayer l’envoi et synchroniser l’état actuel"
+L.AGREEMENT_WHISPER = "Chuchoter au contact"
+L.AGREEMENT_IGNORE = "Ignorer les futures demandes de ce joueur"
+L.AGREEMENT_DELETE = "Supprimer cet accord local"
+L.AGREEMENT_IGNORED = "Expéditeurs ignorés"
+L.AGREEMENT_NO_IGNORED = "Aucun joueur ignoré."
+L.AGREEMENT_UNIGNORE = "Autoriser les demandes de %s"
+L.AGREEMENT_DELIVERY_FAILED = "Envoi échoué — réessayer disponible"
+
+-- Labeled agreement actions
+L.AGREEMENT_BUTTON_SEND = "Envoyer la demande"
+L.AGREEMENT_BUTTON_ACCEPT = "Accepter les conditions"
+L.AGREEMENT_BUTTON_DECLINE = "Refuser"
+L.AGREEMENT_BUTTON_COUNTER = "Contre-proposition"
+L.AGREEMENT_BUTTON_CANCEL = "Annuler l’accord"
+L.AGREEMENT_BUTTON_COMPLETE = "Déclarer terminé"
+L.AGREEMENT_BUTTON_TRACK = "Suivre les composants"
+L.AGREEMENT_BUTTON_RETRY = "Réessayer l’envoi"
+L.AGREEMENT_BUTTON_WHISPER = "Chuchoter"
+L.AGREEMENT_BUTTON_IGNORE = "Ignorer le joueur"
+L.AGREEMENT_BUTTON_DELETE = "Supprimer l’accord"
+L.AGREEMENT_BUTTON_IGNORED = "Joueurs ignorés"
+L.AGREEMENT_BUTTON_PREVIOUS = "Précédent"
+L.AGREEMENT_BUTTON_NEXT = "Suivant"
+L.AGREEMENT_BUTTON_CONFIRM = "Confirmer la fin"
+
+L.FOREVER_COMPLETED_AGREEMENTS = "Accords terminés"
+L.FOREVER_COMPLETED_COUNTS = "%d terminés · %d avec vous"
+L.FOREVER_COMPLETED_PERSONAL = "%d avec vous"
+L.FOREVER_COMPLETED_AGREEMENTS_HELP = "Total déclaré par cet artisan pour ses personnages. « Avec vous » compte les accords terminés avec vos personnages. Les deux participants doivent confirmer. Les anciens accords supprimés ne peuvent pas être récupérés."
+
+L.AGREEMENT_TAB = "Accords"
+
+L.CHANGELOG_ENTRY_FOREVER_2_2_0 = [[### Ajouté
+- Organisez des accords privés depuis la découverte : demande de fabrication, négociation des quantités et de la commission, acceptation, refus et confirmation mutuelle de la réalisation.
+- Consultez les accords reçus et envoyés dans un onglet dédié, avec notifications, compteurs de messages non lus et suivi de livraison.
+- Suivez les composants des accords acceptés dans les objectifs et recherchez les composants manquants avec Auctionator.
+- Consultez les totaux d’accords réalisés dans la découverte, avec vos propres accords présentés séparément.
+
+### Modifié
+- Les accords utilisent une page de parchemin de taille fixe, des objets présentés comme les récompenses de quête et un tampon de réalisation.
+- Les quantités de composants proviennent du client et sont figées à l'acceptation. Les données indisponibles restent inconnues ; rouvrir un accord accepté ne demande aucune nouvelle donnée.
+- Les deux joueurs doivent utiliser une version compatible d'ArtisanFinder. Aucun objet, échange ou paiement n'est effectué automatiquement.
+- La découverte privilégie les données ArtisanFinder ; les chargements d’objets actualisent uniquement les vues et les suivis concernés.]]

@@ -13,10 +13,10 @@ for _,locale in ipairs({"enUS","frFR"}) do
         local entries=AF:GetChangelogEntries()
         assert(#entries>0 and entries[1].content~="")
         if flavor=="Forever" then
-            assert(entries[1].version=="2.1.5" and entries[#entries].version=="2.1.4")
+            assert(entries[1].version=="2.2.0" and entries[#entries].version=="2.1.4")
             assert(not entries[1].content:find("CHANGELOG_ENTRY",1,true),"Forever resolves its own text")
         else
-            assert(entries[1].version=="2.1.5" and #entries==10,"Retail release history preserved")
+            assert(entries[1].version=="2.2.0" and #entries==11,"Retail release history preserved")
         end
         local filtered=AF:GetChangelogEntries("99.0.0")
         assert(#filtered==1 and filtered[1].content==entries[1].content,"empty filter uses same flavor fallback")

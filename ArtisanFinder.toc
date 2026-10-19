@@ -73,6 +73,12 @@ Features\Forever\Directory.lua
 Features\Forever\Pricing.lua
 Features\Forever\Hierarchy.lua
 Features\Forever\Sorting.lua
+Features\Forever\Agreements.lua
+Features\Forever\AgreementComms.lua
+Features\Forever\AgreementPreparation.lua
+Features\Forever\AgreementNotifications.lua
+Features\Forever\AgreementUI.lua
+Features\Forever\AgreementEntry.lua
 Features\Forever\DirectoryUI.lua
 Features\Crafter\UI.lua
 Features\Forever\CrafterBehavior.lua

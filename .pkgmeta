@@ -22,3 +22,5 @@ ignore:
   - Images
   - Tests
   - Tools
+  - AGENTS.md
+  - RELEASE.md

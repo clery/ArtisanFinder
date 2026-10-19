@@ -123,3 +123,8 @@ L.CUSTOMER_SIDE_PREVIEW = "Aperçu client"
 L.CUSTOMER_SIDE_PREVIEW_EMPTY = "Aucune donnée visible par le client n'est encore enregistrée pour cette ligne."
 L.CUSTOMER_SIDE_PREVIEW_SCANNING = "Cette fabrication est en cours d'analyse. L'aperçu client sera actualisé à la fin de l'analyse."
 L.TUTORIAL_CRAFTER_PREVIEW = "Survolez l'icône Aperçu client pour voir ce que les clients verront pour l'objet sélectionné, avec les valeurs propres à l'objet fusionnées avec les valeurs par défaut du métier."
+
+L.CHANGELOG_ENTRY_2_2_0 = [[### Corrigé
+- Les notifications de commandes personnelles transmettent les identifiants de recette et de métier pour afficher les noms dans la langue du destinataire.
+- Les anciens messages trop longs conservent les identifiants en supprimant les noms de secours, ou sont arrêtés s'ils dépassent encore la limite.
+- Les chargements d’objets actualisent uniquement les vues et les suivis concernés pour limiter le travail inutile.]]

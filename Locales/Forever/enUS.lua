@@ -103,3 +103,95 @@ L.FOREVER_TUTORIAL_PAGES = "Use these arrows to change artisan pages. Scroll ins
 L.FOREVER_TUTORIAL_RESET = "Tutorials reset. Open discovery or a profession to see the guide again. The information icons always reopen help."
 
 L.FOREVER_TUTORIAL_END_HINT = "Click this information icon again to end the tutorial."
+
+-- Private crafting agreements
+L.AGREEMENT_TITLE = "Crafting agreements"
+L.AGREEMENT_TOAST_TITLE = "Crafting agreement"
+L.AGREEMENT_REQUEST = "Request this craft"
+L.AGREEMENT_SLASH_HELP = "/af agreements - open private crafting agreements"
+L.AGREEMENT_INCOMING = "Incoming"
+L.AGREEMENT_OUTGOING = "Outgoing"
+L.AGREEMENT_DRAFT = "Unsent draft"
+L.AGREEMENT_PENDING = "Pending"
+L.AGREEMENT_COUNTEROFFERED = "Counteroffer"
+L.AGREEMENT_ACCEPTED = "Accepted"
+L.AGREEMENT_COMPLETED = "Completed"
+L.AGREEMENT_DECLINED = "Declined"
+L.AGREEMENT_CANCELLED = "Cancelled"
+L.AGREEMENT_EXPIRED = "Expired"
+L.AGREEMENT_AWAITING_CONFIRMATION = "Awaiting completion confirmation"
+L.AGREEMENT_WAITING_DELIVERY = "Awaiting delivery confirmation"
+L.AGREEMENT_CONTACT = "Contact: %s"
+L.AGREEMENT_CRAFTING_CHARACTER = "Crafting character: %s"
+L.AGREEMENT_QUANTITY = "Craft operations"
+L.AGREEMENT_TOTAL_COMMISSION = "Total commission (blank = unspecified)"
+L.AGREEMENT_MESSAGE = "Optional message"
+L.AGREEMENT_MATERIALS = "Materials · owned / required · missing"
+L.AGREEMENT_MATERIAL_UNKNOWN = "? / %d · missing unknown"
+L.AGREEMENT_MATERIAL_LINE = "%s · %d / %d · %d missing"
+L.AGREEMENT_MORE_MATERIALS = "+ %d materials (hover to see all)"
+L.AGREEMENT_OUTPUT = "Result: %d–%d items"
+L.AGREEMENT_DRAFT_HELP = "An agreement records intentions only. Crafting, trading and payment remain manual. Zero commission means free."
+L.AGREEMENT_UNSUPPORTED = "Support is not confirmed. Sending saves an unsent draft; you can whisper the artisan instead."
+L.AGREEMENT_UNKNOWN_CRAFT = "Unknown craft"
+L.AGREEMENT_EMPTY = "No agreements in this list."
+L.AGREEMENT_LIST_COUNT = "%d agreements · scroll to browse"
+L.AGREEMENT_NOTIFICATION = "Crafting agreement updated: %s"
+L.AGREEMENT_QUANTITY_ERROR = "Enter 1–999 craft operations."
+L.AGREEMENT_PRICE_ERROR = "Enter a valid total commission within the allowed limit."
+L.AGREEMENT_ACTION_ERROR = "This action could not be completed. Check the agreement and try again."
+L.AGREEMENT_RESTRICTED = "Cannot send here while addon messages are restricted. Your draft is saved; try again after leaving the restricted activity."
+L.AGREEMENT_CAPACITY_ERROR = "You already have 50 active outgoing agreements. Complete or cancel an agreement before sending another."
+L.AGREEMENT_INVALID_ERROR = "This draft has invalid craft details or message text. Use a known craft, a different recipient, and a message of up to 256 characters without links."
+L.AGREEMENT_SCHEMA_ERROR = "These agreements were saved by a newer addon version. Update ArtisanFinder before sending."
+L.AGREEMENT_MATERIALS_ERROR = "Material details are unavailable for this craft."
+L.AGREEMENT_SEND = "Send request"
+L.AGREEMENT_ACCEPT = "Accept these terms"
+L.AGREEMENT_DECLINE = "Decline agreement"
+L.AGREEMENT_COUNTER = "Send counteroffer with this total commission and message"
+L.AGREEMENT_CANCEL = "Cancel agreement"
+L.AGREEMENT_COMPLETE = "Declare or confirm completion"
+L.AGREEMENT_TRACK = "Track required materials"
+L.AGREEMENT_RETRY = "Retry delivery and reconcile the latest state"
+L.AGREEMENT_WHISPER = "Whisper contact"
+L.AGREEMENT_IGNORE = "Ignore future requests from this player"
+L.AGREEMENT_DELETE = "Delete this local record"
+L.AGREEMENT_IGNORED = "Ignored request senders"
+L.AGREEMENT_NO_IGNORED = "No ignored players."
+L.AGREEMENT_UNIGNORE = "Allow requests from %s"
+L.AGREEMENT_DELIVERY_FAILED = "Delivery failed — retry available"
+
+-- Labeled agreement actions
+L.AGREEMENT_BUTTON_SEND = "Send request"
+L.AGREEMENT_BUTTON_ACCEPT = "Accept terms"
+L.AGREEMENT_BUTTON_DECLINE = "Decline"
+L.AGREEMENT_BUTTON_COUNTER = "Counteroffer"
+L.AGREEMENT_BUTTON_CANCEL = "Cancel agreement"
+L.AGREEMENT_BUTTON_COMPLETE = "Declare completion"
+L.AGREEMENT_BUTTON_TRACK = "Track materials"
+L.AGREEMENT_BUTTON_RETRY = "Retry delivery"
+L.AGREEMENT_BUTTON_WHISPER = "Whisper"
+L.AGREEMENT_BUTTON_IGNORE = "Ignore player"
+L.AGREEMENT_BUTTON_DELETE = "Delete record"
+L.AGREEMENT_BUTTON_IGNORED = "Ignored players"
+L.AGREEMENT_BUTTON_PREVIOUS = "Previous"
+L.AGREEMENT_BUTTON_NEXT = "Next"
+L.AGREEMENT_BUTTON_CONFIRM = "Confirm completion"
+
+L.FOREVER_COMPLETED_AGREEMENTS = "Completed agreements"
+L.FOREVER_COMPLETED_COUNTS = "%d completed · %d with you"
+L.FOREVER_COMPLETED_PERSONAL = "%d with you"
+L.FOREVER_COMPLETED_AGREEMENTS_HELP = "Total reported by this artisan across their characters. “With you” counts agreements completed with your characters. Both participants must confirm completion. Earlier deleted history cannot be recovered."
+
+L.AGREEMENT_TAB = "Agreements"
+
+L.CHANGELOG_ENTRY_FOREVER_2_2_0 = [[### Added
+- Arrange private crafting agreements directly from discovery: request a craft, negotiate quantities and commission, accept or decline, and confirm completion together.
+- Browse incoming and outgoing agreements in a dedicated tab, with unread badges, notifications, delivery status and retry controls.
+- See completed-agreement totals in discovery, with your own completed agreements shown separately.
+- Track accepted agreements separately in the objectives tracker and search missing materials with Auctionator.
+
+### Changed
+- Agreements use a fixed-size parchment page with quest-style item cards, clear missing-material indicators and a completion stamp.
+- Material counts come from the customer and are saved when the agreement is accepted. Reopening an accepted agreement does not request or change those counts; unavailable counts remain unknown.
+- Private agreements require both players to use a compatible ArtisanFinder version. They do not automatically craft, trade or transfer gold.]]

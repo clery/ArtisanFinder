@@ -23,6 +23,8 @@ for path in ("Features/Retail/Crafter/CustomerPreview.lua", "Features/Retail/Ord
     assert path in retail and path not in forever, f"Retail-only module leaked: {path}"
 assert not any(path.startswith("Features/Forever/") for path in retail), "Forever module leaked into Retail"
 assert "Features/Forever/DirectoryUI.lua" in forever
+for module in ("Agreements", "AgreementComms", "AgreementUI", "AgreementPreparation", "AgreementEntry", "AgreementNotifications"):
+    assert f"Features/Forever/{module}.lua" in forever, f"Missing private agreement module: {module}"
 assert "Changelogs/Retail.lua" in retail and "Changelogs/Retail.lua" not in forever
 assert "Changelogs/Forever.lua" in forever and "Changelogs/Forever.lua" not in retail
 for path in ("Core/Core.lua", "Core/Data.lua", "Core/Transfer.lua", "Features/Social/Comms.lua", "Features/Crafter/Scanner.lua", "Features/Crafter/UI.lua", "Features/Crafter/ProfessionRecipes.lua", "Features/Customer/ProfessionOpening.lua", "Features/Customer/PreparationTracker.lua", "Locales/Shared.xml", "SharedCore.xml", "Features/SharedData.xml", "UI/SharedWidgets.xml"):
@@ -35,9 +37,17 @@ for flavor, paths, other in (("Retail", retail, "Forever"), ("Forever", forever,
     assert f"Locales/{flavor}/frFR.lua" in paths
     assert f"Flavors/{other}.lua" not in paths
 print("PASS flavor isolation and shared module selection", flush=True)
-for path in sorted(root.rglob("*.lua")):
-    subprocess.run(["luac", "-p", str(path)], cwd=root, check=True)
-print("PASS Lua syntax: all addon, library and test files", flush=True)
+# Check tracked/new source files and every shipped dependency. Ignore local scratch
+# files excluded by git (for example unused experiments inside vendored libraries).
+source_paths = subprocess.run(
+    ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+    cwd=root, capture_output=True, text=True, check=True,
+).stdout.split("\0")
+syntax_paths = {root / name for name in source_paths if name.endswith(".lua")}
+syntax_paths.update(root / name for paths in flavors.values() for name in paths if name.endswith(".lua"))
+for path in sorted(syntax_paths):
+    subprocess.run(["luac5.1", "-p", str(path)], cwd=root, check=True)
+print(f"PASS Lua 5.1 syntax: {len(syntax_paths)} source, library and test files", flush=True)
 subprocess.run([sys.executable, str(root / "Tests/release_packaging.py")], cwd=root, check=True)
 tests = sorted((root / "Tests").glob("*.lua"))
 for path in tests:
@@ -50,13 +60,13 @@ import tempfile
 from zipfile import ZipFile
 with tempfile.TemporaryDirectory(prefix="artisanfinder-packages-") as directory:
     for flavor in ("retail", "forever"):
-        archive = build(flavor, Path(directory))
+        archive = build(flavor, Path(directory), version="2.2.0")
         with ZipFile(archive) as package:
             names = set(package.namelist())
             manifest = package.read("ArtisanFinder/ArtisanFinder.toc").decode()
             changelog = package.read("ArtisanFinder/CHANGELOG.md")
             assert changelog == (root / f"CHANGELOG_{flavor.upper()}.md").read_bytes()
-            assert "@project-version@" not in manifest
+            assert "## Version: 2.2.0" in manifest and "@project-version@" not in manifest
             other = "Retail" if flavor == "forever" else "Forever"
             assert f"ArtisanFinder/Changelogs/{other}.lua" not in names
             assert f"Flavors\\{flavor.title()}.lua" in manifest

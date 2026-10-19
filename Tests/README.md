@@ -2,7 +2,7 @@
 
 Run `rtk proxy python3 Tests/run.py` from the addon directory, or use the script's absolute path from another directory.
 
-The runner validates recursive Lua/XML dependencies for all three manifests, checks client module isolation and shared modules, parses all Lua source, and runs every Lua fixture. It also builds both distribution archives and checks their runtime includes without relying on the source checkout.
+The runner validates recursive Lua/XML dependencies for all three manifests, checks client module isolation and shared modules, parses tracked/new Lua source and every runtime dependency with Lua 5.1 (excluding ignored local scratch files), and runs every Lua fixture. It also builds both distribution archives with explicit release version 2.2.0 and checks their runtime includes without relying on the source checkout.
 
 The original Retail suites cover customer order-state refresh, preparation/reagent details, quality wire data, recommendation calculations, guild cache, imports, transfers and large profession-open workloads. [retail_startup.lua](retail_startup.lua) verifies Retail order events, notification/preparation startup and lazy order-panel attachment.
 
@@ -21,3 +21,7 @@ Trade Chat diagnosis: `/af debug on`, wait for a profession advertisement, then 
 `forever_hierarchy.lua` covers artisan/profession/craft expansion, merged recipe sources, deduplication, collapse state, pagination and default-versus-item pricing. The UI fixture verifies that row clicks expand without whispering; discovery tests verify default notes, including chunked long notes and note-only professions.
 
 `shared_flavor_modules.lua` checks shared implementation ownership, client recipe policy, item-data callback composition and initialization of every Forever discovery transport. Manifest checks also enforce that Retail reagent controls never enter the Forever package.
+
+Private agreement two-client checks: [Forever agreements](AGREEMENTS.md).
+
+[locale_coverage.lua](locale_coverage.lua) checks every shared and client-owned string in all ten supported locales, format argument types/order, runtime language selection, and localized current release notes. [forever_translations.lua](forever_translations.lua) retains focused Forever UI coverage.

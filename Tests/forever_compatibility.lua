@@ -15,7 +15,7 @@ AF.Now=function() return now end AF.NormalizeName=function(_,name) return name e
 AF.GetPlayerFullName=function() return AF.playerName end
 AF.GetSupportedProfessionID=function(_,id) return (id==164 or id==333 or id==165) and id or nil end
 AF.GetProfessionName=function(_,id) return "Profession "..id end
-AF.GetDisplayItemName=function(_,id) return "Item "..id end
+AF.GetDisplayItemName=function(_,id,fallback) return ({[201]="Sword",[202]="Shield"})[id] or fallback or "Item "..id end
 AF.IsProtectedActionRestricted=function() return false end AF.IsAddonCommsUnavailable=function() return false end
 AF.DebugLog=function() end AF.RefreshCustomerResults=function(self) self.refreshed=true end
 AF.RefreshForeverNameplates=function() end AF.IsFavoriteArtisan=function() return false end
@@ -57,6 +57,17 @@ assert(#AF:GetForeverKnownCrafts("Remote Crafter",164)==2,"CraftBoard recipes ex
 AF.currentCustomerItemID=201
 assert(#AF:GetForeverDirectoryRows("",nil,"CRAFTBOARD")==1,"selected-item searches include CraftBoard")
 AF.currentCustomerItemID=nil
+-- The protocol keeps numeric identities; only the receiver's display locale changes.
+local originalDisplayName=AF.GetDisplayItemName
+AF.GetDisplayItemName=function(_,id,fallback) return ({[201]="Épée",[202]="Bouclier"})[id] or fallback or "Unknown" end
+assert(#AF:GetForeverDirectoryRows("Épée",nil,"CRAFTBOARD")==1,"French receiver finds English CraftBoard item by local name")
+assert(AF:FindForeverItems("Épée")[1].itemID==201,"cross-locale item search retains exact numeric identity")
+assert(AF:GetForeverKnownCrafts("Remote Crafter",164)[1].craftName~="Sword","remote English names do not override local labels")
+AF.GetDisplayItemName=originalDisplayName
+receive("CBRD","H",{v=1,h="french-book",n=1,profs={[164]={r=300}}},"GUILD","French Crafter")
+receive("CBRD","R",{v=1,h="french-book",profs={[164]={r=300}},list={{101,"Épée",201,164}},pg=1,pgs=1},"WHISPER","French Crafter")
+assert(#AF:GetForeverDirectoryRows("sword",nil,"CRAFTBOARD")==2,"English receiver finds French CraftBoard item by local name")
+assert(AF:GetForeverKnownCrafts("French Crafter",164)[1].craftName=="Sword","shared item ID wins over translated sender label")
 receive("ReleaseGaming",2,{name="RG Crafter",version=9},"WHISPER","RG Crafter")
 assert(sent[#sent].prefix=="ReleaseGaming" and sent[#sent].target=="RG Crafter","RG HEAD triggers GET")
 local record={version=9,professions={[333]={rank=300,items={301,302},spells={401}}},main="RG Main"}

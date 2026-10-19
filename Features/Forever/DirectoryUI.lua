@@ -96,7 +96,7 @@ function AF:OpenForeverSourceFilter(owner)
 end
 local function rowIsHovered(row)
     if row:IsMouseOver() then return true end
-    for _,button in ipairs({row.action,row.star,row.link,row.whoRefresh,row.itemLink,row.track}) do
+    for _,button in ipairs({row.action,row.star,row.link,row.whoRefresh,row.itemLink,row.track,row.request,row.completedTip}) do
         if button and button:IsShown() and button:IsMouseOver() then return true end
     end
     for _,button in ipairs(row.professionButtons or {}) do
@@ -155,6 +155,18 @@ local function createRow(parent)
     row.chevron=row:CreateTexture(nil,"ARTWORK")
     row.chevron:SetSize(10,14) row.chevron:SetAtlas("common-icon-forwardarrow")
     row.name=label(row,"",12,0,200)
+    row.completed=label(row,"",26,0,200,"GameFontHighlightSmall",MUTED)
+    row.completedTip=CreateFrame("Button",nil,row)
+    row.completedTip:SetAllPoints(row.completed)
+    row.completedTip:SetScript("OnEnter",function(owner)
+        GameTooltip:SetOwner(owner,"ANCHOR_RIGHT")
+        GameTooltip:SetText(AF:Text("FOREVER_COMPLETED_AGREEMENTS"),1,.82,.35)
+        GameTooltip:AddLine(row.completed:GetText(),1,1,1,true)
+        GameTooltip:AddLine(AF:Text("FOREVER_COMPLETED_AGREEMENTS_HELP"),1,1,1,true)
+        GameTooltip:Show()
+    end)
+    row.completedTip:SetScript("OnLeave",function() GameTooltip:Hide() end)
+    row.completedTip:SetScript("OnClick",function() if row:GetScript("OnClick") then row:GetScript("OnClick")(row) end end)
     row.itemIcon=row:CreateTexture(nil,"ARTWORK") row.itemIcon:SetSize(20,20)
     row.itemIcon:SetPoint("LEFT",row,"LEFT",46,0) row.itemIcon:SetTexCoord(.08,.92,.08,.92)
     row.itemLink=CreateFrame("Button",nil,row) row.itemLink:SetAllPoints(row.name)
@@ -196,6 +208,10 @@ local function createRow(parent)
         if row.view.kind=="craft" then AF:TrackForeverCraftMaterials(row.entry) end
     end,AF:Text("FOREVER_TRACK_MATERIALS_HELP"))
     row.track:SetPoint("RIGHT",row,"RIGHT",-5,0)
+    row.request=icon(row,"Interface\\Cursor\\LootAll",AF:Text("AGREEMENT_REQUEST"),function()
+        AF:RequestForeverCraftAgreement(row.view)
+    end)
+    row.request:SetPoint("RIGHT",row.track,"LEFT",-4,0)
     row.actions:SetPoint("RIGHT",row.star,"LEFT",-3,0)
     row.link=icon(row.actions,"Interface\\Buttons\\UI-GuildButton-PublicNote-Up",AF:Text("PROFESSION_LINK"),function(owner)
         local offers=AF:GetOpenableForeverProfessions(row.group)
@@ -247,7 +263,7 @@ local function createRow(parent)
     row:SetScript("OnLeave",function()
         deferRowLeave(row) GameTooltip:Hide()
     end)
-    for _,button in ipairs({row.action,row.star,row.link,row.whoRefresh,row.itemLink,row.track}) do
+    for _,button in ipairs({row.action,row.star,row.link,row.whoRefresh,row.itemLink,row.track,row.request,row.completedTip}) do
         button:SetFrameLevel(button==row.itemLink and row:GetFrameLevel()+1 or row.actions:GetFrameLevel()+1)
         local enter,leave=button:GetScript("OnEnter"),button:GetScript("OnLeave")
         button:SetScript("OnEnter",function(owner,...)
@@ -262,11 +278,79 @@ local function createRow(parent)
     return row
 end
 function AF:InitializeCustomerUI() self:AttachCustomerUI() end
+-- Discovery and agreements share one shell, so navigation never opens overlapping windows.
+function AF:SelectForeverDirectoryTab(kind)
+    self:AttachCustomerUI()
+    local frame=self.customerFrame
+    kind=kind=="agreements" and "agreements" or "discovery"
+    if kind=="agreements" and not self.agreementsFrame then self:ShowAgreements() return end
+    if frame.directoryTab==kind then return end
+    if self.activeTutorialKind=="discovery" and self.EndForeverTutorial then self:EndForeverTutorial() end
+    frame.directoryTab=kind
+    local discovery=kind=="discovery"
+    for _,widget in ipairs(frame.discoveryWidgets) do widget:SetShown(discovery) end
+    if self.customerTutorialButton then self.customerTutorialButton:SetShown(discovery) end
+    if self.agreementsFrame then self.agreementsFrame:SetShown(not discovery) end
+    self:PositionForeverDirectoryTabs()
+    if discovery then
+        self:ResizeForeverDirectoryHost(620)
+        self:RefreshCustomerResults()
+    else self:RefreshAgreementUI() end
+end
+function AF:ResizeForeverDirectoryHost(height)
+    local frame=self.customerFrame
+    if not frame then return end
+    -- Match the agreement canvas instead of centering it inside the wider directory.
+    local width=frame.directoryTab=="agreements" and self.agreementsFrame and self.agreementsFrame:GetWidth()
+        or frame.discoveryWidth or frame:GetWidth()
+    frame:SetSize(width,height)
+    if self.directoryInProfessions and ProfessionsFrame then
+        ProfessionsFrame:SetSize(width,height)
+    else
+        local rightInset=frame.agreements:GetWidth()+28
+        frame:SetScale(math.min(1,(UIParent:GetWidth()-24)/(frame:GetWidth()+rightInset),(UIParent:GetHeight()-24)/height))
+    end
+end
+function AF:PositionForeverDirectoryTabs()
+    local frame=self.customerFrame
+    if not frame or not frame.directoryTabs then return end
+    local embedded=self.directoryInProfessions~=nil
+    frame:SetClampRectInsets(0,embedded and 0 or frame.agreements:GetWidth()+28,0,0)
+    for index,tab in ipairs(frame.directoryTabs) do
+        tab:SetShown(not embedded)
+        tab:SetFrameStrata(frame:GetFrameStrata())
+        tab:SetFrameLevel(frame:GetFrameLevel()+20)
+        tab:SetChecked((index==2)==(frame.directoryTab=="agreements"))
+    end
+    if self.foreverDiscoveryTab then self.foreverDiscoveryTab:SetChecked(embedded and frame.directoryTab~="agreements") end
+    if self.foreverAgreementsTab then self.foreverAgreementsTab:SetChecked(embedded and frame.directoryTab=="agreements") end
+end
+local function directoryTabs(frame)
+    frame.directoryTabs={}
+    local textures={"Interface\\AddOns\\"..(AF.ADDON_NAME or "ArtisanFinder").."\\Assets\\Icon.png","Interface\\Icons\\INV_Scroll_03"}
+    for index,key in ipairs({"FOREVER_DISCOVERY_OPTIONS","AGREEMENT_TAB"}) do
+        local tab=CreateFrame("Frame",nil,frame,"LargeSideTabButtonTemplate")
+        tab:EnableMouse(true) tab:SetFillToInterior(true)
+        tab.tooltipText="ArtisanFinder - "..AF:Text(key) tab.Icon:SetTexture(textures[index])
+        if index==1 then tab:SetPoint("TOPLEFT",frame,"TOPRIGHT",0,-60)
+        else tab:SetPoint("TOPLEFT",frame.directoryTabs[index-1],"BOTTOMLEFT",0,-2) end
+        tab:SetCustomOnMouseUpHandler(function(_,button,inside)
+            if button=="LeftButton" and inside then AF:SelectForeverDirectoryTab(index==1 and "discovery" or "agreements") end
+        end)
+        frame.directoryTabs[index]=tab
+    end
+    frame.agreements=frame.directoryTabs[2]
+    frame.agreements.notificationBadgeInsideTab=true
+    frame.directoryTabs[1]:SetChecked(true) frame.directoryTabs[2]:SetChecked(false)
+    frame.directoryTab="discovery"
+    frame.discoveryWidgets={frame.inset,frame.scroll,frame.header,frame.footer,frame.previous,frame.next}
+end
 function AF:AttachCustomerUI()
     if self.customerFrame then return end
     local frame=CreateFrame("Frame","ArtisanFinderDirectory",UIParent,"PortraitFrameTemplate")
     local screenWidth=UIParent:GetWidth()
     local panelWidth=type(screenWidth)=="number" and math.min(920,math.max(840,screenWidth-32)) or 920
+    frame.discoveryWidth=panelWidth
     frame:SetSize(panelWidth,620)
     if type(screenWidth)=="number" and screenWidth>0 and screenWidth<panelWidth+24 then
         frame:SetScale((screenWidth-24)/panelWidth)
@@ -346,7 +430,11 @@ function AF:AttachCustomerUI()
     end
     frame.previous=arrow(-1,"atlas:common-icon-backarrow","FOREVER_PREVIOUS")
     frame.next=arrow(1,"atlas:common-icon-forwardarrow","FOREVER_NEXT")
+    directoryTabs(frame)
     self.customerFrame,self.customerRows=frame,{}
+    self:PositionForeverDirectoryTabs()
+    self:ResizeForeverDirectoryHost(620)
+    if self.RefreshAgreementUnreadIndicator then self:RefreshAgreementUnreadIndicator() end
     frame:SetScript("OnShow",function() AF.directoryLiveOrder=nil AF:RefreshCustomerResults() end)
     frame:SetScript("OnHide",function() AF.directoryLiveOrder=nil end)
     frame:Hide() if UISpecialFrames then table.insert(UISpecialFrames,"ArtisanFinderDirectory") end
@@ -375,11 +463,15 @@ function AF:FocusTargetedForeverArtisan()
 end
 function AF:OpenCustomerUI()
     self:AttachCustomerUI()
+    self:SelectForeverDirectoryTab("discovery")
     self:FocusTargetedForeverArtisan()
     self.customerFrame:Show() self:RefreshCustomerQuery(false)
 end
 function AF:ToggleCustomerUI()
     self:AttachCustomerUI()
+    if self.customerFrame.directoryTab=="agreements" then
+        self:SelectForeverDirectoryTab("discovery") self.customerFrame:Show() return
+    end
     if self:FocusTargetedForeverArtisan() then
         self.customerFrame:Show() self:RefreshCustomerResults()
     else self.customerFrame:SetShown(not self.customerFrame:IsShown()) end
@@ -452,7 +544,7 @@ function AF:QueueCustomerResultsRefresh()
 end
 
 function AF:RefreshCustomerResults(statusOverride)
-    local frame=self.customerFrame if not frame or not frame:IsShown() then return end
+    local frame=self.customerFrame if not frame or not frame:IsShown() or frame.directoryTab=="agreements" then return end
     self.directoryLastRefreshAt=self:Now()
     local build={}
     local started=debugprofilestop and debugprofilestop()
@@ -542,6 +634,9 @@ function AF:RefreshCustomerResults(statusOverride)
         local title=view.label or (view.kind=="profession" and self:GetForeverProfessionLabel(group,view.professionID) or self:GetDisplayPlayerName(group.name))
         row.itemIcon:SetShown(view.kind=="craft") row.itemLink:SetShown(view.kind=="craft")
         row.track:SetShown(view.kind=="craft")
+        row.request:SetShown(view.kind=="craft" and AF.GetAgreementInputFromCraft and AF:GetAgreementInputFromCraft(view.artisanGroup or group,group.entry)~=nil)
+        row.actions:ClearAllPoints()
+        row.actions:SetPoint("RIGHT",view.kind=="craft" and row.request or row.star,"LEFT",-3,0)
         row.craftLink,row.craftPayload=nil,nil
         if view.kind=="craft" then
             local texture
@@ -549,6 +644,17 @@ function AF:RefreshCustomerResults(statusOverride)
             row.itemIcon:SetTexture(texture)
             row.name:ClearAllPoints() row.name:SetPoint("TOPLEFT",72,y) row.name:SetWidth(source-84)
             title=row.craftLink
+        end
+        local completed,personal
+        if view.kind=="artisan" and self.GetForeverGroupAgreementCounts then completed,personal=self:GetForeverGroupAgreementCounts(group) end
+        local showCompleted=completed~=nil or (personal or 0)>0
+        row.completed:SetShown(showCompleted) row.completedTip:SetShown(showCompleted)
+        if showCompleted then
+            row.name:ClearAllPoints() row.name:SetPoint("TOPLEFT",26,-math.max(1,math.floor((rowHeight-28)/2)))
+            row.completed:ClearAllPoints() row.completed:SetPoint("TOPLEFT",row.name,"BOTTOMLEFT",0,-1)
+            row.completed:SetWidth(profession-38)
+            row.completed:SetText(completed~=nil and self:Text("FOREVER_COMPLETED_COUNTS",completed,personal or 0)
+                or self:Text("FOREVER_COMPLETED_PERSONAL",personal))
         end
         row.name:SetText(title)
         row.name:SetTextColor(unpack(view.kind=="profession" and GOLD or (view.kind=="artisan" and {1,.96,.85} or {.86,.83,.75})))

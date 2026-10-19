@@ -61,9 +61,11 @@ crafter.db.artisanProfile.professions["333"].professionLink="|cffffd000|Htrade:P
 crafter.db.artisanProfile.professionPrices={["333"]={priceCopper=12500,commissionSpecified=true,note="Bring materials | tips welcome"}}
 crafter.db.artisanProfile.professions["333"].skillLevel=225
 crafter.db.artisanProfile.professions["333"].maxSkillLevel=300
+crafter.GetCompletedAgreementCounts=function() return 12,0 end
 local browser=new("Browser Surname",false)
 browser:InitializeComms() flush() flush()
 local presence=browser.db.foreverDiscoveries["Crafter Surname"]
+assert(presence.completedAgreements==12,"native presence shares only the completed aggregate")
 assert(presence.skills[333].level==225 and presence.skills[333].maximum==300,"native presence exchanges profession levels")
 assert(presence.commissions[333].note=="Bring materials | tips welcome","default notes survive wire encoding")
 assert(presence.commissions[333].priceCopper==12500,"default commissions are announced with professions")
@@ -182,3 +184,20 @@ browser.QueueGuildRosterCacheRefresh=function(_,request) assert(request==false) 
 browser.foreverGuildDiscoveryFrame.OnEvent(nil,"CLUB_MEMBER_UPDATED")
 assert(refreshed,"guild roster changes refresh discovery")
 print("PASS guild roster profession discovery, full names, sources, deduplication, guild leave and updates")
+
+for _,value in ipairs({"-1","1.5","nan","2147483648","4abc"}) do
+    browser:HandleFlavorAddonMessage("FA",{"FA","FF1","333","a:completed",value},"Bad Count","CHANNEL")
+    assert(browser.db.foreverDiscoveries["Bad Count"].completedAgreements==nil,"invalid aggregate rejected")
+end
+browser:HandleFlavorAddonMessage("FA",{"FA","FF1","333"},"Legacy Crafter","CHANNEL")
+assert(browser.db.foreverDiscoveries["Legacy Crafter"].completedAgreements==nil,"legacy count unknown, not zero")
+browser:HandleFlavorAddonMessage("FA",{"FA","FF1","333","a:completed","0"},"New Crafter","CHANNEL")
+assert(browser.db.foreverDiscoveries["New Crafter"].completedAgreements==0,"known zero retained")
+local total,personal=browser:GetForeverGroupAgreementCounts({name="New Crafter",offers={{target="New Crafter"}}})
+assert(total==0 and personal==0)
+browser.GetCompletedAgreementCounts=function(_,contacts) assert(contacts["Crafter Surname"] and contacts["Crafter Alt"]) return 99,3 end
+browser.db.foreverDiscoveries["Crafter Surname"].completedAgreements=12
+browser.db.foreverDiscoveries["Crafter Alt"]={completedAgreements=12}
+total,personal=browser:GetForeverGroupAgreementCounts({name="Crafter Alt",offers={{target="Crafter Surname"},{target="Crafter Alt"}}})
+assert(total==12 and personal==3,"do not sum shared account aggregate for linked contacts")
+print("PASS completed aggregate wire compatibility, bounds and grouped private/public totals")

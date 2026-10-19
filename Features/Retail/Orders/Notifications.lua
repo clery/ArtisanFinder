@@ -1,6 +1,5 @@
 local _, AF = ...
 
-local ORDER_SOUND_FALLBACK = "CATALOG_SHOP_OPEN_LOADING_SCREEN" -- catalog_shop_open_loading_screen_1
 local TOAST_WIDTH = 340
 local TOAST_HEIGHT = 80
 local TOAST_SPACING = 6
@@ -55,18 +54,6 @@ end
 local function ShouldRetryCustomerOrderStateRefresh(blockReason)
 	return blockReason == "restricted" or blockReason == "player-casting"
 end
-
-local function GetOrderSound()
-	local soundKey = AF.db and AF.db.orderNotificationSound or ORDER_SOUND_FALLBACK
-	return SOUNDKIT and (SOUNDKIT[soundKey] or SOUNDKIT[ORDER_SOUND_FALLBACK])
-end
-
-local function GetOrderSoundChannel()
-	local channel = AF.db and AF.db.orderNotificationChannel
-	return channel and channel ~= "" and channel ~= "default" and channel or nil
-end
-
-
 
 local function CountPersonalOrders()
 	if not C_CraftingOrders or not C_CraftingOrders.GetPersonalOrdersInfo then
@@ -242,6 +229,8 @@ local function CopyOrderDetails(details)
 	return {
 		notificationType = details.notificationType,
 		itemID = tonumber(details.itemID),
+		recipeID = tonumber(details.recipeID),
+		professionID = tonumber(details.professionID),
 		orderID = details.orderID,
 		itemLink = itemLink,
 		itemName = itemName,
@@ -350,10 +339,30 @@ local function GetFallbackOrderName(form, recipeSchematic)
 	return StripOrderDisplayText(text) or StripOrderDisplayText(recipeSchematic and recipeSchematic.name)
 end
 
+local function CanonicalOrderID(value)
+	value = tonumber(value)
+	return value and value > 0 and value <= 2147483647 and value % 1 == 0 and value or nil
+end
+
+local function FillOrderDetailsIdentifiers(details)
+	details.recipeID = CanonicalOrderID(details.recipeID)
+	details.professionID = CanonicalOrderID(details.professionID)
+	if not details.professionID and details.recipeID and C_TradeSkillUI and C_TradeSkillUI.GetProfessionInfoByRecipeID then
+		local ok, info = pcall(C_TradeSkillUI.GetProfessionInfoByRecipeID, details.recipeID)
+		if ok and type(info) == "table" then
+			details.professionID = CanonicalOrderID(info.parentProfessionID) or CanonicalOrderID(info.professionID)
+		end
+	end
+	if details.professionID and AF.GetProfessionName then
+		details.professionName = AF:GetProfessionName(details.professionID)
+	end
+end
+
 local function FillOrderDetailsFromItemInfo(details)
+	FillOrderDetailsIdentifiers(details)
 	local itemID, itemName, itemLink, itemQuality, itemIcon = GetOrderNotificationItemInfo(details)
 	details.itemID = details.itemID or itemID
-	details.itemName = details.itemName or itemName
+	details.itemName = itemName or details.itemName
 	details.itemLink = details.itemLink or itemLink
 	details.itemQuality = details.itemQuality or itemQuality
 	details.itemIcon = details.itemIcon or itemIcon
@@ -370,6 +379,7 @@ local function FillOrderDetailsFromRecipeInfo(details, recipeInfo)
 	if type(recipeInfo) ~= "table" then
 		return details
 	end
+	details.recipeID = details.recipeID or CanonicalOrderID(recipeInfo.recipeID)
 	details.itemID = details.itemID or tonumber(recipeInfo.itemID)
 	details.itemLink = details.itemLink or recipeInfo.hyperlink
 	details.itemName = details.itemName or recipeInfo.name
@@ -381,6 +391,8 @@ local function FillOrderDetailsFromOrderInfo(details, order)
 	if type(order) ~= "table" then
 		return FillOrderDetailsFromItemInfo(details)
 	end
+	details.recipeID = details.recipeID or CanonicalOrderID(order.spellID or order.recipeID)
+	details.professionID = details.professionID or CanonicalOrderID(order.professionID)
 	details.itemID = details.itemID or tonumber(order.itemID)
 	details.itemLink = details.itemLink or order.outputItemHyperlink or order.recraftItemHyperlink
 	details.itemID = details.itemID or AF:GetItemIDFromLink(details.itemLink)
@@ -440,19 +452,6 @@ local function GetOrderTotals(addon)
 		end
 	end
 	return currentTotal, altTotal
-end
-
-function AF:PlayOrderNotificationSound(force)
-	if not force and self.db and (self.db.orderNotificationsEnabled == false or self.db.orderNotificationSoundEnabled == false) then
-		return
-	end
-	-- if not force and not CanShowOrderNotification(self) then
-	-- 	return
-	-- end
-	local sound = GetOrderSound()
-	if sound then
-		PlaySound(sound, GetOrderSoundChannel())
-	end
 end
 
 function AF:ShowOrderNotification(characterName, count, details)
@@ -515,6 +514,8 @@ function AF:NotifyPersonalOrder(characterName, count, sender, details)
 		sender = sender,
 		dev = sender == "dev" or nil,
 		itemID = details.itemID,
+		recipeID = details.recipeID,
+		professionID = details.professionID,
 		itemLink = details.itemLink,
 		itemName = details.itemName,
 		itemQuality = details.itemQuality,
@@ -619,8 +620,10 @@ function AF:HandleOrderNotification(parts, sender)
 		itemIcon = tonumber(parts[10]),
 		professionName = self:DecodeField(parts[11]),
 		itemQuality = tonumber(parts[12]),
+		professionID = CanonicalOrderID(parts[13]),
+		recipeID = CanonicalOrderID(parts[14]),
 	}
-	self:NotifyPersonalOrder(characterName, count, sender, details)
+	self:NotifyPersonalOrder(characterName, count, sender, FillOrderDetailsFromItemInfo(details))
 end
 
 function AF:HandleFulfilledOrderNotification(parts, sender)
@@ -639,7 +642,10 @@ function AF:HandleFulfilledOrderNotification(parts, sender)
 		itemIcon = tonumber(parts[8]),
 		professionName = self:DecodeField(parts[9]),
 		itemQuality = tonumber(parts[10]),
+		professionID = CanonicalOrderID(parts[11]),
+		recipeID = CanonicalOrderID(parts[12]),
 	}
+	FillOrderDetailsFromItemInfo(details)
 	if orderID and orderID ~= "" then
 		self.db.customerOrderStates = self.db.customerOrderStates or {}
 		self.db.customerOrderStates[tostring(orderID)] = tostring(Enum.CraftingOrderState.Fulfilled)
@@ -674,6 +680,9 @@ function AF:SendOrderNotification(characterName, count, details)
 		tonumber(details.itemIcon) or "",
 		self:EncodeField(details.professionName or ""),
 		tonumber(details.itemQuality) or "",
+		-- Append-only fields: older clients continue reading the original layout.
+		CanonicalOrderID(details.professionID) or "",
+		CanonicalOrderID(details.recipeID) or "",
 	}
 	self:DebugLog("orders", "send target=" .. tostring(messageTarget) .. " orderTarget=" .. tostring(characterName) .. " item=" .. tostring(details.itemID or ""))
 	if self.SendPayloadParts and self:SendPayloadParts(payloadParts, "WHISPER", messageTarget, "NORMAL", "O:" .. characterName) then
@@ -686,7 +695,14 @@ function AF:SendOrderNotification(characterName, count, details)
 	for index, value in ipairs(payloadParts) do
 		payloadParts[index] = tostring(value or "")
 	end
-	return self:SendAddon(table.concat(payloadParts, "|"), "WHISPER", messageTarget, "NORMAL", "O:" .. characterName)
+	local payload = table.concat(payloadParts, "|")
+	if #payload > 255 then
+		-- IDs retain meaning when translated display fallbacks do not fit.
+		payloadParts[9], payloadParts[11] = "", ""
+		payload = table.concat(payloadParts, "|")
+	end
+	if #payload > 255 then return false end
+	return self:SendAddon(payload, "WHISPER", messageTarget, "NORMAL", "O:" .. characterName)
 end
 
 function AF:SendFulfilledOrderNotification(order, details)
@@ -724,6 +740,9 @@ function AF:SendFulfilledOrderNotification(order, details)
 		tonumber(details.itemIcon) or "",
 		self:EncodeField(details.professionName or ""),
 		tonumber(details.itemQuality) or "",
+		-- Append-only fields: older clients continue reading the original layout.
+		CanonicalOrderID(details.professionID) or "",
+		CanonicalOrderID(details.recipeID) or "",
 	}
 	self:DebugLog("orders", "send fulfilled target=" .. tostring(target) .. " order=" .. tostring(order.orderID or "") .. " item=" .. tostring(details.itemID or ""))
 	if self.SendPayloadParts and self:SendPayloadParts(payloadParts, "WHISPER", target, "NORMAL", "F:" .. tostring(order.orderID or "")) then
@@ -736,7 +755,13 @@ function AF:SendFulfilledOrderNotification(order, details)
 	for index, value in ipairs(payloadParts) do
 		payloadParts[index] = tostring(value or "")
 	end
-	return self:SendAddon(table.concat(payloadParts, "|"), "WHISPER", target, "NORMAL", "F:" .. tostring(order.orderID or ""))
+	local payload = table.concat(payloadParts, "|")
+	if #payload > 255 then
+		payloadParts[7], payloadParts[9] = "", ""
+		payload = table.concat(payloadParts, "|")
+	end
+	if #payload > 255 then return false end
+	return self:SendAddon(payload, "WHISPER", target, "NORMAL", "F:" .. tostring(order.orderID or ""))
 end
 
 function AF:OnPersonalOrderCountsUpdated()
@@ -990,6 +1015,7 @@ function AF:CapturePersonalOrderDetails(orderInfo, form)
 	if form and form.order then
 		details.professionName = C_TradeSkillUI.GetProfessionNameForSkillLineAbility(form.order.skillLineAbilityID)
 		local recipeID = form.order.spellID
+		details.recipeID = CanonicalOrderID(recipeID)
 		local transaction = form.transaction
 		local recipeSchematic = transaction and transaction.GetRecipeSchematic and transaction:GetRecipeSchematic()
 		if form.order.isRecraft and form.order.recraftItemHyperlink then
@@ -1109,6 +1135,8 @@ function AF:GetKnownOrderRows()
 				alt = true,
 				dev = entry.dev,
 				itemID = entry.itemID,
+				recipeID = entry.recipeID,
+				professionID = entry.professionID,
 				itemLink = entry.itemLink,
 				itemName = entry.itemName,
 				itemQuality = entry.itemQuality,

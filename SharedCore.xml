@@ -1,5 +1,6 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/">
     <Script file="Core\Util.lua"/>
+    <Script file="Core\NotificationSound.lua"/>
     <Script file="Utils\Formatting.lua"/>
     <Script file="Core\Data.lua"/>
 </Ui>

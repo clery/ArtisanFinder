@@ -123,3 +123,8 @@ L.CUSTOMER_SIDE_PREVIEW = "Customer Preview"
 L.CUSTOMER_SIDE_PREVIEW_EMPTY = "No customer-visible data is saved for this row yet."
 L.CUSTOMER_SIDE_PREVIEW_SCANNING = "Scanning this craft. Customer preview will update when scanning finishes."
 L.TUTORIAL_CRAFTER_PREVIEW = "Hover the Customer Preview icon to see what customers will see for the selected craft, including item-specific values merged with profession defaults."
+
+L.CHANGELOG_ENTRY_2_2_0 = [[### Fixed
+- Personal-order notifications now carry recipe and profession identifiers so item and profession names can be resolved in the receiving player's language.
+- Oversized legacy notification messages retain their identifiers while dropping display-name fallbacks, or stop safely if they still exceed the message limit.
+- Item-data updates refresh only the affected panels and tracked crafts, reducing unnecessary work.]]

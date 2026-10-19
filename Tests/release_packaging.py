@@ -6,6 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "Tools"))
 from release_changelog import render
+from package import build
 
 with tempfile.TemporaryDirectory() as directory:
     root = Path(directory)
@@ -24,7 +25,19 @@ with tempfile.TemporaryDirectory() as directory:
     else:
         raise AssertionError("Empty release notes must stop publishing")
 
+# Invalid release labels must fail before creating an artifact.
+with tempfile.TemporaryDirectory() as directory:
+    for version in ("", "dirty", "2.2.0\ninvalid", "2.2"):
+        try:
+            build("forever", Path(directory), version=version)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f"Accepted invalid release version: {version!r}")
+    assert not list(Path(directory).iterdir())
+
 notes = render()
+assert notes.count("[v2.2.0]") == 2, "Both flavor histories must describe release 2.2.0"
 assert "## Retail" in notes and "## Forever" in notes
 workflow = (ROOT / ".github/workflows/release.yml").read_text()
 assert workflow.index("python3 Tests/run.py") < workflow.index("python3 Tools/release_changelog.py") < workflow.index("uses: BigWigsMods/packager")

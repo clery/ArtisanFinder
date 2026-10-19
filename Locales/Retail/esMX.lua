@@ -123,3 +123,8 @@ L.CUSTOMER_SIDE_PREVIEW = "Vista previa de cliente"
 L.CUSTOMER_SIDE_PREVIEW_EMPTY = "Aún no hay datos visibles para el cliente guardados en esta fila."
 L.CUSTOMER_SIDE_PREVIEW_SCANNING = "Se está escaneando esta fabricación. La vista previa de cliente se actualizará al terminar."
 L.TUTORIAL_CRAFTER_PREVIEW = "Pasa el cursor sobre el icono de vista previa de cliente para ver lo que verán los clientes para el objeto seleccionado, incluidos valores específicos del objeto combinados con los predeterminados de la profesión."
+
+L.CHANGELOG_ENTRY_2_2_0 = [[### Corregido
+- Las notificaciones de pedidos personales ahora incluyen identificadores de receta y profesión para mostrar los nombres de objetos y profesiones en el idioma del destinatario.
+- Los mensajes antiguos demasiado grandes conservan sus identificadores y omiten los nombres alternativos, o se cancelan de forma segura si aún superan el límite del mensaje.
+- Las actualizaciones de datos de objetos solo actualizan los paneles y las fabricaciones seguidas afectados, reduciendo el trabajo innecesario.]]

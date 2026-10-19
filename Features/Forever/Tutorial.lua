@@ -73,6 +73,7 @@ function AF:BuildDiscoveryHelpPlateInfo()
     return #info>0 and info or nil
 end
 function AF:ShowDiscoveryTutorial(initial)
+    if self.customerFrame and self.customerFrame.directoryTab=="agreements" then return end
     if not H.EnsureHelpPlate() or not self.customerFrame or not self.customerTutorialButton then return end
     if H.IsActiveHelpPlateShowing("discovery") then self:EndForeverTutorial() return end
     self:BeginForeverTutorial("discovery",self:BuildDiscoveryHelpPlateInfo(),self.customerTutorialButton,initial)

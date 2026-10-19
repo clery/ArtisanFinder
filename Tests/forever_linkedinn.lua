@@ -105,3 +105,11 @@ if arg and arg[1] then
     assert(AF:DecodeLinkedInnProfessions(encoded)[333].recipes[2]==1005,"ArtisanFinder accepts upstream encoder packet")
 end
 print("PASS Linked Inn protocol interoperability, chunking, source filters, recipes, links, expiry, throttling and coexistence")
+
+AF.IsAvailable=function() return true end
+AF.GetProfessionName=function() return "Enchantement" end
+local translatedPayload=AF:BuildLinkedInnAdvertisement()
+assert(translatedPayload==payload,"Linked Inn requires fixed English profession tokens regardless of client locale")
+local translated=assert(AF:DecodeLinkedInnProfessions(incoming))
+assert(translated[333].link:find("[Enchantement]",1,true) and translated[333].recipes[2]==1005,"Linked Inn tokens become numeric profession IDs and local link labels")
+print("PASS Linked Inn fixed protocol tokens remain locale independent")

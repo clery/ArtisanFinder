@@ -14,7 +14,12 @@ ArtisanFinder helps players find available crafters directly from the Crafting O
 * Discover crafters through ArtisanFinder, guild professions, Trade Chat, Linked Inn, CraftBoard and Release Gaming – Find Crafts. Other addons' data does not imply a confirmed price or current availability.
 * Track an item's required materials in the quest objectives and search missing materials with Auctionator at the auction house.
 
-Forever has no crafting-order panel, customer quality preview, material-quality selection or order notifications.
+* Request a craft from discovery and negotiate private agreements with addon-enabled artisans. Browse incoming/outgoing agreements, review the customer's materials saved at acceptance, and confirm completion together.
+* Receive agreement notifications and unread badges without opening a window. Track each accepted agreement separately.
+
+![ArtisanFinder crafting agreement on WoW Forever](Images/ForeverCraftAgreement.png)
+
+Forever has no Blizzard crafting-order panel, customer quality preview or material-quality selection. Private agreements require a compatible ArtisanFinder version on both clients and do not craft, trade or pay automatically.
 
 ## Features
 
@@ -97,6 +102,7 @@ ArtisanFinder includes localization support for English, French, German, Europea
 ## Useful Commands
 
 *   `/af`: shows help on Retail; opens discovery on Forever. Use `/af help` for commands.
+*   `/af agreements`: opens private crafting agreements on Forever.
 *   `/af scan`: force a fresh scan of the currently open profession.
 *   `/af auto`: show current automatic availability state.
 *   `/af auto on`: enable automatic availability in trade-chat areas.

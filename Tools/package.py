@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Build either client flavor from this same checkout, without publishing."""
 import argparse
+import re
 import subprocess
 from pathlib import Path
 import xml.etree.ElementTree as ET
@@ -34,7 +35,9 @@ def runtime_files(manifest):
     return files
 
 
-def build(flavor, output):
+def build(flavor, output, version=None):
+    if version is not None and not re.fullmatch(r"v?\d+\.\d+\.\d+(?:[-.][A-Za-z0-9]+)*", version):
+        raise ValueError("Version must be a release version, for example 2.2.0")
     manifest = ROOT / MANIFESTS[flavor]
     files = runtime_files(manifest)
     for directory in ("Assets",):
@@ -51,7 +54,7 @@ def build(flavor, output):
     output.mkdir(parents=True, exist_ok=True)
     archive = output / f"ArtisanFinder-{flavor}.zip"
     with ZipFile(archive, "w", compression=ZIP_DEFLATED) as package:
-        version = subprocess.run(
+        version = version or subprocess.run(
             ["git", "describe", "--tags", "--always", "--dirty"], cwd=ROOT,
             capture_output=True, text=True, check=True,
         ).stdout.strip()
@@ -67,7 +70,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--flavor", choices=("retail", "forever", "all"), default="all")
     parser.add_argument("--output", type=Path, default=ROOT / ".release")
+    parser.add_argument("--version", help="Explicit version for local release preparation; defaults to git describe")
     args = parser.parse_args()
     flavors = MANIFESTS if args.flavor == "all" else (args.flavor,)
     for flavor in flavors:
-        print(build(flavor, args.output))
+        print(build(flavor, args.output, args.version))

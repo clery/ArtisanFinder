@@ -123,3 +123,8 @@ L.CUSTOMER_SIDE_PREVIEW = "Kundenvorschau"
 L.CUSTOMER_SIDE_PREVIEW_EMPTY = "Für diese Zeile sind noch keine kundensichtbaren Daten gespeichert."
 L.CUSTOMER_SIDE_PREVIEW_SCANNING = "Diese Herstellung wird gescannt. Die Kundenvorschau wird nach Abschluss des Scans aktualisiert."
 L.TUTORIAL_CRAFTER_PREVIEW = "Fahre über das Kundenvorschau-Symbol, um zu sehen, was Kunden für den ausgewählten Gegenstand sehen, einschließlich gegenstandsspezifischer Werte zusammen mit Berufsstandards."
+
+L.CHANGELOG_ENTRY_2_2_0 = [[### Behoben
+- Benachrichtigungen zu persönlichen Aufträgen enthalten jetzt Rezept- und Berufskennungen, damit Gegenstands- und Berufsnamen in der Sprache des Empfängers angezeigt werden können.
+- Zu große ältere Benachrichtigungen behalten ihre Kennungen und verzichten auf Ersatznamen. Überschreiten sie weiterhin das Nachrichtenlimit, wird der Versand sicher abgebrochen.
+- Aktualisierte Gegenstandsdaten erneuern nur die betroffenen Fenster und verfolgten Herstellungsvorgänge und vermeiden so unnötige Verarbeitung.]]

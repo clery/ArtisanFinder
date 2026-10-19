@@ -72,3 +72,109 @@ L.FOREVER_TUTORIAL_PAGES = "Use as setas para mudar de página. Desloque a tabel
 L.FOREVER_TUTORIAL_RESET = "Tutoriais repostos. Abra a lista ou uma profissão para ver o guia. Os ícones de informação reabrem sempre a ajuda."
 
 L.FOREVER_TUTORIAL_END_HINT = "Clique novamente neste ícone de informação para terminar o tutorial."
+
+-- Private crafting agreements
+L.AGREEMENT_TITLE = "Acordos de criação"
+L.AGREEMENT_TOAST_TITLE = "Acordo de criação"
+L.AGREEMENT_REQUEST = "Solicitar esta criação"
+L.AGREEMENT_SLASH_HELP = "/af agreements - abrir acordos privados de criação"
+L.AGREEMENT_INCOMING = "Recebidos"
+L.AGREEMENT_OUTGOING = "Enviados"
+L.AGREEMENT_DRAFT = "Rascunho não enviado"
+L.AGREEMENT_PENDING = "Pendente"
+L.AGREEMENT_COUNTEROFFERED = "Contraproposta"
+L.AGREEMENT_ACCEPTED = "Aceite"
+L.AGREEMENT_COMPLETED = "Concluído"
+L.AGREEMENT_DECLINED = "Recusado"
+L.AGREEMENT_CANCELLED = "Cancelado"
+L.AGREEMENT_EXPIRED = "Expirado"
+L.AGREEMENT_AWAITING_CONFIRMATION = "Aguardando confirmação de conclusão"
+L.AGREEMENT_WAITING_DELIVERY = "Aguardando confirmação de entrega"
+L.AGREEMENT_CONTACT = "Contacto: %s"
+L.AGREEMENT_CRAFTING_CHARACTER = "Personagem artesão: %s"
+L.AGREEMENT_QUANTITY = "Criações"
+L.AGREEMENT_TOTAL_COMMISSION = "Comissão total (vazio = não especificada)"
+L.AGREEMENT_MESSAGE = "Mensagem opcional"
+L.AGREEMENT_MATERIALS = "Materiais · possuídos / necessários · faltam"
+L.AGREEMENT_MATERIAL_UNKNOWN = "? / %d · faltantes desconhecidos"
+L.AGREEMENT_MATERIAL_LINE = "%s · %d / %d · faltam %d"
+L.AGREEMENT_MORE_MATERIALS = "+ %d materiais (passe o cursor para ver todos)"
+L.AGREEMENT_OUTPUT = "Resultado: %d–%d itens"
+L.AGREEMENT_DRAFT_HELP = "Um acordo registra apenas intenções. Criação, troca e pagamento continuam manuais. Comissão zero significa grátis."
+L.AGREEMENT_UNSUPPORTED = "Compatibilidade não confirmada. Enviar guarda um rascunho não enviado; pode sussurrar ao artesão."
+L.AGREEMENT_UNKNOWN_CRAFT = "Criação desconhecida"
+L.AGREEMENT_EMPTY = "Nenhum acordo nesta lista."
+L.AGREEMENT_LIST_COUNT = "%d acordos · desloque para navegar"
+L.AGREEMENT_NOTIFICATION = "Acordo de criação atualizado: %s"
+L.AGREEMENT_QUANTITY_ERROR = "Informe entre 1 e 999 criações."
+L.AGREEMENT_PRICE_ERROR = "Informe uma comissão total válida dentro do limite permitido."
+L.AGREEMENT_ACTION_ERROR = "Não foi possível concluir a ação. Verifique o acordo e tente novamente."
+L.AGREEMENT_RESTRICTED = "Não é possível enviar enquanto as mensagens de addons estiverem restritas. O rascunho foi guardado; tente novamente após sair desta atividade."
+L.AGREEMENT_CAPACITY_ERROR = "Já tem 50 acordos de saída ativos. Conclua ou cancele um antes de enviar outro."
+L.AGREEMENT_INVALID_ERROR = "O rascunho contém dados de fabrico ou texto inválidos. Use uma receita conhecida, outro destinatário e uma mensagem de até 256 caracteres sem ligações."
+L.AGREEMENT_SCHEMA_ERROR = "Estes acordos foram guardados por uma versão mais recente. Atualize o ArtisanFinder antes de enviar."
+L.AGREEMENT_MATERIALS_ERROR = "Os materiais desta criação não estão disponíveis."
+L.AGREEMENT_SEND = "Enviar solicitação"
+L.AGREEMENT_ACCEPT = "Aceitar estes termos"
+L.AGREEMENT_DECLINE = "Recusar acordo"
+L.AGREEMENT_COUNTER = "Enviar contraproposta com esta comissão total e mensagem"
+L.AGREEMENT_CANCEL = "Cancelar acordo"
+L.AGREEMENT_COMPLETE = "Declarar ou confirmar conclusão"
+L.AGREEMENT_TRACK = "Acompanhar materiais necessários"
+L.AGREEMENT_RETRY = "Tentar entrega novamente e sincronizar o estado atual"
+L.AGREEMENT_WHISPER = "Sussurrar ao contacto"
+L.AGREEMENT_IGNORE = "Ignorar futuras solicitações deste jogador"
+L.AGREEMENT_DELETE = "Eliminar este registo local"
+L.AGREEMENT_IGNORED = "Remetentes ignorados"
+L.AGREEMENT_NO_IGNORED = "Nenhum jogador ignorado."
+L.AGREEMENT_UNIGNORE = "Permitir solicitações de %s"
+L.AGREEMENT_DELIVERY_FAILED = "Falha na entrega — tente novamente"
+
+-- Labeled agreement actions
+L.AGREEMENT_BUTTON_SEND = "Enviar pedido"
+L.AGREEMENT_BUTTON_ACCEPT = "Aceitar condições"
+L.AGREEMENT_BUTTON_DECLINE = "Recusar"
+L.AGREEMENT_BUTTON_COUNTER = "Contraproposta"
+L.AGREEMENT_BUTTON_CANCEL = "Cancelar acordo"
+L.AGREEMENT_BUTTON_COMPLETE = "Declarar conclusão"
+L.AGREEMENT_BUTTON_TRACK = "Seguir materiais"
+L.AGREEMENT_BUTTON_RETRY = "Reenviar"
+L.AGREEMENT_BUTTON_WHISPER = "Sussurrar"
+L.AGREEMENT_BUTTON_IGNORE = "Ignorar jogador"
+L.AGREEMENT_BUTTON_DELETE = "Eliminar registo"
+L.AGREEMENT_BUTTON_IGNORED = "Jogadores ignorados"
+L.AGREEMENT_BUTTON_PREVIOUS = "Anterior"
+L.AGREEMENT_BUTTON_NEXT = "Seguinte"
+L.AGREEMENT_BUTTON_CONFIRM = "Confirmar conclusão"
+
+L.FOREVER_COMPLETED_AGREEMENTS = "Acordos concluídos"
+L.FOREVER_COMPLETED_COUNTS = "%d concluídos · %d contigo"
+L.FOREVER_COMPLETED_PERSONAL = "%d contigo"
+L.FOREVER_COMPLETED_AGREEMENTS_HELP = "Total comunicado pelo artesão para as suas personagens. «Contigo» conta acordos com as tuas personagens. Ambos devem confirmar. O histórico eliminado anteriormente não pode ser recuperado."
+
+L.AGREEMENT_TAB = "Acordos"
+
+L.CHANGELOG_ENTRY_FOREVER_2_1_4 = [[### Adicionado
+- Encontra artesãos num diretório independente com pesquisa, favoritos e ligações de profissão.
+- Gere comissões, notas e disponibilidade de profissões e receitas na janela de fabrico.
+- Anuncia as profissões analisadas dos teus personagens e importa ou exporta perfis de artesãos.
+- Identifica artesãos próximos através dos ícones de profissão sobre jogadores amigáveis.]]
+
+L.CHANGELOG_ENTRY_FOREVER_2_1_5 = [[### Adicionado
+- Encontra artesãos pelo nome do artesão, profissão ou objeto, incluindo personagens alternativos associados. Pesquisa com uma ligação de objeto ou arrasta um objeto para a pesquisa.
+- Descobre artesãos de Linked Inn, CraftBoard e Release Gaming – Find Crafts, além de ArtisanFinder, membros da guilda e ofertas do chat de Comércio.
+- Acompanha os materiais de um fabrico nos objetivos de missão e procura os materiais em falta com Auctionator.
+
+### Alterado
+- Consulta um diretório expansível de artesãos com níveis de profissão, receitas conhecidas, comissões e notas. Filtra e ordena resultados, mantém os favoritos primeiro e abre ligações de profissão ou sussurra diretamente aos artesãos.]]
+
+L.CHANGELOG_ENTRY_FOREVER_2_2_0 = [[### Adicionado
+- Combina acordos privados de fabrico diretamente na pesquisa: solicita um fabrico, negoceia quantidades e comissão, aceita ou recusa e confirma a conclusão com a outra pessoa.
+- Consulta acordos recebidos e enviados num separador dedicado, com indicadores de não lidos, notificações, estado de entrega e controlos para tentar novamente.
+- Vê o total de acordos concluídos na pesquisa, com os teus próprios acordos concluídos apresentados separadamente.
+- Acompanha acordos aceites separadamente no acompanhamento de objetivos e procura materiais em falta com Auctionator.
+
+### Alterado
+- Os acordos usam uma página de pergaminho de tamanho fixo com cartões de objetos como os das missões, indicadores claros de materiais em falta e um carimbo de conclusão.
+- As quantidades de materiais vêm do cliente e são guardadas quando o acordo é aceite. Reabrir um acordo aceite não solicita nem altera essas quantidades; os dados indisponíveis permanecem desconhecidos.
+- Os acordos privados exigem que ambos os jogadores usem uma versão compatível do ArtisanFinder. Não fabricam, trocam nem transferem ouro automaticamente.]]

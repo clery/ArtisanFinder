@@ -49,12 +49,8 @@ function AF:GetForeverKnownCrafts(name, professionID, build)
         local copy={} for field,value in pairs(entry) do copy[field]=value end
         copy.name,copy.target,copy.professionID=name,name,professionID
         copy.itemID,copy.recipeID=itemID,recipeID
-        local title=copy.itemName or copy.recipeName
-        if not title and itemID>0 then title=self:GetDisplayItemName(itemID) end
-        if not title and recipeID and C_Spell and C_Spell.GetSpellName then
-            local ok,value=pcall(C_Spell.GetSpellName,recipeID)
-            if ok and not self:IsSecretValue(value) then title=value end
-        end
+        -- IDs cross locales; remote labels are only a fallback while local data loads.
+        local title=self:GetDisplayItemName(itemID,copy.itemName or copy.recipeName or copy.craftName)
         copy.craftName=title or self:Text("FOREVER_RECIPE_ID",recipeID or itemID)
         crafts[#crafts+1]=copy seen[key]=copy
     end
@@ -159,7 +155,7 @@ function AF:BuildForeverExpandedRows(groups,first,last,query,build)
                     rows[#rows+1]={kind="profession",group=job,key=key,expanded=self.directoryExpandedProfessions[key],professionID=id}
                     if self.directoryExpandedProfessions[key] then
                         for _,craft in ipairs(crafts) do
-                            rows[#rows+1]={kind="craft",group={name=group.name,entry=craft,offers={craft},professions={[id]=true},source=group.source,updatedAt=craft.updatedAt or group.updatedAt},label=craft.craftName}
+                            rows[#rows+1]={kind="craft",artisanGroup=group,group={name=group.name,entry=craft,offers={craft},professions={[id]=true},source=group.source,updatedAt=craft.updatedAt or group.updatedAt},label=craft.craftName}
                         end
                         if #crafts==0 then rows[#rows+1]={kind="empty",group=job,label=self:Text("FOREVER_NO_KNOWN_CRAFTS")} end
                     end
@@ -181,7 +177,7 @@ end
 
 function AF:GetForeverCraftPresentation(entry)
     local itemID,recipeID=tonumber(entry.itemID),tonumber(entry.recipeID)
-    local name=entry.craftName or entry.itemName or entry.recipeName or "?"
+    local name=self:GetDisplayItemName(itemID or (recipeID and -recipeID),entry.craftName or entry.itemName or entry.recipeName or "?")
     local link,texture,payload
     if itemID and itemID>0 then
         payload="item:"..itemID
